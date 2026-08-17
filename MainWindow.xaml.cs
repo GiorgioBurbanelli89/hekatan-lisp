@@ -207,7 +207,8 @@ namespace HekatanLisp
             if (LooksLikeLisp(text))
             {
                 if (!Balanced(text)) { Output.Text = "…  (completa el código: paréntesis sin cerrar)"; return; }
-                Output.Text = RunLispShowingValue(text);
+                if (IsLispProgram(text)) Output.Text = RunLispClean(text);   // defun/loop/let... → ejecutar
+                else EvalOneLispExpr(text);                                   // una expresión → valor o simplificado
                 return;
             }
 
@@ -216,7 +217,7 @@ namespace HekatanLisp
                 string exec;
                 try { exec = MatlabToLisp.Translate(text).Executable; }
                 catch (Exception ex) { Output.Text = "…  (no se pudo traducir: " + ex.Message + ")"; return; }
-                Output.Text = RunLispShowingValue2(exec);   // ya trae (format ...), no re-envolver
+                Output.Text = RunLispClean(exec);
                 return;
             }
 
@@ -234,17 +235,55 @@ namespace HekatanLisp
                 @"\(\s*((defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\b|[-+*/=<>])");
         }
 
-        private static string RunLispShowingValue2(string code)
-            => LispEngine.RunScript("(setf *print-case* :downcase)\n" + code).TrimEnd();
+        /// <summary>¿El LISP es un PROGRAMA (defun/loop/let/…) y no una simple expresión?</summary>
+        private static bool IsLispProgram(string t)
+            => System.Text.RegularExpressions.Regex.IsMatch(t,
+                @"\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\b");
 
-        /// <summary>Ejecuta LISP; si no imprimió nada pero devuelve un valor, lo muestra.</summary>
-        private static string RunLispShowingValue(string lisp)
+        /// <summary>Ejecuta un PROGRAMA LISP; si no imprime nada, muestra su valor; si SBCL
+        /// falla (p.ej. variable sin valor), muestra un mensaje LIMPIO, no el backtrace.</summary>
+        private static string RunLispClean(string code)
         {
             const string pre = "(setf *print-case* :downcase)\n";
-            var res = LispEngine.RunScript(pre + lisp);
+            var res = LispEngine.RunScript(pre + code);
             if (string.IsNullOrWhiteSpace(res))
-                res = LispEngine.RunScript(pre + "(format t \"~a~%\" (progn\n" + lisp + "))");
-            return res.TrimEnd();
+                res = LispEngine.RunScript(pre + "(format t \"~a~%\" (progn\n" + code + "))");
+            return CleanSbcl(res).TrimEnd();
+        }
+
+        /// <summary>Convierte el vólcado de error de SBCL en un mensaje corto y claro.</summary>
+        private static string CleanSbcl(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            var m = System.Text.RegularExpressions.Regex.Match(s, @"variable (\w+) is unbound",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success)
+                return "⚠ la variable «" + m.Groups[1].Value.ToLower() +
+                       "» no tiene valor. Asígnale un número (ej.: " + m.Groups[1].Value.ToLower() + " = 2).";
+            int bt = s.IndexOf("Backtrace for:", StringComparison.Ordinal);
+            if (bt >= 0)
+            {
+                foreach (var l in s.Substring(0, bt).Replace("\r", "").Split('\n'))
+                {
+                    var t = l.Trim();
+                    if (t.Length > 0 && !t.StartsWith("Unhandled") && !t.Contains("thread"))
+                        return "⚠ " + t;
+                }
+                return "⚠ error en el código LISP.";
+            }
+            return s;
+        }
+
+        /// <summary>Una expresión LISP (aritmética): su VALOR si es numérica, o su forma
+        /// SIMPLIFICADA (matemática) si tiene incógnitas. Nunca revienta.</summary>
+        private void EvalOneLispExpr(string lisp)
+        {
+            var r = LispEngine.EvalOrSimplify(new List<string> { lisp.Trim() });
+            var v = r.Count > 0 ? r[0].Trim() : "";
+            if (v.Length == 0 || v == "?") { Output.Text = lisp.Trim(); return; }
+            if (IsNumber(v)) { Output.Text = v; return; }
+            try { Output.Text = LispConverter.ToLab(LispConverter.ParseLisp(v), 0); }
+            catch { Output.Text = v; }
         }
 
         /// <summary>Cada línea de matemática -> su forma LISP; y "= valor" si SBCL puede calcularlo
@@ -327,26 +366,6 @@ namespace HekatanLisp
             else Convert();
         }
 
-        /// <summary>Botón "⇒ a LISP": pasa la matemática (loops, funciones, expresiones) a su
-        /// forma LISP en el editor y la ejecuta (modo Calcular). Es el "cambiar a forma LISP".</summary>
-        private void OnToLisp(object s, RoutedEventArgs e)
-        {
-            var text = Editor.Text;
-            if (string.IsNullOrWhiteSpace(text)) return;
-            string lisp;
-            try
-            {
-                lisp = MatlabToLisp.IsImperative(text)
-                     ? MatlabToLisp.Translate(text).Lisp
-                     : ReconvertLines(text, toLisp: true);
-            }
-            catch { return; }
-            Editor.Text = lisp;
-            _syntaxLisp = true;
-            SyntaxToggle.Content = "escribo: LISP";
-            SetMode(5, false);   // muestra el LISP a la izquierda y el resultado (SBCL) a la derecha
-        }
-
         private void MenuEjemploLoop(object s, RoutedEventArgs e)
         {
             _syntaxLisp = false;
@@ -408,9 +427,6 @@ namespace HekatanLisp
                     SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
                     Convert();
                     return "{\"ok\":true,\"lisp\":" + (_syntaxLisp ? "true" : "false") + "}";
-                case "tolisp":   // pulsa el botón "⇒ a LISP"
-                    OnToLisp(null, null);
-                    return System.Text.Json.JsonSerializer.Serialize(new { input = Editor.Text, output = Output.Text });
                 case "state":
                     return System.Text.Json.JsonSerializer.Serialize(new { mode = _mode, lisp = _syntaxLisp });
                 case "hashl":   // ¿está cargado el resaltado AvalonEdit?

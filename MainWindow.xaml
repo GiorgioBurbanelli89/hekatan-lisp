@@ -117,9 +117,6 @@
                 <Button x:Name="SyntaxToggle" Style="{StaticResource SymBtn}" MinWidth="150"
                         Foreground="#5DCAA5" Content="escribo: LISP" Click="OnToggleSyntax"
                         ToolTip="Cambia entre escribir/insertar como LISP o como matemática"/>
-                <Button x:Name="ToLispBtn" Style="{StaticResource SymBtn}" MinWidth="96"
-                        Foreground="#B0AAED" Content="⇒ a LISP" Click="OnToLisp"
-                        ToolTip="Pasa la matemática (loops, funciones, expresiones) a su forma LISP y la ejecuta"/>
                 <Border Width="12"/>
                 <Button Style="{StaticResource SymBtn}" Content="(" Click="OnInsert" Tag="("/>
                 <Button Style="{StaticResource SymBtn}" Content=")" Click="OnInsert" Tag=")"/>

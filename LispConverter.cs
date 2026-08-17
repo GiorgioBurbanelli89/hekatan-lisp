@@ -184,11 +184,17 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             {
                 var line = raw.Trim();
                 if (line.Length == 0) continue;
+                // Prefijo de RESULTADO: "= …" o "→ …" (para mostrar el cálculo debajo).
+                string prefix = "";
+                var expr = line;
+                if (line.StartsWith("= ") || line.StartsWith("→ ")) { prefix = line.Substring(0, 2); expr = line.Substring(2).Trim(); }
                 string html;
                 try
                 {
-                    var tree = fromLisp ? ParseLisp(line) : ParseMath(line);
+                    var tree = fromLisp ? ParseLisp(expr) : ParseMath(expr);
                     html = "<span class=\"m-expr\">" + ToHtml(tree) + "</span>";
+                    if (prefix.Length > 0)
+                        html = "<span class=\"m-op\">" + System.Net.WebUtility.HtmlEncode(prefix) + "</span>" + html;
                 }
                 catch { html = System.Net.WebUtility.HtmlEncode(line); }   // mensajes/resultados: texto plano
                 body.Append("<div class=\"ws-eq\">").Append(html).Append("</div>");

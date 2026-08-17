@@ -52,6 +52,8 @@ namespace HekatanLisp
             _ctl = ValueAfter(args, "--ctl");
             var v = ValueAfter(args, "--view");
             if (v is "render" or "lisp" or "math") _view = v;
+            var o = ValueAfter(args, "--op");
+            if (o is "auto" or "simplify" or "expand" or "deriv") _op = o;
 
             var profile = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
@@ -128,7 +130,11 @@ namespace HekatanLisp
             }
             var sb = new StringBuilder();
             foreach (var f in forms)
-                sb.AppendLine(_view == "lisp" ? f : ToMathView(f));
+            {
+                if (_view == "lisp") { sb.AppendLine(f); continue; }   // LISP tal cual (incluye "= …")
+                if (f.StartsWith("= ")) sb.AppendLine("= " + ToMathView(f.Substring(2)));
+                else sb.AppendLine(ToMathView(f));
+            }
             Output.Text = sb.ToString().TrimEnd();
         }
 
@@ -170,16 +176,20 @@ namespace HekatanLisp
                 if (formOf[i] != null) { forms.Add(formOf[i]); idx.Add(i); }
             }
             var results = LispEngine.EvalOp(forms, _op);
-            var outForm = new string[lines.Length];
-            for (int k = 0; k < idx.Count; k++)
+            var resOf = new string[lines.Length];
+            for (int k = 0; k < idx.Count; k++) resOf[idx[k]] = k < results.Count ? results[k].Trim() : "";
+
+            // Muestra el CÁLCULO: la ENTRADA y, debajo, "= RESULTADO" (solo si cambió).
+            var display = new List<string>();
+            for (int i = 0; i < lines.Length; i++)
             {
-                var r = k < results.Count ? results[k].Trim() : "";
-                outForm[idx[k]] = (r.Length == 0 || r.Equals("nil", StringComparison.OrdinalIgnoreCase))
-                                  ? formOf[idx[k]] : r;
+                if (formOf[i] == null) { display.Add(""); continue; }
+                display.Add(formOf[i]);
+                var r = resOf[i] ?? "";
+                if (r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && r != formOf[i])
+                    display.Add("= " + r);
             }
-            var res = new List<string>();
-            for (int i = 0; i < lines.Length; i++) res.Add(outForm[i] ?? "");
-            return res;
+            return display;
         }
 
         /// <summary>La línea (matemática o LISP) → su forma LISP; null si está vacía o no parsea.</summary>
@@ -413,6 +423,27 @@ namespace HekatanLisp
             else { Editor.Document.Insert(caret, tag); Editor.CaretOffset = caret + tag.Length; }
             Editor.Focus();
         }
+
+        private void MenuReglas(object s, RoutedEventArgs e) =>
+            MessageBox.Show(
+                "REGLAS DEL LENGUAJE LISP (para tus comentarios)\n\n" +
+                "1. TODO es una lista:  (operador  arg1  arg2)\n" +
+                "     (+ 2 3) = 2+3 = 5      (* (+ 1 2) 3) = 9\n" +
+                "2. Notación PREFIJA: el operador va PRIMERO (no 2 + 3, sino (+ 2 3)).\n" +
+                "3. Los PARÉNTESIS mandan: no hay precedencia ambigua.\n" +
+                "4. CÓDIGO = DATOS (homoiconicidad): '(+ 2 3) es una LISTA que puedes tocar.\n" +
+                "5. quote (')  CONGELA:  'x = el símbolo x sin evaluar.\n" +
+                "6. eval  ejecuta datos como código:  (eval '(+ 2 3)) = 5.\n" +
+                "7. REPL = Read (lee texto→lista) · Eval (calcula) · Print (muestra).\n" +
+                "8. MOSTRAR:  (print x)   (format t \"~a~%\" x)   (write x)\n" +
+                "9. Definir función:  (defun f (x)  cuerpo )\n" +
+                "10. Variables locales:  (let ((x 1) (y 2))  ... )\n" +
+                "11. Listas:  car = primero · cdr = resto · cons = agrega.\n" +
+                "12. La RECURSIÓN es la forma natural de iterar (además de loop).\n" +
+                "13. Los símbolos NO distinguen mayúsculas por defecto:  x = X.\n\n" +
+                "Por eso LISP es ideal para lo simbólico: la fórmula ES una lista y las\n" +
+                "operaciones (derivar, simplificar) sólo recorren y reescriben esa lista.",
+                "Reglas de LISP");
 
         private void MenuNuevo(object s, RoutedEventArgs e) => Editor.Text = "";
         private void MenuEjemplo(object s, RoutedEventArgs e) => Editor.Text = _syntaxLisp ? EJ_LISP : EJ_MATH;

@@ -91,6 +91,7 @@
                 <MenuItem Header="cos( )"         Click="OnInsert" Tag="cos(§§)"/>
             </MenuItem>
             <MenuItem Header="A_yuda" Foreground="#E7EDF3">
+                <MenuItem Header="Reglas de LISP (para comentar)" Click="MenuReglas"/>
                 <MenuItem Header="Acerca de Hekatan LISP" Click="MenuAbout"/>
             </MenuItem>
         </Menu>

@@ -114,7 +114,18 @@
             <WrapPanel>
                 <Button x:Name="SyntaxToggle" Style="{StaticResource SymBtn}" MinWidth="150"
                         Foreground="#5DCAA5" Content="escribo: LISP" Click="OnToggleSyntax"
-                        ToolTip="Cambia entre escribir/insertar como LISP o como matemática"/>
+                        ToolTip="Convierte la ventana izquierda a LISP o a matemática"/>
+                <Border Width="12"/>
+                <TextBlock Text="operar:" Foreground="#8B98A6" VerticalAlignment="Center"
+                           FontFamily="Consolas" FontSize="12" Margin="0,0,4,0"/>
+                <Button x:Name="OpAuto" Style="{StaticResource SymBtn}" MinWidth="62" Content="tal cual"
+                        Click="OnOpAuto" ToolTip="Muestra la expresión tal cual (o su valor si es número)"/>
+                <Button x:Name="OpSimplify" Style="{StaticResource SymBtn}" MinWidth="82" Content="simplificar"
+                        Click="OnOpSimplify" ToolTip="Junta términos semejantes: x²+x² → 2·x²"/>
+                <Button x:Name="OpExpand" Style="{StaticResource SymBtn}" MinWidth="72" Content="expandir"
+                        Click="OnOpExpand" ToolTip="Distribuye: (x+1)² → x²+2·x+1"/>
+                <Button x:Name="OpDeriv" Style="{StaticResource SymBtn}" MinWidth="62" Content="derivar"
+                        Click="OnOpDeriv" ToolTip="Derivada respecto a x"/>
                 <Border Width="12"/>
                 <Button Style="{StaticResource SymBtn}" Content="(" Click="OnInsert" Tag="("/>
                 <Button Style="{StaticResource SymBtn}" Content=")" Click="OnInsert" Tag=")"/>

@@ -36,6 +36,7 @@
           ((eq op '*) (cond ((or (eql a 0) (eql b 0)) 0)
                             ((eql a 1) b) ((eql b 1) a)
                             ((and (numberp a) (numberp b)) (* a b))
+                            ((equal a b) (list 'expt a 2))   ; x*x -> x^2
                             (t (list '* a b))))
           ((eq op '/) (cond ((eql a 0) 0) ((eql b 1) a)
                             ((and (numberp a) (numberp b)) (/ a b))  ; 6/4 -> 3/2 (racional)
@@ -96,3 +97,29 @@
 (defun simplify (e)
   "Simplifica de verdad: reglas obvias (simp*) + combina terminos semejantes."
   (collect-in (simp* e)))
+
+;;;; --- expandir: distribuye productos y potencias  (x+1)^2 -> x^2 + 2*x + 1 ---
+
+(defun expand-mul (a b)
+  "Multiplica a*b distribuyendo si alguno es suma/resta."
+  (cond
+    ((and (consp a) (member (car a) '(+ -)))
+     (list (car a) (expand-mul (second a) b) (expand-mul (third a) b)))
+    ((and (consp b) (member (car b) '(+ -)))
+     (list (car b) (expand-mul a (second b)) (expand-mul a (third b))))
+    (t (list '* a b))))
+
+(defun expand (e)
+  "Expande productos sobre sumas y potencias enteras (polinomios)."
+  (if (atom e) e
+      (let ((op (car e)) (a (expand (second e))) (b (expand (third e))))
+        (cond
+          ((eq op '*) (expand-mul a b))
+          ((eq op 'expt)
+           (cond ((eql b 1) a)
+                 ((and (integerp b) (> b 1)) (expand (list '* a (list 'expt a (1- b)))))
+                 (t (list 'expt a b))))
+          (t (list op a b))))))
+
+(defun expand* (e) "Expande y luego simplifica." (simplify (expand e)))
+(defun derive-x (e) "Deriva respecto a x y simplifica." (simplify (deriv e 'x)))

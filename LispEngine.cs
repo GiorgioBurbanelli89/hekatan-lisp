@@ -62,17 +62,27 @@ namespace HekatanLisp
         /// Aquí es donde el usuario define SUS funciones, las llama, y se ejecutan.</summary>
         public static string RunScript(string code) => Run(code);
 
-        /// <summary>Para cada expresión LISP: si es numérica devuelve el VALOR; si es simbólica
-        /// (tiene incógnitas) devuelve la forma SIMPLIFICADA (combina términos semejantes).
-        /// Una sola llamada a SBCL. Cada línea del resultado = una expresión (o '?').</summary>
-        public static List<string> EvalOrSimplify(List<string> lispExprs)
+        /// <summary>Aplica una OPERACIÓN a cada expresión LISP y devuelve el resultado como forma LISP:
+        ///   op="auto"     → el VALOR numérico si se puede; si no, la expresión TAL CUAL (no toca).
+        ///   op="simplify" → junta términos semejantes.
+        ///   op="expand"   → distribuye productos/potencias.
+        ///   op="deriv"    → derivada respecto a x (simplificada).
+        /// Una sola llamada a SBCL. Cada línea del resultado = una expresión.</summary>
+        public static List<string> EvalOp(List<string> lispExprs, string op)
         {
+            string fn = op switch { "simplify" => "simplify", "expand" => "expand*", "deriv" => "derive-x", _ => null };
             var sb = new StringBuilder();
             sb.Append("(setf *print-case* :downcase)\n");
             sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
             foreach (var ex in lispExprs)
-                sb.Append("(format t \"~a~%\" (or (ignore-errors ").Append(ex)
-                  .Append(") (ignore-errors (simplify '").Append(ex).Append(")) '?))\n");
+            {
+                if (fn == null)   // auto: valor si evalúa a número; si no, la forma tal cual
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (let ((v ").Append(ex)
+                      .Append(")) (if (numberp v) v nil))) '").Append(ex).Append("))\n");
+                else
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (").Append(fn).Append(" '")
+                      .Append(ex).Append(")) '").Append(ex).Append("))\n");
+            }
             var res = new List<string>();
             foreach (var l in Run(sb.ToString()).Replace("\r", "").Split('\n'))
                 res.Add(l);

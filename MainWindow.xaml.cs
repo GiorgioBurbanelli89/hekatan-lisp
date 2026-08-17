@@ -27,7 +27,8 @@ namespace HekatanLisp
     {
         private readonly DispatcherTimer _debounce =
             new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
-        private string _view = "render";           // "render" | "lisp" | "math"
+        private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
+        private string _op = "auto";               // operación: "auto" | "simplify" | "expand" | "deriv"
         private string _shot, _ctl;
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
@@ -65,6 +66,7 @@ namespace HekatanLisp
             SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
             if (string.IsNullOrWhiteSpace(Editor.Text)) Editor.Text = EJ_MATH;
             SetView(_view);
+            SetOp(_op);
 
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
@@ -108,52 +110,85 @@ namespace HekatanLisp
         }
 
         // ---------- calcula el RESULTADO y lo muestra en el formato elegido ----------
+        // El resultado es SIEMPRE una forma LISP canónica (o número/mensaje); la DERECHA
+        // la muestra como render / LISP / matemática. La OPERACIÓN (auto/simplify/expand/deriv)
+        // es SEPARADA: 'auto' NO simplifica, deja la expresión tal cual (o su valor si es número).
         private bool IsRenderView => _view == "render";
 
         private void ShowResult()
         {
-            var lines = ComputeResult();
+            var forms = ComputeResult();   // formas LISP canónicas (o números/mensajes)
             Output.Visibility = IsRenderView ? Visibility.Collapsed : Visibility.Visible;
             Viewer.Visibility = IsRenderView ? Visibility.Visible : Visibility.Collapsed;
 
             if (IsRenderView)
             {
-                if (_webReady) Viewer.NavigateToString(LispConverter.RenderPage(string.Join("\n", lines), false));
+                if (_webReady) Viewer.NavigateToString(LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true));
                 return;
             }
             var sb = new StringBuilder();
-            foreach (var l in lines)
-                sb.AppendLine(_view == "lisp" ? ToLispView(l) : l);
+            foreach (var f in forms)
+                sb.AppendLine(_view == "lisp" ? f : ToMathView(f));
             Output.Text = sb.ToString().TrimEnd();
         }
 
-        /// <summary>Una línea de resultado (matemática/número/mensaje) → su forma LISP.</summary>
-        private static string ToLispView(string mathLine)
+        /// <summary>Una forma LISP del resultado → matemática legible (o tal cual si no parsea).</summary>
+        private static string ToMathView(string lispForm)
         {
-            if (string.IsNullOrWhiteSpace(mathLine)) return "";
-            if (mathLine.StartsWith("⚠") || IsNumber(mathLine)) return mathLine;
-            try { return LispConverter.MathToLisp(mathLine); } catch { return mathLine; }
+            if (string.IsNullOrWhiteSpace(lispForm)) return "";
+            if (lispForm.StartsWith("⚠") || lispForm.StartsWith("…")) return lispForm;
+            try { return LispConverter.ToLab(LispConverter.ParseLisp(lispForm), 0); } catch { return lispForm; }
         }
 
-        /// <summary>El RESULTADO de lo escrito, como líneas de matemática/número/mensaje.
-        /// Autodetecta: LISP, programa (loop/función) o expresiones.</summary>
+        /// <summary>El RESULTADO como FORMAS LISP. Autodetecta programa (ejecuta) vs expresiones
+        /// (les aplica la operación elegida: auto/simplify/expand/deriv).</summary>
         private List<string> ComputeResult()
         {
             var text = Editor.Text;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
 
-            if (LooksLikeLisp(text))
+            // Programas: LISP (defun/loop/let) o matemática imperativa (for/while) → EJECUTAR.
+            if (LooksLikeLisp(text) && IsLispProgram(text))
             {
                 if (!Balanced(text)) return new List<string> { "…  (paréntesis sin cerrar)" };
-                if (IsLispProgram(text)) return new List<string> { RunLispClean(text) };
-                return new List<string> { EvalOneLispExpr(text) };
+                return new List<string> { RunLispClean(text) };
             }
-            if (MatlabToLisp.IsImperative(text))
+            if (!LooksLikeLisp(text) && MatlabToLisp.IsImperative(text))
             {
                 try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
                 catch (Exception ex) { return new List<string> { "…  (" + ex.Message + ")" }; }
             }
-            return EvalExpressions(text);
+
+            // Expresiones (matemática o LISP) → aplicar la operación elegida.
+            var lines = text.Replace("\r", "").Split('\n');
+            var formOf = new string[lines.Length];
+            var forms = new List<string>();
+            var idx = new List<int>();
+            for (int i = 0; i < lines.Length; i++)
+            {
+                formOf[i] = LispFormOfLine(lines[i]);
+                if (formOf[i] != null) { forms.Add(formOf[i]); idx.Add(i); }
+            }
+            var results = LispEngine.EvalOp(forms, _op);
+            var outForm = new string[lines.Length];
+            for (int k = 0; k < idx.Count; k++)
+            {
+                var r = k < results.Count ? results[k].Trim() : "";
+                outForm[idx[k]] = (r.Length == 0 || r.Equals("nil", StringComparison.OrdinalIgnoreCase))
+                                  ? formOf[idx[k]] : r;
+            }
+            var res = new List<string>();
+            for (int i = 0; i < lines.Length; i++) res.Add(outForm[i] ?? "");
+            return res;
+        }
+
+        /// <summary>La línea (matemática o LISP) → su forma LISP; null si está vacía o no parsea.</summary>
+        private static string LispFormOfLine(string line)
+        {
+            line = line.Trim();
+            if (line.Length == 0) return null;
+            if (LooksLikeLisp(line)) return line;             // ya es LISP
+            try { return LispConverter.MathToLisp(line); } catch { return null; }
         }
 
         // ---------- motor: expresiones y programas ----------
@@ -198,53 +233,23 @@ namespace HekatanLisp
             return s;
         }
 
-        /// <summary>Expresión LISP: su VALOR (número) o su forma SIMPLIFICADA (matemática).</summary>
-        private static string EvalOneLispExpr(string lisp)
+        // ---------- selector de OPERACIÓN (separada del formato) ----------
+        private void OnOpAuto(object s, RoutedEventArgs e) => SetOp("auto");
+        private void OnOpSimplify(object s, RoutedEventArgs e) => SetOp("simplify");
+        private void OnOpExpand(object s, RoutedEventArgs e) => SetOp("expand");
+        private void OnOpDeriv(object s, RoutedEventArgs e) => SetOp("deriv");
+
+        private void SetOp(string op)
         {
-            var r = LispEngine.EvalOrSimplify(new List<string> { lisp.Trim() });
-            var v = r.Count > 0 ? r[0].Trim() : "";
-            if (v.Length == 0 || v == "?") return lisp.Trim();
-            if (IsNumber(v)) return v;
-            try { return LispConverter.ToLab(LispConverter.ParseLisp(v), 0); } catch { return v; }
+            _op = op;
+            var on = (Color)ColorConverter.ConvertFromString("#4B42AD");
+            var off = (Color)ColorConverter.ConvertFromString("#1B1E24");
+            OpAuto.Background = new SolidColorBrush(op == "auto" ? on : off);
+            OpSimplify.Background = new SolidColorBrush(op == "simplify" ? on : off);
+            OpExpand.Background = new SolidColorBrush(op == "expand" ? on : off);
+            OpDeriv.Background = new SolidColorBrush(op == "deriv" ? on : off);
+            ShowResult();
         }
-
-        /// <summary>Expresiones matemáticas (una por línea) → el RESULTADO: el número si se puede
-        /// calcular, o la forma simplificada (que puede ser la misma si no se reduce).</summary>
-        private static List<string> EvalExpressions(string text)
-        {
-            var lines = text.Replace("\r", "").Split('\n');
-            var formOf = new string[lines.Length];
-            var forms = new List<string>();
-            var idx = new List<int>();
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var t = lines[i].Trim();
-                if (t.Length == 0) { formOf[i] = null; continue; }
-                try { formOf[i] = LispConverter.MathToLisp(t); } catch { formOf[i] = "?"; }
-                if (formOf[i] != "?") { forms.Add(formOf[i]); idx.Add(i); }
-            }
-            var results = LispEngine.EvalOrSimplify(forms);
-            var outLine = new string[lines.Length];
-            for (int k = 0; k < idx.Count; k++)
-            {
-                int i = idx[k];
-                var r = k < results.Count ? results[k].Trim() : "";
-                var mathIn = lines[i].Trim();
-                if (r.Length == 0 || r == "?") { outLine[i] = mathIn; continue; }
-                if (IsNumber(r)) { outLine[i] = r; continue; }
-                try { outLine[i] = LispConverter.ToLab(LispConverter.ParseLisp(r), 0); }
-                catch { outLine[i] = mathIn; }
-            }
-            var res = new List<string>();
-            for (int i = 0; i < lines.Length; i++)
-                res.Add(formOf[i] == null ? "" : (outLine[i] ?? mathTrim(lines[i])));
-            return res;
-        }
-
-        private static string mathTrim(string s) => s?.Trim() ?? "";
-
-        private static bool IsNumber(string s)
-            => System.Text.RegularExpressions.Regex.IsMatch(s, @"^-?\d+(/\d+)?(\.\d+)?$");
 
         private static bool Balanced(string code)
         {
@@ -253,12 +258,41 @@ namespace HekatanLisp
             return b == 0;
         }
 
-        private void OnToggleSyntax(object s, RoutedEventArgs e)
+        private void OnToggleSyntax(object s, RoutedEventArgs e) => SetSyntax(!_syntaxLisp);
+
+        /// <summary>Cambia la forma de la IZQUIERDA y CONVIERTE el contenido a esa forma
+        /// (matemática ↔ LISP). El "por qué": si eliges "escribo: LISP", la ventana izquierda
+        /// debe verse en LISP, no seguir en matemática.</summary>
+        private void SetSyntax(bool toLisp)
         {
-            _syntaxLisp = !_syntaxLisp;
-            SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
-            LblIn.Text = _syntaxLisp ? "escribes: LISP" : "escribes: matemática";
+            Editor.Text = ConvertEditor(Editor.Text, toLisp);
+            _syntaxLisp = toLisp;
+            SyntaxToggle.Content = toLisp ? "escribo: LISP" : "escribo: matemática";
+            LblIn.Text = toLisp ? "escribes: LISP" : "escribes: matemática";
             ShowResult();
+        }
+
+        private static string ConvertEditor(string text, bool toLisp)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text;
+            if (toLisp && !LooksLikeLisp(text) && MatlabToLisp.IsImperative(text))
+            {   // programa matemático (for/while) → LISP en bloque
+                try { return MatlabToLisp.Translate(text).Lisp; } catch { return text; }
+            }
+            var sb = new StringBuilder();
+            foreach (var raw in text.Replace("\r", "").Split('\n'))
+            {
+                var l = raw.Trim();
+                if (l.Length == 0) { sb.AppendLine(); continue; }
+                bool isLisp = LooksLikeLisp(l);
+                try
+                {
+                    if (toLisp) sb.AppendLine(isLisp ? l : LispConverter.MathToLisp(l));
+                    else sb.AppendLine(isLisp ? LispConverter.ToLab(LispConverter.ParseLisp(l), 0) : l);
+                }
+                catch { sb.AppendLine(l); }
+            }
+            return sb.ToString().TrimEnd();
         }
 
         private void MenuEjemploLoop(object s, RoutedEventArgs e)
@@ -301,9 +335,12 @@ namespace HekatanLisp
                     Editor.Text = doc.RootElement.GetProperty("text").GetString();
                     ShowResult();
                     return "{\"ok\":true}";
-                case "view":     // elige el formato de la derecha: render|lisp|math
+                case "view":     // formato de la derecha: render|lisp|math
                     SetView(doc.RootElement.GetProperty("name").GetString());
                     return "{\"ok\":true,\"view\":\"" + _view + "\"}";
+                case "op":       // operación: auto|simplify|expand|deriv
+                    SetOp(doc.RootElement.GetProperty("name").GetString());
+                    return "{\"ok\":true,\"op\":\"" + _op + "\"}";
                 case "getoutput":
                     if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
                     {
@@ -313,13 +350,11 @@ namespace HekatanLisp
                     return System.Text.Json.JsonSerializer.Serialize(new { output = Output.Text });
                 case "gettext":
                     return System.Text.Json.JsonSerializer.Serialize(new { input = Editor.Text });
-                case "syntax":
-                    _syntaxLisp = doc.RootElement.GetProperty("lisp").GetBoolean();
-                    SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
-                    ShowResult();
+                case "syntax":   // cambia la IZQUIERDA a LISP/matemática (convierte el contenido)
+                    SetSyntax(doc.RootElement.GetProperty("lisp").GetBoolean());
                     return "{\"ok\":true,\"lisp\":" + (_syntaxLisp ? "true" : "false") + "}";
                 case "state":
-                    return System.Text.Json.JsonSerializer.Serialize(new { view = _view, lisp = _syntaxLisp });
+                    return System.Text.Json.JsonSerializer.Serialize(new { view = _view, op = _op, lisp = _syntaxLisp });
                 case "hashl":
                     return System.Text.Json.JsonSerializer.Serialize(new { hl = Editor.SyntaxHighlighting?.Name });
                 case "quit":

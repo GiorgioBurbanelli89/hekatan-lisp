@@ -62,6 +62,23 @@ namespace HekatanLisp
         /// Aquí es donde el usuario define SUS funciones, las llama, y se ejecutan.</summary>
         public static string RunScript(string code) => Run(code);
 
+        /// <summary>Para cada expresión LISP: si es numérica devuelve el VALOR; si es simbólica
+        /// (tiene incógnitas) devuelve la forma SIMPLIFICADA (combina términos semejantes).
+        /// Una sola llamada a SBCL. Cada línea del resultado = una expresión (o '?').</summary>
+        public static List<string> EvalOrSimplify(List<string> lispExprs)
+        {
+            var sb = new StringBuilder();
+            sb.Append("(setf *print-case* :downcase)\n");
+            sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
+            foreach (var ex in lispExprs)
+                sb.Append("(format t \"~a~%\" (or (ignore-errors ").Append(ex)
+                  .Append(") (ignore-errors (simplify '").Append(ex).Append(")) '?))\n");
+            var res = new List<string>();
+            foreach (var l in Run(sb.ToString()).Replace("\r", "").Split('\n'))
+                res.Add(l);
+            return res;
+        }
+
         private static string Run(string code)
         {
             var tmp = Path.Combine(Path.GetTempPath(), $"hlisp_run_{Environment.ProcessId}.lisp");

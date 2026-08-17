@@ -252,37 +252,46 @@ namespace HekatanLisp
         private void EvalExpressions(string text)
         {
             var lines = text.Replace("\r", "").Split('\n');
-            var forms = new string[lines.Length];
-            var script = new StringBuilder("(setf *print-case* :downcase)\n");
-            foreach (var (line, i) in Enumerate(lines))
+            var formOf = new string[lines.Length];
+            var forms = new List<string>();
+            var idx = new List<int>();
+            for (int i = 0; i < lines.Length; i++)
             {
-                var t = line.Trim();
-                if (t.Length == 0) { forms[i] = null; continue; }
-                try { forms[i] = LispConverter.MathToLisp(t); }
-                catch { forms[i] = "?"; }
-                // imprime el valor si se puede evaluar; si no (incógnitas), imprime línea vacía
-                script.Append("(format t \"~a~%\" (or (ignore-errors ")
-                      .Append(forms[i] == "?" ? "nil" : forms[i]).Append(") \"\"))\n");
+                var t = lines[i].Trim();
+                if (t.Length == 0) { formOf[i] = null; continue; }
+                try { formOf[i] = LispConverter.MathToLisp(t); }
+                catch { formOf[i] = "?"; }
+                if (formOf[i] != "?") { forms.Add(formOf[i]); idx.Add(i); }
             }
-            var outp = LispEngine.RunScript(script.ToString()).Replace("\r", "").Split('\n');
+
+            var results = LispEngine.EvalOrSimplify(forms);
+            var outLine = new string[lines.Length];
+            for (int k = 0; k < idx.Count; k++)
+            {
+                int i = idx[k];
+                var r = k < results.Count ? results[k].Trim() : "";
+                var mathIn = lines[i].Trim();
+                if (r.Length == 0 || r == "?") { outLine[i] = formOf[i]; continue; }
+                if (IsNumber(r))                       // números -> el valor
+                    outLine[i] = mathIn + "   =   " + r;
+                else                                    // simbólico -> forma simplificada (matemática)
+                {
+                    string simp;
+                    try { simp = LispConverter.ToLab(LispConverter.ParseLisp(r), 0); }
+                    catch { simp = r; }
+                    outLine[i] = (simp == mathIn) ? mathIn : (mathIn + "   →   " + simp);
+                }
+            }
+
             var sb = new StringBuilder();
-            int k = 0;
-            foreach (var (line, i) in Enumerate(lines))
-            {
-                var t = line.Trim();
-                if (t.Length == 0) { sb.AppendLine(); continue; }
-                var val = k < outp.Length ? outp[k].Trim() : ""; k++;
-                if (forms[i] == "?") sb.AppendLine("…");
-                else if (val.Length > 0) sb.AppendLine(forms[i] + "   =   " + val);
-                else sb.AppendLine(forms[i]);
-            }
+            for (int i = 0; i < lines.Length; i++)
+                if (formOf[i] == null) sb.AppendLine();
+                else sb.AppendLine(outLine[i] ?? formOf[i]);
             Output.Text = sb.ToString().TrimEnd();
         }
 
-        private static IEnumerable<(string, int)> Enumerate(string[] a)
-        {
-            for (int i = 0; i < a.Length; i++) yield return (a[i], i);
-        }
+        private static bool IsNumber(string s)
+            => System.Text.RegularExpressions.Regex.IsMatch(s, @"^-?\d+(/\d+)?(\.\d+)?$");
 
         /// <summary>Convierte cada línea entre matemática y LISP (para llevar el contenido
         /// al cambiar de botón). Las líneas que no convierten se dejan tal cual.</summary>

@@ -146,24 +146,13 @@ namespace HekatanLisp
 
             if (loadExample)
             {
-                // Los botones LLEVAN tu contenido en vez de borrarlo:
-                //  · mismo tipo (matemática 1↔2, LISP 3↔4) → se conserva tal cual.
-                //  · cruce matemática↔LISP → se convierte línea por línea (no se pierde).
-                //  · editor vacío, o desde/hacia el modo 5 (ejecutar) → se carga el ejemplo.
-                bool oldMath = oldMode is 1 or 2, oldLisp = oldMode is 3 or 4;
-                bool newLisp = mode is 3 or 4;
-                var cur = Editor.Text;
-
-                if (mode == 5)
-                    Editor.Text = _syntaxLisp ? EJ_EJEC : EJ_MATH;
-                else if (string.IsNullOrWhiteSpace(cur) || oldMode == 5)
-                    Editor.Text = newLisp ? EJ_LISP : EJ_MATH;
-                else if ((oldMath && mode is 1 or 2) || (oldLisp && mode is 3 or 4))
-                    { /* mismo tipo: conservar el texto tal cual */ }
-                else if (oldMath && newLisp)
-                    Editor.Text = ReconvertLines(cur, toLisp: true);
-                else if (oldLisp && mode is 1 or 2)
-                    Editor.Text = ReconvertLines(cur, toLisp: false);
+                // REGLA: los botones NUNCA borran lo que escribiste.
+                //  · editor con texto → se conserva (Calcular ejecuta ESO, no un ejemplo).
+                //  · editor vacío     → se carga un ejemplo apropiado al modo.
+                // Para cruzar matemática↔LISP conservando contenido, usa el botón "⇒ a LISP".
+                if (string.IsNullOrWhiteSpace(Editor.Text))
+                    Editor.Text = (mode == 5) ? (_syntaxLisp ? EJ_EJEC : EJ_MATH)
+                                : (mode is 3 or 4) ? EJ_LISP : EJ_MATH;
             }
             Convert();   // siempre reconvierte con el texto actual (inmediato)
         }
@@ -207,65 +196,92 @@ namespace HekatanLisp
         /// Autorun inteligente: solo ejecuta si está completo (parens balanceados / línea parsea).</summary>
         private void ConvertCalcular()
         {
-            if (_syntaxLisp)
+            var text = Editor.Text;
+            if (string.IsNullOrWhiteSpace(text)) { Output.Text = ""; return; }
+
+            // AUTODETECTA (no depende del toggle → así no hay "errores" por desajuste):
+            // 1) ¿Ya es LISP?            -> ejecútalo como LISP.
+            // 2) ¿Es un loop/programa?   -> tradúcelo a LISP y ejecútalo.
+            // 3) Si no, son expresiones  -> pásalas a LISP y evalúalas (número si se puede).
+
+            if (LooksLikeLisp(text))
             {
-                var code = Editor.Text;
-                if (string.IsNullOrWhiteSpace(code) || !Balanced(code))
-                {
-                    Output.Text = "…  (completa el código: paréntesis sin cerrar)";
-                    return;
-                }
-                const string pre = "(setf *print-case* :downcase)\n";
-                var res = LispEngine.RunScript(pre + code);
-                // Si el código no imprimió nada pero DEVUELVE un valor (un (let* ...), (suma 100), 3+4...)
-                // lo mostramos. El "por qué": en LISP el valor no se ve salvo que lo imprimas.
-                if (string.IsNullOrWhiteSpace(res))
-                    res = LispEngine.RunScript(pre + "(format t \"~a~%\" (progn\n" + code + "))");
-                Output.Text = res.TrimEnd();
+                if (!Balanced(text)) { Output.Text = "…  (completa el código: paréntesis sin cerrar)"; return; }
+                Output.Text = RunLispShowingValue(text);
                 return;
             }
 
-            // escribo matemática: si es un PROGRAMA (loop/función), tradúcelo a LISP y EJECÚTALO.
-            // El "por qué": Jorge escribe el for como en MATLAB; aquí se corre de verdad en SBCL.
-            if (MatlabToLisp.IsImperative(Editor.Text))
+            if (MatlabToLisp.IsImperative(text))
             {
                 string exec;
-                try { exec = MatlabToLisp.Translate(Editor.Text).Executable; }
+                try { exec = MatlabToLisp.Translate(text).Executable; }
                 catch (Exception ex) { Output.Text = "…  (no se pudo traducir: " + ex.Message + ")"; return; }
-                Output.Text = LispEngine.RunScript("(setf *print-case* :downcase)\n" + exec).TrimEnd();
+                Output.Text = RunLispShowingValue2(exec);   // ya trae (format ...), no re-envolver
                 return;
             }
 
-            // escribo matemática (expresiones sueltas): la deriv ya hecha deriva cada línea
-            var lines = Editor.Text.Replace("\r", "").Split('\n');
-            var outLines = new string[lines.Length];
-            var lisp = new List<string>();
-            var idx = new List<int>();
-            for (int i = 0; i < lines.Length; i++)
+            // Expresiones/operaciones: cada línea -> LISP, y su valor si es calculable.
+            EvalExpressions(text);
+        }
+
+        /// <summary>¿El texto es LISP? (un '(' seguido de un operador conocido, o un comentario ';').</summary>
+        private static bool LooksLikeLisp(string t)
+        {
+            if (t.TrimStart().StartsWith(";")) return true;
+            // '(' seguido de un operador LISP conocido: una palabra (defun/let/loop/…)
+            // o un símbolo de operación ( + - * / = < > ). '(x+1)' NO matchea porque tras '(' va 'x'.
+            return System.Text.RegularExpressions.Regex.IsMatch(t,
+                @"\(\s*((defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\b|[-+*/=<>])");
+        }
+
+        private static string RunLispShowingValue2(string code)
+            => LispEngine.RunScript("(setf *print-case* :downcase)\n" + code).TrimEnd();
+
+        /// <summary>Ejecuta LISP; si no imprimió nada pero devuelve un valor, lo muestra.</summary>
+        private static string RunLispShowingValue(string lisp)
+        {
+            const string pre = "(setf *print-case* :downcase)\n";
+            var res = LispEngine.RunScript(pre + lisp);
+            if (string.IsNullOrWhiteSpace(res))
+                res = LispEngine.RunScript(pre + "(format t \"~a~%\" (progn\n" + lisp + "))");
+            return res.TrimEnd();
+        }
+
+        /// <summary>Cada línea de matemática -> su forma LISP; y "= valor" si SBCL puede calcularlo
+        /// (números). Si tiene incógnitas (x), muestra solo la forma LISP.</summary>
+        private void EvalExpressions(string text)
+        {
+            var lines = text.Replace("\r", "").Split('\n');
+            var forms = new string[lines.Length];
+            var script = new StringBuilder("(setf *print-case* :downcase)\n");
+            foreach (var (line, i) in Enumerate(lines))
             {
-                var line = lines[i].Trim();
-                if (line.Length == 0) { outLines[i] = ""; continue; }
-                LispConverter.N tree = null;
-                try { tree = LispConverter.ParseMath(line); }
-                catch { outLines[i] = "…"; continue; }
-                if (tree == null) { outLines[i] = ""; continue; }
-                lisp.Add(LispConverter.ToLisp(tree));
-                idx.Add(i);
+                var t = line.Trim();
+                if (t.Length == 0) { forms[i] = null; continue; }
+                try { forms[i] = LispConverter.MathToLisp(t); }
+                catch { forms[i] = "?"; }
+                // imprime el valor si se puede evaluar; si no (incógnitas), imprime línea vacía
+                script.Append("(format t \"~a~%\" (or (ignore-errors ")
+                      .Append(forms[i] == "?" ? "nil" : forms[i]).Append(") \"\"))\n");
             }
-            if (lisp.Count > 0)
-            {
-                var res = LispEngine.DeriveBatch(lisp);
-                for (int k = 0; k < idx.Count && k < res.Count; k++)
-                {
-                    string disp;
-                    try { disp = LispConverter.ToLab(LispConverter.ParseLisp(res[k]), 0); }
-                    catch { disp = res[k]; }
-                    outLines[idx[k]] = "d/dx = " + disp;
-                }
-            }
+            var outp = LispEngine.RunScript(script.ToString()).Replace("\r", "").Split('\n');
             var sb = new StringBuilder();
-            foreach (var l in outLines) sb.AppendLine(l ?? "");
+            int k = 0;
+            foreach (var (line, i) in Enumerate(lines))
+            {
+                var t = line.Trim();
+                if (t.Length == 0) { sb.AppendLine(); continue; }
+                var val = k < outp.Length ? outp[k].Trim() : ""; k++;
+                if (forms[i] == "?") sb.AppendLine("…");
+                else if (val.Length > 0) sb.AppendLine(forms[i] + "   =   " + val);
+                else sb.AppendLine(forms[i]);
+            }
             Output.Text = sb.ToString().TrimEnd();
+        }
+
+        private static IEnumerable<(string, int)> Enumerate(string[] a)
+        {
+            for (int i = 0; i < a.Length; i++) yield return (a[i], i);
         }
 
         /// <summary>Convierte cada línea entre matemática y LISP (para llevar el contenido

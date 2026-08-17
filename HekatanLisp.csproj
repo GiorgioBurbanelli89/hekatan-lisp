@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>HekatanLisp</AssemblyName>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="engine.lisp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran) -->
+    <EmbeddedResource Include="Lisp.xshd" />
+  </ItemGroup>
+
+  <!-- Empaquetar SBCL dentro del app (autocontenido, no necesita SBCL instalado).
+       Copia el motor a bin/.../sbcl/ en cada build. -->
+  <Target Name="BundleSbcl" AfterTargets="Build">
+    <ItemGroup>
+      <SbclFiles Include="C:\Program Files\Steel Bank Common Lisp\sbcl.exe" />
+      <SbclFiles Include="C:\Program Files\Steel Bank Common Lisp\sbcl.core" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SbclFiles)" DestinationFolder="$(OutDir)sbcl" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

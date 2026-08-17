@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<!-- Resaltado para Hekatan LISP (AvalonEdit, tema oscuro). Colorea tanto la forma
+     LISP como la matemática estilo MATLAB, porque el editor alterna entre ambas. -->
+<SyntaxDefinition name="HekatanLisp" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment"  foreground="#5AC37E" />
+  <Color name="String"   foreground="#E5C07B" />
+  <Color name="Number"   foreground="#9ECBFF" />
+  <Color name="Keyword"  foreground="#C678DD" fontWeight="bold" />
+  <Color name="Builtin"  foreground="#61AFEF" />
+  <Color name="Symbol"   foreground="#56B6C2" />
+
+  <RuleSet ignoreCase="true">
+
+    <!-- comentarios: ; de LISP  y  % de MATLAB, hasta fin de linea -->
+    <Span color="Comment"><Begin>;</Begin></Span>
+    <Span color="Comment"><Begin>%</Begin></Span>
+
+    <!-- cadenas -->
+    <Span color="String" multiline="false"><Begin>"</Begin><End>"</End></Span>
+
+    <!-- simbolo citado de LISP:  'x   '(...)  -->
+    <Rule color="Symbol">'[A-Za-z_][A-Za-z0-9_\-]*</Rule>
+
+    <!-- palabras clave de control (LISP + MATLAB) -->
+    <Keywords color="Keyword">
+      <Word>defun</Word><Word>defparameter</Word><Word>defvar</Word><Word>lambda</Word>
+      <Word>let</Word><Word>let*</Word><Word>setf</Word><Word>setq</Word>
+      <Word>loop</Word><Word>for</Word><Word>from</Word><Word>to</Word><Word>by</Word>
+      <Word>do</Word><Word>while</Word><Word>across</Word><Word>in</Word><Word>collect</Word>
+      <Word>cond</Word><Word>if</Word><Word>then</Word><Word>else</Word><Word>elseif</Word>
+      <Word>when</Word><Word>unless</Word><Word>progn</Word><Word>return</Word>
+      <Word>dolist</Word><Word>dotimes</Word><Word>function</Word><Word>end</Word>
+    </Keywords>
+
+    <!-- funciones intrinsecas / del motor -->
+    <Keywords color="Builtin">
+      <Word>format</Word><Word>print</Word><Word>list</Word><Word>vector</Word><Word>aref</Word>
+      <Word>car</Word><Word>cdr</Word><Word>cons</Word><Word>first</Word><Word>second</Word><Word>third</Word>
+      <Word>expt</Word><Word>sqrt</Word><Word>exp</Word><Word>log</Word>
+      <Word>sin</Word><Word>cos</Word><Word>tan</Word><Word>abs</Word><Word>mod</Word>
+      <Word>max</Word><Word>min</Word><Word>floor</Word><Word>ceiling</Word><Word>round</Word>
+      <Word>numberp</Word><Word>symbolp</Word><Word>eq</Word><Word>equal</Word>
+      <Word>range</Word><Word>range3</Word><Word>deriv</Word><Word>simplif</Word><Word>dsimp</Word>
+    </Keywords>
+
+    <!-- numeros: enteros, reales, cientificos, y razones 3/2 -->
+    <Rule color="Number">
+      \b\d+(\.\d*)?([eE][+-]?\d+)?
+      |
+      \.\d+([eE][+-]?\d+)?
+    </Rule>
+
+  </RuleSet>
+</SyntaxDefinition>

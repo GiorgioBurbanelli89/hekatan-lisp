@@ -1,0 +1,173 @@
+<Window x:Class="HekatanLisp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="http://icsharpcode.net/sharpdevelop/avalonedit"
+        xmlns:wv="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Hekatan LISP" Height="700" Width="1120"
+        Background="#14161A">
+    <Window.Resources>
+        <Style x:Key="ModeBtn" TargetType="Button">
+            <Setter Property="Background" Value="#232833"/>
+            <Setter Property="Foreground" Value="#E7EDF3"/>
+            <Setter Property="BorderBrush" Value="#2A333D"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- boton de la calculadora de simbolos -->
+        <Style x:Key="SymBtn" TargetType="Button">
+            <Setter Property="Background" Value="#1B1E24"/>
+            <Setter Property="Foreground" Value="#B0AAED"/>
+            <Setter Property="BorderBrush" Value="#2A333D"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Cambria"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="MinWidth" Value="34"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="MainGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- 0 menu -->
+            <RowDefinition Height="Auto"/>   <!-- 1 botones de modo -->
+            <RowDefinition Height="Auto"/>   <!-- 2 calculadora de simbolos -->
+            <RowDefinition Height="Auto"/>   <!-- 3 etiquetas -->
+            <RowDefinition Height="*"/>      <!-- 4 editores -->
+        </Grid.RowDefinitions>
+
+        <!-- ============ barra de menus ============ -->
+        <Menu Grid.Row="0" Background="#1B1E24" Foreground="#E7EDF3" FontFamily="Consolas" FontSize="13">
+            <MenuItem Header="_Archivo" Foreground="#E7EDF3">
+                <MenuItem Header="Nuevo" Click="MenuNuevo"/>
+                <MenuItem Header="Cargar ejemplo" Click="MenuEjemplo"/>
+                <MenuItem Header="Cargar ejemplo (loop)" Click="MenuEjemploLoop"/>
+                <Separator/>
+                <MenuItem Header="Salir" Click="MenuSalir"/>
+            </MenuItem>
+            <MenuItem Header="_Modo" Foreground="#E7EDF3">
+                <MenuItem Header="matemática → LISP" Click="OnMode1"/>
+                <MenuItem Header="matemática → render" Click="OnMode2"/>
+                <MenuItem Header="LISP → matemática" Click="OnMode3"/>
+                <MenuItem Header="LISP → render" Click="OnMode4"/>
+                <MenuItem Header="Calcular LISP" Click="OnMode5"/>
+            </MenuItem>
+            <MenuItem Header="_Insertar" Foreground="#E7EDF3">
+                <MenuItem Header="( )"            Click="OnInsert" Tag="(§§)"/>
+                <MenuItem Header="potencia  x^n"  Click="OnInsert" Tag="x^2"/>
+                <MenuItem Header="fracción  a/b"  Click="OnInsert" Tag="/"/>
+                <Separator/>
+                <MenuItem Header="LISP  (+ …)"    Click="OnInsert" Tag="(+ §§)"/>
+                <MenuItem Header="LISP  (* …)"    Click="OnInsert" Tag="(* §§)"/>
+                <MenuItem Header="LISP  (expt x n)" Click="OnInsert" Tag="(expt x 2)"/>
+                <MenuItem Header="LISP  (deriv … x)" Click="OnInsert" Tag="(deriv '§§ 'x)"/>
+                <Separator/>
+                <MenuItem Header="sqrt( )"        Click="OnInsert" Tag="sqrt(§§)"/>
+                <MenuItem Header="sin( )"         Click="OnInsert" Tag="sin(§§)"/>
+                <MenuItem Header="cos( )"         Click="OnInsert" Tag="cos(§§)"/>
+            </MenuItem>
+            <MenuItem Header="A_yuda" Foreground="#E7EDF3">
+                <MenuItem Header="Acerca de Hekatan LISP" Click="MenuAbout"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- ============ botones de modo ============ -->
+        <DockPanel Grid.Row="1" Background="#14161A" LastChildFill="False" Margin="0,4">
+            <TextBlock DockPanel.Dock="Left" Text="Hekatan LISP" Foreground="#E7EDF3"
+                       FontFamily="Consolas" FontSize="15" FontWeight="Bold"
+                       VerticalAlignment="Center" Margin="14,0,0,0"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button x:Name="Btn1" Style="{StaticResource ModeBtn}" Content="matemática → LISP" Click="OnMode1"/>
+                <Button x:Name="Btn2" Style="{StaticResource ModeBtn}" Content="matemática → render" Click="OnMode2"/>
+                <Button x:Name="Btn3" Style="{StaticResource ModeBtn}" Content="LISP → matemática" Click="OnMode3"/>
+                <Button x:Name="Btn4" Style="{StaticResource ModeBtn}" Content="LISP → render" Click="OnMode4"/>
+                <Button x:Name="Btn5" Style="{StaticResource ModeBtn}" Content="Calcular LISP" Click="OnMode5"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- ============ calculadora de simbolos ============ -->
+        <Border Grid.Row="2" Background="#1B1E24" BorderBrush="#2A333D" BorderThickness="0,1,0,1" Padding="8,4">
+            <WrapPanel>
+                <Button x:Name="SyntaxToggle" Style="{StaticResource SymBtn}" MinWidth="150"
+                        Foreground="#5DCAA5" Content="escribo: LISP" Click="OnToggleSyntax"
+                        ToolTip="Cambia entre escribir/insertar como LISP o como matemática"/>
+                <Button x:Name="ToLispBtn" Style="{StaticResource SymBtn}" MinWidth="96"
+                        Foreground="#B0AAED" Content="⇒ a LISP" Click="OnToLisp"
+                        ToolTip="Pasa la matemática (loops, funciones, expresiones) a su forma LISP y la ejecuta"/>
+                <Border Width="12"/>
+                <Button Style="{StaticResource SymBtn}" Content="(" Click="OnInsert" Tag="("/>
+                <Button Style="{StaticResource SymBtn}" Content=")" Click="OnInsert" Tag=")"/>
+                <Button Style="{StaticResource SymBtn}" Content="+" Click="OnInsert" Tag="+"/>
+                <Button Style="{StaticResource SymBtn}" Content="−" Click="OnInsert" Tag="-"/>
+                <Button Style="{StaticResource SymBtn}" Content="×" Click="OnInsert" Tag="*"/>
+                <Button Style="{StaticResource SymBtn}" Content="÷" Click="OnInsert" Tag="/"/>
+                <Button Style="{StaticResource SymBtn}" Content="xⁿ" Click="OnInsert" Tag="^"/>
+                <Button Style="{StaticResource SymBtn}" Content="x" Click="OnInsert" Tag="x"/>
+                <Border Width="10"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="52" Content="+ suma"  Click="OnInsert" Tag="(+ §§)|+"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="60" Content="× mult"  Click="OnInsert" Tag="(* §§)|*"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="70" Content="potencia" Click="OnInsert" Tag="(expt x 2)|x^2"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="60" Content="deriv" Click="OnInsert" Tag="(deriv '§§ 'x)|d/dx(§§)"/>
+                <Border Width="10"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="√" Click="OnInsert" Tag="(sqrt §§)|sqrt(§§)"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="sin" Click="OnInsert" Tag="(sin §§)|sin(§§)"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="cos" Click="OnInsert" Tag="(cos §§)|cos(§§)"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="eˣ" Click="OnInsert" Tag="(exp §§)|exp(§§)"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- ============ etiquetas ============ -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="LblIn" Grid.Column="0" Text="entrada" Foreground="#8B98A6"
+                       FontFamily="Consolas" FontSize="13" Padding="14,6"/>
+            <TextBlock x:Name="LblOut" Grid.Column="1" Text="salida" Foreground="#8B98A6"
+                       FontFamily="Consolas" FontSize="13" Padding="14,6"/>
+        </Grid>
+
+        <!-- ============ editores ============ -->
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ae:TextEditor x:Name="Editor" Grid.Column="0"
+                           FontFamily="Consolas" FontSize="20" ShowLineNumbers="True"
+                           Background="#1B1E24" Foreground="#E7EDF3"
+                           BorderBrush="#2A333D" BorderThickness="0,0,1,0"/>
+            <ae:TextEditor x:Name="Output" Grid.Column="1" IsReadOnly="True"
+                           FontFamily="Consolas" FontSize="20"
+                           Background="#14161A" Foreground="#B0AAED"/>
+            <wv:WebView2 x:Name="Viewer" Grid.Column="1" Visibility="Collapsed"/>
+        </Grid>
+    </Grid>
+</Window>

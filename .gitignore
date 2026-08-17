@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Motor SBCL empaquetado (se copia en cada build desde Program Files; NO en el repo)
+sbcl/
+
+# Instaladores / binarios grandes (van como Release, no en el repo)
+Installer/*.exe
+
+# Temporales
+hlisp_run_*.lisp
+*.tmp

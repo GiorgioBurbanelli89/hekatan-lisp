@@ -16,48 +16,27 @@ namespace HekatanLisp
 {
     /// <summary>
     /// Hekatan LISP (WPF + AvalonEdit + WebView2 + motor SBCL), estilo Hekatan Lab.
-    /// Autorun (Mathcad-style): convierte/ejecuta en vivo, pero SOLO cuando la linea
-    /// esta completa y valida; si esta a medias, no ejecuta ni tira error, solo espera.
-    /// 5 modos:
-    ///   1 code->LISP  2 code->render  3 LISP->MATLAB  4 LISP->render  5 derivar (motor SBCL)
-    /// Headless: --shot out.png [--mode N] | --html out.html --mode 2|4 | --ctl carpeta (tests)
+    /// Modelo simple: IZQUIERDA = lo que escribes (matemática, o LISP con el toggle).
+    /// DERECHA = el RESULTADO, mostrado en el formato que elijas:
+    ///   · Render CSS (por defecto)  · LISP  · Matemática.
+    /// El resultado = la expresión evaluada (números), el valor del loop, o la forma
+    /// simplificada si es simbólica. Vive en vivo (autorun).
+    /// Headless: --shot out.png [--view render|lisp|math] | --ctl carpeta (tests).
     /// </summary>
     public partial class MainWindow : Window
     {
         private readonly DispatcherTimer _debounce =
-            new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-        private int _mode = 1;
+            new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
+        private string _view = "render";           // "render" | "lisp" | "math"
         private string _shot, _ctl;
         private bool _webReady;
-        private bool _syntaxLisp = true;   // toggle "escribo: LISP" (true) / "matemática" (false)
+        private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private readonly HashSet<string> _ctlSeen = new HashSet<string>();
 
-        private const string EJ_MATH = "x^2 + 3*x\r\nx + 1\r\n(x+1)^2\r\nx^2 - 2*x + 1\r\n3*x/2";
-
-        // Ejemplo de LOOP en "matemática" estilo MATLAB (sin nombres de funciones de MATLAB):
-        // la suma 1..n se hace con el for, que es la forma que se pasa a LISP.
+        private const string EJ_MATH = "x^2 + 3*x\r\n2^3 + 4\r\nx^2 + 1*x^2\r\n(x+1)^2\r\n3*x/2";
         private const string EJ_LOOP =
-            "n = 100\r\n" +
-            "s = 0\r\n" +
-            "for i = 1:n\r\n" +
-            "  s = s + i\r\n" +
-            "end\r\n" +
-            "s";
-        private const string EJ_LISP = "(+ (expt x 2) (* 3 x))\r\n(+ x 1)\r\n(expt (+ x 1) 2)\r\n(/ (* 3 x) 2)";
-
-        // Modo 5 escribiendo LISP: la función COMPLETA (cómo se hace), y se llama.
-        private const string EJ_EJEC =
-            ";; Tú escribes la función deriv, la llamas, y SBCL la ejecuta.\r\n" +
-            "(defun deriv (e x)\r\n" +
-            "  (cond ((numberp e) 0)\r\n" +
-            "        ((symbolp e) (if (eq e x) 1 0))\r\n" +
-            "        ((eq (car e) '+)\r\n" +
-            "         (list '+ (deriv (second e) x) (deriv (third e) x)))\r\n" +
-            "        ((eq (car e) '*)\r\n" +
-            "         (list '+ (list '* (second e) (deriv (third e) x))\r\n" +
-            "                  (list '* (deriv (second e) x) (third e))))))\r\n" +
-            "\r\n" +
-            "(format t \"d/dx(x*x + 3x) = ~a~%\" (deriv '(+ (* x x) (* 3 x)) 'x))";
+            "n = 100\r\ns = 0\r\nfor i = 1:n\r\n  s = s + i\r\nend\r\ns";
+        private const string EJ_LISP = "(+ (expt x 2) (* 3 x))\r\n(* 2 (expt x 2))\r\n(+ 2 (* 3 4))";
 
         public MainWindow()
         {
@@ -70,8 +49,8 @@ namespace HekatanLisp
             var args = Environment.GetCommandLineArgs();
             _shot = ValueAfter(args, "--shot");
             _ctl = ValueAfter(args, "--ctl");
-            var m = ValueAfter(args, "--mode");
-            if (m != null && int.TryParse(m, out var mm) && mm >= 1 && mm <= 5) _mode = mm;
+            var v = ValueAfter(args, "--view");
+            if (v is "render" or "lisp" or "math") _view = v;
 
             var profile = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
@@ -80,18 +59,15 @@ namespace HekatanLisp
             _webReady = true;
 
             Editor.TextChanged += (s, ev) => { _debounce.Stop(); _debounce.Start(); };
-            _debounce.Tick += (s, ev) => { _debounce.Stop(); Convert(); };
+            _debounce.Tick += (s, ev) => { _debounce.Stop(); ShowResult(); };
 
-            LoadHighlighting();   // resaltado AvalonEdit (LISP + matemática)
-            SetMode(_mode, loadExample: true);
+            LoadHighlighting();
+            SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
+            if (string.IsNullOrWhiteSpace(Editor.Text)) Editor.Text = EJ_MATH;
+            SetView(_view);
 
             if (_ctl != null) StartCtl();
-
-            if (_shot != null)
-            {
-                await Task.Delay(700);
-                await CaptureAndExit(_shot);
-            }
+            if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
         }
 
         /// <summary>Resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran/Lab).</summary>
@@ -99,149 +75,99 @@ namespace HekatanLisp
         {
             try
             {
-                using var stream = typeof(MainWindow).Assembly
-                    .GetManifestResourceStream("HekatanLisp.Lisp.xshd");
+                using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("HekatanLisp.Lisp.xshd");
                 if (stream is null) return;
                 using var reader = XmlReader.Create(stream);
                 Editor.SyntaxHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
             }
-            catch { /* sin resaltado no es crítico */ }
+            catch { }
         }
 
-        private void OnMode1(object s, RoutedEventArgs e) => SetMode(1, true);
-        private void OnMode2(object s, RoutedEventArgs e) => SetMode(2, true);
-        private void OnMode3(object s, RoutedEventArgs e) => SetMode(3, true);
-        private void OnMode4(object s, RoutedEventArgs e) => SetMode(4, true);
-        private void OnMode5(object s, RoutedEventArgs e) => SetMode(5, true);
+        // ---------- selector de formato de la DERECHA ----------
+        private void OnViewRender(object s, RoutedEventArgs e) => SetView("render");
+        private void OnViewLisp(object s, RoutedEventArgs e) => SetView("lisp");
+        private void OnViewMath(object s, RoutedEventArgs e) => SetView("math");
 
-        private bool IsRender => _mode == 2 || _mode == 4;
-        private bool FromLisp => _mode == 3 || _mode == 4;   // el modo 5 recibe matematica
-
-        private void SetMode(int mode, bool loadExample)
+        private void SetView(string view)
         {
-            int oldMode = _mode;
-            _mode = mode;
-
+            _view = view;
             var on = (Color)ColorConverter.ConvertFromString("#4B42AD");
             var off = (Color)ColorConverter.ConvertFromString("#232833");
-            Btn1.Background = new SolidColorBrush(mode == 1 ? on : off);
-            Btn2.Background = new SolidColorBrush(mode == 2 ? on : off);
-            Btn3.Background = new SolidColorBrush(mode == 3 ? on : off);
-            Btn4.Background = new SolidColorBrush(mode == 4 ? on : off);
-            Btn5.Background = new SolidColorBrush(mode == 5 ? on : off);
+            BtnRender.Background = new SolidColorBrush(view == "render" ? on : off);
+            BtnLisp.Background = new SolidColorBrush(view == "lisp" ? on : off);
+            BtnMath.Background = new SolidColorBrush(view == "math" ? on : off);
 
-            LblIn.Text = (mode == 5) ? (_syntaxLisp ? "LISP (define tu función y llámala)" : "matemática")
-                       : FromLisp ? "LISP" : "matemática";
-            LblOut.Text = mode switch
+            LblIn.Text = _syntaxLisp ? "escribes: LISP" : "escribes: matemática";
+            LblOut.Text = view switch
             {
-                1 => "LISP",
-                2 => "render (estilo Hekatan Lab)",
-                3 => "matemática",
-                4 => "render (estilo Hekatan Lab)",
-                _ => "resultado (ejecutado por SBCL)",
+                "render" => "resultado — render CSS",
+                "lisp" => "resultado — forma LISP",
+                _ => "resultado — matemática",
             };
-
-            Output.Visibility = IsRender ? Visibility.Collapsed : Visibility.Visible;
-            Viewer.Visibility = IsRender ? Visibility.Visible : Visibility.Collapsed;
-
-            if (loadExample)
-            {
-                // REGLA: los botones NUNCA borran lo que escribiste.
-                //  · editor con texto → se conserva (Calcular ejecuta ESO, no un ejemplo).
-                //  · editor vacío     → se carga un ejemplo apropiado al modo.
-                // Para cruzar matemática↔LISP conservando contenido, usa el botón "⇒ a LISP".
-                if (string.IsNullOrWhiteSpace(Editor.Text))
-                    Editor.Text = (mode == 5) ? (_syntaxLisp ? EJ_EJEC : EJ_MATH)
-                                : (mode is 3 or 4) ? EJ_LISP : EJ_MATH;
-            }
-            Convert();   // siempre reconvierte con el texto actual (inmediato)
+            ShowResult();
         }
 
-        private void Convert()
+        // ---------- calcula el RESULTADO y lo muestra en el formato elegido ----------
+        private bool IsRenderView => _view == "render";
+
+        private void ShowResult()
         {
-            if (IsRender)
+            var lines = ComputeResult();
+            Output.Visibility = IsRenderView ? Visibility.Collapsed : Visibility.Visible;
+            Viewer.Visibility = IsRenderView ? Visibility.Visible : Visibility.Collapsed;
+
+            if (IsRenderView)
             {
-                if (_webReady)
-                    Viewer.NavigateToString(LispConverter.RenderPage(Editor.Text, FromLisp));
+                if (_webReady) Viewer.NavigateToString(LispConverter.RenderPage(string.Join("\n", lines), false));
                 return;
             }
-            if (_mode == 5) { ConvertCalcular(); return; }
-
-            // Programa MATLAB (loops/funciones) -> LISP en bloque, no linea por linea
-            if (_mode == 1 && MatlabToLisp.IsImperative(Editor.Text))
-            {
-                try { Output.Text = MatlabToLisp.Translate(Editor.Text).Lisp; }
-                catch { Output.Text = "…"; }
-                return;
-            }
-
             var sb = new StringBuilder();
-            foreach (var raw in Editor.Text.Replace("\r", "").Split('\n'))
-            {
-                var line = raw.Trim();
-                if (line.Length == 0) { sb.AppendLine(); continue; }
-                try
-                {
-                    sb.AppendLine(_mode == 1 ? LispConverter.MathToLisp(line)
-                                             : LispConverter.LispToLab(line));
-                }
-                catch { sb.AppendLine("…"); }
-            }
+            foreach (var l in lines)
+                sb.AppendLine(_view == "lisp" ? ToLispView(l) : l);
             Output.Text = sb.ToString().TrimEnd();
         }
 
-        /// <summary>Modo 5 "Calcular LISP". Con el toggle:
-        ///  · escribo LISP  -> ejecuta lo que YO escribí (defun + llamada) en SBCL.
-        ///  · escribo matemática -> la deriv YA hecha calcula (por su nombre).
-        /// Autorun inteligente: solo ejecuta si está completo (parens balanceados / línea parsea).</summary>
-        private void ConvertCalcular()
+        /// <summary>Una línea de resultado (matemática/número/mensaje) → su forma LISP.</summary>
+        private static string ToLispView(string mathLine)
+        {
+            if (string.IsNullOrWhiteSpace(mathLine)) return "";
+            if (mathLine.StartsWith("⚠") || IsNumber(mathLine)) return mathLine;
+            try { return LispConverter.MathToLisp(mathLine); } catch { return mathLine; }
+        }
+
+        /// <summary>El RESULTADO de lo escrito, como líneas de matemática/número/mensaje.
+        /// Autodetecta: LISP, programa (loop/función) o expresiones.</summary>
+        private List<string> ComputeResult()
         {
             var text = Editor.Text;
-            if (string.IsNullOrWhiteSpace(text)) { Output.Text = ""; return; }
-
-            // AUTODETECTA (no depende del toggle → así no hay "errores" por desajuste):
-            // 1) ¿Ya es LISP?            -> ejecútalo como LISP.
-            // 2) ¿Es un loop/programa?   -> tradúcelo a LISP y ejecútalo.
-            // 3) Si no, son expresiones  -> pásalas a LISP y evalúalas (número si se puede).
+            if (string.IsNullOrWhiteSpace(text)) return new List<string>();
 
             if (LooksLikeLisp(text))
             {
-                if (!Balanced(text)) { Output.Text = "…  (completa el código: paréntesis sin cerrar)"; return; }
-                if (IsLispProgram(text)) Output.Text = RunLispClean(text);   // defun/loop/let... → ejecutar
-                else EvalOneLispExpr(text);                                   // una expresión → valor o simplificado
-                return;
+                if (!Balanced(text)) return new List<string> { "…  (paréntesis sin cerrar)" };
+                if (IsLispProgram(text)) return new List<string> { RunLispClean(text) };
+                return new List<string> { EvalOneLispExpr(text) };
             }
-
             if (MatlabToLisp.IsImperative(text))
             {
-                string exec;
-                try { exec = MatlabToLisp.Translate(text).Executable; }
-                catch (Exception ex) { Output.Text = "…  (no se pudo traducir: " + ex.Message + ")"; return; }
-                Output.Text = RunLispClean(exec);
-                return;
+                try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
+                catch (Exception ex) { return new List<string> { "…  (" + ex.Message + ")" }; }
             }
-
-            // Expresiones/operaciones: cada línea -> LISP, y su valor si es calculable.
-            EvalExpressions(text);
+            return EvalExpressions(text);
         }
 
-        /// <summary>¿El texto es LISP? (un '(' seguido de un operador conocido, o un comentario ';').</summary>
+        // ---------- motor: expresiones y programas ----------
         private static bool LooksLikeLisp(string t)
         {
             if (t.TrimStart().StartsWith(";")) return true;
-            // '(' seguido de un operador LISP conocido: una palabra (defun/let/loop/…)
-            // o un símbolo de operación ( + - * / = < > ). '(x+1)' NO matchea porque tras '(' va 'x'.
             return System.Text.RegularExpressions.Regex.IsMatch(t,
                 @"\(\s*((defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\b|[-+*/=<>])");
         }
 
-        /// <summary>¿El LISP es un PROGRAMA (defun/loop/let/…) y no una simple expresión?</summary>
         private static bool IsLispProgram(string t)
             => System.Text.RegularExpressions.Regex.IsMatch(t,
                 @"\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\b");
 
-        /// <summary>Ejecuta un PROGRAMA LISP; si no imprime nada, muestra su valor; si SBCL
-        /// falla (p.ej. variable sin valor), muestra un mensaje LIMPIO, no el backtrace.</summary>
         private static string RunLispClean(string code)
         {
             const string pre = "(setf *print-case* :downcase)\n";
@@ -251,7 +177,6 @@ namespace HekatanLisp
             return CleanSbcl(res).TrimEnd();
         }
 
-        /// <summary>Convierte el vólcado de error de SBCL en un mensaje corto y claro.</summary>
         private static string CleanSbcl(string s)
         {
             if (string.IsNullOrEmpty(s)) return s;
@@ -266,29 +191,26 @@ namespace HekatanLisp
                 foreach (var l in s.Substring(0, bt).Replace("\r", "").Split('\n'))
                 {
                     var t = l.Trim();
-                    if (t.Length > 0 && !t.StartsWith("Unhandled") && !t.Contains("thread"))
-                        return "⚠ " + t;
+                    if (t.Length > 0 && !t.StartsWith("Unhandled") && !t.Contains("thread")) return "⚠ " + t;
                 }
                 return "⚠ error en el código LISP.";
             }
             return s;
         }
 
-        /// <summary>Una expresión LISP (aritmética): su VALOR si es numérica, o su forma
-        /// SIMPLIFICADA (matemática) si tiene incógnitas. Nunca revienta.</summary>
-        private void EvalOneLispExpr(string lisp)
+        /// <summary>Expresión LISP: su VALOR (número) o su forma SIMPLIFICADA (matemática).</summary>
+        private static string EvalOneLispExpr(string lisp)
         {
             var r = LispEngine.EvalOrSimplify(new List<string> { lisp.Trim() });
             var v = r.Count > 0 ? r[0].Trim() : "";
-            if (v.Length == 0 || v == "?") { Output.Text = lisp.Trim(); return; }
-            if (IsNumber(v)) { Output.Text = v; return; }
-            try { Output.Text = LispConverter.ToLab(LispConverter.ParseLisp(v), 0); }
-            catch { Output.Text = v; }
+            if (v.Length == 0 || v == "?") return lisp.Trim();
+            if (IsNumber(v)) return v;
+            try { return LispConverter.ToLab(LispConverter.ParseLisp(v), 0); } catch { return v; }
         }
 
-        /// <summary>Cada línea de matemática -> su forma LISP; y "= valor" si SBCL puede calcularlo
-        /// (números). Si tiene incógnitas (x), muestra solo la forma LISP.</summary>
-        private void EvalExpressions(string text)
+        /// <summary>Expresiones matemáticas (una por línea) → el RESULTADO: el número si se puede
+        /// calcular, o la forma simplificada (que puede ser la misma si no se reduce).</summary>
+        private static List<string> EvalExpressions(string text)
         {
             var lines = text.Replace("\r", "").Split('\n');
             var formOf = new string[lines.Length];
@@ -298,11 +220,9 @@ namespace HekatanLisp
             {
                 var t = lines[i].Trim();
                 if (t.Length == 0) { formOf[i] = null; continue; }
-                try { formOf[i] = LispConverter.MathToLisp(t); }
-                catch { formOf[i] = "?"; }
+                try { formOf[i] = LispConverter.MathToLisp(t); } catch { formOf[i] = "?"; }
                 if (formOf[i] != "?") { forms.Add(formOf[i]); idx.Add(i); }
             }
-
             var results = LispEngine.EvalOrSimplify(forms);
             var outLine = new string[lines.Length];
             for (int k = 0; k < idx.Count; k++)
@@ -310,51 +230,26 @@ namespace HekatanLisp
                 int i = idx[k];
                 var r = k < results.Count ? results[k].Trim() : "";
                 var mathIn = lines[i].Trim();
-                if (r.Length == 0 || r == "?") { outLine[i] = formOf[i]; continue; }
-                if (IsNumber(r))                       // números -> el valor
-                    outLine[i] = mathIn + "   =   " + r;
-                else                                    // simbólico -> forma simplificada (matemática)
-                {
-                    string simp;
-                    try { simp = LispConverter.ToLab(LispConverter.ParseLisp(r), 0); }
-                    catch { simp = r; }
-                    outLine[i] = (simp == mathIn) ? mathIn : (mathIn + "   →   " + simp);
-                }
+                if (r.Length == 0 || r == "?") { outLine[i] = mathIn; continue; }
+                if (IsNumber(r)) { outLine[i] = r; continue; }
+                try { outLine[i] = LispConverter.ToLab(LispConverter.ParseLisp(r), 0); }
+                catch { outLine[i] = mathIn; }
             }
-
-            var sb = new StringBuilder();
+            var res = new List<string>();
             for (int i = 0; i < lines.Length; i++)
-                if (formOf[i] == null) sb.AppendLine();
-                else sb.AppendLine(outLine[i] ?? formOf[i]);
-            Output.Text = sb.ToString().TrimEnd();
+                res.Add(formOf[i] == null ? "" : (outLine[i] ?? mathTrim(lines[i])));
+            return res;
         }
+
+        private static string mathTrim(string s) => s?.Trim() ?? "";
 
         private static bool IsNumber(string s)
             => System.Text.RegularExpressions.Regex.IsMatch(s, @"^-?\d+(/\d+)?(\.\d+)?$");
 
-        /// <summary>Convierte cada línea entre matemática y LISP (para llevar el contenido
-        /// al cambiar de botón). Las líneas que no convierten se dejan tal cual.</summary>
-        private static string ReconvertLines(string text, bool toLisp)
-        {
-            var sb = new StringBuilder();
-            foreach (var raw in text.Replace("\r", "").Split('\n'))
-            {
-                var line = raw.Trim();
-                if (line.Length == 0) { sb.AppendLine(); continue; }
-                try { sb.AppendLine(toLisp ? LispConverter.MathToLisp(line) : LispConverter.LispToLab(line)); }
-                catch { sb.AppendLine(line); }
-            }
-            return sb.ToString().TrimEnd();
-        }
-
         private static bool Balanced(string code)
         {
             int b = 0;
-            foreach (var c in code)
-            {
-                if (c == '(') b++;
-                else if (c == ')') { b--; if (b < 0) return false; }
-            }
+            foreach (var c in code) { if (c == '(') b++; else if (c == ')') { b--; if (b < 0) return false; } }
             return b == 0;
         }
 
@@ -362,8 +257,8 @@ namespace HekatanLisp
         {
             _syntaxLisp = !_syntaxLisp;
             SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
-            if (_mode == 5) SetMode(5, true);   // recarga el ejemplo apropiado
-            else Convert();
+            LblIn.Text = _syntaxLisp ? "escribes: LISP" : "escribes: matemática";
+            ShowResult();
         }
 
         private void MenuEjemploLoop(object s, RoutedEventArgs e)
@@ -371,7 +266,7 @@ namespace HekatanLisp
             _syntaxLisp = false;
             SyntaxToggle.Content = "escribo: matemática";
             Editor.Text = EJ_LOOP;
-            SetMode(1, false);
+            SetView(_view);
         }
 
         // ---------- canal de control --ctl (tests desde terminal) ----------
@@ -404,17 +299,13 @@ namespace HekatanLisp
             {
                 case "settext":
                     Editor.Text = doc.RootElement.GetProperty("text").GetString();
-                    Convert();
+                    ShowResult();
                     return "{\"ok\":true}";
-                case "mode":
-                    SetMode(doc.RootElement.GetProperty("n").GetInt32(), false);
-                    return "{\"ok\":true,\"mode\":" + _mode + "}";
-                case "clickmode":   // como pulsar el botón de modo (SetMode con loadExample=true)
-                    SetMode(doc.RootElement.GetProperty("n").GetInt32(), true);
-                    return "{\"ok\":true,\"mode\":" + _mode + "}";
+                case "view":     // elige el formato de la derecha: render|lisp|math
+                    SetView(doc.RootElement.GetProperty("name").GetString());
+                    return "{\"ok\":true,\"view\":\"" + _view + "\"}";
                 case "getoutput":
-                    // en modos de render la salida vive en el WebView2, no en Output
-                    if (IsRender && _webReady && Viewer.CoreWebView2 is not null)
+                    if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
                     {
                         var t = await Viewer.ExecuteScriptAsync("(document.body?document.body.innerText:'')");
                         return "{\"ok\":true,\"output\":" + (string.IsNullOrEmpty(t) ? "\"\"" : t) + "}";
@@ -422,16 +313,15 @@ namespace HekatanLisp
                     return System.Text.Json.JsonSerializer.Serialize(new { output = Output.Text });
                 case "gettext":
                     return System.Text.Json.JsonSerializer.Serialize(new { input = Editor.Text });
-                case "syntax":   // elige escribir LISP (true) o matemática/MATLAB (false)
+                case "syntax":
                     _syntaxLisp = doc.RootElement.GetProperty("lisp").GetBoolean();
                     SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
-                    Convert();
+                    ShowResult();
                     return "{\"ok\":true,\"lisp\":" + (_syntaxLisp ? "true" : "false") + "}";
                 case "state":
-                    return System.Text.Json.JsonSerializer.Serialize(new { mode = _mode, lisp = _syntaxLisp });
-                case "hashl":   // ¿está cargado el resaltado AvalonEdit?
-                    return System.Text.Json.JsonSerializer.Serialize(new
-                    { hl = Editor.SyntaxHighlighting?.Name });
+                    return System.Text.Json.JsonSerializer.Serialize(new { view = _view, lisp = _syntaxLisp });
+                case "hashl":
+                    return System.Text.Json.JsonSerializer.Serialize(new { hl = Editor.SyntaxHighlighting?.Name });
                 case "quit":
                     Application.Current.Shutdown();
                     return "{\"ok\":true}";
@@ -445,7 +335,7 @@ namespace HekatanLisp
         {
             try
             {
-                if (IsRender)
+                if (IsRenderView)
                 {
                     await Task.Delay(400);
                     var json = await Viewer.CoreWebView2.CallDevToolsProtocolMethodAsync(
@@ -469,12 +359,10 @@ namespace HekatanLisp
         }
 
         // ---------- calculadora de simbolos + menus ----------
-        /// <summary>Inserta el Tag del boton en el editor. "§§" marca donde queda el cursor.</summary>
         private void OnInsert(object sender, RoutedEventArgs e)
         {
             var tag = (sender as FrameworkElement)?.Tag as string;
             if (string.IsNullOrEmpty(tag)) return;
-            // Tag "formaLISP|formaMatemática": elige según el toggle.
             if (tag.Contains("|"))
             {
                 var alt = tag.Split('|');
@@ -487,27 +375,22 @@ namespace HekatanLisp
                 Editor.Document.Insert(caret, parts[0] + parts[1]);
                 Editor.CaretOffset = caret + parts[0].Length;
             }
-            else
-            {
-                Editor.Document.Insert(caret, tag);
-                Editor.CaretOffset = caret + tag.Length;
-            }
+            else { Editor.Document.Insert(caret, tag); Editor.CaretOffset = caret + tag.Length; }
             Editor.Focus();
         }
 
         private void MenuNuevo(object s, RoutedEventArgs e) => Editor.Text = "";
-        private void MenuEjemplo(object s, RoutedEventArgs e) => Editor.Text = FromLisp ? EJ_LISP : EJ_MATH;
+        private void MenuEjemplo(object s, RoutedEventArgs e) => Editor.Text = _syntaxLisp ? EJ_LISP : EJ_MATH;
         private void MenuSalir(object s, RoutedEventArgs e) => Close();
         private void MenuAbout(object s, RoutedEventArgs e) =>
             MessageBox.Show(
-                "Hekatan LISP\n\nEditor simbólico para practicar: matemática ↔ LISP ↔ MATLAB,\ncon render estilo Hekatan Lab y motor SBCL que deriva de verdad.",
+                "Hekatan LISP\n\nEscribes matemática a la izquierda; el resultado sale a la derecha\nen render CSS, LISP o matemática. Motor SBCL embebido.",
                 "Acerca de Hekatan LISP");
 
         private static string ValueAfter(string[] a, string flag)
         {
             for (int i = 1; i < a.Length - 1; i++)
-                if (string.Equals(a[i], flag, StringComparison.OrdinalIgnoreCase))
-                    return a[i + 1];
+                if (string.Equals(a[i], flag, StringComparison.OrdinalIgnoreCase)) return a[i + 1];
             return null;
         }
     }

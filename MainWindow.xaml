@@ -71,12 +71,10 @@
                 <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>
             </MenuItem>
-            <MenuItem Header="_Modo" Foreground="#E7EDF3">
-                <MenuItem Header="matemática → LISP" Click="OnMode1"/>
-                <MenuItem Header="matemática → render" Click="OnMode2"/>
-                <MenuItem Header="LISP → matemática" Click="OnMode3"/>
-                <MenuItem Header="LISP → render" Click="OnMode4"/>
-                <MenuItem Header="Calcular LISP" Click="OnMode5"/>
+            <MenuItem Header="_Ver resultado" Foreground="#E7EDF3">
+                <MenuItem Header="Render CSS" Click="OnViewRender"/>
+                <MenuItem Header="LISP" Click="OnViewLisp"/>
+                <MenuItem Header="Matemática" Click="OnViewMath"/>
             </MenuItem>
             <MenuItem Header="_Insertar" Foreground="#E7EDF3">
                 <MenuItem Header="( )"            Click="OnInsert" Tag="(§§)"/>
@@ -103,11 +101,11 @@
                        FontFamily="Consolas" FontSize="15" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="14,0,0,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                <Button x:Name="Btn1" Style="{StaticResource ModeBtn}" Content="matemática → LISP" Click="OnMode1"/>
-                <Button x:Name="Btn2" Style="{StaticResource ModeBtn}" Content="matemática → render" Click="OnMode2"/>
-                <Button x:Name="Btn3" Style="{StaticResource ModeBtn}" Content="LISP → matemática" Click="OnMode3"/>
-                <Button x:Name="Btn4" Style="{StaticResource ModeBtn}" Content="LISP → render" Click="OnMode4"/>
-                <Button x:Name="Btn5" Style="{StaticResource ModeBtn}" Content="Calcular LISP" Click="OnMode5"/>
+                <TextBlock Text="resultado como:" Foreground="#8B98A6" FontFamily="Consolas" FontSize="12"
+                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Button x:Name="BtnRender" Style="{StaticResource ModeBtn}" Content="Render CSS" Click="OnViewRender"/>
+                <Button x:Name="BtnLisp" Style="{StaticResource ModeBtn}" Content="LISP" Click="OnViewLisp"/>
+                <Button x:Name="BtnMath" Style="{StaticResource ModeBtn}" Content="Matemática" Click="OnViewMath"/>
             </StackPanel>
         </DockPanel>
 

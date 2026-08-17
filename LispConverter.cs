@@ -190,7 +190,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     var tree = fromLisp ? ParseLisp(line) : ParseMath(line);
                     html = "<span class=\"m-expr\">" + ToHtml(tree) + "</span>";
                 }
-                catch { html = "<span class=\"m-op\">…</span>"; }
+                catch { html = System.Net.WebUtility.HtmlEncode(line); }   // mensajes/resultados: texto plano
                 body.Append("<div class=\"ws-eq\">").Append(html).Append("</div>");
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" + CSS +

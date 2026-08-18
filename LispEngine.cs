@@ -70,7 +70,7 @@ namespace HekatanLisp
         /// Una sola llamada a SBCL. Cada línea del resultado = una expresión.</summary>
         public static List<string> EvalOp(List<string> lispExprs, string op)
         {
-            string fn = op switch { "simplify" => "simplify", "expand" => "expand*", "deriv" => "derive-x", _ => null };
+            string fn = op switch { "simplify" => "simplify", "expand" => "expand*", "deriv" => "derive-x", "integ" => "integ-x", _ => null };
             var sb = new StringBuilder();
             sb.Append("(setf *print-case* :downcase)\n");
             sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");

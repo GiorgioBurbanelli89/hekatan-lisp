@@ -55,7 +55,7 @@ namespace HekatanLisp
             var v = ValueAfter(args, "--view");
             if (v is "render" or "lisp" or "math") _view = v;
             var o = ValueAfter(args, "--op");
-            if (o is "auto" or "simplify" or "expand" or "deriv") _op = o;
+            if (o is "auto" or "simplify" or "expand" or "deriv" or "integ") _op = o;
 
             var profile = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
@@ -279,6 +279,7 @@ namespace HekatanLisp
         private void OnOpSimplify(object s, RoutedEventArgs e) => SetOp("simplify");
         private void OnOpExpand(object s, RoutedEventArgs e) => SetOp("expand");
         private void OnOpDeriv(object s, RoutedEventArgs e) => SetOp("deriv");
+        private void OnOpInteg(object s, RoutedEventArgs e) => SetOp("integ");
 
         private void SetOp(string op)
         {
@@ -289,6 +290,7 @@ namespace HekatanLisp
             OpSimplify.Background = new SolidColorBrush(op == "simplify" ? on : off);
             OpExpand.Background = new SolidColorBrush(op == "expand" ? on : off);
             OpDeriv.Background = new SolidColorBrush(op == "deriv" ? on : off);
+            OpInteg.Background = new SolidColorBrush(op == "integ" ? on : off);
             ShowResult();
         }
 

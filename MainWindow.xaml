@@ -133,7 +133,9 @@
                 <Button x:Name="OpExpand" Style="{StaticResource SymBtn}" MinWidth="72" Content="expandir"
                         Click="OnOpExpand" ToolTip="Distribuye: (x+1)² → x²+2·x+1"/>
                 <Button x:Name="OpDeriv" Style="{StaticResource SymBtn}" MinWidth="62" Content="derivar"
-                        Click="OnOpDeriv" ToolTip="Derivada respecto a x"/>
+                        Click="OnOpDeriv" ToolTip="Derivada respecto a la variable detectada: d/ds (1-s)/2 → -1/2"/>
+                <Button x:Name="OpInteg" Style="{StaticResource SymBtn}" MinWidth="66" Content="∫ integrar"
+                        Click="OnOpInteg" ToolTip="Integral indefinida de polinomios: ∫ s² → s³/3"/>
                 <Border Width="12"/>
                 <Button Style="{StaticResource SymBtn}" Content="(" Click="OnInsert" Tag="("/>
                 <Button Style="{StaticResource SymBtn}" Content=")" Click="OnInsert" Tag=")"/>

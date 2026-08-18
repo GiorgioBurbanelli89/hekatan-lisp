@@ -121,5 +121,188 @@
                  (t (list 'expt a b))))
           (t (list op a b))))))
 
-(defun expand* (e) "Expande y luego simplifica." (simplify (expand e)))
-(defun derive-x (e) "Deriva respecto a x y simplifica." (simplify (deriv e 'x)))
+;;;; ==========================================================================
+;;;; MOTOR DE POLINOMIOS con coeficientes RACIONALES (exacto).
+;;;; Un polinomio = alist (monomio . coef).  Monomio = alist ordenado
+;;;; ((var . potencia) ...), constante = NIL.  Coef = racional de Lisp (1/2, -3).
+;;;; Esto da simplify/expand/deriv EXACTOS para funciones de forma y la matriz D.
+;;;; ==========================================================================
+
+(defun vars-of (e)
+  "Variables (simbolos) libres en la formula, sin repetir."
+  (cond ((numberp e) nil)
+        ((symbolp e) (list e))
+        ((consp e) (remove-duplicates (mapcan #'vars-of (cdr e))))
+        (t nil)))
+
+(defun mono-mul (m1 m2)
+  "Producto de monomios: suma potencias de la misma variable; ordena por nombre."
+  (let ((res (copy-alist m1)))
+    (dolist (pr m2)
+      (let ((cell (assoc (car pr) res)))
+        (if cell (incf (cdr cell) (cdr pr))
+            (setf res (append res (list (cons (car pr) (cdr pr))))))))
+    (sort (remove-if (lambda (pr) (zerop (cdr pr))) res)
+          #'string< :key (lambda (pr) (string (car pr))))))
+
+(defun mono-degree (m) (reduce #'+ (mapcar #'cdr m) :initial-value 0))
+
+(defun p+ (p q)
+  "Suma de polinomios (combina monomios iguales, tira los de coef 0)."
+  (let ((res (copy-alist p)))
+    (dolist (term q)
+      (let ((cell (assoc (car term) res :test #'equal)))
+        (if cell (incf (cdr cell) (cdr term))
+            (setf res (append res (list (cons (car term) (cdr term))))))))
+    (remove-if (lambda (term) (zerop (cdr term))) res)))
+
+(defun p-scale (p c)
+  (if (zerop c) nil (mapcar (lambda (term) (cons (car term) (* (cdr term) c))) p)))
+
+(defun p* (p q)
+  (let ((res nil))
+    (dolist (a p)
+      (dolist (b q)
+        (setf res (p+ res (list (cons (mono-mul (car a) (car b))
+                                      (* (cdr a) (cdr b))))))))
+    res))
+
+(defun p-const (c) (if (zerop c) nil (list (cons nil c))))
+(defun p-var (v) (list (cons (list (cons v 1)) 1)))
+
+(defun p-constant (p)
+  "Valor si el polinomio es constante; :nc si no lo es."
+  (cond ((null p) 0)
+        ((and (null (cdr p)) (null (caar p))) (cdar p))
+        (t :nc)))
+
+(defun expr->poly (e)
+  "Formula LISP -> polinomio racional.  Lanza 'notpoly con :fail si no es polinomio
+   (p.ej. division por algo NO constante, potencia no entera, funcion desconocida)."
+  (cond
+    ((integerp e) (p-const e))
+    ((rationalp e) (p-const e))
+    ((floatp e) (p-const (rationalize e)))          ; 0.2 -> 1/5 (exacto)
+    ((symbolp e) (p-var e))
+    ((consp e)
+     (let ((op (car e)))
+       (cond
+         ((eq op '+) (p+ (expr->poly (second e)) (expr->poly (third e))))
+         ((eq op '-) (if (cddr e)
+                         (p+ (expr->poly (second e)) (p-scale (expr->poly (third e)) -1))
+                         (p-scale (expr->poly (second e)) -1)))   ; menos unario
+         ((eq op '*) (p* (expr->poly (second e)) (expr->poly (third e))))
+         ((eq op '/) (let* ((d (expr->poly (third e))) (dc (p-constant d)))
+                       (if (or (eq dc :nc) (zerop dc))
+                           (throw 'notpoly :fail)      ; denominador no constante -> no polinomio
+                           (p-scale (expr->poly (second e)) (/ 1 dc)))))
+         ((eq op 'expt) (let ((n (third e)))
+                          (if (and (integerp n) (>= n 0))
+                              (let ((r (p-const 1)))
+                                (dotimes (i n) (setf r (p* r (expr->poly (second e)))))
+                                r)
+                              (throw 'notpoly :fail))))
+         (t (throw 'notpoly :fail)))))
+    (t (throw 'notpoly :fail))))
+
+(defun try-poly (e) (catch 'notpoly (expr->poly e)))
+
+(defun mono->expr (m)
+  (if (null m) 1
+      (reduce (lambda (a b) (list '* a b))
+              (mapcar (lambda (pr) (if (= (cdr pr) 1) (car pr)
+                                       (list 'expt (car pr) (cdr pr))))
+                      m))))
+
+(defun coeff->expr (c) (if (integerp c) c (list '/ (numerator c) (denominator c))))
+
+(defun neg-expr (e)
+  "Niega una expresion ya construida, de forma legible (sin romperse con simbolos)."
+  (cond ((numberp e) (- e))
+        ((and (consp e) (eq (car e) '/) (numberp (second e))) (list '/ (- (second e)) (third e)))
+        (t (list '* -1 e))))
+
+(defun term->expr (m c)
+  "Monomio m con coef POSITIVO c (racional) -> expresion legible:
+   1->mono, entero->n*mono, p/q -> (p*mono)/q  (asi 1/2*nu se ve como nu/2)."
+  (cond ((null m) (coeff->expr c))
+        ((= c 1) (mono->expr m))
+        ((integerp c) (list '* c (mono->expr m)))
+        (t (let ((num (numerator c)) (den (denominator c)))
+             (list '/ (if (= num 1) (mono->expr m) (list '* num (mono->expr m))) den)))))
+
+(defun poly->expr (p)
+  "Polinomio -> formula LISP legible. Positivos primero (grado desc), luego los
+   negativos como restas -> queda '1 - s^2', 's - 1/2', 'nu/2', etc."
+  (if (null p) 0
+      (let* ((bydeg (sort (copy-alist p) #'> :key (lambda (tm) (mono-degree (car tm)))))
+             (pos (remove-if     (lambda (tm) (minusp (cdr tm))) bydeg))
+             (neg (remove-if-not (lambda (tm) (minusp (cdr tm))) bydeg))
+             (terms (append pos neg))
+             (acc nil))
+        (dolist (tm terms)
+          (let* ((m (car tm)) (c (cdr tm)) (isneg (minusp c))
+                 (e (term->expr m (abs c))))
+            (setf acc
+                  (cond ((null acc) (if isneg (neg-expr e) e))
+                        (isneg (list '- acc e))
+                        (t     (list '+ acc e))))))
+        acc)))
+
+(defun simplify (e)
+  "Simplifica EXACTO via polinomios; si no es polinomio, cae al motor viejo."
+  (let ((p (try-poly e)))
+    (if (eq p :fail) (collect-in (simp* e)) (poly->expr p))))
+
+(defun expand* (e) "Expande y simplifica (mismo motor de polinomios)." (simplify e))
+
+(defun poly-deriv (p v)
+  "Derivada del polinomio p respecto a v."
+  (let ((res nil))
+    (dolist (tm p)
+      (let* ((m (car tm)) (c (cdr tm)) (cell (assoc v m)))
+        (when cell
+          (let* ((k (cdr cell))
+                 (rest (remove v (copy-alist m) :key #'car))
+                 (m2 (if (> k 1) (cons (cons v (1- k)) rest) rest))
+                 (m2 (sort m2 #'string< :key (lambda (pr) (string (car pr))))))
+            (setf res (p+ res (list (cons m2 (* c k)))))))))
+    res))
+
+(defun derive-x (e)
+  "Deriva respecto a la variable DETECTADA (no fija a x) y simplifica."
+  (let* ((vs (vars-of e)) (v (if vs (car vs) 'x)) (p (try-poly e)))
+    (if (eq p :fail) (simplify (deriv e v)) (poly->expr (poly-deriv p v)))))
+
+(defun poly-integ (p v)
+  "Integral indefinida del polinomio p respecto a v:  c*v^n -> c/(n+1) * v^(n+1)."
+  (let ((res nil))
+    (dolist (tm p)
+      (let* ((m (car tm)) (c (cdr tm)) (cell (assoc v m))
+             (k (if cell (cdr cell) 0))
+             (rest (if cell (remove v (copy-alist m) :key #'car) (copy-alist m)))
+             (m2 (sort (cons (cons v (1+ k)) rest)
+                       #'string< :key (lambda (pr) (string (car pr))))))
+        (setf res (p+ res (list (cons m2 (/ c (1+ k))))))))
+    res))
+
+(defun integ-x (e)
+  "Integral indefinida respecto a la variable DETECTADA (solo polinomios; sin +C)."
+  (let* ((vs (vars-of e)) (v (if vs (car vs) 'x)) (p (try-poly e)))
+    (if (eq p :fail) e (poly->expr (poly-integ p v)))))
+
+(defun subst-var (e v val)
+  "Sustituye la variable v por val (numero) en la formula e."
+  (cond ((numberp e) e)
+        ((symbolp e) (if (eq e v) val e))
+        ((consp e) (cons (car e) (mapcar (lambda (x) (subst-var x v val)) (cdr e))))
+        (t e)))
+
+(defun defint-x (e a b)
+  "Integral DEFINIDA de e entre a y b (regla de Barrow: F(b)-F(a)), variable detectada."
+  (let* ((vs (vars-of e)) (v (if vs (car vs) 'x)) (p (try-poly e)))
+    (if (eq p :fail) e
+        (let* ((f (poly->expr (poly-integ p v)))
+               (fb (simplify (subst-var f v b)))
+               (fa (simplify (subst-var f v a))))
+          (simplify (list '- fb fa))))))

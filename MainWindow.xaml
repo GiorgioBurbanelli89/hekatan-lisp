@@ -102,6 +102,13 @@
                        FontFamily="Consolas" FontSize="15" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="14,0,0,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button x:Name="BtnRun" Style="{StaticResource ModeBtn}" Content="▶ Ejecutar" Click="OnRun"
+                        Foreground="#5DCAA5" ToolTip="Ejecuta ahora (F5). Útil si AutoRun está apagado."/>
+                <CheckBox x:Name="ChkAutoRun" Content="AutoRun" IsChecked="True" Foreground="#E7EDF3"
+                          VerticalAlignment="Center" Margin="8,0,4,0" FontFamily="Consolas" FontSize="12"
+                          Checked="OnAutoRun" Unchecked="OnAutoRun"
+                          ToolTip="Actualiza el resultado en vivo tras cada cambio (como Hekatan Lab)"/>
+                <Border Width="12"/>
                 <TextBlock Text="resultado como:" Foreground="#8B98A6" FontFamily="Consolas" FontSize="12"
                            VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <Button x:Name="BtnRender" Style="{StaticResource ModeBtn}" Content="Render CSS" Click="OnViewRender"/>

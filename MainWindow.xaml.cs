@@ -29,6 +29,7 @@ namespace HekatanLisp
             new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
         private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
         private string _op = "auto";               // operación: "auto" | "simplify" | "expand" | "deriv"
+        private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
         private string _shot, _ctl;
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
@@ -62,7 +63,8 @@ namespace HekatanLisp
             _webReady = true;
 
             Editor.TextChanged += (s, ev) => { _debounce.Stop(); _debounce.Start(); };
-            _debounce.Tick += (s, ev) => { _debounce.Stop(); ShowResult(); };
+            _debounce.Tick += (s, ev) => { _debounce.Stop(); if (_autoRun) ShowResult(); };
+            KeyDown += (s, ev) => { if (ev.Key == System.Windows.Input.Key.F5) { ShowResult(); ev.Handled = true; } };
 
             LoadHighlighting();
             SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
@@ -243,6 +245,16 @@ namespace HekatanLisp
             return s;
         }
 
+        // ---------- ▶ Ejecutar (manual) + AutoRun (en vivo), como Hekatan Lab ----------
+        private void OnRun(object s, RoutedEventArgs e) => ShowResult();   // ejecuta ahora (también F5)
+
+        private void OnAutoRun(object s, RoutedEventArgs e)
+        {
+            if (!IsLoaded) { _autoRun = ChkAutoRun.IsChecked == true; return; }  // durante InitializeComponent, no tocar UI
+            _autoRun = ChkAutoRun.IsChecked == true;
+            if (_autoRun) ShowResult();   // al reactivar, refresca ya
+        }
+
         // ---------- selector de OPERACIÓN (separada del formato) ----------
         private void OnOpAuto(object s, RoutedEventArgs e) => SetOp("auto");
         private void OnOpSimplify(object s, RoutedEventArgs e) => SetOp("simplify");
@@ -351,6 +363,12 @@ namespace HekatanLisp
                 case "op":       // operación: auto|simplify|expand|deriv
                     SetOp(doc.RootElement.GetProperty("name").GetString());
                     return "{\"ok\":true,\"op\":\"" + _op + "\"}";
+                case "autorun":  // enciende/apaga AutoRun (en vivo)
+                    ChkAutoRun.IsChecked = doc.RootElement.GetProperty("on").GetBoolean();
+                    return "{\"ok\":true,\"autorun\":" + (_autoRun ? "true" : "false") + "}";
+                case "run":      // pulsa ▶ Ejecutar (o F5)
+                    ShowResult();
+                    return "{\"ok\":true}";
                 case "getoutput":
                     if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
                     {
@@ -364,7 +382,7 @@ namespace HekatanLisp
                     SetSyntax(doc.RootElement.GetProperty("lisp").GetBoolean());
                     return "{\"ok\":true,\"lisp\":" + (_syntaxLisp ? "true" : "false") + "}";
                 case "state":
-                    return System.Text.Json.JsonSerializer.Serialize(new { view = _view, op = _op, lisp = _syntaxLisp });
+                    return System.Text.Json.JsonSerializer.Serialize(new { view = _view, op = _op, lisp = _syntaxLisp, autorun = _autoRun });
                 case "hashl":
                     return System.Text.Json.JsonSerializer.Serialize(new { hl = Editor.SyntaxHighlighting?.Name });
                 case "quit":

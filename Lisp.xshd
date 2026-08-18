@@ -10,9 +10,22 @@
   <Color name="Builtin"  foreground="#61AFEF" />
   <Color name="Symbol"   foreground="#56B6C2" />
 
+  <Color name="Bracket"  foreground="#56B6C2" fontWeight="bold" />
+
   <RuleSet ignoreCase="true">
 
-    <!-- comentarios: ; de LISP  y  % de MATLAB, hasta fin de linea -->
+    <!-- vectores / matrices: [ ... ]  El ; de adentro es SEPARADOR DE FILA, no
+         comentario. Por eso los corchetes son un bloque con su propia regla:
+         dentro solo se colorean numeros; el ; y los espacios quedan neutros. -->
+    <Span color="Bracket">
+      <Begin>\[</Begin>
+      <End>\]</End>
+      <RuleSet>
+        <Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?</Rule>
+      </RuleSet>
+    </Span>
+
+    <!-- comentarios: ; de LISP  y  % de MATLAB, hasta fin de linea (fuera de [ ]) -->
     <Span color="Comment"><Begin>;</Begin></Span>
     <Span color="Comment"><Begin>%</Begin></Span>
 

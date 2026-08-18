@@ -35,7 +35,7 @@ namespace HekatanLisp
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private readonly HashSet<string> _ctlSeen = new HashSet<string>();
 
-        private const string EJ_MATH = "x^2 + 3*x\r\n2^3 + 4\r\nx^2 + 1*x^2\r\n(x+1)^2\r\n3*x/2";
+        private const string EJ_MATH = "x^2 + 3*x\r\nsqrt(x) + sin(x)\r\n[1 2 3]\r\n[1 2; 3 4]\r\n3*x/2";
         private const string EJ_LOOP =
             "n = 100\r\ns = 0\r\nfor i = 1:n\r\n  s = s + i\r\nend\r\ns";
         private const string EJ_LISP = "(+ (expt x 2) (* 3 x))\r\n(* 2 (expt x 2))\r\n(+ 2 (* 3 4))";

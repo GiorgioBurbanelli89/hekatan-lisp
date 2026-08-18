@@ -33,6 +33,7 @@ namespace HekatanLisp
         private string _shot, _ctl;
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
+        private bool _ranProgram = false;          // el último resultado vino de EJECUTAR un programa (stdout de consola)
         private readonly HashSet<string> _ctlSeen = new HashSet<string>();
 
         private const string EJ_MATH = "x^2 + 3*x\r\nsqrt(x) + sin(x)\r\n[1 2 3]\r\n[1 2; 3 4]\r\n3*x/2";
@@ -127,7 +128,11 @@ namespace HekatanLisp
 
             if (IsRenderView)
             {
-                if (_webReady) Viewer.NavigateToString(LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true));
+                if (!_webReady) return;
+                // Un PROGRAMA imprime texto de consola (format/print) -> no es una fórmula:
+                // se muestra como consola (<pre>), no se pasa por el renderizador de expresiones.
+                if (_ranProgram) Viewer.NavigateToString(ConsolePage(string.Join("\n", forms)));
+                else Viewer.NavigateToString(LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true));
                 return;
             }
             var sb = new StringBuilder();
@@ -138,6 +143,17 @@ namespace HekatanLisp
                 else sb.AppendLine(ToMathView(f));
             }
             Output.Text = sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Salida de un PROGRAMA (stdout) como página de consola (monospace), tema oscuro.</summary>
+        private static string ConsolePage(string text)
+        {
+            var esc = (text ?? "").Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+            return "<!doctype html><html><head><meta charset='utf-8'><style>" +
+                   "html,body{margin:0;background:#1e1e1e;color:#d4d4d4}" +
+                   "pre{margin:0;padding:14px 16px;white-space:pre-wrap;word-break:break-word;" +
+                   "font-family:Consolas,'Cascadia Code',monospace;font-size:14px;line-height:1.5}" +
+                   "</style></head><body><pre>" + esc + "</pre></body></html>";
         }
 
         /// <summary>Una forma LISP del resultado → matemática legible (o tal cual si no parsea).</summary>
@@ -153,16 +169,19 @@ namespace HekatanLisp
         private List<string> ComputeResult()
         {
             var text = Editor.Text;
+            _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
 
             // Programas: LISP (defun/loop/let) o matemática imperativa (for/while) → EJECUTAR.
             if (LooksLikeLisp(text) && IsLispProgram(text))
             {
                 if (!Balanced(text)) return new List<string> { "…  (paréntesis sin cerrar)" };
+                _ranProgram = true;
                 return new List<string> { RunLispClean(text) };
             }
             if (!LooksLikeLisp(text) && MatlabToLisp.IsImperative(text))
             {
+                _ranProgram = true;
                 try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
                 catch (Exception ex) { return new List<string> { "…  (" + ex.Message + ")" }; }
             }

@@ -431,7 +431,7 @@ namespace HekatanLisp
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {
                     var (kind, align, raw2) = textOf[i].Value;
-                    string html = LispConverter.FormatInlineText(raw2, name => LookupVarHtml(name, labels, resOf, formOf));
+                    string html = LispConverter.FormatInlineText(raw2, name => LookupVarHtml(name, labels, resOf, formOf, funcMap));
                     display.Add(LispConverter.TxtLine(kind, align, html));
                     continue;
                 }
@@ -477,6 +477,21 @@ namespace HekatanLisp
             return display;
         }
 
+        /// <summary>¿La forma LISP tiene alguna VARIABLE LIBRE? (un identificador que no sea función/
+        /// constante conocida). Si no la tiene, es puramente numérica y se puede evaluar sin miedo.</summary>
+        private static bool HasFreeVar(string lisp)
+        {
+            foreach (System.Text.RegularExpressions.Match m in
+                     System.Text.RegularExpressions.Regex.Matches(lisp, @"[A-Za-z_]\w*"))
+            {
+                var w = m.Value.ToLower();
+                if (w is "expt" or "sqrt" or "sin" or "cos" or "tan" or "exp" or "log" or "abs"
+                    or "pi" or "vector" or "e") continue;
+                return true;
+            }
+            return false;
+        }
+
         /// <summary>Primera variable libre de una forma LISP (para la notación d/dx, ∫…dx).</summary>
         private static string FirstVar(string lispForm)
         {
@@ -494,7 +509,8 @@ namespace HekatanLisp
         /// <summary>La línea (matemática o LISP) → su forma LISP; null si está vacía o no parsea.</summary>
         // {Var} en un texto: busca la etiqueta definida en la hoja y devuelve su valor renderizado (math).
         // Si no es una etiqueta, intenta la expresión literal (número/fórmula). null = déjalo tal cual.
-        private static string LookupVarHtml(string name, string[] labels, string[] resOf, string[] formOf)
+        private static string LookupVarHtml(string name, string[] labels, string[] resOf, string[] formOf,
+                                            Dictionary<string, (List<string> ps, LispConverter.N body)> funcMap = null)
         {
             // 1) ¿es una ETIQUETA definida en la hoja? → su resultado (ya calculado en el lote)
             for (int j = 0; j < labels.Length; j++)
@@ -504,13 +520,17 @@ namespace HekatanLisp
                             ? resOf[j] : formOf[j];
                     try { return LispConverter.ToHtml(LispConverter.ParseLisp(r)); } catch { return null; }
                 }
-            // 2) expresión suelta: si trae un TOKEN (Factor, Partial, Simplify…), COMPÚTALA con el motor
-            //    y renderiza el resultado; si no, se renderiza tal cual (símbolo/fórmula).
+            // 2) expresión suelta: aplica funciones (f(3)→3²+1) y, si trae un TOKEN (Factor, Partial,
+            //    Simplify…), COMPÚTALA con el motor y renderiza el resultado; si no, tal cual.
             try
             {
                 var tree = LispConverter.ParseMath(name);
+                if (funcMap != null && funcMap.Count > 0) tree = LispConverter.SubstFuncs(tree, funcMap);
                 var lisp = LispConverter.ToLisp(tree);
-                if (HasOpCall(lisp))
+                // Computa SOLO si hay token (Factor/Partial/…) o si es TOTALMENTE numérico (sin variable
+                // libre, ej. N1(-1)=1). Un símbolo como N_i NO se toca: se dibuja tal cual (si lo pasáramos
+                // por el motor, una variable libre podría dar 0 o volver en minúscula).
+                if (HasOpCall(lisp) || !HasFreeVar(lisp))
                 {
                     var res = LispEngine.EvalOp(new List<string> { lisp }, "auto", null);
                     var rr = res.Count > 0 ? res[0].Trim() : "";
@@ -611,8 +631,14 @@ namespace HekatanLisp
         private static bool LooksLikeLisp(string t)
         {
             if (t.TrimStart().StartsWith(";")) return true;
-            return System.Text.RegularExpressions.Regex.IsMatch(t,
-                @"\(\s*((defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\b|[-+*/=<>])");
+            // (a) una palabra clave LISP tras '(' → seguro es LISP
+            if (System.Text.RegularExpressions.Regex.IsMatch(t,
+                @"\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\b"))
+                return true;
+            // (b) forma prefija de operador  (- 1 2) : el '(' NO va pegado a un identificador
+            //     (si no, N1(-1) sería "resta LISP") y el operador lleva ESPACIO detrás (LISP: "(- 1",
+            //     no matemática "(-1)").  Así f(-1), sin(-x), (1-s)/2 quedan como MATEMÁTICA.
+            return System.Text.RegularExpressions.Regex.IsMatch(t, @"(?<![A-Za-z0-9_.])\(\s*[-+*/=<>]\s");
         }
 
         private static bool IsLispProgram(string t)

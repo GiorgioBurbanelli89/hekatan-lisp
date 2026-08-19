@@ -32,7 +32,7 @@ namespace HekatanLisp
         // ---------- parse: MATEMATICA -> arbol ----------
         // $Nombre = operadores estilo Calcpad; {} = paréntesis; @ y : = bloque solver ($Op{f @ x = a : b}).
         // ∂ y ∇ cuentan como parte del identificador → así {∂N/∂s} renderiza la parcial en comentarios.
-        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:|]");
+        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:]");
         // operadores solver de Calcpad → función del motor
         static readonly Dictionary<string, string> SolverOps = new Dictionary<string, string>
         {
@@ -127,25 +127,18 @@ namespace HekatanLisp
             }
             N VecMat()
             {
-                // ¿la matriz usa '|' para las filas? (estilo Hekatan Lab / Calcpad-simbólico:
-                //   | = fila , ; = columna).  Si no hay '|', vale el estilo MATLAB: ; = fila , , = columna.
-                bool pipe = false;
-                for (int k = i, depth = 0; k < t.Count; k++)
-                {
-                    if (t[k] == "[") depth++;
-                    else if (t[k] == "]") { depth--; if (depth == 0) break; }
-                    else if (t[k] == "|" && depth == 1) { pipe = true; break; }
-                }
+                // Sintaxis MATLAB: dentro de [ ] la COMA (o el espacio) separa columnas y el
+                // PUNTO Y COMA separa filas. El '|' NO va en el script (es OR en MATLAB); las filas
+                // con '|' son solo cosa del RENDER. Los elementos separados por espacio funcionan
+                // porque Expr() se detiene al no ver un operador (así "[2 3 4]" da 3 columnas).
                 Eat();  // '['
                 var rows = new List<List<N>>();
                 var cur = new List<N>();
-                string rowSep = pipe ? "|" : ";";      // separador de FILA según el estilo detectado
                 while (Peek() != "]" && Peek() != null)
                 {
-                    var p = Peek();
-                    if (p == rowSep) { Eat(); rows.Add(cur); cur = new List<N>(); continue; }
-                    if (p == "," || p == ";" || p == "|") { Eat(); continue; }   // separadores de COLUMNA
-                    cur.Add(Expr());   // cada elemento es una expresión
+                    if (Peek() == ";") { Eat(); rows.Add(cur); cur = new List<N>(); continue; }   // fila
+                    if (Peek() == ",") { Eat(); continue; }                                        // columna
+                    cur.Add(Expr());   // cada elemento es una expresión (espacio = siguiente columna)
                 }
                 if (Peek() == "]") Eat();
                 rows.Add(cur);

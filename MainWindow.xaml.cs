@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -34,6 +36,7 @@ namespace HekatanLisp
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private bool _ranProgram = false;          // el último resultado vino de EJECUTAR un programa (stdout de consola)
+        private bool _dark = true;                 // tema: oscuro (true) / claro (false), como Hekatan Lab
         private readonly HashSet<string> _ctlSeen = new HashSet<string>();
 
         private const string EJ_MATH = "x^2 + 3*x\r\nsqrt(x) + sin(x)\r\n[1 2 3]\r\n[1 2; 3 4]\r\n3*x/2";
@@ -63,18 +66,54 @@ namespace HekatanLisp
             Viewer.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
             _webReady = true;
 
-            Editor.TextChanged += (s, ev) => { _debounce.Stop(); _debounce.Start(); };
-            _debounce.Tick += (s, ev) => { _debounce.Stop(); if (_autoRun) ShowResult(); };
-            KeyDown += (s, ev) => { if (ev.Key == System.Windows.Input.Key.F5) { ShowResult(); ev.Handled = true; } };
+            Editor.TextChanged += (s, ev) =>
+            {
+                if (_reprSwitch) return;   // solo cambió la REPRESENTACIÓN izquierda → NO recalcular la derecha
+                _transliterated = false;
+                if (LblIn != null && LblIn.Text.Contains("aprox"))   // quita la etiqueta pegada de "MATLAB aprox"
+                    LblIn.Text = _syntaxLisp ? "escribes: expresión LISP (símbolo — NO ejecutable; para correr usa «LISP completo»)" : "escribes: texto plano";
+                _debounce.Stop(); _debounce.Start();
+            };
+            _debounce.Tick += (s, ev) => { _debounce.Stop(); if (_autoRun) ShowResult(); AutoSaveTemp(); };
+            KeyDown += (s, ev) =>
+            {
+                if (ev.Key == System.Windows.Input.Key.F5) { ShowResult(); ev.Handled = true; }
+                // Ctrl+S = Guardar (al archivo actual, sin volver a preguntar)
+                else if (ev.Key == System.Windows.Input.Key.S
+                         && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0)
+                { MenuGuardar(this, null); ev.Handled = true; }
+            };
 
             LoadHighlighting();
-            SyntaxToggle.Content = _syntaxLisp ? "escribo: LISP" : "escribo: matemática";
-            if (string.IsNullOrWhiteSpace(Editor.Text)) Editor.Text = EJ_MATH;
+            HighlightSyntax();
+            Editor.TextArea.TextEntered += OnTextEntered;   // autocompletar símbolos LISP
+            Editor.PreviewMouseWheel += OnCtrlZoom;          // Ctrl+rueda = zoom (como el render)
+            Output.PreviewMouseWheel += OnCtrlZoom;
+            PoblarEjemplos();                                // menú Ejemplos ← carpeta ejemplos/
+            if (string.IsNullOrWhiteSpace(Editor.Text))
+            {
+                // arranque normal: recupera el trabajo NO guardado del respaldo temporal (si existe)
+                string recup = null;
+                if (_ctl == null && _shot == null)
+                    try { if (File.Exists(AutoSavePath)) recup = File.ReadAllText(AutoSavePath); } catch { }
+                Editor.Text = !string.IsNullOrWhiteSpace(recup) ? recup : EJ_MATH;
+            }
             SetView(_view);
             SetOp(_op);
 
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
+        }
+
+        // Ctrl + rueda del ratón → zoom del texto (agranda/achica la fuente del editor/salida)
+        private void OnCtrlZoom(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
+            if (sender is ICSharpCode.AvalonEdit.TextEditor ed)
+            {
+                ed.FontSize = Math.Max(8, Math.Min(48, ed.FontSize + (e.Delta > 0 ? 1.5 : -1.5)));
+                e.Handled = true;
+            }
         }
 
         /// <summary>Resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran/Lab).</summary>
@@ -93,23 +132,29 @@ namespace HekatanLisp
         // ---------- selector de formato de la DERECHA ----------
         private void OnViewRender(object s, RoutedEventArgs e) => SetView("render");
         private void OnViewLisp(object s, RoutedEventArgs e) => SetView("lisp");
+        private void OnViewLearn(object s, RoutedEventArgs e) => SetView("learn");
         private void OnViewMath(object s, RoutedEventArgs e) => SetView("math");
 
         private void SetView(string view)
         {
             _view = view;
-            var on = (Color)ColorConverter.ConvertFromString("#4B42AD");
-            var off = (Color)ColorConverter.ConvertFromString("#232833");
+            // seleccionado = morado (claro en tema claro, oscuro en tema oscuro); resto = fondo temático del botón.
+            // Antes el 'off' estaba FIJO en oscuro → en modo claro los botones se veían negros e ilegibles.
+            var on = (Color)ColorConverter.ConvertFromString(_dark ? "#4B42AD" : "#C7C0F2");
+            var off = (Resources["ThemeButtonBg"] as SolidColorBrush)?.Color
+                      ?? (Color)ColorConverter.ConvertFromString("#262016");
             BtnRender.Background = new SolidColorBrush(view == "render" ? on : off);
             BtnLisp.Background = new SolidColorBrush(view == "lisp" ? on : off);
+            BtnLearn.Background = new SolidColorBrush(view == "learn" ? on : off);
             BtnMath.Background = new SolidColorBrush(view == "math" ? on : off);
 
-            LblIn.Text = _syntaxLisp ? "escribes: LISP" : "escribes: matemática";
+            LblIn.Text = _syntaxLisp ? "escribes: expresión LISP (símbolo — NO ejecutable; para correr usa «LISP completo»)" : "escribes: texto plano";
             LblOut.Text = view switch
             {
                 "render" => "resultado — render CSS",
                 "lisp" => "resultado — forma LISP",
-                _ => "resultado — matemática",
+                "learn" => "resultado — 3 formas (Renderizado · LISP · Texto plano)",
+                _ => "resultado — texto plano",
             };
             ShowResult();
         }
@@ -118,21 +163,46 @@ namespace HekatanLisp
         // El resultado es SIEMPRE una forma LISP canónica (o número/mensaje); la DERECHA
         // la muestra como render / LISP / matemática. La OPERACIÓN (auto/simplify/expand/deriv)
         // es SEPARADA: 'auto' NO simplifica, deja la expresión tal cual (o su valor si es número).
-        private bool IsRenderView => _view == "render";
+        private bool IsRenderView => _view == "render" || _view == "learn";
 
-        private void ShowResult()
+        // vista MATLAB 2017a REAL: muestra el código MATLAB (syms + tic/toc) en el panel, para copiar.
+
+        private int _showGen = 0;
+        private System.Threading.Tasks.Task _showTask = System.Threading.Tasks.Task.CompletedTask;
+
+        // Lanza el cálculo. El SBCL corre en SEGUNDO PLANO → la UI nunca se congela.
+        private void ShowResult() { _showTask = RunShowAsync(); }
+
+        private async System.Threading.Tasks.Task RunShowAsync()
         {
-            var forms = ComputeResult();   // formas LISP canónicas (o números/mensajes)
+            int gen = ++_showGen;                          // marca esta petición (la última gana)
+            // La DERECHA siempre muestra el RESULTADO del ORIGINAL, aunque la izquierda muestre
+            // el LISP completo o el código Hekatan Lab (esos solo cambian la representación de copia).
+            var text = SourceText();
+            var dvar = TxtVar?.Text?.Trim();
             Output.Visibility = IsRenderView ? Visibility.Collapsed : Visibility.Visible;
             Viewer.Visibility = IsRenderView ? Visibility.Visible : Visibility.Collapsed;
+
+            // el cálculo pesado (SBCL) fuera del hilo de UI
+            var forms = await System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
+            if (gen != _showGen) return;                   // llegó algo más nuevo → descarta este
 
             if (IsRenderView)
             {
                 if (!_webReady) return;
-                // Un PROGRAMA imprime texto de consola (format/print) -> no es una fórmula:
-                // se muestra como consola (<pre>), no se pasa por el renderizador de expresiones.
-                if (_ranProgram) Viewer.NavigateToString(ConsolePage(string.Join("\n", forms)));
-                else Viewer.NavigateToString(LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true));
+                // Programa: su salida (N1 = …, texto…) se RENDERIZA (RenderPage dibuja "N1 = fórmula"
+                // bonito y deja el texto suelto como está). Así la DEDUCCIÓN se ve como matemática.
+                string html;
+                if (_view == "learn")   // 3 formas: Matemática · LISP · MATLAB (para aprender)
+                    html = LispConverter.LearnPage(string.Join("\n", forms), fromLisp: true);
+                else
+                {
+                    html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true);
+                    var svg = BuildPlots(text, forms);   // ;grafica en comentario → dibuja las funciones
+                    if (!string.IsNullOrEmpty(svg))
+                        html = html.Replace("</body>", "<hr style=\"border:0;border-top:1px solid var(--mut);opacity:.4;margin:1.2em 0\">" + svg + "</body>");
+                }
+                Viewer.NavigateToString(html);
                 return;
             }
             var sb = new StringBuilder();
@@ -143,6 +213,90 @@ namespace HekatanLisp
                 else sb.AppendLine(ToMathView(f));
             }
             Output.Text = sb.ToString().TrimEnd();
+        }
+
+        // ;grafica en COMENTARIO (LISP lo ignora, la app lo dibuja): ";grafica s -1 1 [N1 N2 …]".
+        // Toma las funciones YA deducidas (etiquetas NAME = … = RESULTADO de la salida) y las grafica.
+        // línea de comentario que empieza el comando de gráfica; el resto se parsea a mano
+        private static readonly System.Text.RegularExpressions.Regex RxGraf = new System.Text.RegularExpressions.Regex(
+            @"^\s*;+\s*(fplot|plot|ezplot|graficas?|grafico)\b(.*)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // separa por comas de PRIMER nivel (respeta [ ] y ( ))
+        private static List<string> SplitTop(string s)
+        {
+            var res = new List<string>(); int depth = 0; var cur = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (c == '[' || c == '(') depth++;
+                else if (c == ']' || c == ')') depth--;
+                if (c == ',' && depth == 0) { res.Add(cur.ToString()); cur.Clear(); }
+                else cur.Append(c);
+            }
+            if (cur.ToString().Trim().Length > 0) res.Add(cur.ToString());
+            return res;
+        }
+
+        private static string BuildPlots(string editorText, List<string> forms)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            // 1) recolecta NOMBRE -> arbol del RESULTADO (ultimo tramo tras " = ")
+            var fns = new List<(string name, LispConverter.N tree)>();
+            var byName = new Dictionary<string, LispConverter.N>();
+            var todas = (forms ?? new List<string>()).SelectMany(f => (f ?? "").Replace("\r", "").Split('\n'));
+            foreach (var raw in todas)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                if (!m.Success) continue;
+                var partes = System.Text.RegularExpressions.Regex.Split(m.Groups[2].Value, @"\s=\s");
+                try
+                {
+                    var tree = LispConverter.ParseLisp(partes[partes.Length - 1].Trim());
+                    if (!byName.ContainsKey(m.Groups[1].Value)) { byName[m.Groups[1].Value] = tree; fns.Add((m.Groups[1].Value, tree)); }
+                }
+                catch { }
+            }
+            // 2) por cada directiva de gráfica, arma un SVG
+            var outp = new StringBuilder();
+            foreach (System.Text.RegularExpressions.Match d in RxGraf.Matches(editorText ?? ""))
+            {
+                string rest = d.Groups[2].Value.Trim();
+                double lo = -1, hi = 1; string forcedVar = null;
+                var sel = new List<(string, LispConverter.N)>();
+
+                var paren = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (paren.Success)   // ---- estilo MATLAB: fplot(N1, N2, [-1 1]) o fplot(1-s^2, [-1 1]) ----
+                {
+                    foreach (var a0 in SplitTop(paren.Groups[1].Value))
+                    {
+                        var a = a0.Trim(); if (a.Length == 0) continue;
+                        var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
+                        if (rng.Success) { double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out lo); double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out hi); continue; }
+                        AddFn(sel, byName, a);
+                    }
+                }
+                else   // ---- forma simple: ;grafica s -1 1 [N1 N2 …] ----
+                {
+                    var toks = rest.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    int k = 0;
+                    if (toks.Length > 0 && !double.TryParse(toks[0], System.Globalization.NumberStyles.Any, inv, out _)) { forcedVar = toks[0]; k = 1; }
+                    if (toks.Length >= k + 2 && double.TryParse(toks[k], System.Globalization.NumberStyles.Any, inv, out lo) && double.TryParse(toks[k + 1], System.Globalization.NumberStyles.Any, inv, out hi))
+                        for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
+                }
+                if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
+                if (sel.Count == 0) continue;
+                string var = forcedVar ?? LispConverter.FreeVar(sel[0].Item2);
+                var svg = LispConverter.PlotSvg(var, lo, hi, sel);
+                if (!string.IsNullOrEmpty(svg)) outp.Append(svg);
+            }
+            return outp.ToString();
+        }
+
+        // agrega una función: por NOMBRE ya deducido, o expresión MATLAB inline (1-s^2)
+        private static void AddFn(List<(string, LispConverter.N)> sel, Dictionary<string, LispConverter.N> byName, string spec)
+        {
+            if (byName.TryGetValue(spec, out var t)) { sel.Add((spec, t)); return; }
+            try { var t2 = LispConverter.ParseMath(spec); if (t2 != null) sel.Add((spec, t2)); } catch { }
         }
 
         /// <summary>Salida de un PROGRAMA (stdout) como página de consola (monospace), tema oscuro.</summary>
@@ -161,14 +315,22 @@ namespace HekatanLisp
         {
             if (string.IsNullOrWhiteSpace(lispForm)) return "";
             if (lispForm.StartsWith("⚠") || lispForm.StartsWith("…")) return lispForm;
-            try { return LispConverter.ToLab(LispConverter.ParseLisp(lispForm), 0); } catch { return lispForm; }
+            // "A = B = C" → convierte cada tramo a matemática y une con " = " (todo en UNA línea)
+            var partes = System.Text.RegularExpressions.Regex.Split(lispForm, @"\s=\s");
+            var outp = new List<string>();
+            foreach (var p in partes)
+            {
+                var t = p.Trim();
+                if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^[A-Za-z]\w*$")) { outp.Add(t); continue; }  // NAME
+                try { outp.Add(LispConverter.ToLab(LispConverter.ParseLisp(t), 0)); } catch { outp.Add(t); }
+            }
+            return string.Join(" = ", outp);
         }
 
         /// <summary>El RESULTADO como FORMAS LISP. Autodetecta programa (ejecuta) vs expresiones
         /// (les aplica la operación elegida: auto/simplify/expand/deriv).</summary>
-        private List<string> ComputeResult()
+        private List<string> ComputeResult(string text, string dvar)
         {
-            var text = Editor.Text;
             _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
 
@@ -179,47 +341,270 @@ namespace HekatanLisp
                 _ranProgram = true;
                 return new List<string> { RunLispClean(text) };
             }
-            if (!LooksLikeLisp(text) && MatlabToLisp.IsImperative(text))
+            // Solo EJECUTAR (imperativo) si hay CONTROL DE FLUJO real (for/while/if/function).
+            // Las asignaciones simples "N1 = expr" NO se ejecutan: son etiquetas simbólicas.
+            if (!LooksLikeLisp(text) &&
+                System.Text.RegularExpressions.Regex.IsMatch(text, @"(^|\n)\s*(for|while|if|function)\b"))
             {
                 _ranProgram = true;
                 try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
                 catch (Exception ex) { return new List<string> { "…  (" + ex.Message + ")" }; }
             }
 
+            // DESPEJAR: cada línea "lhs = rhs" (o "expr" que implica expr = 0) → resolver para la variable.
+            if (_op == "despejar")
+            {
+                var disp = new List<string>();
+                foreach (var raw in text.Replace("\r", "").Split('\n'))
+                {
+                    var line = raw.Trim();
+                    if (line.Length == 0) { disp.Add(""); continue; }
+                    var eq = line.Split(new[] { '=' }, 2);
+                    string lhsF = LispFormOfLine(eq[0].Trim()) ?? "0";
+                    string rhsF = LispFormOfLine(eq.Length > 1 ? eq[1].Trim() : "0") ?? "0";
+                    string v = !string.IsNullOrWhiteSpace(dvar) ? dvar.Trim()
+                             : ((lhsF + " " + rhsF).Contains("x") ? "x" : FirstVar(lhsF + " " + rhsF));
+                    string sol = LispEngine.RunDespejar(lhsF, rhsF, v);
+                    disp.Add(v + " = " + sol);
+                }
+                return disp;
+            }
+
             // Expresiones (matemática o LISP) → aplicar la operación elegida.
             var lines = text.Replace("\r", "").Split('\n');
             var formOf = new string[lines.Length];
+            var labels = new string[lines.Length];   // nombre que DEFINE cada línea (N1, N2…) si es "NAME = expr"
+            var textOf = new (string kind, string align, string text)?[lines.Length];  // directiva de TEXTO (; formato)
             var forms = new List<string>();
             var idx = new List<int>();
+            var treeOf = new LispConverter.N[lines.Length];   // árbol de cada línea (para resolver etiquetas)
+            var notationOf = new string[lines.Length];        // línea de NOTACIÓN pura (f(x)=…, y=f(x)=…): se dibuja, no se calcula
+            var funcMap = new Dictionary<string, (List<string> ps, LispConverter.N body)>();  // f(x)=x²+1 → aplicar f(3)
+            // PASO 1: parsear cada línea a árbol + detectar su etiqueta
             for (int i = 0; i < lines.Length; i++)
             {
-                formOf[i] = LispFormOfLine(lines[i]);
+                var exprText = lines[i];
+                if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
+                        @"^\s*;+\s*(fplot|plot|ezplot|graficas?|grafico)\b",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
+                var td = LispConverter.TextDirective(lines[i]);
+                if (td != null) { textOf[i] = td; continue; }
+                CollectFuncDefs(lines[i], funcMap);   // registra  f(x)=…  para poder aplicar f(3) después
+                // NOTACIÓN de función / cadena de igualdades: se RENDERIZA tal cual, sin pasar por el motor.
+                //   f(x) = x^2+1   ·   y = f(x) = x^2+1   ·   h(x) = f(G(x))
+                // Regla (el porqué): es notación si hay ≥2 signos '=' (cadena), o si ANTES del 1er '='
+                // aparece una llamada de función  id(…)  (definición). Un  N1 = (1-s)/2  NO lo es.
+                var nt = NotationLine(lines[i]);
+                if (nt != null) { notationOf[i] = nt; continue; }
+                var lm = System.Text.RegularExpressions.Regex.Match(lines[i].Trim(),
+                            @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");   // NAME = expr  (no ==)
+                if (lm.Success) { labels[i] = lm.Groups[1].Value; exprText = lm.Groups[2].Value; }
+                treeOf[i] = TreeOfLine(exprText);
+            }
+            // mapa etiqueta → su árbol (para sustituir  Partial{v@x}  con la definición de v)
+            var labelMap = new Dictionary<string, LispConverter.N>();
+            for (int i = 0; i < lines.Length; i++)
+                if (labels[i] != null && treeOf[i] != null && !labelMap.ContainsKey(labels[i]))
+                    labelMap[labels[i]] = treeOf[i];
+            // PASO 2: sustituir etiquetas y pasar a LISP
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (treeOf[i] == null) continue;
+                try
+                {
+                    var app = funcMap.Count > 0 ? LispConverter.SubstFuncs(treeOf[i], funcMap) : treeOf[i];  // aplica f(3)→3²+1
+                    var sub = LispConverter.SubstLabels(app, labelMap, labels[i], new HashSet<string>());
+                    formOf[i] = LispConverter.ToLisp(sub);
+                }
+                catch { formOf[i] = null; }
                 if (formOf[i] != null) { forms.Add(formOf[i]); idx.Add(i); }
             }
-            var results = LispEngine.EvalOp(forms, _op);
+            bool hasVar = !string.IsNullOrWhiteSpace(dvar);   // dvar = variable de la parcial (∂/∂), o null = auto
+            var results = LispEngine.EvalOp(forms, _op, dvar);
             var resOf = new string[lines.Length];
             for (int k = 0; k < idx.Count; k++) resOf[idx[k]] = k < results.Count ? results[k].Trim() : "";
 
-            // Muestra el CÁLCULO: la ENTRADA y, debajo, "= RESULTADO" (solo si cambió).
+            // Muestra el CÁLCULO: la ENTRADA (con nombre N1= y símbolo d/dx ó ∫ si aplica) y "= RESULTADO".
             var display = new List<string>();
             for (int i = 0; i < lines.Length; i++)
             {
+                if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
+                {
+                    var (kind, align, raw2) = textOf[i].Value;
+                    string html = LispConverter.FormatInlineText(raw2, name => LookupVarHtml(name, labels, resOf, formOf));
+                    display.Add(LispConverter.TxtLine(kind, align, html));
+                    continue;
+                }
+                if (notationOf[i] != null) { display.Add(notationOf[i]); continue; }   // notación: ya viene en forma LISP "a = b = c"
                 if (formOf[i] == null) { display.Add(""); continue; }
-                display.Add(formOf[i]);
+                string lbl = labels[i];
+                string v = hasVar ? dvar : FirstVar(formOf[i]);
                 var r = resOf[i] ?? "";
-                if (r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && r != formOf[i])
-                    display.Add("= " + r);
+                bool hasR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && r != formOf[i];
+
+                if (_op == "deriv" || _op == "integ")
+                {   // d/dv(N1) = …   ó   ∫ N1 dv = …  TODO EN UNA LÍNEA (notación = resultado)
+                    string inner = lbl ?? formOf[i];
+                    string notation = "(" + (_op == "deriv" ? "deriv" : "integ") + " " + inner + " " + v + ")";
+                    // deriv: SIEMPRE muestra el resultado (d/dx(e^x)=e^x, aunque sea = input).
+                    // integ: muestra el resultado salvo que el motor marque (no-elem …) = no supo integrarlo.
+                    //        Así ∫e^x dx = e^x SÍ se muestra (aunque coincida con el input).
+                    bool okR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase);
+                    bool unsup = r.StartsWith("(no-elem");
+                    bool showR = _op == "deriv" ? okR : (okR && !unsup);
+                    display.Add(showR ? notation + " = " + r : notation);
+                }
+                else if (lbl != null)   // auto/simplify/expand con nombre → "N1 = <expr o resultado>"
+                {
+                    // si la fórmula tiene TOKENS (Partial, Factor…) muestra TÉRMINO = RESULTADO
+                    // (el término entero renderiza a CSS, y al lado su valor simbólico).
+                    if (HasOpCall(formOf[i]) && hasR)
+                        display.Add(lbl + " = " + formOf[i] + " = " + r);
+                    else if (_op == "auto" && hasR &&
+                             System.Text.RegularExpressions.Regex.IsMatch(r, @"^-?\d+(\.\d+)?$"))
+                        display.Add(lbl + " = " + formOf[i] + " = " + r);   // f(3) = 3²+1 = 10 (numérico: muestra forma Y valor)
+                    else
+                    {
+                        string rhs = (_op == "auto" || !hasR) ? formOf[i] : r;
+                        display.Add(lbl + " = " + rhs);
+                    }
+                }
+                else                    // sin nombre → "entrada = resultado" EN UNA LÍNEA
+                {
+                    display.Add(hasR ? formOf[i] + " = " + r : formOf[i]);
+                }
             }
             return display;
         }
 
+        /// <summary>Primera variable libre de una forma LISP (para la notación d/dx, ∫…dx).</summary>
+        private static string FirstVar(string lispForm)
+        {
+            foreach (System.Text.RegularExpressions.Match m in
+                     System.Text.RegularExpressions.Regex.Matches(lispForm, @"[A-Za-z_]\w*"))
+            {
+                var w = m.Value.ToLower();
+                if (w is "expt" or "sqrt" or "sin" or "cos" or "tan" or "exp" or "log" or "abs"
+                    or "vector" or "deriv" or "integ" or "pi") continue;
+                return m.Value;
+            }
+            return "x";
+        }
+
         /// <summary>La línea (matemática o LISP) → su forma LISP; null si está vacía o no parsea.</summary>
+        // {Var} en un texto: busca la etiqueta definida en la hoja y devuelve su valor renderizado (math).
+        // Si no es una etiqueta, intenta la expresión literal (número/fórmula). null = déjalo tal cual.
+        private static string LookupVarHtml(string name, string[] labels, string[] resOf, string[] formOf)
+        {
+            // 1) ¿es una ETIQUETA definida en la hoja? → su resultado (ya calculado en el lote)
+            for (int j = 0; j < labels.Length; j++)
+                if (labels[j] == name)
+                {
+                    var r = !string.IsNullOrEmpty(resOf[j]) && !resOf[j].Equals("nil", StringComparison.OrdinalIgnoreCase)
+                            ? resOf[j] : formOf[j];
+                    try { return LispConverter.ToHtml(LispConverter.ParseLisp(r)); } catch { return null; }
+                }
+            // 2) expresión suelta: si trae un TOKEN (Factor, Partial, Simplify…), COMPÚTALA con el motor
+            //    y renderiza el resultado; si no, se renderiza tal cual (símbolo/fórmula).
+            try
+            {
+                var tree = LispConverter.ParseMath(name);
+                var lisp = LispConverter.ToLisp(tree);
+                if (HasOpCall(lisp))
+                {
+                    var res = LispEngine.EvalOp(new List<string> { lisp }, "auto", null);
+                    var rr = res.Count > 0 ? res[0].Trim() : "";
+                    if (rr.Length > 0 && !rr.Equals("nil", StringComparison.OrdinalIgnoreCase) && rr != lisp)
+                        return LispConverter.ToHtml(LispConverter.ParseLisp(rr));
+                }
+                return LispConverter.ToHtml(tree);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Si la línea es NOTACIÓN (definición de función o cadena de igualdades), la
+        /// convierte a la forma LISP "a = b = c" que RenderPage dibuja lado a lado SIN evaluar.
+        /// Devuelve null si no es notación (entonces sigue el camino normal de cálculo).
+        /// El porqué: f(x)=x²+1 no es un cálculo, es una definición; hay que DIBUJARLA, no resolverla.</summary>
+        private static string NotationLine(string raw)
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("(")) return null;   // LISP crudo no
+            // signos '=' que NO son ==, <=, >=, != …
+            var eqs = System.Text.RegularExpressions.Regex.Matches(line, @"(?<![=<>!])=(?!=)");
+            if (eqs.Count == 0) return null;
+            // antes del PRIMER '=' ¿hay una llamada de función  id(  ?  (definición f(x)= …)
+            string lhs0 = line.Substring(0, eqs[0].Index);
+            bool funcDef = System.Text.RegularExpressions.Regex.IsMatch(lhs0, @"[A-Za-z_]\w*\s*\(");
+            if (eqs.Count < 2 && !funcDef) return null;                  // un solo '=' sin función = cálculo normal
+            // partir en segmentos por cada '=' y pasar cada lado a LISP
+            var segs = System.Text.RegularExpressions.Regex.Split(line, @"\s*(?<![=<>!])=(?!=)\s*");
+            var outParts = new List<string>();
+            foreach (var s in segs)
+            {
+                var t = s.Trim();
+                if (t.Length == 0) return null;
+                var f = LispFormOfLine(t);
+                if (f == null) return null;   // si algún lado no parsea, que lo maneje el camino normal
+                outParts.Add(f);
+            }
+            return string.Join(" = ", outParts);
+        }
+
         private static string LispFormOfLine(string line)
         {
             line = line.Trim();
             if (line.Length == 0) return null;
             if (LooksLikeLisp(line)) return line;             // ya es LISP
             try { return LispConverter.MathToLisp(line); } catch { return null; }
+        }
+
+        /// <summary>Registra las definiciones de función de una línea:  f(x) = cuerpo  (también dentro de
+        /// una cadena  y = f(x) = cuerpo). Guarda nombre → (parámetros, árbol del cuerpo) para luego
+        /// APLICAR  f(3), f(a), f(G(x))  por sustitución (β-reducción, el método de la época LISP).</summary>
+        private static void CollectFuncDefs(string raw, Dictionary<string, (List<string> ps, LispConverter.N body)> map)
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("(")) return;
+            var segs = System.Text.RegularExpressions.Regex.Split(line, @"\s*(?<![=<>!])=(?!=)\s*");
+            if (segs.Length < 2) return;
+            for (int i = 0; i < segs.Length - 1; i++)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(segs[i].Trim(), @"^([A-Za-z]\w*)\s*\(([^)]*)\)$");
+                if (!m.Success) continue;
+                var name = m.Groups[1].Value;
+                var ps = new List<string>();
+                bool ok = true;
+                foreach (var p in m.Groups[2].Value.Split(','))
+                {
+                    var pn = p.Trim();
+                    if (pn.Length == 0) continue;
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(pn, @"^[A-Za-z]\w*$")) { ok = false; break; }
+                    ps.Add(pn);
+                }
+                if (!ok || ps.Count == 0 || map.ContainsKey(name)) continue;
+                try
+                {
+                    var body = LispConverter.ParseMath(segs[i + 1].Trim());
+                    if (body != null) map[name] = (ps, body);
+                }
+                catch { }
+            }
+        }
+
+        // ¿la forma LISP contiene alguna llamada de operación (Partial, Factor, ∫, …)?
+        private static readonly string[] OpCalls = {
+            "(partial","(derive-x","(factor","(expand*","(integ-var","(integ-x","(area-under","(slope-at",
+            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op" };
+        private static bool HasOpCall(string f) => f != null && System.Array.Exists(OpCalls, s => f.Contains(s));
+
+        // la línea (matemática o LISP) → su ÁRBOL (para resolver etiquetas antes de pasar a LISP)
+        private static LispConverter.N TreeOfLine(string line)
+        {
+            line = line.Trim();
+            if (line.Length == 0) return null;
+            try { return LooksLikeLisp(line) ? LispConverter.ParseLisp(line) : LispConverter.ParseMath(line); }
+            catch { return null; }
         }
 
         // ---------- motor: expresiones y programas ----------
@@ -236,7 +621,12 @@ namespace HekatanLisp
 
         private static string RunLispClean(string code)
         {
-            const string pre = "(setf *print-case* :downcase)\n";
+            // carga el motor (deriv, simplify, expand*…) para que los PROGRAMAS puedan usarlo:
+            // así puedes DEDUCIR (ej. una función lagrange que arma las funciones de forma).
+            var engine = System.IO.Path.Combine(AppContext.BaseDirectory, "engine.lisp").Replace("\\", "/");
+            // *print-right-margin* grande: que NO parta las formas largas (si no, un (- ... ) se corta
+            // en dos líneas y el render lo lee incompleto como una negación).
+            string pre = "(setf *print-case* :downcase)\n(setf *print-right-margin* 100000)\n(load \"" + engine + "\")\n";
             var res = LispEngine.RunScript(pre + code);
             if (string.IsNullOrWhiteSpace(res))
                 res = LispEngine.RunScript(pre + "(format t \"~a~%\" (progn\n" + code + "))");
@@ -274,24 +664,69 @@ namespace HekatanLisp
             if (_autoRun) ShowResult();   // al reactivar, refresca ya
         }
 
+        // al cambiar la variable de la parcial (∂/∂: s, t…), recalcula en vivo
+        private void OnVarChanged(object s, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (IsLoaded && _autoRun) ShowResult();
+        }
+
         // ---------- selector de OPERACIÓN (separada del formato) ----------
         private void OnOpAuto(object s, RoutedEventArgs e) => SetOp("auto");
         private void OnOpSimplify(object s, RoutedEventArgs e) => SetOp("simplify");
         private void OnOpExpand(object s, RoutedEventArgs e) => SetOp("expand");
         private void OnOpDeriv(object s, RoutedEventArgs e) => SetOp("deriv");
         private void OnOpInteg(object s, RoutedEventArgs e) => SetOp("integ");
+        private void OnOpDespejar(object s, RoutedEventArgs e) => SetOp("despejar");
 
         private void SetOp(string op)
         {
             _op = op;
-            var on = (Color)ColorConverter.ConvertFromString("#4B42AD");
-            var off = (Color)ColorConverter.ConvertFromString("#1B1E24");
+            var on = (Color)ColorConverter.ConvertFromString(_dark ? "#6B551E" : "#E3D08A");  // dorado activo
+            var off = (Resources["ThemeButtonBg"] as SolidColorBrush)?.Color
+                      ?? (Color)ColorConverter.ConvertFromString("#262016");                  // fondo del tema
             OpAuto.Background = new SolidColorBrush(op == "auto" ? on : off);
             OpSimplify.Background = new SolidColorBrush(op == "simplify" ? on : off);
             OpExpand.Background = new SolidColorBrush(op == "expand" ? on : off);
             OpDeriv.Background = new SolidColorBrush(op == "deriv" ? on : off);
             OpInteg.Background = new SolidColorBrush(op == "integ" ? on : off);
+            if (OpDespejar != null) OpDespejar.Background = new SolidColorBrush(op == "despejar" ? on : off);
             ShowResult();
+        }
+
+        // ---------- mostrar/ocultar calculadora + tema claro/oscuro (como Hekatan Lab) ----------
+        private void OnToggleKeypad(object s, RoutedEventArgs e)
+        {
+            if (KeypadPanel == null) return;
+            KeypadPanel.Visibility = KeypadPanel.Visibility == Visibility.Visible
+                ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void OnToggleTheme(object s, RoutedEventArgs e) { _dark = !_dark; ApplyTheme(_dark); ShowResult(); }
+
+        private void ApplyTheme(bool dark)
+        {
+            void B(string key, string hex) =>
+                Resources[key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            if (dark)
+            {
+                B("ThemeWindowBg", "#141109"); B("ThemePanelBg", "#1C1810"); B("ThemeEditorBg", "#1A1712");
+                B("ThemeText", "#E8E2D4"); B("ThemeTextMuted", "#A89F8C");
+                B("ThemeAccentRed", "#E5382B"); B("ThemeAccentGold", "#E6C463");
+                B("ThemeButtonBg", "#262016"); B("ThemeButtonBorder", "#3A3226"); B("ThemeHoverBg", "#33E5382B");
+                if (BtnTheme != null) BtnTheme.Content = "☾";
+            }
+            else
+            {
+                B("ThemeWindowBg", "#EDE6D3"); B("ThemePanelBg", "#E3DBC5"); B("ThemeEditorBg", "#FBF7EC");
+                B("ThemeText", "#2A2418"); B("ThemeTextMuted", "#6E664F");
+                B("ThemeAccentRed", "#C0392B"); B("ThemeAccentGold", "#A9791C");
+                B("ThemeButtonBg", "#E9E1CD"); B("ThemeButtonBorder", "#C7BC9F"); B("ThemeHoverBg", "#22E5382B");
+                if (BtnTheme != null) BtnTheme.Content = "☀";
+            }
+            LispConverter.Dark = dark;
+            HighlightSyntax();
+            SetView(_view);   // reaplica el fondo de los botones "resultado como" con el color del tema
+            SetOp(_op);   // reaplica el resaltado de operación con el fondo del nuevo tema (y refresca render)
         }
 
         private static bool Balanced(string code)
@@ -301,25 +736,124 @@ namespace HekatanLisp
             return b == 0;
         }
 
-        private void OnToggleSyntax(object s, RoutedEventArgs e) => SetSyntax(!_syntaxLisp);
+        private bool _synFull = false;   // el editor muestra el LISP COMPLETO (ejecutable)
 
-        /// <summary>Cambia la forma de la IZQUIERDA y CONVIERTE el contenido a esa forma
-        /// (matemática ↔ LISP). El "por qué": si eliges "escribo: LISP", la ventana izquierda
-        /// debe verse en LISP, no seguir en matemática.</summary>
+        // izquierda: MATLAB · expresión LISP · LISP (completo). El activo se resalta.
+        private void OnSynMath(object s, RoutedEventArgs e) { _synFull = false; SetSyntax(false); }
+        private void OnSynLisp(object s, RoutedEventArgs e) { _synFull = false; SetSyntax(true); }
+
+        // LISP COMPLETO en la VENTANA IZQUIERDA: vuelca el script ejecutable en el editor,
+        // para verlo entero y copiarlo (Ctrl+A → Ctrl+C) a un .lisp en blanco.
+        private void OnSynLispFull(object s, RoutedEventArgs e)
+        {
+            var text = SourceText();         // parte del ORIGINAL, no del contenido derivado
+            if (string.IsNullOrWhiteSpace(text)) return;
+            var script = BuildFullLisp(text);
+            if (string.IsNullOrWhiteSpace(script)) return;
+            _reprSwitch = true;
+            try
+            {
+                _lispBackup = text;              // guarda el original para restaurar/derivar
+                Editor.Text = script;            // el LISP completo, aquí a la izquierda
+                _synFull = true; _syntaxLisp = true; _transliterated = false;
+                HighlightSyntax();
+                LblIn.Text = "escribes: LISP completo (cópialo entero a un .lisp y córrelo)";
+            }
+            finally { _reprSwitch = false; }   // la derecha no cambia (misma expresión)
+        }
+
+        // Hekatan Lab / MATLAB en la VENTANA IZQUIERDA: pone el código (syms + diff/int + tic/toc)
+        // en el editor para copiarlo a Hekatan Lab y comparar tiempos. AQUÍ no corre (es motor LISP).
+        private void OnSynHekLab(object s, RoutedEventArgs e)
+        {
+            var text = SourceText();         // parte del ORIGINAL, no del contenido derivado
+            if (string.IsNullOrWhiteSpace(text)) return;
+            if (LooksLikeLisp(text) && IsLispProgram(text))   // Hekatan Lab es para EXPRESIONES, no programas
+            {
+                MessageBox.Show("«Hekatan Lab» convierte EXPRESIONES a MATLAB (syms, diff, int).\nNo aplica a un programa LISP.", "Hekatan LISP");
+                return;
+            }
+            var code = BuildRealMatlab(text);
+            if (string.IsNullOrWhiteSpace(code)) return;
+            _reprSwitch = true;
+            try
+            {
+                _lispBackup = text;
+                Editor.Text = code;
+                _transliterated = true;
+                _synFull = false; _syntaxLisp = false;
+                HighlightSyntax();
+                LblIn.Text = "escribes: Hekatan Lab / MATLAB (cópialo a Hekatan Lab; aquí no corre)";
+            }
+            finally { _reprSwitch = false; }   // la derecha no cambia (misma expresión)
+        }
+
+        /// <summary>Pone la IZQUIERDA en LISP o MATLAB y CONVIERTE el contenido a esa forma.
+        /// Pulsar el botón LISP deja el editor en LISP; el botón MATLAB, en MATLAB.</summary>
+        private string _lispBackup = null;    // LISP original antes de traducir a MATLAB/Hekatan Lab
+        private bool _transliterated = false; // el editor muestra código NO-LISP (no se ejecuta aquí)
+        private string _transNote = "";       // nota que se muestra a la derecha en ese estado
+        private bool _reprSwitch = false;     // true = solo cambia la representación izquierda (no recalcular)
+
+        // El texto ORIGINAL del usuario (no el derivado). Detecta el derivado por su ENCABEZADO,
+        // así es robusto aunque las banderas se desincronicen.
+        private string SourceText()
+        {
+            var t = Editor.Text ?? "";
+            var ts = t.TrimStart();
+            bool derivado = ts.StartsWith(";;;; Script LISP") || ts.StartsWith("% Hekatan Lab") || ts.StartsWith("% =====");
+            return (derivado && _lispBackup != null) ? _lispBackup : t;
+        }
+
         private void SetSyntax(bool toLisp)
         {
-            Editor.Text = ConvertEditor(Editor.Text, toLisp);
-            _syntaxLisp = toLisp;
-            SyntaxToggle.Content = toLisp ? "escribo: LISP" : "escribo: matemática";
-            LblIn.Text = toLisp ? "escribes: LISP" : "escribes: matemática";
-            ShowResult();
+            _reprSwitch = true;   // solo cambia la representación izquierda → la derecha NO se recalcula
+            try
+            {
+                // veníamos de contenido DERIVADO (completo / Hekatan Lab / pseudocódigo) → restaura el ORIGINAL
+                if ((_synFull || _transliterated) && _lispBackup != null) { Editor.Text = _lispBackup; }
+                _synFull = false;
+                _transliterated = false;
+                // BLINDAJE: un PROGRAMA LISP (defun/loop/format…) NO se convierte a texto plano por línea.
+                if (!toLisp && LooksLikeLisp(Editor.Text) && IsLispProgram(Editor.Text))
+                {
+                    _syntaxLisp = true; HighlightSyntax();
+                    LblIn.Text = "escribes: LISP (programa — no se convierte a texto plano por línea)";
+                    return;
+                }
+                Editor.Text = ConvertEditor(Editor.Text, toLisp);
+                _syntaxLisp = toLisp;
+                HighlightSyntax();
+                LblIn.Text = toLisp ? "escribes: expresión LISP (símbolo — NO ejecutable; para correr usa «LISP completo»)" : "escribes: texto plano";
+            }
+            finally { _reprSwitch = false; }
+            // NO ShowResult: cambiar la representación no cambia el resultado (solo la forma de copiar).
+        }
+
+        /// <summary>Resalta en dorado el botón de sintaxis activo (MATLAB o LISP).</summary>
+        private void HighlightSyntax()
+        {
+            if (BtnSynMath == null || BtnSynLisp == null) return;
+            var on = (Color)ColorConverter.ConvertFromString(_dark ? "#6B551E" : "#E3D08A");
+            var off = (Resources["ThemeButtonBg"] as SolidColorBrush)?.Color
+                      ?? (Color)ColorConverter.ConvertFromString("#262016");
+            BtnSynMath.Background = new SolidColorBrush((!_syntaxLisp && !_synFull && !_transliterated) ? on : off);
+            BtnSynLisp.Background = new SolidColorBrush((_syntaxLisp && !_synFull && !_transliterated) ? on : off);
+            if (BtnSynLispFull != null) BtnSynLispFull.Background = new SolidColorBrush(_synFull ? on : off);
+            if (BtnSynHekLab != null) BtnSynHekLab.Background = new SolidColorBrush(_transliterated ? on : off);
         }
 
         private static string ConvertEditor(string text, bool toLisp)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-            if (toLisp && !LooksLikeLisp(text) && MatlabToLisp.IsImperative(text))
-            {   // programa matemático (for/while) → LISP en bloque
+            // Un PROGRAMA LISP (o el script "LISP completo") YA es LISP: NO convertir línea por
+            // línea (mangaría (load …)/(setf …) que MathToLisp no entiende). Se devuelve igual.
+            if (toLisp && LooksLikeLisp(text) && IsLispProgram(text)) return text;
+            // Solo un PROGRAMA con CONTROL DE FLUJO real (for/while/if/function) va en bloque.
+            // "A = x+1" NO es programa: es una ETIQUETA simbólica (se convierte lado a lado).
+            if (toLisp && !LooksLikeLisp(text) &&
+                System.Text.RegularExpressions.Regex.IsMatch(text, @"(^|\n)\s*(for|while|if|function)\b"))
+            {
                 try { return MatlabToLisp.Translate(text).Lisp; } catch { return text; }
             }
             var sb = new StringBuilder();
@@ -327,6 +861,24 @@ namespace HekatanLisp
             {
                 var l = raw.Trim();
                 if (l.Length == 0) { sb.AppendLine(); continue; }
+                // COMENTARIO/DIRECTIVA ';' (texto, gráfica, ;;): se conserva TAL CUAL en ambos sentidos.
+                // (si no, ToLab(ParseLisp(";# título")) leería solo el 1er token y borraría el texto)
+                if (l.StartsWith(";")) { sb.AppendLine(l); continue; }
+                // etiqueta  NOMBRE = expr  → convierte SOLO el lado derecho, conserva "NOMBRE = "
+                var lm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                if (lm.Success)
+                {
+                    string rhs = lm.Groups[2].Value.Trim();
+                    try
+                    {
+                        string conv = LooksLikeLisp(rhs)
+                            ? (toLisp ? rhs : LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0))
+                            : (toLisp ? LispConverter.MathToLisp(rhs) : rhs);
+                        sb.AppendLine(lm.Groups[1].Value + " = " + conv);
+                    }
+                    catch { sb.AppendLine(l); }
+                    continue;
+                }
                 bool isLisp = LooksLikeLisp(l);
                 try
                 {
@@ -341,7 +893,8 @@ namespace HekatanLisp
         private void MenuEjemploLoop(object s, RoutedEventArgs e)
         {
             _syntaxLisp = false;
-            SyntaxToggle.Content = "escribo: matemática";
+            HighlightSyntax();
+            LblIn.Text = "escribes: texto plano";
             Editor.Text = EJ_LOOP;
             SetView(_view);
         }
@@ -384,6 +937,10 @@ namespace HekatanLisp
                 case "op":       // operación: auto|simplify|expand|deriv
                     SetOp(doc.RootElement.GetProperty("name").GetString());
                     return "{\"ok\":true,\"op\":\"" + _op + "\"}";
+                case "setvar":   // fija la variable del cuadro var: (deriv/integ/despejar)
+                    if (TxtVar != null) TxtVar.Text = doc.RootElement.GetProperty("var").GetString();
+                    ShowResult();
+                    return "{\"ok\":true}";
                 case "autorun":  // enciende/apaga AutoRun (en vivo)
                     ChkAutoRun.IsChecked = doc.RootElement.GetProperty("on").GetBoolean();
                     return "{\"ok\":true,\"autorun\":" + (_autoRun ? "true" : "false") + "}";
@@ -391,6 +948,8 @@ namespace HekatanLisp
                     ShowResult();
                     return "{\"ok\":true}";
                 case "getoutput":
+                    try { await _showTask; } catch { }          // espera al cálculo async
+                    await System.Threading.Tasks.Task.Delay(60); // deja asentar el render del WebView
                     if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
                     {
                         var t = await Viewer.ExecuteScriptAsync("(document.body?document.body.innerText:'')");
@@ -399,9 +958,32 @@ namespace HekatanLisp
                     return System.Text.Json.JsonSerializer.Serialize(new { output = Output.Text });
                 case "gettext":
                     return System.Text.Json.JsonSerializer.Serialize(new { input = Editor.Text });
+                case "theme":    // tema claro/oscuro (para verificar el render en ambos)
+                    _dark = doc.RootElement.GetProperty("dark").GetBoolean();
+                    ApplyTheme(_dark);
+                    ShowResult();
+                    return "{\"ok\":true,\"dark\":" + (_dark ? "true" : "false") + "}";
+                case "gethtml":   // vuelca el HTML del render (para PNG con render_html.py)
+                    try { await _showTask; } catch { }
+                    await System.Threading.Tasks.Task.Delay(60);
+                    if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
+                    {
+                        var h = await Viewer.ExecuteScriptAsync("document.documentElement.outerHTML");
+                        return "{\"ok\":true,\"html\":" + (string.IsNullOrEmpty(h) ? "\"\"" : h) + "}";
+                    }
+                    return "{\"ok\":false}";
                 case "syntax":   // cambia la IZQUIERDA a LISP/matemática (convierte el contenido)
                     SetSyntax(doc.RootElement.GetProperty("lisp").GetBoolean());
                     return "{\"ok\":true,\"lisp\":" + (_syntaxLisp ? "true" : "false") + "}";
+                case "synfull":  // pulsa el botón "LISP completo" (izquierda)
+                    OnSynLispFull(this, null);
+                    return "{\"ok\":true}";
+                case "synheklab": // pulsa el botón "Hekatan Lab" (izquierda)
+                    OnSynHekLab(this, null);
+                    return "{\"ok\":true}";
+                case "vermotor": // Menú Motor → Ver funciones (carga engine.lisp)
+                    MenuVerMotor(this, null);
+                    return "{\"ok\":true}";
                 case "state":
                     return System.Text.Json.JsonSerializer.Serialize(new { view = _view, op = _op, lisp = _syntaxLisp, autorun = _autoRun });
                 case "hashl":
@@ -484,9 +1066,343 @@ namespace HekatanLisp
                 "operaciones (derivar, simplificar) sólo recorren y reescriben esa lista.",
                 "Reglas de LISP");
 
-        private void MenuNuevo(object s, RoutedEventArgs e) => Editor.Text = "";
+        private void MenuNuevo(object s, RoutedEventArgs e) { Editor.Text = ""; SetCurrentFile(null); }
         private void MenuEjemplo(object s, RoutedEventArgs e) => Editor.Text = _syntaxLisp ? EJ_LISP : EJ_MATH;
         private void MenuSalir(object s, RoutedEventArgs e) => Close();
+
+        /// <summary>Genera un script LISP COMPLETO y EJECUTABLE a partir de lo que hay en el editor:
+        /// detecta si es programa o expresiones y le pone lo que necesita (cargar el motor, quote,
+        /// format para imprimir). Lo guarda y lo abre en el bloc de notas.</summary>
+        private void OnExportLisp(object s, RoutedEventArgs e)
+        {
+            var text = Editor.Text;
+            if (string.IsNullOrWhiteSpace(text)) return;
+            var script = BuildFullLisp(text);
+            // (1) copia el script completo al portapapeles  (2) lo abre en el bloc de notas para VERLO todo
+            try { Clipboard.SetText(script); } catch { }
+            try
+            {
+                var tmp = Path.Combine(Path.GetTempPath(), "hekatan_script.lisp");
+                File.WriteAllText(tmp, script);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tmp) { UseShellExecute = true });
+            }
+            catch { }
+        }
+
+        // El LISP COMPLETO y EJECUTABLE: carga el motor, cita ('), imprime. Se copia a un .lisp
+        // en blanco y CORRE en SBCL tal cual. (La vista "LISP" y el botón "📋 LISP completo" lo usan.)
+        private string BuildFullLisp(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var enginePath = Path.Combine(AppContext.BaseDirectory, "engine.lisp").Replace("\\", "/");
+            var sb = new StringBuilder();
+            var sbclDir = Path.Combine(AppContext.BaseDirectory, "sbcl").Replace("\\", "/");
+            sb.AppendLine(";;;; Script LISP ejecutable — generado por Hekatan LISP");
+            sb.AppendLine(";;;; CÓMO CORRERLO (PowerShell): primero 'cd' a la carpeta de ESTE archivo, o usa su ruta completa.");
+            sb.AppendLine(";;;;   & \"" + sbclDir + "/sbcl.exe\" --core \"" + sbclDir + "/sbcl.core\" --script \"<ruta_completa_de_este_archivo>\"");
+            sb.AppendLine(";;;; (OJO: si pasas solo el nombre, SBCL lo busca en la carpeta ACTUAL de la consola, no donde está el .lisp)");
+            sb.AppendLine(";;;; (el ' cita las expresiones como DATOS: no evalúa x, las manipula simbólico)");
+            sb.AppendLine("(load \"" + enginePath + "\")");
+            sb.AppendLine("(setf *print-case* :downcase)");
+            sb.AppendLine("(setf *print-right-margin* 100000)   ; no partir formas largas en 2 lineas");
+            sb.AppendLine();
+
+            if (LooksLikeLisp(text) && IsLispProgram(text))
+            {
+                sb.AppendLine(";; es un PROGRAMA: se ejecuta tal cual (ya imprime con format)");
+                sb.AppendLine(text.Trim());
+            }
+            else
+            {
+                string opfn = _op switch
+                {
+                    "simplify" => "factor", "expand" => "expand*",
+                    "deriv" => "derive-x", "integ" => "integ-x", _ => null
+                };
+                sb.AppendLine(";; una fórmula por bloque: MATLAB (comentario) + LISP (ejecutable) + resultado (" + _op + ")");
+                sb.AppendLine(";; (las líneas ';' de TEXTO/gráfica se conservan como comentario: al correr NO se ven, solo Hekatan LISP las dibuja)");
+                int idx = 1;
+                foreach (var raw in text.Replace("\r", "").Split('\n'))
+                {
+                    var line = raw.Trim();
+                    if (line.Length == 0) { sb.AppendLine(); continue; }
+                    if (line.StartsWith(";")) { sb.AppendLine(line); continue; }   // texto/gráfica/comentario: VERBATIM
+                    // etiqueta NOMBRE = expr → usa el lado DERECHO (si no, ParseMath descarta el '=')
+                    var lm = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                    var f = LispFormOfLine(lm.Success ? lm.Groups[2].Value : line);
+                    if (f == null) continue;
+                    string matlab; try { matlab = LispConverter.ToLab(LispConverter.ParseLisp(f), 0); } catch { matlab = f; }
+                    sb.AppendLine();
+                    sb.AppendLine(";; ── fórmula " + idx + " ──");
+                    sb.AppendLine(";;    MATLAB:  " + matlab);
+                    sb.AppendLine(";;    LISP:    " + f);
+                    // operador SOLVER de Calcpad ($Area/$Slope/…): SIEMPRE se EVALÚA (imprime su resultado),
+                    // aunque la operación sea "tal cual". Si no, saldría (slope-at …) sin calcular.
+                    bool isSolver = System.Text.RegularExpressions.Regex.IsMatch(f,
+                        @"^\(\s*(area-under|slope-at|suma|producto-op|root-op|find-op|sup-op|inf-op|repeat-op)\b");
+                    if (isSolver)
+                        sb.AppendLine("(let ((r (ignore-errors " + f + "))) (format t \"" +
+                                      matlab.Replace("\\", "\\\\").Replace("\"", "\\\"") +
+                                      "  =>  ~a~%\" (cond ((null r) '?) ((consp r) (or (ignore-errors (infix r)) r)) (t r))))");
+                    // imprime en MATEMÁTICA (infix) y también deja ver la forma LISP entre paréntesis
+                    else if (opfn == null)
+                        sb.AppendLine("(let ((e '" + f + ")) (format t \"~a       (LISP: ~a)~%\" (infix e) e))");
+                    else
+                        sb.AppendLine("(let* ((e '" + f + ") (r (or (ignore-errors (" + opfn +
+                                      " e)) e))) (format t \"~a  =>  ~a       (LISP: ~a)~%\" (infix e) (infix r) r))");
+                    idx++;
+                }
+            }
+            return sb.ToString();
+        }
+        // ---------- carpeta de ejemplos (para practicar) ----------
+        private static string EjemplosDir => Path.Combine(AppContext.BaseDirectory, "ejemplos");
+
+        private void PoblarEjemplos()
+        {
+            if (MnuEjemplos == null) return;
+            MnuEjemplos.Items.Clear();
+            try
+            {
+                if (Directory.Exists(EjemplosDir))
+                    foreach (var f in System.Linq.Enumerable.OrderBy(Directory.GetFiles(EjemplosDir, "*.lisp"), x => x))
+                    {
+                        var path = f;
+                        var mi = new MenuItem { Header = Path.GetFileNameWithoutExtension(f) };
+                        mi.Click += (s, e) => CargarArchivo(path);
+                        MnuEjemplos.Items.Add(mi);
+                    }
+            }
+            catch { }
+            if (MnuEjemplos.Items.Count == 0)
+                MnuEjemplos.Items.Add(new MenuItem { Header = "(no hay ejemplos)", IsEnabled = false });
+        }
+
+        // ---------- documento actual (para que Guardar/Ctrl+S no vuelva a preguntar) ----------
+        private string _currentFile = null;   // ruta del archivo abierto/guardado; null = sin guardar aún
+        // carpeta propia del usuario (NO dentro del programa, NO en %temp%): Documentos\Hekatan LISP
+        private static string DocsDir
+        {
+            get
+            {
+                var d = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Hekatan LISP");
+                try { Directory.CreateDirectory(d); } catch { }
+                return d;
+            }
+        }
+        private void SetCurrentFile(string path)
+        {
+            _currentFile = path;
+            Title = string.IsNullOrEmpty(path) ? "Hekatan LISP" : "Hekatan LISP — " + Path.GetFileName(path);
+            // ya hay archivo REAL → el respaldo temporal sobra (bórralo)
+            if (!string.IsNullOrEmpty(path))
+                try { if (File.Exists(AutoSavePath)) File.Delete(AutoSavePath); } catch { }
+        }
+
+        // respaldo del trabajo NO guardado: mientras no haya archivo real, se vuelca a %temp%.
+        private static string AutoSavePath => Path.Combine(Path.GetTempPath(), "hekatan_lisp_autosave.lisp");
+        private void AutoSaveTemp()
+        {
+            if (!string.IsNullOrEmpty(_currentFile)) return;   // hay archivo real → no usa temporal
+            if (_ctl != null || _shot != null) return;         // en pruebas headless no respalda
+            try
+            {
+                var t = Editor.Text ?? "";
+                if (t.Trim().Length == 0) { if (File.Exists(AutoSavePath)) File.Delete(AutoSavePath); }
+                else File.WriteAllText(AutoSavePath, t);
+            }
+            catch { }
+        }
+
+        private void CargarArchivo(string path)
+        {
+            try
+            {
+                Editor.Text = File.ReadAllText(path);
+                _synFull = false; _transliterated = false;
+                _syntaxLisp = LooksLikeLisp(Editor.Text);
+                HighlightSyntax();
+                LblIn.Text = _syntaxLisp ? "escribes: expresión LISP (símbolo — NO ejecutable; para correr usa «LISP completo»)" : "escribes: texto plano";
+                SetCurrentFile(path);     // recuerda el archivo abierto
+                ShowResult();
+            }
+            catch (Exception ex) { MessageBox.Show("No pude abrir: " + ex.Message); }
+        }
+
+        private void MenuAbrir(object s, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "LISP (*.lisp)|*.lisp|Todos (*.*)|*.*",
+                InitialDirectory = DocsDir
+            };
+            if (dlg.ShowDialog() == true) CargarArchivo(dlg.FileName);
+        }
+
+        // Guardar (Ctrl+S): si YA hay archivo, escribe ahí SIN preguntar. Si no, actúa como "Guardar como".
+        private void MenuGuardar(object s, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_currentFile))
+            {
+                try { File.WriteAllText(_currentFile, Editor.Text); }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
+            }
+            else MenuGuardarComo(s, e);
+        }
+
+        // Guardar como…: siempre pregunta ubicación; la recuerda para los próximos Ctrl+S.
+        private void MenuGuardarComo(object s, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "LISP (*.lisp)|*.lisp",
+                InitialDirectory = !string.IsNullOrEmpty(_currentFile) ? Path.GetDirectoryName(_currentFile) : DocsDir,
+                FileName = !string.IsNullOrEmpty(_currentFile) ? Path.GetFileName(_currentFile) : "mi_script.lisp"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                try { File.WriteAllText(dlg.FileName, Editor.Text); SetCurrentFile(dlg.FileName); }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
+            }
+        }
+
+        // ---------- autocompletar: al escribir, lista los símbolos LISP que empiezan igual ----------
+        private static readonly string[] LispSymbols =
+        {
+            "derive-x","integ-x","integ-var","defint-x","partial","simplify","expand*","infix",
+            "deriv","diff","integ","expt","sqrt","sin","cos","tan","exp","log","abs",
+            "vector","list","cons","car","cdr","first","second","third","rest","length","reverse",
+            "append","nth","mapcar","member","null","atom","consp","numberp","integerp","rationalp",
+            "symbolp","let","let*","cond","if","when","unless","and","or","not","defun","lambda",
+            "dotimes","dolist","setf","format","funcall","progn","quote","prod","factores"
+        };
+        private ICSharpCode.AvalonEdit.CodeCompletion.CompletionWindow _completion;
+
+        private void OnTextEntered(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            if (e.Text.Length != 1) return;
+            char c = e.Text[0];
+            if (!char.IsLetter(c)) return;
+            var doc = Editor.Document; int caret = Editor.CaretOffset; int start = caret;
+            while (start > 0) { char p = doc.GetCharAt(start - 1); if (char.IsLetterOrDigit(p) || p == '-' || p == '*') start--; else break; }
+            string prefix = doc.GetText(start, caret - start);
+            if (prefix.Length < 1) return;
+            var matches = System.Linq.Enumerable.ToList(
+                System.Linq.Enumerable.Where(LispSymbols, sy => sy.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
+            if (matches.Count == 0) { return; }
+            _completion = new ICSharpCode.AvalonEdit.CodeCompletion.CompletionWindow(Editor.TextArea) { StartOffset = start };
+            foreach (var m in matches) _completion.CompletionList.CompletionData.Add(new LispCompletion(m));
+            _completion.Show();
+            _completion.Closed += (s2, e2) => _completion = null;
+        }
+
+        // Ver motor: carga engine.lisp en el editor para VER las funciones (derive-x, simplify, infix…)
+        private void MenuVerMotor(object s, RoutedEventArgs e)
+        {
+            try
+            {
+                var p = Path.Combine(AppContext.BaseDirectory, "engine.lisp");
+                Editor.Text = File.ReadAllText(p);
+                _synFull = false; _syntaxLisp = true; _transliterated = false;
+                HighlightSyntax();
+                LblIn.Text = "MOTOR — funciones LISP (derive-x, simplify, expand*, integ-x, infix…)";
+            }
+            catch (Exception ex) { MessageBox.Show("No pude leer engine.lisp: " + ex.Message); }
+        }
+
+        // Ver el motor (o el programa actual) TRADUCIDO a MATLAB aprox — solo para ENTENDER.
+        private void MenuVerMotorMat(object s, RoutedEventArgs e)
+        {
+            try
+            {
+                var src = Editor.Text;
+                if (string.IsNullOrWhiteSpace(src) || !(LooksLikeLisp(src) && IsLispProgram(src)))
+                    src = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "engine.lisp"));
+                _lispBackup = src;
+                Editor.Text = LispPseudoMat.Translate(src);
+                _transliterated = true; _synFull = false; _syntaxLisp = false;
+                _transNote = "PSEUDOCÓDIGO estilo MATLAB — traducido del LISP solo para ENTENDER. NO es MATLAB real (falta 'syms'), no lo copies para correr. Menú Motor → Ver funciones (LISP) para volver.";
+                HighlightSyntax();
+                LblIn.Text = "PSEUDOCÓDIGO estilo MATLAB (no corre; para entender). Menú Motor → Ver funciones (LISP) para volver.";
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        // MATLAB 2017a REAL (Symbolic Toolbox): syms + diff/int/simplify + tic/toc. Copiable y ejecutable.
+        private string BuildRealMatlab(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var vars = new SortedSet<string>(StringComparer.Ordinal);
+            var body = new StringBuilder();
+            string OpCall(string e) => _op switch
+            {
+                "simplify" => "factor(" + e + ")",
+                "expand" => "expand(" + e + ")",
+                "deriv" => "diff(" + e + ")",
+                "integ" => "int(" + e + ")",
+                _ => e
+            };
+            // texto de Hekatan LISP → texto de Hekatan Lab: {Var}→@{Var}; quita *negrita*/_cursiva_ inline
+            // (el %'... de Hekatan Lab NO procesa markdown inline; dejaría los * y _ visibles).
+            string MdVars(string t)
+            {
+                t = System.Text.RegularExpressions.Regex.Replace(t ?? "", @"\*([^*]+)\*", "$1");
+                t = System.Text.RegularExpressions.Regex.Replace(t, @"_([^_]+)_", "$1");
+                return System.Text.RegularExpressions.Regex.Replace(t, @"\{([^}]+)\}", "@{$1}");
+            }
+            foreach (var raw in text.Replace("\r", "").Split('\n'))
+            {
+                var line = raw.Trim();
+                if (line.Length == 0) { body.AppendLine(); continue; }
+                // GRÁFICA:  ;fplot(x^2, [0 1])  →  $Plot{x^2 @ x = 0 : 1}  (Hekatan Lab NO tiene fplot;
+                // su operador Calcpad $Plot se transpila a plot(linspace,arrayfun) y SÍ dibuja).
+                var fp = System.Text.RegularExpressions.Regex.Match(line,
+                    @"^;+\s*(?:fplot|plot|ezplot)\s*\(\s*(.+?)\s*,\s*\[\s*([^\]\s]+)\s+([^\]\s]+)\s*\]\s*\)\s*$",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (fp.Success)
+                {
+                    string ex = fp.Groups[1].Value.Trim();
+                    string pv = "x"; try { pv = LispConverter.FreeVar(LispConverter.ParseMath(ex)) ?? "x"; } catch { }
+                    // plot(X, arrayfun(@(x) f, X)) — MATLAB puro que Hekatan Lab dibuja (no tiene fplot)
+                    string rng = "linspace(" + fp.Groups[2].Value + ", " + fp.Groups[3].Value + ", 200)";
+                    body.AppendLine("plot(" + rng + ", arrayfun(@(" + pv + ") " + ex + ", " + rng + "))");
+                    continue;
+                }
+                // TEXTO con formato:  directiva ';' → markup de Hekatan Lab (%" título · %'| centro · %'> der · %' texto)
+                var td = LispConverter.TextDirective(line);
+                if (td != null && line.StartsWith(";"))
+                {
+                    var (kind, align, txt) = td.Value;
+                    txt = MdVars(txt);
+                    string pfx = (kind == "h1" || kind == "h2") ? "%\" "
+                               : align == "center" ? "%'| "
+                               : align == "right" ? "%'> " : "%' ";
+                    body.AppendLine(pfx + txt);
+                    continue;
+                }
+                if (line.StartsWith("%")) { body.AppendLine(line); continue; }   // ya es MATLAB
+                if (line.StartsWith(";")) continue;                              // comentario LISP suelto
+                var lm = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                string rhs = lm.Success ? lm.Groups[2].Value : line;
+                string mexpr;
+                try
+                {
+                    var tree = LooksLikeLisp(rhs) ? LispConverter.ParseLisp(rhs) : LispConverter.ParseMath(rhs);
+                    LispConverter.LabMatlab = true;                 // solver → MATLAB (int, diff, symsum…)
+                    try { mexpr = LispConverter.ToLab(tree, 0); } finally { LispConverter.LabMatlab = false; }
+                    foreach (var v in LispConverter.VarsOf(tree)) vars.Add(v);
+                }
+                catch { mexpr = rhs; }
+                body.AppendLine(lm.Success ? (lm.Groups[1].Value + " = " + OpCall(mexpr)) : OpCall(mexpr));
+            }
+            var sb = new StringBuilder();
+            sb.AppendLine("% Hekatan Lab / MATLAB (Symbolic) — cópialo a Hekatan Lab: texto, operación y gráfica igual.");
+            sb.AppendLine("% Para MEDIR el tiempo, rodéalo con  tic ... toc  (en LISP: get-internal-real-time).");
+            if (vars.Count > 0) sb.AppendLine("syms " + string.Join(" ", vars));
+            sb.Append(body);
+            return sb.ToString().TrimEnd();
+        }
+
         private void MenuAbout(object s, RoutedEventArgs e) =>
             MessageBox.Show(
                 "Hekatan LISP\n\nEscribes matemática a la izquierda; el resultado sale a la derecha\nen render CSS, LISP o matemática. Motor SBCL embebido.",
@@ -498,5 +1414,19 @@ namespace HekatanLisp
                 if (string.Equals(a[i], flag, StringComparison.OrdinalIgnoreCase)) return a[i + 1];
             return null;
         }
+    }
+
+    // Elemento de la lista de autocompletado (AvalonEdit).
+    public class LispCompletion : ICSharpCode.AvalonEdit.CodeCompletion.ICompletionData
+    {
+        public LispCompletion(string text) { Text = text; }
+        public System.Windows.Media.ImageSource Image => null;
+        public string Text { get; }
+        public object Content => Text;
+        public object Description => "LISP · " + Text;
+        public double Priority => 0;
+        public void Complete(ICSharpCode.AvalonEdit.Editing.TextArea textArea,
+                             ICSharpCode.AvalonEdit.Document.ISegment completionSegment, EventArgs e)
+            => textArea.Document.Replace(completionSegment, Text);
     }
 }

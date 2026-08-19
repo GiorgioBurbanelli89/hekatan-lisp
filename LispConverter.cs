@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,11 +26,23 @@ namespace HekatanLisp
             public static N Make(string op, N a, N b = null) => new N { Op = op, A = a, B = b };
         }
 
-        static bool IsNum(string s) => Regex.IsMatch(s, @"^[\d.]");
+        static bool IsNum(string s) => Regex.IsMatch(s, @"^-?[\d.]");
         static int Prec(string op) => op switch { "^" => 4, "*" or "/" => 2, "+" or "-" => 1, _ => 0 };
 
         // ---------- parse: MATEMATICA -> arbol ----------
-        static readonly Regex Tok = new Regex(@"\d+\.?\d*|[A-Za-z_]\w*|[-+*/^(),;\[\]]");
+        // $Nombre = operadores estilo Calcpad; {} = paréntesis; @ y : = bloque solver ($Op{f @ x = a : b}).
+        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_]\w*|[-+*/^(),;\[\]{}@:]");
+        // operadores solver de Calcpad → función del motor
+        static readonly Dictionary<string, string> SolverOps = new Dictionary<string, string>
+        {
+            { "area", "area-under" }, { "integral", "area-under" },
+            { "slope", "slope-at" }, { "derivative", "slope-at" },
+            { "sum", "suma-op" }, { "product", "producto-op" }, { "root", "root-op" },
+            { "find", "find-op" }, { "sup", "sup-op" }, { "inf", "inf-op" }, { "repeat", "repeat-op" },
+            // tokens de operación simbólica (nuestra notación): computan inline
+            { "partial", "partial" }, { "derivate", "derive-x" }, { "diff", "derive-x" },
+            { "simplify", "factor" }, { "factor", "factor" }, { "expand", "expand*" },
+        };
 
         public static N ParseMath(string s)
         {
@@ -61,6 +73,8 @@ namespace HekatanLisp
             }
             N Factor()
             {
+                // menos unario liga MENOS que la potencia: -x^2 = -(x^2), -(x-1)^2 = -((x-1)^2)
+                if (Peek() == "-") { Eat(); return N.Make("neg", Factor()); }
                 var n = Base();
                 if (Peek() == "^") { Eat(); n = N.Make("^", n, Factor()); }
                 return n;
@@ -70,19 +84,45 @@ namespace HekatanLisp
                 var t0 = Peek();
                 if (t0 == "(") { Eat(); var n = Expr(); if (Peek() == ")") Eat(); return n; }
                 if (t0 == "[") return VecMat();
-                if (t0 == "-") { Eat(); return N.Make("neg", Base()); }
                 if (t0 == null) throw new Exception("fin inesperado");
                 var id = Eat();
-                // función: identificador (letra) seguido de '('
-                if (id.Length > 0 && (char.IsLetter(id[0]) || id[0] == '_') && Peek() == "(")
+                bool isName = id.Length > 0 && (char.IsLetter(id[0]) || id[0] == '_' || id[0] == '$');
+                var fname0 = id.StartsWith("$") ? id.Substring(1) : id;
+                // OPERADOR SOLVER: matemática es NUESTRA notación → acepta  Area{…}  con o sin '$',
+                // y sin importar mayúsculas ($Area, Area, area, AREA…).
+                var solverKey = fname0.ToLower();
+                if (isName && SolverOps.ContainsKey(solverKey) && Peek() == "{")
                 {
-                    Eat();  // '('
-                    var args = new List<N>();
-                    if (Peek() != ")") { args.Add(Expr()); while (Peek() == ",") { Eat(); args.Add(Expr()); } }
-                    if (Peek() == ")") Eat();
-                    return new N { Op = "fn", Atom = id, Items = args };
+                    Eat();  // {
+                    var f = Expr();
+                    var items = new List<N> { f };
+                    if (Peek() == "@")
+                    {
+                        Eat();
+                        string vv = Peek(); Eat();               // variable
+                        items.Add(N.Leaf(vv));
+                        // 'a' (y 'b') SOLO si hay '=' — así Partial{f @ x} queda con 2 campos (sin comerse el '}')
+                        if (Peek() == "=")
+                        {
+                            Eat();
+                            items.Add(Expr());                        // a (punto o límite inferior)
+                            if (Peek() == ":") { Eat(); items.Add(Expr()); }   // b (límite superior)
+                        }
+                    }
+                    if (Peek() == "}") Eat();
+                    return new N { Op = "solver", Atom = solverKey, Items = items };   // atom = area|slope|sum|...
                 }
-                return N.Leaf(id);
+                // función normal: identificador seguido de '(' o '{'
+                if (isName && (Peek() == "(" || Peek() == "{"))
+                {
+                    string close = Peek() == "(" ? ")" : "}";
+                    Eat();
+                    var args = new List<N>();
+                    if (Peek() != close) { args.Add(Expr()); while (Peek() == ",") { Eat(); args.Add(Expr()); } }
+                    if (Peek() == close) Eat();
+                    return new N { Op = "fn", Atom = fname0, Items = args };
+                }
+                return N.Leaf(fname0);
             }
             N VecMat()
             {
@@ -116,14 +156,28 @@ namespace HekatanLisp
 
         static readonly HashSet<string> Bin = new HashSet<string> { "+", "-", "*", "/", "expt" };
 
+        static readonly Dictionary<string, string> SolverFn = new Dictionary<string, string>
+        {
+            { "area-under", "area" }, { "slope-at", "slope" }, { "suma", "sum" },
+            { "producto-op", "product" }, { "root-op", "root" },
+            { "find-op", "find" }, { "sup-op", "sup" }, { "inf-op", "inf" }, { "repeat-op", "repeat" },
+            { "partial", "partial" }, { "derive-x", "derivate" }, { "integ-var", "integral" },
+            { "factor", "factor" }, { "expand*", "expand" },
+        };
+
         static N ReadLisp(List<string> toks, ref int i)
         {
             var t = toks[i++];
+            if (t == "'" || t == "`") return ReadLisp(toks, ref i);   // quote suelto (antes de lista) → transparente
+            if (t.Length > 1 && (t[0] == '\'' || t[0] == '`')) t = t.Substring(1);   // 'x → x
             if (t != "(") return N.Leaf(t);
             var op = toks[i++];
             var args = new List<N>();
             while (i < toks.Count && toks[i] != ")") args.Add(ReadLisp(toks, ref i));
             if (i < toks.Count) i++;   // descarta ')'
+
+            // reconstruye el nodo SOLVER ($area, $slope…) para que se muestre con su notación
+            if (SolverFn.TryGetValue(op, out var sv)) return new N { Op = "solver", Atom = sv, Items = args };
 
             if (op == "vector")
             {
@@ -140,10 +194,172 @@ namespace HekatanLisp
             return acc;
         }
 
+        // ---------- operadores solver de Calcpad ($Op) en las 4 formas ----------
+        static (string f, string v, string a, string b) SolverParts(N n, Func<N, string> conv)
+        {
+            string f = conv(n.Items[0]);
+            string v = n.Items.Count > 1 ? conv(n.Items[1]) : "x";
+            string a = n.Items.Count > 2 ? conv(n.Items[2]) : "0";
+            string b = n.Items.Count > 3 ? conv(n.Items[3]) : null;
+            return (f, v, a, b);
+        }
+        static string SolverToLisp(N n)   // → llamada al motor (f y var CITADOS)
+        {
+            var (f, v, a, b) = SolverParts(n, x => ToLisp(x));
+            return n.Atom switch
+            {
+                "area" => $"(area-under '{f} '{v} {a} {b})",
+                "integral" => b != null ? $"(area-under '{f} '{v} {a} {b})" : $"(integ-var '{f} '{v})",
+                "slope" or "derivative" => $"(slope-at '{f} '{v} {a})",
+                "partial" => $"(partial '{f} '{v})",
+                "derivate" or "diff" => n.Items.Count > 1 ? $"(partial '{f} '{v})" : $"(derive-x '{f})",
+                "simplify" or "factor" => $"(factor '{f})",
+                "expand" => $"(expand* '{f})",
+                "sum" => $"(suma '{f} '{v} {a} {b})",
+                "product" => $"(producto-op '{f} '{v} {a} {b})",
+                "root" => $"(root-op '{f} '{v})",
+                "find" => $"(find-op '{f} '{v} {a} {b})",
+                "sup" => $"(sup-op '{f} '{v} {a} {b})",
+                "inf" => $"(inf-op '{f} '{v} {a} {b})",
+                "repeat" => $"(repeat-op '{f} '{v} {a} {b})",
+                _ => $"({n.Atom} '{f} '{v} {a})",
+            };
+        }
+        public static bool LabMatlab = false;   // true = render de solver como MATLAB (Hekatan Lab); false = Calcpad
+        static string SolverToLab(N n)
+        {
+            var (f, v, a, b) = SolverParts(n, x => ToLab(x, 0));
+            if (LabMatlab)   // Hekatan Lab / MATLAB 2017a
+                return n.Atom switch
+                {
+                    "area" => "int(" + f + ", " + v + ", " + a + ", " + b + ")",
+                    "integral" => b != null ? "int(" + f + ", " + v + ", " + a + ", " + b + ")" : "int(" + f + ", " + v + ")",
+                    "slope" or "derivative" => "subs(diff(" + f + ", " + v + "), " + v + ", " + a + ")",
+                    "partial" or "derivate" or "diff" => "diff(" + f + ", " + v + ")",
+                    "simplify" => "simplify(" + f + ")",
+                    "factor" => "factor(" + f + ")",
+                    "expand" => "expand(" + f + ")",
+                    "sum" => "symsum(" + f + ", " + v + ", " + a + ", " + b + ")",
+                    "product" => "symprod(" + f + ", " + v + ", " + a + ", " + b + ")",
+                    "root" => "solve(" + f + " == 0, " + v + ")",
+                    "find" => "fzero(@(" + v + ") " + f + ", [" + a + " " + b + "])",
+                    "sup" => "max(arrayfun(@(" + v + ") " + f + ", linspace(" + a + ", " + b + ", 1e5)))",
+                    "inf" => "min(arrayfun(@(" + v + ") " + f + ", linspace(" + a + ", " + b + ", 1e5)))",
+                    "repeat" => "subs(" + f + ", " + v + ", " + b + ")",
+                    _ => n.Atom + "(" + f + ", " + v + ", " + a + ")",
+                };
+            // matemática = NUESTRA notación (no Calcpad): sin '$'. La forma la decide cuántos campos hay:
+            //   1 → Op{f}   ·   2 → Op{f @ v}   ·   3 → Op{f @ v = a}   ·   4 → Op{f @ v = a : b}
+            string cap = char.ToUpper(n.Atom[0]) + n.Atom.Substring(1);
+            int nc = n.Items.Count;
+            string inside = nc <= 1 ? f
+                          : nc == 2 ? f + " @ " + v
+                          : nc == 3 ? f + " @ " + v + " = " + a
+                          : f + " @ " + v + " = " + a + " : " + b;
+            return cap + "{" + inside + "}";
+        }
+        static string SolverToHtml(N n)   // → render IGUAL a Hekatan Lab/Calcpad (dvr/nary: límites apilados)
+        {
+            var (f, v, a, b) = SolverParts(n, x => ToHtml(x));
+            // n-ario apilado como Calcpad: <dvr><small>sup</small><nary>Σ</nary><small>sub</small></dvr> expr
+            string Nary(string sym, string sub, string sup, string expr) =>
+                "<span class=\"m-dvr\"><small>" + sup + "</small><span class=\"m-nary\">" + sym +
+                "</span><small>" + sub + "</small></span>" + expr;
+            string idx = "<span class=\"m-var\">" + v + "</span><span class=\"m-op\">=</span>" + a;
+            // d/dv (derivada total) como fracción vertical
+            string ddv = "<span class=\"m-frac\"><span class=\"m-frn\"><span class=\"m-fn\">d</span></span>" +
+                         "<span class=\"m-frd\"><span class=\"m-fn\">d</span><span class=\"m-var\">" + v + "</span></span></span>";
+            // ∂/∂v (derivada PARCIAL) — el símbolo ∂, no la 'd'
+            string pdv = "<span class=\"m-frac\"><span class=\"m-frn\"><span class=\"m-fn\">∂</span></span>" +
+                         "<span class=\"m-frd\"><span class=\"m-fn\">∂</span><span class=\"m-var\">" + v + "</span></span></span>";
+            // palabra clave + llaves (find/sup/inf/root/repeat) como Calcpad: name{ ... }
+            string vv = "<span class=\"m-var\">" + v + "</span>";
+            string interval = vv + " <span class=\"m-op\">∈</span> [" + a + "<span class=\"m-op\">;</span> " + (b ?? "") + "]";
+            string Kw(string name, string inside) =>
+                "<span class=\"m-cond\">" + name + "</span><span class=\"m-op\">{</span>" + inside + "<span class=\"m-op\">}</span>";
+            string dx = " <span class=\"m-fn\">d</span><span class=\"m-var\">" + v + "</span>";
+            return n.Atom switch
+            {
+                "area" => Nary("∫", a, b ?? "", "&hairsp;" + f + dx),
+                "integral" => b != null ? Nary("∫", a, b, "&hairsp;" + f + dx) : Nary("∫", "", "", "&hairsp;" + f + dx),
+                "sum" => Nary("Σ", idx, b ?? "", "&hairsp;" + f),
+                "product" => Nary("∏", idx, b ?? "", "&hairsp;" + f),
+                "slope" or "derivative" => ddv + Paren(f) + "<span class=\"m-op\"> │</span><sub class=\"m-sub\">" + v + "=" + a + "</sub>",
+                "partial" => pdv + Paren(f),                           // ∂/∂x (f) — derivada PARCIAL
+                "derivate" or "diff" => ddv + Paren(f),                // d/dx (f) — derivada total
+                // simplify/factor/expand NO tienen símbolo matemático: se muestra solo la EXPRESIÓN,
+                // y el " = resultado" (que agrega el display) ya dice que se operó. Matemática pura.
+                "simplify" or "factor" or "expand" => f,
+                "root" => Kw("root", f + " <span class=\"m-op\">=</span> 0"),   // simbólico: TODAS las raíces (sin intervalo)
+                "find" => Kw("find", f + "<span class=\"m-op\">;</span> " + interval),
+                "sup" => Kw("sup", f + "<span class=\"m-op\">;</span> " + interval),
+                "inf" => Kw("inf", f + "<span class=\"m-op\">;</span> " + interval),
+                "repeat" => Kw("repeat", f + " <span class=\"m-cond\">para</span> " + vv + " <span class=\"m-op\">=</span> " + a + "…" + (b ?? "")),
+                _ => "<span class=\"m-fn\">" + n.Atom + "</span>" + Paren(f),
+            };
+        }
+
+        // Sustituye en el árbol los átomos que son ETIQUETAS de la hoja por su definición.
+        // Ej: si v = w*x, entonces  Partial{v @ x}  →  Partial{(w*x) @ x}.  'self' = la etiqueta
+        // de la propia línea (no se auto-sustituye); 'active' evita ciclos.
+        public static N SubstLabels(N n, Dictionary<string, N> map, string self, HashSet<string> active)
+        {
+            if (n == null) return null;
+            if (n.IsAtom)
+            {
+                if (n.Atom != self && !active.Contains(n.Atom) && map.TryGetValue(n.Atom, out var def))
+                {
+                    active.Add(n.Atom);
+                    var r = SubstLabels(def, map, self, active);
+                    active.Remove(n.Atom);
+                    return r;
+                }
+                return n;
+            }
+            return new N
+            {
+                Op = n.Op, Atom = n.Atom,
+                A = SubstLabels(n.A, map, self, active),
+                B = SubstLabels(n.B, map, self, active),
+                Items = n.Items?.Select(x => SubstLabels(x, map, self, active)).ToList()
+            };
+        }
+
+        // β-REDUCCIÓN: aplica las funciones definidas por el usuario.  f(x)=x²+1 y luego f(3) → 3²+1.
+        // Es el mismo mecanismo de la época LISP/Macsyma: una función es un cuerpo con parámetros, y
+        // "aplicarla" es SUSTITUIR el argumento en el parámetro (subst). Recursivo: reduce composiciones
+        // f(G(x)) reduciendo primero los argumentos. `active` evita bucle si una def se llama a sí misma.
+        public static N SubstFuncs(N n, Dictionary<string, (List<string> ps, N body)> fns, HashSet<string> active = null)
+        {
+            if (n == null) return null;
+            active ??= new HashSet<string>();
+            if (n.Op == "fn" && n.Items != null && fns.TryGetValue(n.Atom, out var def)
+                && def.ps.Count == n.Items.Count && !active.Contains(n.Atom))
+            {
+                var pmap = new Dictionary<string, N>();
+                for (int i = 0; i < def.ps.Count; i++)
+                    pmap[def.ps[i]] = SubstFuncs(n.Items[i], fns, active);   // reduce args primero (composición)
+                var body = SubstLabels(def.body, pmap, null, new HashSet<string>());   // param → argumento
+                active.Add(n.Atom);
+                var r = SubstFuncs(body, fns, active);                       // reduce funciones que queden dentro
+                active.Remove(n.Atom);
+                return r;
+            }
+            if (n.IsAtom) return n;
+            return new N
+            {
+                Op = n.Op, Atom = n.Atom,
+                A = SubstFuncs(n.A, fns, active),
+                B = SubstFuncs(n.B, fns, active),
+                Items = n.Items?.Select(x => SubstFuncs(x, fns, active)).ToList()
+            };
+        }
+
         // ---------- render: arbol -> LISP ----------
         public static string ToLisp(N n)
         {
             if (n == null) return "";
+            if (n.Op == "solver") return SolverToLisp(n);
             if (n.IsAtom) return n.Atom;
             if (n.Op == "neg") return "(- " + ToLisp(n.A) + ")";
             if (n.Op == "fn") return "(" + n.Atom + " " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
@@ -156,27 +372,69 @@ namespace HekatanLisp
         public static string ToLab(N n, int outer = 0)
         {
             if (n == null) return "";
+            if (n.Op == "solver") return SolverToLab(n);
             if (n.IsAtom) return n.Atom;
             if (n.Op == "neg") return "-" + ToLab(n.A, 3);
-            if (n.Op == "fn") return n.Atom + "(" + string.Join(", ", n.Items.Select(x => ToLab(x, 0))) + ")";
+            if (n.Op == "fn")
+            {
+                if (n.Atom == "deriv") return "diff(" + string.Join(", ", n.Items.Select(x => ToLab(x, 0))) + ")";
+                if (n.Atom == "integ" || n.Atom == "int") return "int(" + string.Join(", ", n.Items.Select(x => ToLab(x, 0))) + ")";
+                return n.Atom + "(" + string.Join(", ", n.Items.Select(x => ToLab(x, 0))) + ")";
+            }
             if (n.Op == "vec") return "[" + string.Join(" ", n.Items.Select(x => ToLab(x, 0))) + "]";
             if (n.Op == "mat")
                 return "[" + string.Join("; ", n.Items.Select(r => string.Join(" ", r.Items.Select(x => ToLab(x, 0))))) + "]";
             int p = Prec(n.Op);
             string sep = n.Op switch { "+" => " + ", "-" => " - ", "*" => "*", "/" => "/", "^" => "^", _ => n.Op };
-            string s = ToLab(n.A, p) + sep + ToLab(n.B, p);
+            // en - / ^ (no conmutativos) el lado DERECHO necesita más paréntesis: a/(2*b), a-(b+c)
+            int pr = (n.Op == "-" || n.Op == "/" || n.Op == "^") ? p + 1 : p;
+            string s = ToLab(n.A, p) + sep + ToLab(n.B, pr);
             return p < outer ? "(" + s + ")" : s;
         }
 
         // ---------- render: arbol -> HTML matematico (estilo Hekatan Lab) ----------
         static string Paren(string s) => "<span class=\"m-op\">(</span>" + s + "<span class=\"m-op\">)</span>";
 
+        // nombre con SUBÍNDICE: "N1" -> N con 1 abajo · "sigma_x" -> sigma con x abajo.
+        // Convención ingenieril: dígitos finales (o lo que sigue a "_") es subíndice.
+        // nombres de letras griegas → su símbolo (como Hekatan Lab): theta→θ, gamma→γ, sigma→σ…
+        static readonly Dictionary<string, string> Greek = new Dictionary<string, string>
+        {
+            {"alpha","α"},{"beta","β"},{"gamma","γ"},{"delta","δ"},{"epsilon","ε"},{"zeta","ζ"},
+            {"eta","η"},{"theta","θ"},{"iota","ι"},{"kappa","κ"},{"lambda","λ"},{"mu","μ"},
+            {"nu","ν"},{"xi","ξ"},{"omicron","ο"},{"rho","ρ"},{"sigma","σ"},{"tau","τ"},
+            {"upsilon","υ"},{"phi","φ"},{"chi","χ"},{"psi","ψ"},{"omega","ω"},
+            {"Alpha","Α"},{"Beta","Β"},{"Gamma","Γ"},{"Delta","Δ"},{"Theta","Θ"},{"Lambda","Λ"},
+            {"Xi","Ξ"},{"Sigma","Σ"},{"Phi","Φ"},{"Psi","Ψ"},{"Omega","Ω"},
+        };
+        // (πi lo maneja el motor como constante; no lo meto aquí para no chocar con 'pi' numérico)
+        static string GreekSym(string s) => Greek.TryGetValue(s, out var g) ? g : System.Net.WebUtility.HtmlEncode(s);
+
+        static string VarHtml(string name)
+        {
+            string baseN, sub;
+            int us = name.IndexOf('_');
+            if (us > 0 && us < name.Length - 1) { baseN = name.Substring(0, us); sub = name.Substring(us + 1); }
+            else
+            {
+                int i = name.Length;
+                while (i > 1 && char.IsDigit(name[i - 1])) i--;
+                baseN = name.Substring(0, i); sub = name.Substring(i);
+            }
+            // subíndice SOLO si el nombre empieza por letra (no en "-1", que es un número)
+            if (sub.Length > 0 && !(baseN.Length > 0 && char.IsLetter(baseN[0]))) { baseN = name; sub = ""; }
+            var h = "<span class=\"m-var\">" + GreekSym(baseN) + "</span>";   // theta→θ, gamma→γ…
+            if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
+            return h;
+        }
+
         public static string ToHtml(N n, int parentPrec = 0)
         {
             if (n == null) return "";
+            if (n.Op == "solver") return SolverToHtml(n);
             if (n.IsAtom)
                 return IsNum(n.Atom) ? $"<span class=\"m-num\">{n.Atom}</span>"
-                                     : $"<span class=\"m-var\">{n.Atom}</span>";
+                                     : VarHtml(n.Atom);
             if (n.Op == "neg")
             {
                 var r = "<span class=\"m-op\">−</span>" + ToHtml(n.A, 3);
@@ -219,6 +477,19 @@ namespace HekatanLisp
                            "<span class=\"m-radarg\">" + arg0 + "</span></span>";
                 case "exp":
                     return "<span class=\"m-var\">e</span><sup class=\"m-sup\">" + arg0 + "</sup>";
+                case "deriv":   // d/dx( expr )  — notación de derivada, como Hekatan Lab
+                {
+                    var v = n.Items.Count > 1 ? ToHtml(n.Items[1], 0) : "<span class=\"m-var\">x</span>";
+                    return "<span class=\"m-frac\"><span class=\"m-frn\"><span class=\"m-op\">d</span></span>" +
+                           "<span class=\"m-frd\"><span class=\"m-op\">d</span>" + v + "</span></span>" + Paren(arg0);
+                }
+                case "integ":
+                case "int":     // ∫ expr dx  — notación de integral
+                {
+                    var v = n.Items.Count > 1 ? ToHtml(n.Items[1], 0) : "<span class=\"m-var\">x</span>";
+                    return "<span class=\"m-op\" style=\"font-size:1.35em;vertical-align:-0.15em\">∫</span>&hairsp;" +
+                           arg0 + "&thinsp;<span class=\"m-op\">d</span>" + v;
+                }
                 default:
                     var args = string.Join("<span class=\"m-op\">, </span>", n.Items.Select(x => ToHtml(x, 0)));
                     return "<span class=\"m-fn\">" + name + "</span>" + Paren(args);
@@ -238,21 +509,31 @@ namespace HekatanLisp
                    cells + "</span><span class=\"m-brk m-brr\"></span></span>";
         }
 
-        // ---------- pagina HTML completa (worksheet, tema oscuro) ----------
+        // ---------- pagina HTML completa (worksheet) — tema claro/oscuro como Hekatan Lab ----------
+        public static bool Dark = true;
+        const string ROOT_DARK  = ":root{--bg:#14161a;--fg:#e8e8e8;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;}";
+        const string ROOT_LIGHT = ":root{--bg:#ffffff;--fg:#2a2418;--mut:#8a8f96;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;}";
         const string CSS = @"
-:root{--bg:#14161a;--fg:#e8e8e8;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;}
 *{box-sizing:border-box;}
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;}
 .ws-eq{margin:0.4em 0;
   font-family:'Georgia Pro','Century Schoolbook','Times New Roman',Times,serif;font-size:11.5pt;}
-.m-var{font-style:italic;color:var(--var);} .m-num{color:var(--num);}
+.ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
+/* texto con formato (directivas ; estilo Hekatan Lab) */
+.ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
+.ws-h1{font-weight:700;font-size:15pt;margin:.7em 0 .35em;}
+.ws-h2{font-weight:600;font-size:12.5pt;margin:.55em 0 .3em;}
+.al-left{text-align:left;} .al-center{text-align:center;} .al-right{text-align:right;}
+.m-var{font-style:italic;color:var(--var);font-size:105%;} .m-num{color:var(--num);}
 .m-op{color:var(--mut);padding:0 .08em;}
-.m-fn{font-style:normal;color:var(--fg);padding-right:.05em;}
-.m-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .15em;}
-.m-frn{border-bottom:1px solid currentColor;padding:0 .35em;}
-.m-frd{padding:0 .35em;}
-.m-sup{font-size:.70em;vertical-align:super;line-height:0;}
+.m-fn{font-style:normal;font-weight:600;color:var(--fg);padding-right:.05em;}
+.m-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .15em;line-height:110%;}
+.m-frn{border-bottom:1pt solid currentColor;padding:0 .35em .5pt;}
+.m-frd{padding:.5pt .35em 0;}
+/* potencia y subindice — reglas EXACTAS de Calcpad (.eq sup/.eq sub) */
+.m-sup{display:inline-block;margin-left:1pt;margin-top:-3pt;font-size:75%;}
+.m-sub{font-family:Calibri,Candara,Corbel,sans-serif;font-size:80%;vertical-align:-18%;margin-left:1pt;}
 .m-sqrt{display:inline-flex;align-items:flex-start;}
 .m-rad{font-size:1.05em;}
 .m-radarg{border-top:1.2px solid currentColor;padding:0 .2em;margin-left:-.05em;}
@@ -261,19 +542,143 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-brl{border:1.4px solid currentColor;border-right:none;}
 .m-brr{border:1.4px solid currentColor;border-left:none;}
 .m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
-.m-cell{color:var(--num);}";
+.m-cell{color:var(--num);}
+/* n-ario (∫ Σ Π) apilado — geometria exacta de Calcpad/Hekatan Lab */
+.m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-2pt;margin:0 .12em;}
+.m-dvr small{font-family:Calibri,Candara,Corbel,sans-serif;font-size:70%;display:block;}
+.m-nary{display:block;font-size:235%;line-height:70%;font-weight:200;color:var(--nary);font-family:'Georgia Pro','Century Schoolbook','Times New Roman',serif;margin:0 1pt 2pt 1pt;}
+.m-cond{color:#e000d0;font-style:italic;padding:0 .05em;}";
+
+        // ---------- texto con FORMATO en un comentario ';' (Hekatan Lab/Calcpad-style) ----------
+        // SBCL ignora la línea (es ';'); Hekatan LISP la DIBUJA. Al ejecutar el .lisp no se ve (es comentario).
+        //   ;# Título      encabezado centrado   ·   ;## Subtítulo
+        //   ;< texto  izquierda   ·   ;> texto  derecha   ·   ;| ó ;= texto  centrado   ·   ; texto  párrafo
+        // inline:  *negrita*   _cursiva_   {Variable}=su valor
+        public const string TxtMark = "T";   // prefijo interno de línea de texto formateado
+        public const char TxtSep = '';
+        // arma el marcador que RenderPage dibuja como texto formateado
+        public static string TxtLine(string kind, string align, string html) =>
+            TxtMark + TxtSep + kind + TxtSep + align + TxtSep + html;
+        public static (string kind, string align, string text)? TextDirective(string raw)
+        {
+            var s = raw.TrimStart();
+            if (!s.StartsWith(";")) return null;
+            s = s.TrimStart(';').Trim();
+            // las directivas de GRÁFICA (;fplot/;grafica) NO son texto: las dibuja el ploteador
+            if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico)\b", RegexOptions.IgnoreCase)) return null;
+            if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
+            if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
+            if (s.StartsWith("|") || s.StartsWith("=")) return ("p", "center", s.Substring(1).Trim());
+            if (s.StartsWith(">")) return ("p", "right", s.Substring(1).Trim());
+            if (s.StartsWith("<")) return ("p", "left", s.Substring(1).Trim());
+            if (s.StartsWith(":") || s.StartsWith("-")) return ("p", "left", s.Substring(1).Trim());   // párrafo normal
+            return ("p", "left", s);
+        }
+        // convierte el texto a HTML mezclando texto + variable/valor inline. MISMOS TOKENS que Hekatan Lab:
+        //   @nombre   → "nombre = valor"   (el nombre Y su valor, renderizados a CSS)
+        //   @{expr}   → solo el VALOR       (evalúa la expresión/etiqueta, aun con tokens anidados)
+        //   {expr}    → solo el VALOR       (alias antiguo)   ·   *negrita*   _cursiva_
+        // el resto del texto se escapa normal. Una @ suelta queda literal.
+        // (bal) = una llave con UN nivel de anidamiento: así @{Factor{x^2+3*x}} agarra todo el interior.
+        const string Bal = @"(?:[^{}]|\{[^{}]*\})*";
+        public static string FormatInlineText(string t, Func<string, string> varLookup)
+        {
+            t = System.Net.WebUtility.HtmlEncode(t ?? "");
+            // @{expr} → SOLO el valor
+            t = Regex.Replace(t, @"@\{(" + Bal + @")\}", m =>
+            {
+                var v = varLookup?.Invoke(m.Groups[1].Value.Trim());
+                return string.IsNullOrEmpty(v) ? m.Value : "<span class=\"m-expr\">" + v + "</span>";
+            });
+            // @nombre → "nombre = valor"
+            t = Regex.Replace(t, @"@([A-Za-z_]\w*)", m =>
+            {
+                var name = m.Groups[1].Value;
+                var v = varLookup?.Invoke(name);
+                return string.IsNullOrEmpty(v) ? m.Value
+                    : "<span class=\"m-expr\">" + VarHtml(name) + "<span class=\"m-op\"> = </span>" + v + "</span>";
+            });
+            // {expr} → SOLO el valor (alias antiguo)
+            t = Regex.Replace(t, @"\{(" + Bal + @")\}", m =>
+            {
+                var v = varLookup?.Invoke(m.Groups[1].Value.Trim());
+                return string.IsNullOrEmpty(v) ? m.Value : "<span class=\"m-expr\">" + v + "</span>";
+            });
+            t = Regex.Replace(t, @"\*([^*]+)\*", "<b>$1</b>");
+            t = Regex.Replace(t, @"_([^_]+)_", "<i>$1</i>");
+            return t;
+        }
 
         public static string RenderPage(string text, bool fromLisp)
         {
             var body = new StringBuilder();
             foreach (var raw in text.Replace("\r", "").Split('\n'))
             {
+                // marcador de TEXTO con formato (viene de una directiva ; procesada en ComputeResult)
+                if (raw.StartsWith(TxtMark))
+                {
+                    var pz = raw.Split(TxtSep);   // ["","T",kind,align,html…]
+                    string kind = pz.Length > 2 ? pz[2] : "p";
+                    string align = pz.Length > 3 ? pz[3] : "left";
+                    string htmlC = pz.Length > 4 ? string.Join(TxtSep.ToString(), pz.Skip(4)) : "";
+                    string cls = kind == "h1" ? "ws-h1" : kind == "h2" ? "ws-h2" : "";
+                    body.Append("<div class=\"ws-fmt " + cls + " al-" + align + "\">").Append(htmlC).Append("</div>");
+                    continue;
+                }
                 var line = raw.Trim();
                 if (line.Length == 0) continue;
                 string prefix = "";
                 var expr = line;
                 if (line.StartsWith("= ") || line.StartsWith("→ ")) { prefix = line.Substring(0, 2); expr = line.Substring(2).Trim(); }
+                // etiqueta "NAME = expr" (nombre que define la línea, ej. N1 = (1-s)/2)
+                var lblM = prefix.Length == 0
+                    ? System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$")
+                    : System.Text.RegularExpressions.Match.Empty;
                 string html;
+                if (lblM.Success)
+                {
+                    try
+                    {
+                        // "N1 = OPERACIÓN = RESULTADO": varios pasos separados por " = ".
+                        // Muestra la OPERACIÓN simbólica y su RESULTADO (como Hekatan Lab), no solo el final.
+                        var partes = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"\s=\s");
+                        var sb = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value));
+                        foreach (var pz in partes)
+                        {
+                            var rt = fromLisp ? ParseLisp(pz.Trim()) : ParseMath(pz.Trim());
+                            sb.Append("<span class=\"m-op\"> = </span><span class=\"m-expr\">").Append(ToHtml(rt)).Append("</span>");
+                        }
+                        html = sb.ToString();
+                    }
+                    catch { html = System.Net.WebUtility.HtmlEncode(line); }
+                    body.Append("<div class=\"ws-eq\">").Append(html).Append("</div>");
+                    continue;
+                }
+                // "forma = resultado" (sin NOMBRE): parte por " = " y lo renderiza TODO en UNA línea.
+                if (System.Text.RegularExpressions.Regex.IsMatch(expr, @"\s=\s"))
+                {
+                    try
+                    {
+                        var partes = System.Text.RegularExpressions.Regex.Split(expr, @"\s=\s");
+                        var sb = new System.Text.StringBuilder();
+                        for (int pi = 0; pi < partes.Length; pi++)
+                        {
+                            if (pi > 0) sb.Append("<span class=\"m-op\"> = </span>");
+                            var rt = fromLisp ? ParseLisp(partes[pi].Trim()) : ParseMath(partes[pi].Trim());
+                            sb.Append("<span class=\"m-expr\">").Append(ToHtml(rt)).Append("</span>");
+                        }
+                        body.Append("<div class=\"ws-eq\">").Append(sb).Append("</div>");
+                        continue;
+                    }
+                    catch { }   // si algún tramo no parsea, cae al manejo normal de abajo
+                }
+                // Prosa suelta de un programa (ej. "1D LINEAL (2 nodos):") no es UNA forma LISP:
+                // si intentáramos parsearla, ParseLisp toma solo el primer token ("1D"). Mostrar tal cual.
+                if (fromLisp && !expr.StartsWith("(") && expr.Contains(' '))
+                {
+                    body.Append("<div class=\"ws-eq ws-txt\">").Append(System.Net.WebUtility.HtmlEncode(line)).Append("</div>");
+                    continue;
+                }
                 try
                 {
                     var tree = fromLisp ? ParseLisp(expr) : ParseMath(expr);
@@ -284,9 +689,216 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 catch { html = System.Net.WebUtility.HtmlEncode(line); }
                 body.Append("<div class=\"ws-eq\">").Append(html).Append("</div>");
             }
-            return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" + CSS +
+            return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
+                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
                    "</style></head><body>" + body + "</body></html>";
         }
+
+        // ---------- evaluador NUMERICO del arbol (para graficar) ----------
+        // sustituye la variable por un numero y calcula. Devuelve NaN si hay algo que no sabe evaluar.
+        public static double Eval(N n, string var, double x)
+        {
+            if (n == null) return double.NaN;
+            if (n.IsAtom)
+            {
+                if (IsNum(n.Atom)) return double.TryParse(n.Atom, System.Globalization.NumberStyles.Any,
+                                        System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : double.NaN;
+                if (n.Atom == var) return x;
+                if (n.Atom == "pi") return Math.PI;
+                if (n.Atom == "e") return Math.E;
+                return double.NaN;
+            }
+            if (n.Op == "neg") return -Eval(n.A, var, x);
+            if (n.Op == "fn")
+            {
+                double a = (n.Items != null && n.Items.Count > 0) ? Eval(n.Items[0], var, x) : double.NaN;
+                return n.Atom switch
+                {
+                    "sqrt" => Math.Sqrt(a), "sin" => Math.Sin(a), "cos" => Math.Cos(a), "tan" => Math.Tan(a),
+                    "exp" => Math.Exp(a), "log" => Math.Log(a), "abs" => Math.Abs(a), _ => double.NaN
+                };
+            }
+            double l = Eval(n.A, var, x), r = Eval(n.B, var, x);
+            return n.Op switch { "+" => l + r, "-" => l - r, "*" => l * r, "/" => l / r, "^" => Math.Pow(l, r), _ => double.NaN };
+        }
+
+        // paleta por defecto de MATLAB (orden de colores de las líneas)
+        static readonly string[] PlotColors = { "#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30", "#4DBEEE", "#A2142F" };
+
+        // TODAS las variables (símbolos) de una expresión, sin repetir (para 'syms x y' de MATLAB)
+        public static List<string> VarsOf(N n)
+        {
+            var found = new List<string>();
+            void Rec(N x)
+            {
+                if (x == null) return;
+                if (x.IsAtom) { if (!IsNum(x.Atom) && x.Atom != "pi" && x.Atom != "e" && !found.Contains(x.Atom)) found.Add(x.Atom); return; }
+                Rec(x.A); Rec(x.B);
+                if (x.Items != null) foreach (var it in x.Items) Rec(it);
+            }
+            Rec(n);
+            return found;
+        }
+
+        // variable LIBRE de una expresión (para fplot estilo MATLAB, que no pide la variable)
+        public static string FreeVar(N n)
+        {
+            var found = new List<string>();
+            void Rec(N x)
+            {
+                if (x == null) return;
+                if (x.IsAtom) { if (!IsNum(x.Atom) && x.Atom != "pi" && x.Atom != "e" && !found.Contains(x.Atom)) found.Add(x.Atom); return; }
+                Rec(x.A); Rec(x.B);
+                if (x.Items != null) foreach (var it in x.Items) Rec(it);
+            }
+            Rec(n);
+            if (found.Contains("s")) return "s";
+            if (found.Contains("x")) return "x";
+            return found.Count > 0 ? found[0] : "x";
+        }
+
+        // paso "bonito" para los ticks (1,2,5 ×10^n), estilo MATLAB
+        static double NiceStep(double range, int target)
+        {
+            if (range <= 0) return 1;
+            double raw = range / Math.Max(1, target);
+            double mag = Math.Pow(10, Math.Floor(Math.Log10(raw)));
+            double norm = raw / mag;
+            double step = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+            return step * mag;
+        }
+
+        // ---------- grafica SVG de una o varias funciones f(var) sobre [lo,hi] ----------
+        public static string PlotSvg(string var, double lo, double hi, List<(string name, N tree)> fns)
+        {
+            if (fns == null || fns.Count == 0 || hi <= lo) return "";
+            const int W = 540, H = 360, pL = 56, pR = 18, pT = 18, pB = 44, NS = 200;
+            var C = System.Globalization.CultureInfo.InvariantCulture;
+            // muestrear
+            var series = new List<(string name, double[] xs, double[] ys)>();
+            double ymin = double.PositiveInfinity, ymax = double.NegativeInfinity;
+            foreach (var (name, tree) in fns)
+            {
+                var xs = new double[NS + 1]; var ys = new double[NS + 1];
+                for (int k = 0; k <= NS; k++)
+                {
+                    double xx = lo + (hi - lo) * k / NS;
+                    double yy = Eval(tree, var, xx);
+                    xs[k] = xx; ys[k] = yy;
+                    if (!double.IsNaN(yy) && !double.IsInfinity(yy)) { ymin = Math.Min(ymin, yy); ymax = Math.Max(ymax, yy); }
+                }
+                series.Add((name, xs, ys));
+            }
+            if (double.IsInfinity(ymin) || double.IsInfinity(ymax)) return "";
+            if (ymax - ymin < 1e-9) { ymin -= 1; ymax += 1; }
+            // límites Y "bonitos" (como MATLAB): redondea a múltiplos del paso
+            double ystep = NiceStep(ymax - ymin, 5);
+            ymin = Math.Floor(ymin / ystep) * ystep; ymax = Math.Ceiling(ymax / ystep) * ystep;
+            double xstep = NiceStep(hi - lo, 6);
+            double SX(double x) => pL + (W - pL - pR) * (x - lo) / (hi - lo);
+            double SY(double y) => H - pB - (H - pT - pB) * (y - ymin) / (ymax - ymin);
+            string Num(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", C);
+            var sb = new StringBuilder();
+            sb.Append("<div class=\"ws-plot\"><svg viewBox=\"0 0 ").Append(W).Append(' ').Append(H)
+              .Append("\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"'Segoe UI',Arial,sans-serif\" style=\"max-width:100%;height:auto\">");
+            // GRID (líneas tenues en cada tick) — estilo MATLAB
+            for (double gx = Math.Ceiling(lo / xstep) * xstep; gx <= hi + xstep * 1e-6; gx += xstep)
+                sb.Append("<line x1=\"").Append(Num(SX(gx))).Append("\" y1=\"").Append(pT).Append("\" x2=\"").Append(Num(SX(gx))).Append("\" y2=\"").Append(H - pB).Append("\" stroke=\"var(--mut)\" stroke-opacity=\".22\" stroke-width=\"1\"/>");
+            for (double gy = ymin; gy <= ymax + ystep * 1e-6; gy += ystep)
+                sb.Append("<line x1=\"").Append(pL).Append("\" y1=\"").Append(Num(SY(gy))).Append("\" x2=\"").Append(W - pR).Append("\" y2=\"").Append(Num(SY(gy))).Append("\" stroke=\"var(--mut)\" stroke-opacity=\".22\" stroke-width=\"1\"/>");
+            // ejes cero (más marcados)
+            if (ymin < 0 && ymax > 0) sb.Append("<line x1=\"").Append(pL).Append("\" y1=\"").Append(Num(SY(0))).Append("\" x2=\"").Append(W - pR).Append("\" y2=\"").Append(Num(SY(0))).Append("\" stroke=\"var(--mut)\" stroke-opacity=\".6\"/>");
+            if (lo < 0 && hi > 0) sb.Append("<line x1=\"").Append(Num(SX(0))).Append("\" y1=\"").Append(pT).Append("\" x2=\"").Append(Num(SX(0))).Append("\" y2=\"").Append(H - pB).Append("\" stroke=\"var(--mut)\" stroke-opacity=\".6\"/>");
+            // ticks con números
+            for (double gx = Math.Ceiling(lo / xstep) * xstep; gx <= hi + xstep * 1e-6; gx += xstep)
+            {
+                sb.Append("<line x1=\"").Append(Num(SX(gx))).Append("\" y1=\"").Append(H - pB).Append("\" x2=\"").Append(Num(SX(gx))).Append("\" y2=\"").Append(H - pB + 4).Append("\" stroke=\"var(--mut)\"/>");
+                sb.Append("<text x=\"").Append(Num(SX(gx))).Append("\" y=\"").Append(H - pB + 16).Append("\" fill=\"var(--mut)\" font-size=\"11\" text-anchor=\"middle\">").Append(Num(gx)).Append("</text>");
+            }
+            for (double gy = ymin; gy <= ymax + ystep * 1e-6; gy += ystep)
+            {
+                sb.Append("<line x1=\"").Append(pL - 4).Append("\" y1=\"").Append(Num(SY(gy))).Append("\" x2=\"").Append(pL).Append("\" y2=\"").Append(Num(SY(gy))).Append("\" stroke=\"var(--mut)\"/>");
+                sb.Append("<text x=\"").Append(pL - 7).Append("\" y=\"").Append(Num(SY(gy) + 4)).Append("\" fill=\"var(--mut)\" font-size=\"11\" text-anchor=\"end\">").Append(Num(gy)).Append("</text>");
+            }
+            // caja
+            sb.Append("<rect x=\"").Append(pL).Append("\" y=\"").Append(pT).Append("\" width=\"").Append(W - pL - pR)
+              .Append("\" height=\"").Append(H - pT - pB).Append("\" fill=\"none\" stroke=\"var(--mut)\" stroke-width=\"1.2\"/>");
+            // etiqueta eje X
+            sb.Append("<text x=\"").Append((pL + W - pR) / 2).Append("\" y=\"").Append(H - 6).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\" text-anchor=\"middle\">").Append(System.Net.WebUtility.HtmlEncode(var)).Append("</text>");
+            // curvas
+            for (int s = 0; s < series.Count; s++)
+            {
+                var (name, xs, ys) = series[s];
+                string col = PlotColors[s % PlotColors.Length];
+                var pts = new StringBuilder();
+                for (int k = 0; k < xs.Length; k++)
+                {
+                    if (double.IsNaN(ys[k]) || double.IsInfinity(ys[k])) continue;
+                    if (pts.Length > 0) pts.Append(' ');
+                    pts.Append(Num(SX(xs[k]))).Append(',').Append(Num(SY(ys[k])));
+                }
+                sb.Append("<polyline points=\"").Append(pts).Append("\" fill=\"none\" stroke=\"").Append(col).Append("\" stroke-width=\"2\"/>");
+            }
+            // leyenda en CAJA (estilo MATLAB), arriba-derecha dentro de los ejes
+            int lw = 78, lh = 8 + series.Count * 17, lx = W - pR - lw - 8, lyTop = pT + 8;
+            sb.Append("<rect x=\"").Append(lx).Append("\" y=\"").Append(lyTop).Append("\" width=\"").Append(lw).Append("\" height=\"").Append(lh)
+              .Append("\" fill=\"var(--bg)\" fill-opacity=\".85\" stroke=\"var(--mut)\" stroke-width=\"1\"/>");
+            for (int s = 0; s < series.Count; s++)
+            {
+                int ly = lyTop + 14 + s * 17; string col = PlotColors[s % PlotColors.Length];
+                sb.Append("<line x1=\"").Append(lx + 8).Append("\" y1=\"").Append(ly).Append("\" x2=\"").Append(lx + 26).Append("\" y2=\"").Append(ly).Append("\" stroke=\"").Append(col).Append("\" stroke-width=\"2.5\"/>");
+                sb.Append("<text x=\"").Append(lx + 32).Append("\" y=\"").Append(ly + 4).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\">").Append(System.Net.WebUtility.HtmlEncode(series[s].name)).Append("</text>");
+            }
+            sb.Append("</svg></div>");
+            return sb.ToString();
+        }
+
+        // ---------- vista APRENDER: cada fórmula en 3 formas (Matemática · LISP · MATLAB) ----------
+        public static string LearnPage(string text, bool fromLisp)
+        {
+            var body = new StringBuilder();
+            foreach (var raw in (text ?? "").Replace("\r", "").Split('\n'))
+            {
+                var line = raw.Trim();
+                if (line.Length == 0) continue;
+                string label = null, exprStr = line;
+                var lbl = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                if (lbl.Success)
+                {
+                    label = lbl.Groups[1].Value;
+                    var partes = System.Text.RegularExpressions.Regex.Split(lbl.Groups[2].Value, @"\s=\s");
+                    exprStr = partes[partes.Length - 1].Trim();   // el RESULTADO (último tramo)
+                }
+                // prosa (encabezado como "1D CUADRATICA"): texto, no fórmula
+                if (fromLisp && !exprStr.StartsWith("(") && exprStr.Contains(' ') && label == null)
+                {
+                    body.Append("<div class=\"lp-hdr\">").Append(System.Net.WebUtility.HtmlEncode(line)).Append("</div>");
+                    continue;
+                }
+                N tree; try { tree = fromLisp ? ParseLisp(exprStr) : ParseMath(exprStr); }
+                catch { body.Append("<div class=\"lp-hdr\">").Append(System.Net.WebUtility.HtmlEncode(line)).Append("</div>"); continue; }
+                string mat = System.Net.WebUtility.HtmlEncode(ToLab(tree, 0));
+                string lsp = System.Net.WebUtility.HtmlEncode(ToLisp(tree));
+                body.Append("<div class=\"lp-card\">");
+                if (label != null) body.Append("<div class=\"lp-name\">").Append(VarHtml(label)).Append("</div>");
+                body.Append("<div class=\"lp-row\"><span class=\"lp-tag\">Renderizado</span><span class=\"lp-math\">").Append(ToHtml(tree)).Append("</span></div>");
+                body.Append("<div class=\"lp-row\"><span class=\"lp-tag\">LISP</span><code class=\"lp-code\">").Append(lsp).Append("</code></div>");
+                body.Append("<div class=\"lp-row\"><span class=\"lp-tag\">Texto plano</span><code class=\"lp-code\">").Append(mat).Append("</code></div>");
+                body.Append("</div>");
+            }
+            return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
+                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS + LEARN_CSS +
+                   "</style></head><body>" + body + "</body></html>";
+        }
+
+        const string LEARN_CSS =
+            ".lp-card{border:1px solid var(--mut);border-radius:8px;padding:8px 12px;margin:10px 0;}" +
+            ".lp-name{font-style:italic;color:var(--var);font-size:13pt;margin-bottom:4px;}" +
+            ".lp-row{display:flex;align-items:baseline;gap:10px;margin:5px 0;}" +
+            ".lp-tag{flex:0 0 78px;font-family:'Segoe UI',sans-serif;font-size:9.5pt;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;}" +
+            ".lp-math{font-family:'Georgia Pro',serif;font-size:12pt;}" +
+            ".lp-code{font-family:Consolas,monospace;font-size:11pt;color:var(--fg);white-space:pre-wrap;}" +
+            ".lp-hdr{font-family:'Segoe UI',sans-serif;font-weight:600;color:var(--mut);margin-top:1em;}";
 
         // ---------- atajos por linea (para los modos de TEXTO) ----------
         public static string MathToLisp(string line) => ToLisp(ParseMath(line));

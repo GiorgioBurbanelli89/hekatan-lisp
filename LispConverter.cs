@@ -32,7 +32,7 @@ namespace HekatanLisp
         // ---------- parse: MATEMATICA -> arbol ----------
         // $Nombre = operadores estilo Calcpad; {} = paréntesis; @ y : = bloque solver ($Op{f @ x = a : b}).
         // ∂ y ∇ cuentan como parte del identificador → así {∂N/∂s} renderiza la parcial en comentarios.
-        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:]");
+        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:|]");
         // operadores solver de Calcpad → función del motor
         static readonly Dictionary<string, string> SolverOps = new Dictionary<string, string>
         {
@@ -127,13 +127,24 @@ namespace HekatanLisp
             }
             N VecMat()
             {
+                // ¿la matriz usa '|' para las filas? (estilo Hekatan Lab / Calcpad-simbólico:
+                //   | = fila , ; = columna).  Si no hay '|', vale el estilo MATLAB: ; = fila , , = columna.
+                bool pipe = false;
+                for (int k = i, depth = 0; k < t.Count; k++)
+                {
+                    if (t[k] == "[") depth++;
+                    else if (t[k] == "]") { depth--; if (depth == 0) break; }
+                    else if (t[k] == "|" && depth == 1) { pipe = true; break; }
+                }
                 Eat();  // '['
                 var rows = new List<List<N>>();
                 var cur = new List<N>();
+                string rowSep = pipe ? "|" : ";";      // separador de FILA según el estilo detectado
                 while (Peek() != "]" && Peek() != null)
                 {
-                    if (Peek() == ";") { Eat(); rows.Add(cur); cur = new List<N>(); continue; }
-                    if (Peek() == ",") { Eat(); continue; }
+                    var p = Peek();
+                    if (p == rowSep) { Eat(); rows.Add(cur); cur = new List<N>(); continue; }
+                    if (p == "," || p == ";" || p == "|") { Eat(); continue; }   // separadores de COLUMNA
                     cur.Add(Expr());   // cada elemento es una expresión
                 }
                 if (Peek() == "]") Eat();
@@ -552,8 +563,27 @@ namespace HekatanLisp
                 }
                 default:
                     var args = string.Join("<span class=\"m-op\">, </span>", n.Items.Select(x => ToHtml(x, 0)));
-                    return "<span class=\"m-fn\">" + name + "</span>" + Paren(args);
+                    return FnNameHtml(name) + Paren(args);
             }
+        }
+
+        // nombre de FUNCIÓN con subíndice: N_1 → N₁ , N1 → N₁ , f → f (mismo split que las variables,
+        // pero en estilo función m-fn). Así N_1(x) renderiza N₁(x), no "N_1(x)".
+        static string FnNameHtml(string name)
+        {
+            string baseN, sub;
+            int us = name.IndexOf('_');
+            if (us > 0 && us < name.Length - 1) { baseN = name.Substring(0, us); sub = name.Substring(us + 1); }
+            else
+            {
+                int i = name.Length;
+                while (i > 1 && char.IsDigit(name[i - 1])) i--;
+                baseN = name.Substring(0, i); sub = name.Substring(i);
+            }
+            if (sub.Length > 0 && !(baseN.Length > 0 && char.IsLetter(baseN[0]))) { baseN = name; sub = ""; }
+            var h = "<span class=\"m-fn\">" + GreekSym(baseN) + "</span>";
+            if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
+            return h;
         }
 
         // vector/matriz: cuadrícula con corchetes grandes

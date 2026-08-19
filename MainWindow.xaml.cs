@@ -371,7 +371,9 @@ namespace HekatanLisp
             }
 
             // Expresiones (matemática o LISP) → aplicar la operación elegida.
-            var lines = text.Replace("\r", "").Split('\n');
+            // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
+            // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
+            var lines = JoinBracketLines(text).Split('\n');
             var formOf = new string[lines.Length];
             var labels = new string[lines.Length];   // nombre que DEFINE cada línea (N1, N2…) si es "NAME = expr"
             var textOf = new (string kind, string align, string text)?[lines.Length];  // directiva de TEXTO (; formato)
@@ -633,6 +635,42 @@ namespace HekatanLisp
         private static bool HasOpCall(string f) => f != null && System.Array.Exists(OpCalls, s => f.Contains(s));
 
         // la línea (matemática o LISP) → su ÁRBOL (para resolver etiquetas antes de pasar a LISP)
+        /// <summary>Une las líneas de una MATRIZ que abarca varios renglones (el '[' quedó abierto).
+        /// El salto de línea DENTRO de [ ] es separador de FILA en MATLAB → se une con ';' (salvo que
+        /// el renglón ya termine en ';' , ',' o '[', para no meter una fila vacía). Fuera de [ ] no toca nada.
+        ///   B = [1 2;\n   3 4]   →   B = [1 2; 3 4]      ·      [1 2\n 3 4]  →  [1 2; 3 4]</summary>
+        private static string JoinBracketLines(string text)
+        {
+            var raw = text.Replace("\r", "").Split('\n');
+            var outLines = new List<string>();
+            string buf = null;
+            foreach (var ln in raw)
+            {
+                if (buf == null) buf = ln;
+                else
+                {
+                    var tb = buf.TrimEnd();
+                    // '...' = CONTINUACIÓN MATLAB: se pega el siguiente renglón EN LA MISMA FILA
+                    // (el salto NO cuenta como separador). Fuera o dentro de [ ] (aquí, matrices).
+                    if (tb.EndsWith("..."))
+                        buf = tb.Substring(0, tb.Length - 3).TrimEnd() + " " + ln.Trim();
+                    else
+                    {
+                        char last = tb.Length > 0 ? tb[tb.Length - 1] : ' ';
+                        // salto de línea dentro de [ ] = nueva FILA (';'), salvo que ya venga ; , o [
+                        buf = (last == ';' || last == ',' || last == '[') ? tb + " " + ln.Trim()
+                                                                          : tb + "; " + ln.Trim();
+                    }
+                }
+                int depth = 0;
+                foreach (char c in buf) { if (c == '[') depth++; else if (c == ']') depth--; }
+                bool cont = buf.TrimEnd().EndsWith("...");   // sigue continuando (dentro o fuera de [ ])
+                if (depth <= 0 && !cont) { outLines.Add(buf); buf = null; }   // completa
+            }
+            if (buf != null) outLines.Add(buf.Replace("...", " "));
+            return string.Join("\n", outLines);
+        }
+
         private static LispConverter.N TreeOfLine(string line)
         {
             line = line.Trim();

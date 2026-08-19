@@ -32,7 +32,7 @@ namespace HekatanLisp
         // ---------- parse: MATEMATICA -> arbol ----------
         // $Nombre = operadores estilo Calcpad; {} = paréntesis; @ y : = bloque solver ($Op{f @ x = a : b}).
         // ∂ y ∇ cuentan como parte del identificador → así {∂N/∂s} renderiza la parcial en comentarios.
-        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:]");
+        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:']");
         // operadores solver de Calcpad → función del motor
         static readonly Dictionary<string, string> SolverOps = new Dictionary<string, string>
         {
@@ -51,7 +51,7 @@ namespace HekatanLisp
             foreach (Match m in Tok.Matches(s)) toks.Add(m.Value);
             if (toks.Count == 0) return null;
             var p = new MP(toks);
-            return p.Expr();
+            return p.Range();
         }
 
         class MP
@@ -60,6 +60,16 @@ namespace HekatanLisp
             public MP(List<string> toks) { t = toks; }
             string Peek() => i < t.Count ? t[i] : null;
             string Eat() => t[i++];
+            // RANGO estilo MATLAB:  a:b  (paso 1)  ·  a:s:b  (paso s).  Precedencia más baja.
+            public N Range()
+            {
+                var a = Expr();
+                if (Peek() != ":") return a;
+                Eat();
+                var b = Expr();
+                if (Peek() == ":") { Eat(); var c = Expr(); return new N { Op = "range", Items = new List<N> { a, b, c } }; }
+                return new N { Op = "range", Items = new List<N> { a, b } };
+            }
             public N Expr()
             {
                 var n = Term();
@@ -77,6 +87,7 @@ namespace HekatanLisp
                 // menos unario liga MENOS que la potencia: -x^2 = -(x^2), -(x-1)^2 = -((x-1)^2)
                 if (Peek() == "-") { Eat(); return N.Make("neg", Factor()); }
                 var n = Base();
+                while (Peek() == "'") { Eat(); n = new N { Op = "trans", A = n }; }   // A' = transpuesta (postfija)
                 if (Peek() == "^") { Eat(); n = N.Make("^", n, Factor()); }
                 return n;
             }
@@ -138,7 +149,7 @@ namespace HekatanLisp
                 {
                     if (Peek() == ";") { Eat(); rows.Add(cur); cur = new List<N>(); continue; }   // fila
                     if (Peek() == ",") { Eat(); continue; }                                        // columna
-                    cur.Add(Expr());   // cada elemento es una expresión (espacio = siguiente columna)
+                    cur.Add(Range());   // cada elemento es una expresión o rango (espacio = siguiente columna)
                 }
                 if (Peek() == "]") Eat();
                 rows.Add(cur);
@@ -402,6 +413,8 @@ namespace HekatanLisp
             if (n.Op == "solver") return SolverToLisp(n);
             if (n.IsAtom) return n.Atom;
             if (n.Op == "neg") return "(- " + ToLisp(n.A) + ")";
+            if (n.Op == "trans") return "(mtransp " + ToLisp(n.A) + ")";
+            if (n.Op == "range") return "(mrange " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
             if (n.Op == "fn") return "(" + n.Atom + " " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
             if (n.Op == "vec" || n.Op == "mat") return "(vector " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
             var o = n.Op == "^" ? "expt" : n.Op;
@@ -504,6 +517,10 @@ namespace HekatanLisp
                 var r = "<span class=\"m-op\">−</span>" + ToHtml(n.A, 3);
                 return parentPrec > 3 ? Paren(r) : r;
             }
+            if (n.Op == "trans")   // transpuesta: Aᵀ
+                return ToHtml(n.A, 5) + "<sup class=\"m-sup\">T</sup>";
+            if (n.Op == "range")   // rango a:b  ó  a:s:b
+                return string.Join("<span class=\"m-op\">:</span>", n.Items.Select(x => ToHtml(x, 2)));
             if (n.Op == "fn") return FnHtml(n);
             if (n.Op == "vec") return GridHtml(new List<List<N>> { n.Items });
             if (n.Op == "mat") return GridHtml(n.Items.Select(r => r.Items).ToList());

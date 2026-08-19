@@ -144,9 +144,13 @@ namespace HekatanLisp
             sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
             foreach (var ex in lispExprs)
             {
+                // ¿MATRIZ? (vector/transpuesta/rango) → evaluar con meval e imprimir como (vector …)
+                bool hasMat = ex.Contains("(vector") || ex.Contains("(mtransp") || ex.Contains("(mrange");
                 // ¿la forma tiene ALGÚN token de operación (aunque sea anidado)? → evaluar con evops
                 bool hasOp = System.Array.Exists(OpCallNames, nm => ex.Contains("(" + nm));
-                if (hasOp)   // tokens (Partial, Factor, …) puros o mezclados con aritmética → resultado simbólico
+                if (hasMat)  // álgebra de matrices simbólica/numérica
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (mprint (meval '").Append(ex).Append("))) '").Append(ex).Append("))\n");
+                else if (hasOp)   // tokens (Partial, Factor, …) puros o mezclados con aritmética → resultado simbólico
                     sb.Append("(format t \"~a~%\" (or (ignore-errors (evops '").Append(ex).Append(")) '").Append(ex).Append("))\n");
                 else if (fn == null)   // auto: valor si evalúa a número; si no, la forma tal cual
                     sb.Append("(format t \"~a~%\" (or (ignore-errors (let ((v ").Append(ex)

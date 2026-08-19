@@ -474,6 +474,8 @@ namespace HekatanLisp
                     // (el término entero renderiza a CSS, y al lado su valor simbólico).
                     if (HasOpCall(formOf[i]) && hasR)
                         display.Add(lbl + " = " + formOf[i] + " = " + r);
+                    else if (hasR && r.StartsWith("(vector") && r != formOf[i])
+                        display.Add(lbl + " = " + r);   // operación de matriz (A', A*B, A^-1…) → muestra la matriz resultado
                     else if (_op == "auto" && hasR &&
                              System.Text.RegularExpressions.Regex.IsMatch(r, @"^-?\d+(\.\d+)?$"))
                         display.Add(lbl + " = " + formOf[i] + " = " + r);   // f(3) = 3²+1 = 10 (numérico: muestra forma Y valor)

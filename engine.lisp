@@ -649,3 +649,103 @@
     ((member (car e) '(+ - * / expt))                    ; aritmética → simplifica lo combinado
      (simplify (cons (car e) (mapcar #'evops (cdr e)))))
     (t e)))
+
+;;;; ================= ÁLGEBRA DE MATRICES (simbólica/numérica) =================
+;;;; Forma externa (del parser): fila = #(a b c) ; matriz = #(#(..) #(..)).
+;;;; Internamente: LISTA DE FILAS (cada fila, lista de entradas). Las entradas pueden
+;;;; ser números o expresiones simbólicas; se compactan con `simplify`.
+(defun to-rows (x)
+  (cond ((not (vectorp x)) (list (list x)))                       ; escalar -> 1x1
+        ((and (plusp (length x)) (vectorp (aref x 0)))            ; ya es matriz
+         (map 'list (lambda (r) (coerce r 'list)) x))
+        (t (list (coerce x 'list)))))                            ; fila -> 1xN
+(defun from-rows (rows)
+  (if (= (length rows) 1)
+      (coerce (first rows) 'vector)                               ; una fila -> #(..)
+      (coerce (mapcar (lambda (r) (coerce r 'vector)) rows) 'vector)))
+(defun matp (x) (vectorp x))                                      ; un valor matriz/vector
+
+(defun mtransp (x) (from-rows (apply #'mapcar #'list (to-rows x))))
+;; producto punto: suma BINARIA anidada (+ (+ (+ 0 p1) p2) p3), porque `simplify` solo
+;; combina '+' de dos en dos (un (+ a b c) n-ario le haría perder términos).
+(defun mdot (row col)
+  (simplify (reduce (lambda (acc pr) (list '+ acc (list '* (car pr) (cdr pr))))
+                    (mapcar #'cons row col) :initial-value 0)))
+(defun mmul (a b)
+  (let ((ra (to-rows a)) (cb (apply #'mapcar #'list (to-rows b))))
+    (from-rows (mapcar (lambda (row) (mapcar (lambda (col) (mdot row col)) cb)) ra))))
+(defun mscale (s x)
+  (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (simplify (list '* s e))) row)) (to-rows x))))
+(defun madd (a b)
+  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (simplify (list '+ e f))) r1 r2))
+                     (to-rows a) (to-rows b))))
+(defun msub (a b)
+  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (simplify (list '- e f))) r1 r2))
+                     (to-rows a) (to-rows b))))
+(defun mrange (a &optional s b)                                   ; (a b) o (a s b)
+  (unless b (setf b s s 1))
+  (coerce (loop for x from a to b by s collect x) 'vector))
+
+;; INVERSA por Gauss-Jordan. Convierte cada entrada a número (eval-consts) y resuelve
+;; con aritmética EXACTA de SBCL (racionales). Matriz singular -> se deja igual.
+(defun mnum (e) (let ((v (ignore-errors (eval-consts (simplify e))))) (if (numberp v) v 0)))
+(defun minv (x)
+  (let* ((rows (to-rows x)) (n (length rows))
+         (a (make-array (list n (* 2 n)) :initial-element 0)))
+    (loop for i from 0 below n do
+      (loop for j from 0 below n do (setf (aref a i j) (mnum (nth j (nth i rows)))))
+      (setf (aref a i (+ n i)) 1))
+    (loop for c from 0 below n do
+      (when (zerop (aref a c c))
+        (loop for r from (1+ c) below n do
+          (unless (zerop (aref a r c))
+            (loop for k from 0 below (* 2 n) do (rotatef (aref a c k) (aref a r k)))
+            (return))))
+      (let ((piv (aref a c c)))
+        (when (zerop piv) (return-from minv x))                   ; singular
+        (loop for k from 0 below (* 2 n) do (setf (aref a c k) (/ (aref a c k) piv)))
+        (loop for r from 0 below n do
+          (unless (= r c)
+            (let ((f (aref a r c)))
+              (loop for k from 0 below (* 2 n) do
+                (setf (aref a r k) (- (aref a r k) (* f (aref a c k))))))))))
+    (from-rows (loop for i from 0 below n collect
+                     (loop for j from 0 below n collect (aref a i (+ n j)))))))
+
+;; construye la matriz de un literal [ … ]: si los elementos ya son matrices/filas,
+;; los apila por filas (vertcat); si son escalares, es una sola fila.
+(defun build-mat (elems)
+  (if (some #'vectorp elems)
+      (from-rows (apply #'append (mapcar #'to-rows elems)))
+      (coerce elems 'vector)))
+
+;; meval: evalúa una expresión que MEZCLA matrices y escalares.
+;;   (vector …) construye ; mtransp/mrange ; + - * expt(-1)=inversa ; escalar·matriz.
+(defun meval (e)
+  (cond
+    ((atom e) e)
+    ((eq (car e) 'quote) (second e))
+    ((eq (car e) 'vector) (build-mat (mapcar #'meval (cdr e))))
+    ((eq (car e) 'mtransp) (mtransp (meval (second e))))
+    ((eq (car e) 'mrange)  (apply #'mrange (mapcar #'meval (cdr e))))
+    ((eq (car e) '+) (m2 #'madd #'+ (meval (second e)) (meval (third e))))
+    ((eq (car e) '-) (if (cddr e) (m2 #'msub #'- (meval (second e)) (meval (third e)))
+                         (let ((v (meval (second e))))    ; menos unario: matriz -> escalar -1; escalar -> -x
+                           (if (matp v) (mscale -1 v) (simplify (list '- v))))))
+    ((eq (car e) '*) (mtimes (meval (second e)) (meval (third e))))
+    ((eq (car e) 'expt)
+     (let ((base (meval (second e))) (p (meval (third e))))
+       (if (and (matp base) (eql p -1)) (minv base) (simplify (list 'expt base p)))))
+    (t (simplify (cons (car e) (mapcar #'meval (cdr e)))))))
+(defun m2 (mf sf a b) (if (or (matp a) (matp b)) (funcall mf a b) (simplify (list (if (eq sf #'+) '+ '-) a b))))
+(defun mtimes (a b)
+  (cond ((and (matp a) (matp b)) (mmul a b))
+        ((matp a) (mscale b a))
+        ((matp b) (mscale a b))
+        (t (simplify (list '* a b)))))
+
+;; imprime el resultado como forma (vector …) para que el parser de C# lo lea y renderice.
+(defun mprint (x)
+  (if (vectorp x)
+      (format nil "(vector ~{~a~^ ~})" (map 'list #'mprint x))
+      (format nil "~a" x)))

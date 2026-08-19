@@ -406,13 +406,20 @@ namespace HekatanLisp
             for (int i = 0; i < lines.Length; i++)
                 if (labels[i] != null && treeOf[i] != null && !labelMap.ContainsKey(labels[i]))
                     labelMap[labels[i]] = treeOf[i];
+            // vecMap = etiquetas cuyo valor es un VECTOR o MATRIZ → así v(i)/A(i,j) es ÍNDICE (no función).
+            // Es lo que diferencia f(x) de v(i): el NOMBRE está definido como función o como vector.
+            var vecMap = new Dictionary<string, LispConverter.N>();
+            foreach (var kv in labelMap)
+                if (kv.Value != null && (kv.Value.Op == "vec" || kv.Value.Op == "mat"))
+                    vecMap[kv.Key] = kv.Value;
             // PASO 2: sustituir etiquetas y pasar a LISP
             for (int i = 0; i < lines.Length; i++)
             {
                 if (treeOf[i] == null) continue;
                 try
                 {
-                    var app = funcMap.Count > 0 ? LispConverter.SubstFuncs(treeOf[i], funcMap) : treeOf[i];  // aplica f(3)→3²+1
+                    var app = (funcMap.Count > 0 || vecMap.Count > 0)
+                              ? LispConverter.SubstFuncs(treeOf[i], funcMap, vecMap) : treeOf[i];  // f(3)→3²+1, v(2)→componente
                     var sub = LispConverter.SubstLabels(app, labelMap, labels[i], new HashSet<string>());
                     formOf[i] = LispConverter.ToLisp(sub);
                 }
@@ -431,12 +438,15 @@ namespace HekatanLisp
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {
                     var (kind, align, raw2) = textOf[i].Value;
-                    string html = LispConverter.FormatInlineText(raw2, name => LookupVarHtml(name, labels, resOf, formOf, funcMap));
+                    string html = LispConverter.FormatInlineText(raw2, name => LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap));
                     display.Add(LispConverter.TxtLine(kind, align, html));
                     continue;
                 }
                 if (notationOf[i] != null) { display.Add(notationOf[i]); continue; }   // notación: ya viene en forma LISP "a = b = c"
                 if (formOf[i] == null) { display.Add(""); continue; }
+                // DEFINICIÓN de vector/matriz: es solo el dato, no lleva "= resultado".
+                if (labels[i] != null && formOf[i].StartsWith("(vector"))
+                { display.Add(labels[i] + " = " + formOf[i]); continue; }
                 string lbl = labels[i];
                 string v = hasVar ? dvar : FirstVar(formOf[i]);
                 var r = resOf[i] ?? "";
@@ -510,7 +520,8 @@ namespace HekatanLisp
         // {Var} en un texto: busca la etiqueta definida en la hoja y devuelve su valor renderizado (math).
         // Si no es una etiqueta, intenta la expresión literal (número/fórmula). null = déjalo tal cual.
         private static string LookupVarHtml(string name, string[] labels, string[] resOf, string[] formOf,
-                                            Dictionary<string, (List<string> ps, LispConverter.N body)> funcMap = null)
+                                            Dictionary<string, (List<string> ps, LispConverter.N body)> funcMap = null,
+                                            Dictionary<string, LispConverter.N> vecMap = null)
         {
             // 1) ¿es una ETIQUETA definida en la hoja? → su resultado (ya calculado en el lote)
             for (int j = 0; j < labels.Length; j++)
@@ -525,7 +536,8 @@ namespace HekatanLisp
             try
             {
                 var tree = LispConverter.ParseMath(name);
-                if (funcMap != null && funcMap.Count > 0) tree = LispConverter.SubstFuncs(tree, funcMap);
+                if ((funcMap != null && funcMap.Count > 0) || (vecMap != null && vecMap.Count > 0))
+                    tree = LispConverter.SubstFuncs(tree, funcMap ?? new Dictionary<string, (List<string>, LispConverter.N)>(), vecMap);
                 var lisp = LispConverter.ToLisp(tree);
                 // Computa SOLO si hay token (Factor/Partial/…) o si es TOTALMENTE numérico (sin variable
                 // libre, ej. N1(-1)=1). Un símbolo como N_i NO se toca: se dibuja tal cual (si lo pasáramos

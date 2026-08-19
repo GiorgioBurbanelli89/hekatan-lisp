@@ -330,30 +330,65 @@ namespace HekatanLisp
         // Es el mismo mecanismo de la época LISP/Macsyma: una función es un cuerpo con parámetros, y
         // "aplicarla" es SUSTITUIR el argumento en el parámetro (subst). Recursivo: reduce composiciones
         // f(G(x)) reduciendo primero los argumentos. `active` evita bucle si una def se llama a sí misma.
-        public static N SubstFuncs(N n, Dictionary<string, (List<string> ps, N body)> fns, HashSet<string> active = null)
+        public static N SubstFuncs(N n, Dictionary<string, (List<string> ps, N body)> fns,
+                                   Dictionary<string, N> vecs = null, HashSet<string> active = null)
         {
             if (n == null) return null;
             active ??= new HashSet<string>();
-            if (n.Op == "fn" && n.Items != null && fns.TryGetValue(n.Atom, out var def)
-                && def.ps.Count == n.Items.Count && !active.Contains(n.Atom))
+            if (n.Op == "fn" && n.Items != null)
             {
-                var pmap = new Dictionary<string, N>();
-                for (int i = 0; i < def.ps.Count; i++)
-                    pmap[def.ps[i]] = SubstFuncs(n.Items[i], fns, active);   // reduce args primero (composición)
-                var body = SubstLabels(def.body, pmap, null, new HashSet<string>());   // param → argumento
-                active.Add(n.Atom);
-                var r = SubstFuncs(body, fns, active);                       // reduce funciones que queden dentro
-                active.Remove(n.Atom);
-                return r;
+                // (a) LLAMADA DE FUNCIÓN  f(x) → β-reducción (si f está definida como función)
+                if (fns.TryGetValue(n.Atom, out var def) && def.ps.Count == n.Items.Count && !active.Contains(n.Atom))
+                {
+                    var pmap = new Dictionary<string, N>();
+                    for (int i = 0; i < def.ps.Count; i++)
+                        pmap[def.ps[i]] = SubstFuncs(n.Items[i], fns, vecs, active);   // reduce args (composición)
+                    var body = SubstLabels(def.body, pmap, null, new HashSet<string>());   // param → argumento
+                    active.Add(n.Atom);
+                    var r = SubstFuncs(body, fns, vecs, active);                   // reduce funciones anidadas
+                    active.Remove(n.Atom);
+                    return r;
+                }
+                // (b) ÍNDICE de vector/matriz  v(i), A(i,j) → componente (estilo MATLAB 2017a),
+                //     SOLO si el nombre es un vector/matriz definido y los índices son enteros.
+                if (vecs != null && vecs.TryGetValue(n.Atom, out var cont))
+                {
+                    var args = n.Items.Select(x => SubstFuncs(x, fns, vecs, active)).ToList();
+                    var hit = TryIndex(cont, args);
+                    if (hit != null) return hit;
+                }
             }
             if (n.IsAtom) return n;
             return new N
             {
                 Op = n.Op, Atom = n.Atom,
-                A = SubstFuncs(n.A, fns, active),
-                B = SubstFuncs(n.B, fns, active),
-                Items = n.Items?.Select(x => SubstFuncs(x, fns, active)).ToList()
+                A = SubstFuncs(n.A, fns, vecs, active),
+                B = SubstFuncs(n.B, fns, vecs, active),
+                Items = n.Items?.Select(x => SubstFuncs(x, fns, vecs, active)).ToList()
             };
+        }
+
+        // v(k) → k-ésima componente (1-based, MATLAB) · A(i,j) → elemento fila i, columna j.
+        // Devuelve null si los índices no son enteros o se salen de rango (se deja como v(i) simbólico).
+        static N TryIndex(N cont, List<N> args)
+        {
+            int? IntOf(N x) => x != null && x.IsAtom && int.TryParse(x.Atom, out var v) ? v : (int?)null;
+            if (cont == null) return null;
+            if (cont.Op == "vec" && args.Count == 1)
+            {
+                var k = IntOf(args[0]);
+                if (k >= 1 && k <= cont.Items.Count) return cont.Items[k.Value - 1];
+            }
+            if (cont.Op == "mat" && args.Count == 2)
+            {
+                int? i = IntOf(args[0]), j = IntOf(args[1]);
+                if (i >= 1 && i <= cont.Items.Count)
+                {
+                    var row = cont.Items[i.Value - 1];
+                    if (row?.Op == "vec" && j >= 1 && j <= row.Items.Count) return row.Items[j.Value - 1];
+                }
+            }
+            return null;
         }
 
         // ---------- render: arbol -> LISP ----------

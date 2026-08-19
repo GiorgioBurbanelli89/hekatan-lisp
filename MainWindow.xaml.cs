@@ -438,7 +438,9 @@ namespace HekatanLisp
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {
                     var (kind, align, raw2) = textOf[i].Value;
-                    string html = LispConverter.FormatInlineText(raw2, name => LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap));
+                    string html = LispConverter.FormatInlineText(raw2,
+                        name => LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
+                        name => vecMap.TryGetValue(name, out var vt) && vt.Op == "vec");   // @v → flecha solo si v es VECTOR
                     display.Add(LispConverter.TxtLine(kind, align, html));
                     continue;
                 }

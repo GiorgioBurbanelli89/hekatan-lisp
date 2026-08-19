@@ -446,7 +446,29 @@ namespace HekatanLisp
         // (πi lo maneja el motor como constante; no lo meto aquí para no chocar con 'pi' numérico)
         static string GreekSym(string s) => Greek.TryGetValue(s, out var g) ? g : System.Net.WebUtility.HtmlEncode(s);
 
-        static string VarHtml(string name)
+        // acento centrado ARRIBA del contenido (flecha, sombrero, punto, tilde) — como Hekatan Lab.
+        static string Over(string acc, string inner) =>
+            "<span style=\"display:inline-block;position:relative;text-align:center;\">" + inner +
+            "<span style=\"position:absolute;left:0;right:0;top:-.52em;font-size:.72em;font-style:normal;font-weight:400;line-height:1;\">"
+            + acc + "</span></span>";
+        // DECORA la base con sufijos de NOMBRE (válidos porque ⃗ ̄ ̂ no se teclean), igual que Hekatan Lab:
+        //   Fvec → F⃗   ·   xbar → x̄   ·   xhat → x̂   ·   xdot → ẋ   ·   xtilde → x̃
+        // La flecha del VECTOR es de Hekatan Lab (Calcpad no la tiene). Recursivo + griegas al final.
+        static readonly (string tok, string acc)[] Decos =
+            { ("vec", "&#8594;"), ("hat", "^"), ("tilde", "~"), ("dot", "&#183;") };
+        static string DecorateBase(string b)
+        {
+            if (string.IsNullOrEmpty(b)) return "";
+            if (b.Length > 3 && b.EndsWith("bar"))
+                return "<span style=\"display:inline-block;border-top:.08em solid currentColor;line-height:1.05;padding:0 .04em;\">"
+                     + DecorateBase(b.Substring(0, b.Length - 3)) + "</span>";
+            foreach (var (tok, acc) in Decos)
+                if (b.Length > tok.Length && b.EndsWith(tok))
+                    return Over(acc, DecorateBase(b.Substring(0, b.Length - tok.Length)));
+            return GreekSym(b);
+        }
+
+        static string VarHtml(string name, bool vecArrow = false)
         {
             string baseN, sub;
             int us = name.IndexOf('_');
@@ -459,7 +481,9 @@ namespace HekatanLisp
             }
             // subíndice SOLO si el nombre empieza por letra (no en "-1", que es un número)
             if (sub.Length > 0 && !(baseN.Length > 0 && char.IsLetter(baseN[0]))) { baseN = name; sub = ""; }
-            var h = "<span class=\"m-var\">" + GreekSym(baseN) + "</span>";   // theta→θ, gamma→γ…
+            // vecArrow: la variable ES un vector/matriz → flecha automática sobre el nombre (v → v⃗).
+            var deco = vecArrow ? Over("&#8594;", DecorateBase(baseN)) : DecorateBase(baseN);   // theta→θ, Fvec→F⃗…
+            var h = "<span class=\"m-var\">" + deco + "</span>";
             if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
             return h;
         }
@@ -617,7 +641,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         // el resto del texto se escapa normal. Una @ suelta queda literal.
         // (bal) = una llave con UN nivel de anidamiento: así @{Factor{x^2+3*x}} agarra todo el interior.
         const string Bal = @"(?:[^{}]|\{[^{}]*\})*";
-        public static string FormatInlineText(string t, Func<string, string> varLookup)
+        public static string FormatInlineText(string t, Func<string, string> varLookup, Func<string, bool> isVec = null)
         {
             t = System.Net.WebUtility.HtmlEncode(t ?? "");
             // @{expr} → SOLO el valor
@@ -632,7 +656,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 var name = m.Groups[1].Value;
                 var v = varLookup?.Invoke(name);
                 return string.IsNullOrEmpty(v) ? m.Value
-                    : "<span class=\"m-expr\">" + VarHtml(name) + "<span class=\"m-op\"> = </span>" + v + "</span>";
+                    : "<span class=\"m-expr\">" + VarHtml(name, isVec?.Invoke(name) ?? false) + "<span class=\"m-op\"> = </span>" + v + "</span>";
             });
             // {expr} → SOLO el valor (alias antiguo)
             t = Regex.Replace(t, @"\{(" + Bal + @")\}", m =>
@@ -678,12 +702,15 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                         // "N1 = OPERACIÓN = RESULTADO": varios pasos separados por " = ".
                         // Muestra la OPERACIÓN simbólica y su RESULTADO (como Hekatan Lab), no solo el final.
                         var partes = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"\s=\s");
-                        var sb = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value));
-                        foreach (var pz in partes)
-                        {
-                            var rt = fromLisp ? ParseLisp(pz.Trim()) : ParseMath(pz.Trim());
+                        var trees = new N[partes.Length];
+                        for (int pi = 0; pi < partes.Length; pi++)
+                            trees[pi] = fromLisp ? ParseLisp(partes[pi].Trim()) : ParseMath(partes[pi].Trim());
+                        // ¿el valor es un VECTOR (una fila)? → la variable principal lleva flecha (v → v⃗).
+                        // Las matrices NO llevan flecha (se distinguen por los corchetes grandes).
+                        bool isVec = trees.Length > 0 && trees[0] != null && trees[0].Op == "vec";
+                        var sb = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value, isVec));
+                        foreach (var rt in trees)
                             sb.Append("<span class=\"m-op\"> = </span><span class=\"m-expr\">").Append(ToHtml(rt)).Append("</span>");
-                        }
                         html = sb.ToString();
                     }
                     catch { html = System.Net.WebUtility.HtmlEncode(line); }

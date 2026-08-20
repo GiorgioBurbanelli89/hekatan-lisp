@@ -36,7 +36,7 @@ namespace HekatanLisp
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private bool _ranProgram = false;          // el último resultado vino de EJECUTAR un programa (stdout de consola)
-        private bool _dark = true;                 // tema: oscuro (true) / claro (false), como Hekatan Lab
+        private bool _dark = false;                // tema: oscuro (true) / claro (false). Arranca CLARO, como la UI XAML
         private readonly HashSet<string> _ctlSeen = new HashSet<string>();
 
         private const string EJ_MATH = "x^2 + 3*x\r\nsqrt(x) + sin(x)\r\n[1 2 3]\r\n[1 2; 3 4]\r\n3*x/2";
@@ -63,7 +63,8 @@ namespace HekatanLisp
             var profile = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             await Viewer.EnsureCoreWebView2Async(env);
-            Viewer.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
+            Viewer.CoreWebView2.Profile.PreferredColorScheme =
+                _dark ? CoreWebView2PreferredColorScheme.Dark : CoreWebView2PreferredColorScheme.Light;
             _webReady = true;
 
             Editor.TextChanged += (s, ev) =>
@@ -98,8 +99,7 @@ namespace HekatanLisp
                     try { if (File.Exists(AutoSavePath)) recup = File.ReadAllText(AutoSavePath); } catch { }
                 Editor.Text = !string.IsNullOrWhiteSpace(recup) ? recup : EJ_MATH;
             }
-            SetView(_view);
-            SetOp(_op);
+            ApplyTheme(_dark);   // sincroniza UI + render (LispConverter.Dark) al arrancar; llama SetView/SetOp
 
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }

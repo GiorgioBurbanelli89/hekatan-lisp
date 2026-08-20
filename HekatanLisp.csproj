@@ -16,6 +16,10 @@
     <None Update="engine.lisp">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- carpeta de EJEMPLOS para practicar (se copia a bin/.../ejemplos) -->
+    <None Update="ejemplos\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran) -->
     <EmbeddedResource Include="Lisp.xshd" />
   </ItemGroup>

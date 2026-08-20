@@ -17,4 +17,15 @@ Causa: `engine.lisp` es reescritor de árbol a mano; `derive-x` fija `'x`; `simp
 - Fallback al motor viejo si no es polinomio (p.ej. denominador no constante).
 
 ## Progreso
-- ⏳ reescribir engine.lisp con polinomios racionales.
+- ✅ engine.lisp reescrito con polinomios de coef. RACIONALES (exacto).
+- ✅ simplify/expand exactos: (1-s)/2+(1+s)/2→1 ; (1-s)(1+s)→1-s².
+- ✅ derive-x deriva a la VARIABLE DETECTADA (ya no fija a x): d/ds (1-s)/2→-1/2.
+- ✅ integ-x / defint-x: ∫ polinomios. ∫N1²[-1,1]=2/3, ∫N1N2=1/3 (masa 1D exacta).
+- ✅ botón "∫ integrar" enganchado (EvalOp/SetOp/--ctl/--op). Verificado por --ctl.
+- ✅ perf: matemática 0.003 ms/op; cuello = arranque SBCL ~60 ms/cálculo.
+- ✅ v1.3.0 publicado (GitHub + instalador).
+- ✅ Guía "De MATLAB a LISP" (artefacto, 3 columnas Render·MATLAB·LISP, 9 lecciones
+     + funciones de forma 1D). Verificada por PNG.
+- ⏳ opcional: SBCL vivo (servidor) para bajar de 60 ms a µs.
+- ⏳ opcional: viga Euler-Bernoulli (cúbicos de Hermite) — mismo motor, derivar 2x = curvatura.
+- ⏳ pendiente stage 2: guardar EXPRESIÓN simbólica en variable (N1 = (1-s)/2) y reusar.

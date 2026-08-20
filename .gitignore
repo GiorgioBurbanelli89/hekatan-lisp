@@ -14,3 +14,5 @@ Installer/*.exe
 # Temporales
 hlisp_run_*.lisp
 *.tmp
+guia_matlab_lisp.html
+MATLAB_y_LISP_lado_a_lado.pdf

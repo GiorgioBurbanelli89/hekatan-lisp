@@ -1,0 +1,16 @@
+;;;; Funciones de forma 1D DEDUCIDAS por interpolacion de Lagrange.
+;;;; Muestra el PLANTEAMIENTO (producto) = RESULTADO (polinomio).
+(defun prod (lst) (if (= (length lst) 1) (car lst) (cons '* lst)))
+(defun factores (nodes i)
+  (let ((xi (nth i nodes)) (fn nil) (fd nil))
+    (dotimes (j (length nodes))
+      (unless (= j i)
+        (push (list '- 's (nth j nodes)) fn)
+        (push (list '- xi (nth j nodes)) fd)))
+    (list '/ (prod (reverse fn)) (prod (reverse fd)))))
+(defun muestra (nodos i)
+  (format t "  N~a = ~a = ~a~%" (1+ i) (factores nodos i) (expand* (factores nodos i))))
+(format t "1D LINEAL (2 nodos):~%")
+(dotimes (i 2) (muestra '(-1 1) i))
+(format t "1D CUADRATICA (3 nodos):~%")
+(dotimes (i 3) (muestra '(-1 0 1) i))

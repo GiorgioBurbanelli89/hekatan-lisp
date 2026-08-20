@@ -48,6 +48,10 @@ namespace HekatanLisp
 
         public static N ParseMath(string s)
         {
+            // multiplicación escrita a la Jorge: ·  ∙  ⋅  ×  → *  (el tokenizer solo conoce '*').
+            //   menos/'/' unicode → ASCII.  Sin esto "12·10^6" se leía como 12 (se perdía el operador).
+            s = s.Replace('·', '*').Replace('∙', '*').Replace('⋅', '*').Replace('×', '*')
+                 .Replace('−', '-').Replace('∕', '/').Replace('⁄', '/');
             var toks = new List<string>();
             foreach (Match m in Tok.Matches(s)) toks.Add(m.Value);
             if (toks.Count == 0) return null;
@@ -603,23 +607,86 @@ namespace HekatanLisp
             return h;
         }
 
-        // vector/matriz: cuadrícula con corchetes grandes
+        // vector/matriz: cuadrícula con corchetes grandes.
+        // GRANDE (>9 col ó >11 filas): índices de fila/columna en los bordes y el centro
+        //   COLAPSADO con … ⋮ ⋱ (como el MathCanvas de Hekatan Calc y como NumPy/MATLAB).
+        //   Chica: cuadrícula simple, sin índices.
         static string GridHtml(List<List<N>> rows)
         {
-            int ncols = rows.Count == 0 ? 0 : rows.Max(r => r.Count);
-            var cells = new StringBuilder();
-            foreach (var row in rows)
-                foreach (var cell in row)
-                    cells.Append("<span class=\"m-cell\">").Append(ToHtml(cell, 0)).Append("</span>");
-            return "<span class=\"m-mat\"><span class=\"m-brk m-brl\"></span>" +
-                   "<span class=\"m-mgrid\" style=\"grid-template-columns:repeat(" + ncols + ",auto)\">" +
-                   cells + "</span><span class=\"m-brk m-brr\"></span></span>";
+            int nrows = rows.Count;
+            int ncols = nrows == 0 ? 0 : rows.Max(r => r.Count);
+            const int CMAX = 8, RMAX = 10;              // cuántas primeras se muestran antes de colapsar
+            bool colBig = ncols > CMAX + 1;             // >9 columnas → colapsa horizontal
+            bool rowBig = nrows > RMAX + 1;             // >11 filas   → colapsa vertical
+            if (!colBig && !rowBig)                     // ---- matriz chica: como siempre ----
+            {
+                var sc = new StringBuilder();
+                foreach (var row in rows)
+                    foreach (var cell in row)
+                        sc.Append("<span class=\"m-cell\">").Append(ToHtml(cell, 0)).Append("</span>");
+                return "<span class=\"m-mat\"><span class=\"m-brk m-brl\"></span>" +
+                       "<span class=\"m-mgrid\" style=\"grid-template-columns:repeat(" + ncols + ",auto)\">" +
+                       sc + "</span><span class=\"m-brk m-brr\"></span></span>";
+            }
+            // ---- matriz grande: COLAPSABLE con índices + … ⋮ ⋱ y el MISMO corchete [ ] de siempre ----
+            //   (limpia, sin barras ni marcos: como NumPy/MATLAB).
+            var cols = new List<int>();
+            if (colBig) { for (int j = 0; j < CMAX; j++) cols.Add(j); cols.Add(-1); cols.Add(ncols - 1); }
+            else        { for (int j = 0; j < ncols; j++) cols.Add(j); }
+            var rws = new List<int>();
+            if (rowBig) { for (int i = 0; i < RMAX; i++) rws.Add(i); rws.Add(-1); rws.Add(nrows - 1); }
+            else        { for (int i = 0; i < nrows; i++) rws.Add(i); }
+            return IndexedGrid(rows, cols, rws, ncols, nrows);
+        }
+
+        // dibuja UNA cuadrícula con índices en los bordes; cols/rws son los índices a mostrar (-1 = hueco … ⋮ ⋱)
+        static string IndexedGrid(List<List<N>> rows, List<int> cols, List<int> rws, int ncols, int nrows)
+        {
+            bool showCol = ncols > 1, showRow = nrows > 1;
+            int brkCol   = showRow ? 2 : 1;
+            int dataCol0 = brkCol + 1;
+            int brkRCol  = dataCol0 + cols.Count;
+            int dataRow0 = showCol ? 2 : 1;
+
+            var sb = new StringBuilder();
+            // la fila de índices de columna añade altura arriba → el centro del bloque sube y el '='
+            // exterior queda alto. Compenso bajando el bloque media fila de índices para que el '='
+            // caiga en la MITAD del corchete (sobre los datos).
+            string shift = showCol ? " style=\"transform:translateY(-0.55em)\"" : "";
+            sb.Append("<span class=\"m-matx\"").Append(shift).Append(">");
+            if (showCol && showRow)
+                sb.Append("<span class=\"m-mh\" style=\"grid-row:1;grid-column:1\"></span>");
+            if (showCol)
+                for (int ci = 0; ci < cols.Count; ci++)
+                    sb.Append("<span class=\"m-mh\" style=\"grid-row:1;grid-column:").Append(dataCol0 + ci)
+                      .Append("\">").Append(cols[ci] < 0 ? "⋯" : cols[ci].ToString()).Append("</span>");
+            if (showRow)
+                for (int ri = 0; ri < rws.Count; ri++)
+                    sb.Append("<span class=\"m-mrh\" style=\"grid-row:").Append(dataRow0 + ri)
+                      .Append(";grid-column:1\">").Append(rws[ri] < 0 ? "⋮" : rws[ri].ToString()).Append("</span>");
+            sb.Append("<span class=\"m-brk m-brl\" style=\"grid-row:").Append(dataRow0).Append(" / span ")
+              .Append(rws.Count).Append(";grid-column:").Append(brkCol).Append("\"></span>");
+            sb.Append("<span class=\"m-brk m-brr\" style=\"grid-row:").Append(dataRow0).Append(" / span ")
+              .Append(rws.Count).Append(";grid-column:").Append(brkRCol).Append("\"></span>");
+            for (int ri = 0; ri < rws.Count; ri++)
+                for (int ci = 0; ci < cols.Count; ci++)
+                {
+                    int r = rws[ri], c = cols[ci];
+                    string txt = (r < 0 && c < 0) ? "<span class=\"m-ell\">⋱</span>"
+                               : c < 0 ? "<span class=\"m-ell\">⋯</span>"
+                               : r < 0 ? "<span class=\"m-ell\">⋮</span>"
+                               : (c < rows[r].Count ? ToHtml(rows[r][c], 0) : "");
+                    sb.Append("<span class=\"m-mc\" style=\"grid-row:").Append(dataRow0 + ri)
+                      .Append(";grid-column:").Append(dataCol0 + ci).Append("\">").Append(txt).Append("</span>");
+                }
+            sb.Append("</span>");
+            return sb.ToString();
         }
 
         // ---------- pagina HTML completa (worksheet) — tema claro/oscuro como Hekatan Lab ----------
         public static bool Dark = true;
         const string ROOT_DARK  = ":root{--bg:#14161a;--fg:#e8e8e8;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;}";
-        const string ROOT_LIGHT = ":root{--bg:#ffffff;--fg:#2a2418;--mut:#8a8f96;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;}";
+        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#2a2418;--mut:#6E664F;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;}";
         const string CSS = @"
 *{box-sizing:border-box;}
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
@@ -628,7 +695,6 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Georgia Pro','Century Schoolbook','Times New Roman',Times,serif;font-size:11.5pt;
   overflow-x:auto;overflow-y:hidden;max-width:100%;}   /* matriz muy ancha (12×12): recorta al panel y hace scroll interno */
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
-.ws-eq.grab{cursor:grab;} .ws-eq.grabbing{cursor:grabbing;user-select:none;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 /* texto con formato (directivas ; estilo Hekatan Lab) */
 .ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
@@ -659,6 +725,14 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-brr{border:1.4px solid currentColor;border-left:none;}
 .m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
 .m-cell{color:var(--num);}
+/* matriz GRANDE: índices en los bordes + centro colapsado (… ⋮ ⋱), como Hekatan Calc */
+.m-matx{display:inline-grid;vertical-align:middle;margin:0 .25em;row-gap:.05em;column-gap:0;align-items:center;justify-items:center;}
+.m-mh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .45em .1em;}
+.m-mrh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .35em 0 0;justify-self:end;}
+.m-mc{color:var(--num);padding:.12em .45em;text-align:center;}
+.m-matx>.m-brl{min-width:.3em;margin-right:.18em;align-self:stretch;}
+.m-matx>.m-brr{min-width:.3em;margin-left:.18em;align-self:stretch;}
+.m-ell{color:var(--mut);}
 /* n-ario (∫ Σ Π) apilado — geometria exacta de Calcpad/Hekatan Lab */
 .m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-2pt;margin:0 .12em;}
 .m-dvr small{font-family:Calibri,Candara,Corbel,sans-serif;font-size:70%;display:block;}
@@ -830,19 +904,11 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
-                   "</style></head><body>" + body + DRAG_JS + "</body></html>";
+                   "</style></head><body>" + body + MAT_JS + "</body></html>";
         }
 
-        // arrastrar con el mouse una matriz/línea muy ancha para desplazarla (como Calcpad/Hekatan Lab).
-        const string DRAG_JS = @"<script>(function(){
-  function wire(el){ if(el.scrollWidth<=el.clientWidth) return; el.classList.add('grab');
-    var d=false,sx,sl;
-    el.addEventListener('mousedown',function(e){d=true;el.classList.add('grabbing');sx=e.pageX;sl=el.scrollLeft;e.preventDefault();});
-    window.addEventListener('mouseup',function(){d=false;el.classList.remove('grabbing');});
-    el.addEventListener('mousemove',function(e){ if(!d)return; el.scrollLeft=sl-(e.pageX-sx); });
-  }
-  document.querySelectorAll('.ws-eq').forEach(wire);
-})();</script>";
+        // el marco de la matriz es redimensionable con CSS (resize:both) — no hace falta JS.
+        const string MAT_JS = "";
 
         // ---------- página de AYUDA (se muestra a la derecha cuando no hay script, como Hekatan Lab) ----------
         public static string HelpPage()
@@ -1088,7 +1154,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS + LEARN_CSS +
-                   "</style></head><body>" + body + "</body></html>";
+                   "</style></head><body>" + body + MAT_JS + "</body></html>";
         }
 
         const string LEARN_CSS =

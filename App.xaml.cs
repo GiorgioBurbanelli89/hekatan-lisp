@@ -24,8 +24,19 @@ namespace HekatanLisp
                 return;
             }
 
+            // INSTANCIA ÚNICA: si ya hay una ventana abierta, NO abrir otra (evita 2 WPF).
+            // Se salta en modo --ctl (para automatización/tests que sí pueden coexistir).
+            bool ctl = Array.Exists(args, a => string.Equals(a, "--ctl", StringComparison.OrdinalIgnoreCase));
+            if (!ctl)
+            {
+                _mutex = new System.Threading.Mutex(true, "HekatanLisp_SingleInstance_v1", out bool creada);
+                if (!creada) { Shutdown(0); return; }   // ya existe una → cerrar esta
+            }
+
             base.OnStartup(e);   // muestra MainWindow normal
         }
+
+        private System.Threading.Mutex _mutex;
 
         static string Val(string[] a, string flag)
         {

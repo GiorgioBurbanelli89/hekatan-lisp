@@ -4,36 +4,53 @@
         xmlns:ae="http://icsharpcode.net/sharpdevelop/avalonedit"
         xmlns:wv="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Hekatan LISP" Height="700" Width="1120"
-        Background="#14161A">
+        Background="#141109">
     <Window.Resources>
+        <!-- ===== Tema Hekatan Lab (marrón cálido · dorado · rojo) ===== -->
+        <SolidColorBrush x:Key="ThemeWindowBg"     Color="#141109"/>
+        <SolidColorBrush x:Key="ThemePanelBg"      Color="#1C1810"/>
+        <SolidColorBrush x:Key="ThemeEditorBg"     Color="#1A1712"/>
+        <SolidColorBrush x:Key="ThemeText"         Color="#E8E2D4"/>
+        <SolidColorBrush x:Key="ThemeTextMuted"    Color="#A89F8C"/>
+        <SolidColorBrush x:Key="ThemeAccentRed"    Color="#E5382B"/>
+        <SolidColorBrush x:Key="ThemeAccentGold"   Color="#E6C463"/>
+        <SolidColorBrush x:Key="ThemeButtonBg"     Color="#262016"/>
+        <SolidColorBrush x:Key="ThemeButtonBorder" Color="#3A3226"/>
+        <SolidColorBrush x:Key="ThemeHoverBg"      Color="#33E5382B"/>
+
+        <!-- Botón de modo (Ejecutar, vistas) -->
         <Style x:Key="ModeBtn" TargetType="Button">
-            <Setter Property="Background" Value="#232833"/>
-            <Setter Property="Foreground" Value="#E7EDF3"/>
-            <Setter Property="BorderBrush" Value="#2A333D"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonBg}"/>
+            <Setter Property="FontFamily" Value="Roboto"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="Margin" Value="4,0,0,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource ThemeButtonBorder}"
+                                BorderThickness="1" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentRed}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeHoverBg}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- boton de la calculadora de simbolos -->
+
+        <!-- Botón de la calculadora de símbolos -->
         <Style x:Key="SymBtn" TargetType="Button">
-            <Setter Property="Background" Value="#1B1E24"/>
-            <Setter Property="Foreground" Value="#B0AAED"/>
-            <Setter Property="BorderBrush" Value="#2A333D"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonBg}"/>
             <Setter Property="FontFamily" Value="Cambria"/>
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="MinWidth" Value="34"/>
@@ -43,40 +60,88 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
+                        <Border x:Name="Bd" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource ThemeButtonBorder}"
+                                BorderThickness="1">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentRed}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeHoverBg}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- tecla compacta del keypad -->
+        <Style x:Key="KeyBtn" TargetType="Button" BasedOn="{StaticResource SymBtn}">
+            <Setter Property="MinWidth" Value="30"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="1.5"/>
+        </Style>
+        <!-- letra griega -->
+        <Style x:Key="Greek" TargetType="Button" BasedOn="{StaticResource SymBtn}">
+            <Setter Property="MinWidth" Value="22"/>
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="FontFamily" Value="Times New Roman"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="1"/>
+        </Style>
+        <!-- caja de grupo del keypad (Números / Operadores / Funciones) -->
+        <Style x:Key="GrpBox" TargetType="GroupBox">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextMuted}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeButtonBorder}"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="Padding" Value="4,2,4,4"/>
+            <Setter Property="FontFamily" Value="Roboto"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
     </Window.Resources>
 
-    <Grid x:Name="MainGrid">
+    <Grid x:Name="MainGrid" Background="{DynamicResource ThemeWindowBg}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- 0 menu -->
             <RowDefinition Height="Auto"/>   <!-- 1 botones de modo -->
-            <RowDefinition Height="Auto"/>   <!-- 2 calculadora de simbolos -->
+            <RowDefinition Height="Auto"/>   <!-- 2 barra de operaciones -->
             <RowDefinition Height="Auto"/>   <!-- 3 etiquetas -->
-            <RowDefinition Height="*"/>      <!-- 4 editores -->
+            <RowDefinition Height="*"/>      <!-- 4 editor(izq) + resultado(der) -->
+            <RowDefinition Height="Auto"/>   <!-- 5 calculadora (keypad, solo bajo el editor) -->
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="220"/>   <!-- 0 editor + keypad -->
+            <ColumnDefinition Width="6"/>                  <!-- 1 divisor arrastrable -->
+            <ColumnDefinition Width="*" MinWidth="220"/>   <!-- 2 resultado (altura completa) -->
+        </Grid.ColumnDefinitions>
 
         <!-- ============ barra de menus ============ -->
-        <Menu Grid.Row="0" Background="#1B1E24" Foreground="#E7EDF3" FontFamily="Consolas" FontSize="13">
-            <MenuItem Header="_Archivo" Foreground="#E7EDF3">
+        <Menu Grid.Row="0" Grid.ColumnSpan="3" Background="{DynamicResource ThemePanelBg}" Foreground="{DynamicResource ThemeText}"
+              FontFamily="Roboto" FontSize="13">
+            <MenuItem Header="_Archivo" Foreground="{DynamicResource ThemeText}">
                 <MenuItem Header="Nuevo" Click="MenuNuevo"/>
+                <MenuItem Header="Abrir…" Click="MenuAbrir"/>
+                <MenuItem Header="Guardar" InputGestureText="Ctrl+S" Click="MenuGuardar"/>
+                <MenuItem Header="Guardar como…" Click="MenuGuardarComo"/>
+                <MenuItem x:Name="MnuEjemplos" Header="Ejemplos (practicar)"/>
+                <Separator/>
                 <MenuItem Header="Cargar ejemplo" Click="MenuEjemplo"/>
                 <MenuItem Header="Cargar ejemplo (loop)" Click="MenuEjemploLoop"/>
                 <Separator/>
+                <MenuItem Header="Copiar como LISP ejecutable (portapapeles)" Click="OnExportLisp"/>
+                <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>
             </MenuItem>
-            <MenuItem Header="_Ver resultado" Foreground="#E7EDF3">
+            <MenuItem Header="_Ver resultado" Foreground="{DynamicResource ThemeText}">
                 <MenuItem Header="Render CSS" Click="OnViewRender"/>
                 <MenuItem Header="LISP" Click="OnViewLisp"/>
-                <MenuItem Header="Matemática" Click="OnViewMath"/>
+                <MenuItem Header="MATLAB" Click="OnViewMath"/>
             </MenuItem>
-            <MenuItem Header="_Insertar" Foreground="#E7EDF3">
+            <MenuItem Header="_Insertar" Foreground="{DynamicResource ThemeText}">
                 <MenuItem Header="( )"            Click="OnInsert" Tag="(§§)"/>
                 <MenuItem Header="potencia  x^n"  Click="OnInsert" Tag="x^2"/>
                 <MenuItem Header="fracción  a/b"  Click="OnInsert" Tag="/"/>
@@ -90,100 +155,231 @@
                 <MenuItem Header="sin( )"         Click="OnInsert" Tag="sin(§§)"/>
                 <MenuItem Header="cos( )"         Click="OnInsert" Tag="cos(§§)"/>
             </MenuItem>
-            <MenuItem Header="A_yuda" Foreground="#E7EDF3">
+            <MenuItem Header="_Motor" Foreground="{DynamicResource ThemeText}">
+                <MenuItem Header="Ver funciones del motor (LISP)" Click="MenuVerMotor"
+                          ToolTip="Carga engine.lisp en el editor: verás derive-x, simplify, expand*, integ-x, infix…"/>
+                <MenuItem Header="Ver funciones en MATLAB (aprox.)" Click="MenuVerMotorMat"
+                          ToolTip="Traduce las funciones a MATLAB aproximado (solo para ENTENDER; no corre)"/>
+            </MenuItem>
+            <MenuItem Header="A_yuda" Foreground="{DynamicResource ThemeText}">
                 <MenuItem Header="Reglas de LISP (para comentar)" Click="MenuReglas"/>
                 <MenuItem Header="Acerca de Hekatan LISP" Click="MenuAbout"/>
             </MenuItem>
         </Menu>
 
         <!-- ============ botones de modo ============ -->
-        <DockPanel Grid.Row="1" Background="#14161A" LastChildFill="False" Margin="0,4">
-            <TextBlock DockPanel.Dock="Left" Text="Hekatan LISP" Foreground="#E7EDF3"
-                       FontFamily="Consolas" FontSize="15" FontWeight="Bold"
+        <DockPanel Grid.Row="1" Grid.ColumnSpan="3" Background="{DynamicResource ThemeWindowBg}" LastChildFill="False" Margin="0,4">
+            <TextBlock DockPanel.Dock="Left" Text="Hekatan LISP" Foreground="{DynamicResource ThemeAccentGold}"
+                       FontFamily="Roboto" FontSize="15" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="14,0,0,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                 <Button x:Name="BtnRun" Style="{StaticResource ModeBtn}" Content="▶ Ejecutar" Click="OnRun"
-                        Foreground="#5DCAA5" ToolTip="Ejecuta ahora (F5). Útil si AutoRun está apagado."/>
-                <CheckBox x:Name="ChkAutoRun" Content="AutoRun" IsChecked="True" Foreground="#E7EDF3"
-                          VerticalAlignment="Center" Margin="8,0,4,0" FontFamily="Consolas" FontSize="12"
+                        Foreground="{DynamicResource ThemeAccentGold}" ToolTip="Ejecuta ahora (F5). Útil si AutoRun está apagado."/>
+                <CheckBox x:Name="ChkAutoRun" Content="AutoRun" IsChecked="True" Foreground="{DynamicResource ThemeText}"
+                          VerticalAlignment="Center" Margin="8,0,4,0" FontFamily="Roboto" FontSize="12"
                           Checked="OnAutoRun" Unchecked="OnAutoRun"
                           ToolTip="Actualiza el resultado en vivo tras cada cambio (como Hekatan Lab)"/>
                 <Border Width="12"/>
-                <TextBlock Text="resultado como:" Foreground="#8B98A6" FontFamily="Consolas" FontSize="12"
+                <TextBlock Text="resultado como:" Foreground="{DynamicResource ThemeTextMuted}" FontFamily="Roboto" FontSize="12"
                            VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <Button x:Name="BtnRender" Style="{StaticResource ModeBtn}" Content="Render CSS" Click="OnViewRender"/>
-                <Button x:Name="BtnLisp" Style="{StaticResource ModeBtn}" Content="LISP" Click="OnViewLisp"/>
-                <Button x:Name="BtnMath" Style="{StaticResource ModeBtn}" Content="Matemática" Click="OnViewMath"/>
+                <Button x:Name="BtnLisp" Style="{StaticResource ModeBtn}" Content="LISP" Click="OnViewLisp"
+                        ToolTip="El RESULTADO en forma LISP"/>
+                <Button x:Name="BtnMath" Style="{StaticResource ModeBtn}" Content="matemática" Click="OnViewMath"
+                        ToolTip="El RESULTADO en notación matemática (x^2 + 3*x). Texto plano."/>
+                <Button x:Name="BtnLearn" Style="{StaticResource ModeBtn}" Content="3 formas" Click="OnViewLearn"
+                        ToolTip="APRENDER: la misma expresión en Matemática · LISP · MATLAB, a la vez"/>
+                <Border Width="14"/>
+                <Button x:Name="BtnKeypad" Style="{StaticResource ModeBtn}" Content="🖩" FontSize="15"
+                        Click="OnToggleKeypad" ToolTip="Mostrar / ocultar la calculadora"/>
+                <Button x:Name="BtnTheme" Style="{StaticResource ModeBtn}" Content="☾" FontSize="14"
+                        Click="OnToggleTheme" ToolTip="Cambiar claro / oscuro"/>
             </StackPanel>
         </DockPanel>
 
-        <!-- ============ calculadora de simbolos ============ -->
-        <Border Grid.Row="2" Background="#1B1E24" BorderBrush="#2A333D" BorderThickness="0,1,0,1" Padding="8,4">
+        <!-- ============ barra de operaciones simbólicas ============ -->
+        <Border Grid.Row="2" Grid.ColumnSpan="3" Background="{DynamicResource ThemePanelBg}" BorderBrush="{DynamicResource ThemeButtonBorder}"
+                BorderThickness="0,1,0,0" Padding="8,4">
             <WrapPanel>
-                <Button x:Name="SyntaxToggle" Style="{StaticResource SymBtn}" MinWidth="150"
-                        Foreground="#5DCAA5" Content="escribo: LISP" Click="OnToggleSyntax"
-                        ToolTip="Convierte la ventana izquierda a LISP o a matemática"/>
-                <Border Width="12"/>
-                <TextBlock Text="operar:" Foreground="#8B98A6" VerticalAlignment="Center"
-                           FontFamily="Consolas" FontSize="12" Margin="0,0,4,0"/>
+                <TextBlock Text="escribo:" Foreground="{DynamicResource ThemeTextMuted}" VerticalAlignment="Center"
+                           FontFamily="Roboto" FontSize="12" Margin="2,0,4,0"/>
+                <Button x:Name="BtnSynMath" Style="{StaticResource SymBtn}" MinWidth="72" Content="matemática"
+                        Click="OnSynMath" ToolTip="Escribir la entrada en notación matemática (x^2 + 3*x)"/>
+                <Button x:Name="BtnSynLisp" Style="{StaticResource SymBtn}" MinWidth="56" Content="expr LISP"
+                        Click="OnSynLisp" ToolTip="Solo la EXPRESIÓN en forma LISP (dato simbólico). NO se ejecuta: si la corres en SBCL da «x unbound». Para correr usa «LISP ▶»."/>
+                <Button x:Name="BtnSynLispFull" Style="{StaticResource SymBtn}" MinWidth="56" Content="LISP ▶"
+                        Click="OnSynLispFull" ToolTip="El script LISP COMPLETO y EJECUTABLE (carga el motor + cita las fórmulas). Cópialo entero a un .lisp en blanco y córrelo en SBCL. Este SÍ corre."/>
+                <Button x:Name="BtnSynHekLab" Style="{StaticResource SymBtn}" MinWidth="56" Content="Hekatan Lab"
+                        Click="OnSynHekLab" ToolTip="El código para Hekatan Lab / MATLAB (syms + diff/int + tic/toc), aquí en el editor: cópialo allá y compara tiempos"/>
+                <Border Width="16"/>
+                <TextBlock Text="operar:" Foreground="{DynamicResource ThemeTextMuted}" VerticalAlignment="Center"
+                           FontFamily="Roboto" FontSize="12" Margin="0,0,4,0"/>
                 <Button x:Name="OpAuto" Style="{StaticResource SymBtn}" MinWidth="62" Content="tal cual"
                         Click="OnOpAuto" ToolTip="Muestra la expresión tal cual (o su valor si es número)"/>
-                <Button x:Name="OpSimplify" Style="{StaticResource SymBtn}" MinWidth="82" Content="simplificar"
-                        Click="OnOpSimplify" ToolTip="Junta términos semejantes: x²+x² → 2·x²"/>
-                <Button x:Name="OpExpand" Style="{StaticResource SymBtn}" MinWidth="72" Content="expandir"
-                        Click="OnOpExpand" ToolTip="Distribuye: (x+1)² → x²+2·x+1"/>
-                <Button x:Name="OpDeriv" Style="{StaticResource SymBtn}" MinWidth="62" Content="derivar"
-                        Click="OnOpDeriv" ToolTip="Derivada respecto a la variable detectada: d/ds (1-s)/2 → -1/2"/>
-                <Button x:Name="OpInteg" Style="{StaticResource SymBtn}" MinWidth="66" Content="∫ integrar"
-                        Click="OnOpInteg" ToolTip="Integral indefinida de polinomios: ∫ s² → s³/3"/>
-                <Border Width="12"/>
-                <Button Style="{StaticResource SymBtn}" Content="(" Click="OnInsert" Tag="("/>
-                <Button Style="{StaticResource SymBtn}" Content=")" Click="OnInsert" Tag=")"/>
-                <Button Style="{StaticResource SymBtn}" Content="+" Click="OnInsert" Tag="+"/>
-                <Button Style="{StaticResource SymBtn}" Content="−" Click="OnInsert" Tag="-"/>
-                <Button Style="{StaticResource SymBtn}" Content="×" Click="OnInsert" Tag="*"/>
-                <Button Style="{StaticResource SymBtn}" Content="÷" Click="OnInsert" Tag="/"/>
-                <Button Style="{StaticResource SymBtn}" Content="xⁿ" Click="OnInsert" Tag="^"/>
-                <Button Style="{StaticResource SymBtn}" Content="x" Click="OnInsert" Tag="x"/>
+                <Button x:Name="OpSimplify" Style="{StaticResource SymBtn}" MinWidth="82" Content="simplify"
+                        Click="OnOpSimplify" ToolTip="Simplifica = FACTORIZA: x²+2x+1 → (x+1)² ,  x²-1 → (x-1)(x+1)"/>
+                <Button x:Name="OpExpand" Style="{StaticResource SymBtn}" MinWidth="72" Content="expand"
+                        Click="OnOpExpand" ToolTip="Distribuye (lo contrario de factorizar): (x+1)² → x²+2·x+1"/>
+                <Button x:Name="OpDeriv" Style="{StaticResource SymBtn}" MinWidth="52" Content="diff"
+                        Click="OnOpDeriv" ToolTip="Derivada: d/dx. Variable en el cuadro de la derecha (parcial)."/>
+                <Button x:Name="OpInteg" Style="{StaticResource SymBtn}" MinWidth="52" Content="∫ int"
+                        Click="OnOpInteg" ToolTip="Integral indefinida: ∫ s² → s³/3"/>
+                <Button x:Name="OpDespejar" Style="{StaticResource SymBtn}" MinWidth="72" Content="despejar"
+                        Click="OnOpDespejar" ToolTip="Resuelve una ECUACIÓN para la variable del cuadro (ej: y = m*x+b, var x → x = (y-b)/m). Escribe la ecuación con '=' ."/>
                 <Border Width="10"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="52" Content="+ suma"  Click="OnInsert" Tag="(+ §§)|+"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="60" Content="× mult"  Click="OnInsert" Tag="(* §§)|*"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="70" Content="potencia" Click="OnInsert" Tag="(expt x 2)|x^2"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="60" Content="deriv" Click="OnInsert" Tag="(deriv '§§ 'x)|d/dx(§§)"/>
-                <Border Width="10"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="√" Click="OnInsert" Tag="(sqrt §§)|sqrt(§§)"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="sin" Click="OnInsert" Tag="(sin §§)|sin(§§)"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="cos" Click="OnInsert" Tag="(cos §§)|cos(§§)"/>
-                <Button Style="{StaticResource SymBtn}" MinWidth="46" Content="eˣ" Click="OnInsert" Tag="(exp §§)|exp(§§)"/>
+                <TextBlock Text="var:" Foreground="{DynamicResource ThemeTextMuted}" VerticalAlignment="Center"
+                           FontFamily="Roboto" FontSize="12" Margin="0,0,3,0"/>
+                <TextBox x:Name="TxtVar" Width="42" Height="26" VerticalContentAlignment="Center"
+                         HorizontalContentAlignment="Center" Margin="0,2"
+                         Background="{DynamicResource ThemeButtonBg}" Foreground="{DynamicResource ThemeText}"
+                         BorderBrush="{DynamicResource ThemeButtonBorder}" FontFamily="Cambria" FontSize="14"
+                         ToolTip="Variable de la derivada/integral PARCIAL (ej: s, t). Vacío = autodetecta una."
+                         TextChanged="OnVarChanged"/>
+                <Border Width="18"/>
+                <Button Style="{StaticResource SymBtn}" MinWidth="120" Content="📋 LISP completo"
+                        Foreground="{DynamicResource ThemeAccentGold}" Click="OnExportLisp"
+                        ToolTip="Genera el script LISP COMPLETO y ejecutable (motor + quote + imprimir): lo abre en el bloc de notas y lo copia al portapapeles"/>
             </WrapPanel>
         </Border>
 
-        <!-- ============ etiquetas ============ -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock x:Name="LblIn" Grid.Column="0" Text="entrada" Foreground="#8B98A6"
-                       FontFamily="Consolas" FontSize="13" Padding="14,6"/>
-            <TextBlock x:Name="LblOut" Grid.Column="1" Text="salida" Foreground="#8B98A6"
-                       FontFamily="Consolas" FontSize="13" Padding="14,6"/>
-        </Grid>
+        <!-- ============ calculadora (keypad, solo bajo el editor izquierdo) ============ -->
+        <Border x:Name="KeypadPanel" Grid.Row="5" Grid.Column="0" Background="{DynamicResource ThemePanelBg}"
+                BorderBrush="{DynamicResource ThemeButtonBorder}" BorderThickness="0,1,1,0" Padding="6,3,6,5">
+            <StackPanel>
+                <!-- cabecera: título + minimizar -->
+                <DockPanel Margin="2,0,2,3">
+                    <TextBlock DockPanel.Dock="Left" Text="Calculadora" Foreground="{DynamicResource ThemeTextMuted}"
+                               FontFamily="Roboto" FontSize="11" VerticalAlignment="Center"/>
+                    <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource SymBtn}"
+                            Content="−  minimizar" MinWidth="90" Height="22" FontFamily="Roboto" FontSize="11"
+                            Click="OnToggleKeypad" ToolTip="Ocultar la calculadora"/>
+                </DockPanel>
+                <!-- letras griegas -->
+                <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,4">
+                    <Button Style="{StaticResource Greek}" Content="α" Click="OnInsert" Tag="alpha"/>
+                    <Button Style="{StaticResource Greek}" Content="β" Click="OnInsert" Tag="beta"/>
+                    <Button Style="{StaticResource Greek}" Content="γ" Click="OnInsert" Tag="gamma"/>
+                    <Button Style="{StaticResource Greek}" Content="δ" Click="OnInsert" Tag="delta"/>
+                    <Button Style="{StaticResource Greek}" Content="ε" Click="OnInsert" Tag="epsilon"/>
+                    <Button Style="{StaticResource Greek}" Content="ζ" Click="OnInsert" Tag="zeta"/>
+                    <Button Style="{StaticResource Greek}" Content="η" Click="OnInsert" Tag="eta"/>
+                    <Button Style="{StaticResource Greek}" Content="θ" Click="OnInsert" Tag="theta"/>
+                    <Button Style="{StaticResource Greek}" Content="κ" Click="OnInsert" Tag="kappa"/>
+                    <Button Style="{StaticResource Greek}" Content="λ" Click="OnInsert" Tag="lambda"/>
+                    <Button Style="{StaticResource Greek}" Content="μ" Click="OnInsert" Tag="mu"/>
+                    <Button Style="{StaticResource Greek}" Content="ν" Click="OnInsert" Tag="nu"/>
+                    <Button Style="{StaticResource Greek}" Content="ξ" Click="OnInsert" Tag="xi"/>
+                    <Button Style="{StaticResource Greek}" Content="ρ" Click="OnInsert" Tag="rho"/>
+                    <Button Style="{StaticResource Greek}" Content="σ" Click="OnInsert" Tag="sigma"/>
+                    <Button Style="{StaticResource Greek}" Content="τ" Click="OnInsert" Tag="tau"/>
+                    <Button Style="{StaticResource Greek}" Content="φ" Click="OnInsert" Tag="phi"/>
+                    <Button Style="{StaticResource Greek}" Content="χ" Click="OnInsert" Tag="chi"/>
+                    <Button Style="{StaticResource Greek}" Content="ψ" Click="OnInsert" Tag="psi"/>
+                    <Button Style="{StaticResource Greek}" Content="ω" Click="OnInsert" Tag="omega"/>
+                </WrapPanel>
+                <!-- grupos: números · operadores · funciones · constantes · LISP · loops -->
+                <WrapPanel HorizontalAlignment="Center">
+                    <GroupBox Header="Números" Style="{StaticResource GrpBox}">
+                        <UniformGrid Columns="3" Rows="4">
+                            <Button Style="{StaticResource KeyBtn}" Content="7" Click="OnInsert" Tag="7"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="8" Click="OnInsert" Tag="8"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="9" Click="OnInsert" Tag="9"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="4" Click="OnInsert" Tag="4"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="5" Click="OnInsert" Tag="5"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="6" Click="OnInsert" Tag="6"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="1" Click="OnInsert" Tag="1"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="2" Click="OnInsert" Tag="2"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="3" Click="OnInsert" Tag="3"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="0" Click="OnInsert" Tag="0"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="." Click="OnInsert" Tag="."/>
+                            <Button Style="{StaticResource KeyBtn}" Content="x" Click="OnInsert" Tag="x"/>
+                        </UniformGrid>
+                    </GroupBox>
+                    <GroupBox Header="Operadores" Style="{StaticResource GrpBox}">
+                        <UniformGrid Columns="4" Rows="2">
+                            <Button Style="{StaticResource KeyBtn}" Content="+" Click="OnInsert" Tag="+"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="−" Click="OnInsert" Tag="-"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="×" Click="OnInsert" Tag="*"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="÷" Click="OnInsert" Tag="/"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="xⁿ" Click="OnInsert" Tag="^"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="=" Click="OnInsert" Tag=" = "/>
+                            <Button Style="{StaticResource KeyBtn}" Content="(" Click="OnInsert" Tag="(" Foreground="#E8A0B8"/>
+                            <Button Style="{StaticResource KeyBtn}" Content=")" Click="OnInsert" Tag=")" Foreground="#E8A0B8"/>
+                        </UniformGrid>
+                    </GroupBox>
+                    <GroupBox Header="Funciones" Style="{StaticResource GrpBox}">
+                        <UniformGrid Columns="4" Rows="2">
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="√"   Click="OnInsert" Tag="(sqrt §§)|sqrt(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="sin" Click="OnInsert" Tag="(sin §§)|sin(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="cos" Click="OnInsert" Tag="(cos §§)|cos(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="tan" Click="OnInsert" Tag="(tan §§)|tan(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="eˣ"  Click="OnInsert" Tag="(exp §§)|exp(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="log" Click="OnInsert" Tag="(log §§)|log(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="13" Content="|x|" Click="OnInsert" Tag="(abs §§)|abs(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="42" FontSize="12" Content="expt" Click="OnInsert" Tag="(expt x 2)|x^2"/>
+                        </UniformGrid>
+                    </GroupBox>
+                    <GroupBox Header="Const." Style="{StaticResource GrpBox}">
+                        <UniformGrid Columns="1" Rows="3">
+                            <Button Style="{StaticResource KeyBtn}" Content="π" FontFamily="Times New Roman" Click="OnInsert" Tag="pi"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="e" Click="OnInsert" Tag="(exp 1)|exp(1)"/>
+                            <Button Style="{StaticResource KeyBtn}" Content="g" Click="OnInsert" Tag="9.80665"/>
+                        </UniformGrid>
+                    </GroupBox>
+                    <GroupBox Header="LISP" Style="{StaticResource GrpBox}">
+                        <UniformGrid Columns="2" Rows="2">
+                            <Button Style="{StaticResource KeyBtn}" Width="48" FontSize="12" Content="+ suma" Click="OnInsert" Tag="(+ §§)|+"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="48" FontSize="12" Content="× mult" Click="OnInsert" Tag="(* §§)|*"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="48" FontSize="12" Content="deriv" Click="OnInsert" Tag="(deriv '§§ 'x)|diff(§§)"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="48" FontSize="12" Content="quote" Click="OnInsert" Tag="'§§"/>
+                        </UniformGrid>
+                    </GroupBox>
+                    <GroupBox Header="Loops · Cond" Style="{StaticResource GrpBox}">
+                        <UniformGrid Columns="3" Rows="2">
+                            <Button Style="{StaticResource KeyBtn}" Width="52" FontSize="12" Content="for"
+                                    Click="OnInsert" ToolTip="bucle · LISP loop / MATLAB for"
+                                    Tag="(loop for i from 1 to 10&#10;      collect §§)|for i = 1:10&#10;    §§&#10;end"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="52" FontSize="12" Content="while"
+                                    Click="OnInsert" ToolTip="bucle condicional"
+                                    Tag="(loop while §§&#10;      do (progn ))|while §§&#10;    &#10;end"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="52" FontSize="12" Content="dotimes"
+                                    Click="OnInsert" ToolTip="repetir n veces"
+                                    Tag="(dotimes (i 10)&#10;  §§)|for i = 0:9&#10;    §§&#10;end"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="52" FontSize="12" Content="if"
+                                    Click="OnInsert" ToolTip="condicional simple"
+                                    Tag="(if §§&#10;    then&#10;    else)|if §§&#10;    &#10;else&#10;    &#10;end"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="52" FontSize="12" Content="cond"
+                                    Click="OnInsert" ToolTip="varios casos (if/elseif)"
+                                    Tag="(cond&#10;  (§§ )&#10;  (t ))|if §§&#10;elseif&#10;else&#10;end"/>
+                            <Button Style="{StaticResource KeyBtn}" Width="52" FontSize="12" Content="defun"
+                                    Click="OnInsert" ToolTip="definir función"
+                                    Tag="(defun f (x)&#10;  §§)|function y = f(x)&#10;    y = §§;&#10;end"/>
+                        </UniformGrid>
+                    </GroupBox>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
 
-        <!-- ============ editores ============ -->
-        <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <ae:TextEditor x:Name="Editor" Grid.Column="0"
-                           FontFamily="Consolas" FontSize="20" ShowLineNumbers="True"
-                           Background="#1B1E24" Foreground="#E7EDF3"
-                           BorderBrush="#2A333D" BorderThickness="0,0,1,0"/>
-            <ae:TextEditor x:Name="Output" Grid.Column="1" IsReadOnly="True"
-                           FontFamily="Consolas" FontSize="20"
-                           Background="#14161A" Foreground="#B0AAED"/>
-            <wv:WebView2 x:Name="Viewer" Grid.Column="1" Visibility="Collapsed"/>
-        </Grid>
+        <!-- ============ etiquetas ============ -->
+        <TextBlock x:Name="LblIn" Grid.Row="3" Grid.Column="0" Text="entrada" Foreground="{DynamicResource ThemeTextMuted}"
+                   FontFamily="Roboto" FontSize="13" Padding="14,6"/>
+        <TextBlock x:Name="LblOut" Grid.Row="3" Grid.Column="2" Text="salida" Foreground="{DynamicResource ThemeTextMuted}"
+                   FontFamily="Roboto" FontSize="13" Padding="14,6"/>
+
+        <!-- ============ editor (izq) + resultado (der, altura completa) ============ -->
+        <ae:TextEditor x:Name="Editor" Grid.Row="4" Grid.Column="0"
+                       FontFamily="Consolas" FontSize="15" ShowLineNumbers="True"
+                       Background="{DynamicResource ThemeEditorBg}" Foreground="{DynamicResource ThemeText}"
+                       BorderBrush="{DynamicResource ThemeButtonBorder}" BorderThickness="0,0,1,0"/>
+        <ae:TextEditor x:Name="Output" Grid.Row="4" Grid.RowSpan="2" Grid.Column="2" IsReadOnly="True"
+                       WordWrap="True" FontFamily="Consolas" FontSize="15"
+                       Background="{DynamicResource ThemeWindowBg}" Foreground="{DynamicResource ThemeText}"/>
+        <wv:WebView2 x:Name="Viewer" Grid.Row="4" Grid.RowSpan="2" Grid.Column="2" Visibility="Collapsed"/>
+        <!-- divisor arrastrable (como Hekatan Lab): agranda editor o resultado -->
+        <GridSplitter Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Width="6"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="{DynamicResource ThemeButtonBorder}"
+                      ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" Cursor="SizeWE"
+                      ToolTip="Arrastra para agrandar el editor o el resultado"/>
     </Grid>
 </Window>

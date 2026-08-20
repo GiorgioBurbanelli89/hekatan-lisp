@@ -258,6 +258,33 @@ namespace HekatanLisp
             return res;
         }
 
+        // Varias asignaciones en UNA línea de matemática, estilo MATLAB:  a = 2; b = 3  →  dos líneas.
+        // El ';' separa SOLO a nivel 0 (no dentro de [ ] { } ( ), donde ';' es separador de fila de matriz).
+        // No toca líneas de texto (#), LISP/comentario (;) ni MATLAB (%).
+        private static string[] ExpandMathSemicolons(string[] lines)
+        {
+            var res = new List<string>();
+            foreach (var raw in lines)
+            {
+                var t = raw.TrimStart();
+                if (t.StartsWith("#") || t.StartsWith(";") || t.StartsWith("%") || raw.IndexOf(';') < 0)
+                { res.Add(raw); continue; }
+                int depth = 0; var cur = new StringBuilder(); var parts = new List<string>();
+                foreach (char c in raw)
+                {
+                    if (c == '[' || c == '(' || c == '{') depth++;
+                    else if (c == ']' || c == ')' || c == '}') depth--;
+                    if (c == ';' && depth == 0) { parts.Add(cur.ToString()); cur.Clear(); }
+                    else cur.Append(c);
+                }
+                parts.Add(cur.ToString());
+                bool any = false;
+                foreach (var p in parts) if (p.Trim().Length > 0) { res.Add(p.Trim()); any = true; }
+                if (!any) res.Add(raw);
+            }
+            return res.ToArray();
+        }
+
         private static string BuildPlots(string editorText, List<string> forms)
         {
             var inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -394,7 +421,7 @@ namespace HekatanLisp
             // Expresiones (matemática o LISP) → aplicar la operación elegida.
             // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
             // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
-            var lines = JoinBracketLines(text).Split('\n');
+            var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'));
             var formOf = new string[lines.Length];
             var labels = new string[lines.Length];   // nombre que DEFINE cada línea (N1, N2…) si es "NAME = expr"
             var textOf = new (string kind, string align, string text)?[lines.Length];  // directiva de TEXTO (; formato)
@@ -403,6 +430,26 @@ namespace HekatanLisp
             var treeOf = new LispConverter.N[lines.Length];   // árbol de cada línea (para resolver etiquetas)
             var notationOf = new string[lines.Length];        // línea de NOTACIÓN pura (f(x)=…, y=f(x)=…): se dibuja, no se calcula
             var funcMap = new Dictionary<string, (List<string> ps, LispConverter.N body)>();  // f(x)=x²+1 → aplicar f(3)
+            var deqTag = new string[lines.Length];             // etiqueta @@(…) que va a la DERECHA (estilo libro)
+            // ETIQUETA de ecuación: @@(texto) al FINAL de una línea de MATEMÁTICA → número a la derecha.
+            // La VARIABLE queda a la IZQUIERDA (como Calcpad/Hekatan Lab). Compat: acepta el viejo #deq.
+            // Las líneas de TEXTO (#: ## #> ; %) y las gráficas no llevan etiqueta.
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var s = lines[i].TrimStart();
+                bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
+                               s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
+                               System.Text.RegularExpressions.Regex.IsMatch(s,
+                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico)\b",
+                                   System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (textDir) continue;
+                var m = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(.*?)\s*@@\((.*?)\)\s*$");
+                if (m.Success)
+                {
+                    lines[i] = System.Text.RegularExpressions.Regex.Replace(m.Groups[1].Value.Trim(), @"^#deq\s+", "");
+                    deqTag[i] = m.Groups[2].Value;
+                }
+            }
             // PASO 1: parsear cada línea a árbol + detectar su etiqueta
             for (int i = 0; i < lines.Length; i++)
             {
@@ -518,6 +565,10 @@ namespace HekatanLisp
                     display.Add(hasR ? formOf[i] + " = " + r : formOf[i]);
                 }
             }
+            // #deq: pega la ETIQUETA (a la derecha) al final de la línea de display correspondiente.
+            for (int i = 0; i < lines.Length && i < display.Count; i++)
+                if (deqTag[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark))
+                    display[i] += LispConverter.DeqSep + deqTag[i];
             return display;
         }
 
@@ -870,8 +921,10 @@ namespace HekatanLisp
         private bool _synFull = false;   // el editor muestra el LISP COMPLETO (ejecutable)
 
         // izquierda: MATLAB · expresión LISP · LISP (completo). El activo se resalta.
-        private void OnSynMath(object s, RoutedEventArgs e) { _synFull = false; SetSyntax(false); }
-        private void OnSynLisp(object s, RoutedEventArgs e) { _synFull = false; SetSyntax(true); }
+        // OJO: NO poner _synFull=false aquí — SetSyntax necesita saber que veníamos de «LISP completo»
+        // para restaurar el ORIGINAL (matemática) antes de convertir. SetSyntax ya lo pone en false.
+        private void OnSynMath(object s, RoutedEventArgs e) => SetSyntax(false);
+        private void OnSynLisp(object s, RoutedEventArgs e) => SetSyntax(true);
 
         // LISP COMPLETO en la VENTANA IZQUIERDA: vuelca el script ejecutable en el editor,
         // para verlo entero y copiarlo (Ctrl+A → Ctrl+C) a un .lisp en blanco.
@@ -993,51 +1046,98 @@ namespace HekatanLisp
                 try { return MatlabToLisp.Translate(text).Lisp; } catch { return text; }
             }
             var sb = new StringBuilder();
-            foreach (var raw in text.Replace("\r", "").Split('\n'))
+            // varias asignaciones en una línea (a = 2; b = 3) → una por línea, igual que en el render
+            foreach (var raw in ExpandMathSemicolons(text.Replace("\r", "").Split('\n')))
             {
                 var l = raw.Trim();
                 if (l.Length == 0) { sb.AppendLine(); continue; }
                 // COMENTARIO/DIRECTIVA ';' (texto, gráfica, ;;): se conserva TAL CUAL en ambos sentidos.
                 // (si no, ToLab(ParseLisp(";# título")) leería solo el 1er token y borraría el texto)
                 if (l.StartsWith(";")) { sb.AppendLine(l); continue; }
-                // REVERSO (a matemática): una definición LISP  (setf NOMBRE forma)  →  NOMBRE = math
-                var sm = System.Text.RegularExpressions.Regex.Match(l, @"^\(setf\s+([A-Za-z]\w*)\s+(.+)\)$");
-                if (!toLisp && sm.Success)
+                // DIRECTIVA '#' (markdown #:/##, #fplot, #deq): se conserva. En #deq se convierte SOLO
+                // la ecuación interna (dejando el prefijo #deq y la etiqueta @@(…) intactos).
+                if (l.StartsWith("#"))
                 {
-                    try { sb.AppendLine(sm.Groups[1].Value + " = " + LispConverter.ToLab(LispConverter.ParseLisp(sm.Groups[2].Value.Trim()), 0)); }
-                    catch { sb.AppendLine(l); }
-                    continue;
-                }
-                // etiqueta  NOMBRE = expr  → a LISP es una DEFINICIÓN válida:  (setf NOMBRE forma)
-                var lm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
-                if (lm.Success)
-                {
-                    string rhs = lm.Groups[2].Value.Trim();
-                    try
+                    var dm = System.Text.RegularExpressions.Regex.Match(l, @"^#deq\s+(.*?)\s*(?:@@\((.*?)\))?\s*$");
+                    if (toLisp)
                     {
-                        if (toLisp)
-                        {
-                            string lispRhs = LooksLikeLisp(rhs) ? rhs : LispConverter.MathToLisp(rhs);
-                            sb.AppendLine("(setf " + lm.Groups[1].Value + " " + lispRhs + ")");   // LISP válido
-                        }
+                        // a expr LISP: #deq → (setf…) + etiqueta como comentario ';' ; el texto markdown (#: ##) → ';'
+                        if (dm.Success)
+                            sb.AppendLine(ConvertEqLine(dm.Groups[1].Value.Trim(), true) +
+                                          (dm.Groups[2].Success ? "   ; " + dm.Groups[2].Value : ""));
                         else
-                        {
-                            string conv = LooksLikeLisp(rhs) ? LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0) : rhs;
-                            sb.AppendLine(lm.Groups[1].Value + " = " + conv);
-                        }
+                            sb.AppendLine("; " + l.TrimStart('#', ':', '|', '<', '>', ' '));
                     }
-                    catch { sb.AppendLine(l); }
+                    else   // a matemática: conserva el markdown (el reverso real llega por _lispBackup)
+                    {
+                        if (dm.Success)
+                            sb.AppendLine("#deq " + ConvertEqLine(dm.Groups[1].Value.Trim(), false) +
+                                          (dm.Groups[2].Success ? " @@(" + dm.Groups[2].Value + ")" : ""));
+                        else sb.AppendLine(l);
+                    }
                     continue;
                 }
-                bool isLisp = LooksLikeLisp(l);
-                try
-                {
-                    if (toLisp) sb.AppendLine(isLisp ? l : LispConverter.MathToLisp(l));
-                    else sb.AppendLine(isLisp ? LispConverter.ToLab(LispConverter.ParseLisp(l), 0) : l);
-                }
-                catch { sb.AppendLine(l); }
+                // línea de MATEMÁTICA: extrae la etiqueta @@(…) del final (queda como comentario en LISP,
+                // y se conserva en matemática). La variable sigue a la izquierda.
+                string tg = null; var mt = System.Text.RegularExpressions.Regex.Match(l, @"^(.*?)\s*@@\((.*?)\)\s*$");
+                if (mt.Success) { tg = mt.Groups[2].Value; l = mt.Groups[1].Value.Trim(); }
+                string conv = ConvertEqLine(l, toLisp);
+                if (tg != null) conv += toLisp ? "   ; " + tg : " @@(" + tg + ")";
+                sb.AppendLine(conv);
             }
             return sb.ToString().TrimEnd();
+        }
+
+        // convierte UNA ecuación entre matemática y LISP:  (setf N f)↔N=math ,  N=expr↔(setf N f) ,  o expr suelta.
+        // Si algo no parsea, devuelve la línea TAL CUAL (nunca rompe la conversión global).
+        private static string ConvertEqLine(string l, bool toLisp)
+        {
+            var sm = System.Text.RegularExpressions.Regex.Match(l, @"^\(setf\s+([A-Za-z]\w*)\s+(.+)\)$");
+            if (!toLisp && sm.Success)
+            {
+                try { return sm.Groups[1].Value + " = " + LispConverter.ToLab(LispConverter.ParseLisp(sm.Groups[2].Value.Trim()), 0); }
+                catch { return l; }
+            }
+            // DEFINICIÓN de función  f(x) = expr  (ej. N_1(x) = 1 - x/L): mantiene el LHS, convierte el RHS.
+            var fm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z]\w*)\(([^)]*)\)\s*=\s*(?![=])(.+)$");
+            if (fm.Success)
+            {
+                string rhs = fm.Groups[3].Value.Trim();
+                try
+                {
+                    if (toLisp)
+                    {
+                        string lispRhs = LooksLikeLisp(rhs) ? rhs : LispConverter.MathToLisp(rhs);
+                        return "(defun " + fm.Groups[1].Value + " (" + fm.Groups[2].Value.Replace(",", " ").Trim() + ") " + lispRhs + ")";
+                    }
+                    string cv = LooksLikeLisp(rhs) ? LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0) : rhs;
+                    return fm.Groups[1].Value + "(" + fm.Groups[2].Value + ") = " + cv;
+                }
+                catch { return l; }
+            }
+            var lm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+            if (lm.Success)
+            {
+                string rhs = lm.Groups[2].Value.Trim();
+                try
+                {
+                    if (toLisp)
+                    {
+                        string lispRhs = LooksLikeLisp(rhs) ? rhs : LispConverter.MathToLisp(rhs);
+                        return "(setf " + lm.Groups[1].Value + " " + lispRhs + ")";
+                    }
+                    string conv = LooksLikeLisp(rhs) ? LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0) : rhs;
+                    return lm.Groups[1].Value + " = " + conv;
+                }
+                catch { return l; }
+            }
+            bool isLisp = LooksLikeLisp(l);
+            try
+            {
+                if (toLisp) return isLisp ? l : LispConverter.MathToLisp(l);
+                return isLisp ? LispConverter.ToLab(LispConverter.ParseLisp(l), 0) : l;
+            }
+            catch { return l; }
         }
 
         private void MenuEjemploLoop(object s, RoutedEventArgs e)
@@ -1504,23 +1604,46 @@ namespace HekatanLisp
             {
                 var line = raw.Trim();
                 if (line.Length == 0) { body.AppendLine(); continue; }
-                // GRÁFICA:  ;fplot(x^2, [0 1])  →  $Plot{x^2 @ x = 0 : 1}  (Hekatan Lab NO tiene fplot;
-                // su operador Calcpad $Plot se transpila a plot(linspace,arrayfun) y SÍ dibuja).
+                // #deq  ecuación  @@(etiqueta)  → ecuación MATLAB + etiqueta como comentario '%'
+                var dq = System.Text.RegularExpressions.Regex.Match(line, @"^#deq\s+(.*?)\s*(?:@@\((.*?)\))?\s*$");
+                if (dq.Success)
+                {
+                    string eql = dq.Groups[1].Value.Trim();
+                    string tg = dq.Groups[2].Success ? "   % " + dq.Groups[2].Value : "";
+                    // LHS puede ser  f(x)=…  (definición) o  N=…  (etiqueta); si no, expr suelta.
+                    var fmd = System.Text.RegularExpressions.Regex.Match(eql, @"^([A-Za-z]\w*)\(([^)]*)\)\s*=\s*(?![=])(.+)$");
+                    var lmd = System.Text.RegularExpressions.Regex.Match(eql, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                    string lhs = fmd.Success ? fmd.Groups[1].Value + "(" + fmd.Groups[2].Value + ")"
+                               : lmd.Success ? lmd.Groups[1].Value : null;
+                    string rh  = fmd.Success ? fmd.Groups[3].Value : lmd.Success ? lmd.Groups[2].Value : eql;
+                    string mx;
+                    try
+                    {
+                        var tr = LooksLikeLisp(rh) ? LispConverter.ParseLisp(rh) : LispConverter.ParseMath(rh);
+                        LispConverter.LabMatlab = true;
+                        try { mx = LispConverter.ToLab(tr, 0); } finally { LispConverter.LabMatlab = false; }
+                        foreach (var v in LispConverter.VarsOf(tr)) vars.Add(v);
+                    }
+                    catch { mx = rh; }
+                    body.AppendLine((lhs != null ? lhs + " = " + OpCall(mx) : OpCall(mx)) + tg);
+                    continue;
+                }
+                // GRÁFICA:  ;fplot / #fplot (x^2, [0 1])  →  plot(linspace, arrayfun) (Hekatan Lab NO tiene fplot).
                 var fp = System.Text.RegularExpressions.Regex.Match(line,
-                    @"^;+\s*(?:fplot|plot|ezplot)\s*\(\s*(.+?)\s*,\s*\[\s*([^\]\s]+)\s+([^\]\s]+)\s*\]\s*\)\s*$",
+                    @"^[;#]+\s*(?:fplot|plot|ezplot)\s*\(\s*(.+?)\s*,\s*\[\s*([^\]\s]+)\s+([^\]\s]+)\s*\]\s*\)\s*$",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (fp.Success)
                 {
                     string ex = fp.Groups[1].Value.Trim();
                     string pv = "x"; try { pv = LispConverter.FreeVar(LispConverter.ParseMath(ex)) ?? "x"; } catch { }
-                    // plot(X, arrayfun(@(x) f, X)) — MATLAB puro que Hekatan Lab dibuja (no tiene fplot)
                     string rng = "linspace(" + fp.Groups[2].Value + ", " + fp.Groups[3].Value + ", 200)";
                     body.AppendLine("plot(" + rng + ", arrayfun(@(" + pv + ") " + ex + ", " + rng + "))");
                     continue;
                 }
-                // TEXTO con formato:  directiva ';' → markup de Hekatan Lab (%" título · %'| centro · %'> der · %' texto)
+                // TEXTO con formato:  directiva ';' O '#' (markdown) → markup de Hekatan Lab
+                //   (%" título · %'| centro · %'> der · %' texto)
                 var td = LispConverter.TextDirective(line);
-                if (td != null && line.StartsWith(";"))
+                if (td != null && (line.StartsWith(";") || line.StartsWith("#")))
                 {
                     var (kind, align, txt) = td.Value;
                     txt = MdVars(txt);
@@ -1532,8 +1655,16 @@ namespace HekatanLisp
                 }
                 if (line.StartsWith("%")) { body.AppendLine(line); continue; }   // ya es MATLAB
                 if (line.StartsWith(";")) continue;                              // comentario LISP suelto
-                var lm = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
-                string rhs = lm.Success ? lm.Groups[2].Value : line;
+                if (line.StartsWith("#")) { body.AppendLine("%' " + MdVars(line.TrimStart('#', ' '))); continue; }  // '#' suelto → comentario
+                // etiqueta @@(…) al final → comentario '%'
+                string mtag = "";
+                var em = System.Text.RegularExpressions.Regex.Match(line, @"^(.*?)\s*@@\((.*?)\)\s*$");
+                if (em.Success) { mtag = "   % " + em.Groups[2].Value; line = em.Groups[1].Value.Trim(); }
+                var fmn = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\(([^)]*)\)\s*=\s*(?![=])(.+)$");
+                var lm  = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                string lhs2 = fmn.Success ? fmn.Groups[1].Value + "(" + fmn.Groups[2].Value + ")"
+                            : lm.Success ? lm.Groups[1].Value : null;
+                string rhs = fmn.Success ? fmn.Groups[3].Value : lm.Success ? lm.Groups[2].Value : line;
                 string mexpr;
                 try
                 {
@@ -1543,7 +1674,7 @@ namespace HekatanLisp
                     foreach (var v in LispConverter.VarsOf(tree)) vars.Add(v);
                 }
                 catch { mexpr = rhs; }
-                body.AppendLine(lm.Success ? (lm.Groups[1].Value + " = " + OpCall(mexpr)) : OpCall(mexpr));
+                body.AppendLine((lhs2 != null ? lhs2 + " = " + OpCall(mexpr) : OpCall(mexpr)) + mtag);
             }
             var sb = new StringBuilder();
             sb.AppendLine("% Hekatan Lab / MATLAB (Symbolic) — cópialo a Hekatan Lab: texto, operación y gráfica igual.");

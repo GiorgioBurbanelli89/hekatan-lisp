@@ -176,6 +176,95 @@ namespace HekatanLisp
             if (EngineCore() != null)
                 code = System.Text.RegularExpressions.Regex.Replace(
                     code, @"(?im)^\s*\(load\s+""[^""]*engine\.lisp""\)\s*$", "");
+            // 1) SERVIDOR PERSISTENTE (rápido: sin arranque). Solo con core horneado.
+            if (EngineCore() != null)
+            {
+                try { var r = RunServer(code); if (r != null) return r; }
+                catch { KillServer(); }   // si algo falla, reinicia y cae a proceso-por-eval
+            }
+            // 2) fallback: proceso-por-eval (como antes)
+            return RunOnce(code);
+        }
+
+        // ---------- servidor SBCL vivo: read→eval→print sobre stdin/stdout (elimina el arranque por eval) ----------
+        private static Process _server;
+        private static StreamWriter _sin;
+        private static StreamReader _sout;
+        private static readonly object _srvLock = new object();
+
+        private static string RunServer(string code)
+        {
+            lock (_srvLock)
+            {
+                EnsureServer();
+                if (_server == null || _server.HasExited) return null;
+                _sin.Write(code);
+                _sin.Write("\n(hlisp-done)\n");   // marcador: fin del bloque de entrada
+                _sin.Flush();
+                // lee stdout hasta \x1e (fin de respuesta), con timeout
+                var readTask = System.Threading.Tasks.Task.Run(() =>
+                {
+                    var buf = new StringBuilder();
+                    int c;
+                    while ((c = _sout.Read()) != -1)
+                    {
+                        if (c == 30) break;   // \x1e
+                        buf.Append((char)c);
+                    }
+                    return buf.ToString();
+                });
+                if (!readTask.Wait(30000)) { KillServer(); throw new Exception("timeout server"); }
+                return readTask.Result.TrimEnd('\n', '\r');
+            }
+        }
+
+        private static void EnsureServer()
+        {
+            if (_server != null && !_server.HasExited) return;
+            KillServer();
+            var core = EngineCore();
+            if (core == null) return;
+            var psi = new ProcessStartInfo(Sbcl)
+            {
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardInputEncoding = new UTF8Encoding(false),
+                StandardOutputEncoding = new UTF8Encoding(false),
+                StandardErrorEncoding = new UTF8Encoding(false),
+            };
+            psi.ArgumentList.Add("--core"); psi.ArgumentList.Add(core);
+            psi.ArgumentList.Add("--non-interactive");
+            psi.ArgumentList.Add("--eval"); psi.ArgumentList.Add("(hlisp-server)");
+            psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";
+            psi.EnvironmentVariables["LC_ALL"] = "en_US.UTF-8";
+            _server = Process.Start(psi);
+            _sin = _server.StandardInput;
+            _sout = _server.StandardOutput;
+            var srv = _server;   // drena stderr en background para que no bloquee el pipe
+            System.Threading.Tasks.Task.Run(() => { try { srv.StandardError.ReadToEnd(); } catch { } });
+            // WARM-UP: descarta cualquier banner inicial hasta el primer \x1e → sincroniza el pipe.
+            try
+            {
+                _sin.Write("(hlisp-done)\n"); _sin.Flush();
+                var t = System.Threading.Tasks.Task.Run(() => { int c; while ((c = _sout.Read()) != -1 && c != 30) { } });
+                if (!t.Wait(8000)) KillServer();
+            }
+            catch { KillServer(); }
+        }
+
+        private static void KillServer()
+        {
+            try { if (_server != null && !_server.HasExited) _server.Kill(); } catch { }
+            try { _server?.Dispose(); } catch { }
+            _server = null; _sin = null; _sout = null;
+        }
+
+        // proceso-por-eval (lanza-calcula-cierra): fallback si el servidor no está o falla.
+        private static string RunOnce(string code)
+        {
             var tmp = Path.Combine(Path.GetTempPath(), $"hlisp_run_{Environment.ProcessId}.lisp");
             File.WriteAllText(tmp, code, new UTF8Encoding(false));   // UTF-8 sin BOM (para ∂, ∇, letras)
             try
@@ -186,15 +275,15 @@ namespace HekatanLisp
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    StandardOutputEncoding = new UTF8Encoding(false),   // SBCL imprime UTF-8 → leerlo igual
+                    StandardOutputEncoding = new UTF8Encoding(false),
                     StandardErrorEncoding = new UTF8Encoding(false),
                 };
-                psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";       // SBCL lee el script como UTF-8
+                psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";
                 psi.EnvironmentVariables["LC_ALL"] = "en_US.UTF-8";
                 using var p = Process.Start(psi);
                 var o = p.StandardOutput.ReadToEnd();
                 var e = p.StandardError.ReadToEnd();
-                p.WaitForExit(30000);   // hasta 30 s: el álgebra de matrices grande (12×12 con ∫∫) es pesada
+                p.WaitForExit(30000);
                 return string.IsNullOrWhiteSpace(e) ? o : o + e;
             }
             catch (Exception ex) { return "; error motor SBCL: " + ex.Message; }

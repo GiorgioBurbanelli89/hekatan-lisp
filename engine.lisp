@@ -762,3 +762,20 @@
   (if (vectorp x)
       (format nil "(vector ~{~a~^ ~})" (map 'list #'mprint x))
       (format nil "~a" x)))
+
+;; ---- SERVIDOR PERSISTENTE: un proceso SBCL vivo que evalua formas de stdin y responde ----
+;; Elimina el arranque (~80 ms) por evaluacion. El WPF manda las formas (que hacen format t) y
+;; al final (hlisp-done); el server evalua cada una e imprime, y cierra la respuesta con \x1e.
+(defun hlisp-server ()
+  (setf *print-case* :downcase)
+  (setf *print-right-margin* 100000)
+  (loop
+    (let ((form (handler-case (read *standard-input* nil :hlisp-eof)
+                  (error () :hlisp-skip))))
+      (cond
+        ((eq form :hlisp-eof) (return))
+        ((eq form :hlisp-skip) (read-line *standard-input* nil :hlisp-eof))   ; resincroniza
+        ((equal form '(hlisp-done))
+         (write-char (code-char 30)) (finish-output))                        ; \x1e = fin de respuesta (SIN newline)
+        (t (handler-case (eval form) (error (e) (format t "; error: ~a~%" e)))
+           (finish-output))))))

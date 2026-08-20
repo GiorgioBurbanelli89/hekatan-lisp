@@ -1,39 +1,72 @@
 <?xml version="1.0"?>
-<!-- Resaltado para Hekatan LISP (AvalonEdit, tema oscuro). Colorea tanto la forma
-     LISP como la matemática estilo MATLAB, porque el editor alterna entre ambas. -->
+<!-- Resaltado para Hekatan LISP (AvalonEdit). Colorea la MATEMÁTICA (modo por defecto, con #),
+     la forma LISP (setf) y la de Hekatan Lab (MATLAB). Colores de contraste MEDIO para que se
+     vean tanto en tema claro (crema) como oscuro. -->
 <SyntaxDefinition name="HekatanLisp" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
 
-  <Color name="Comment"  foreground="#5AC37E" />
-  <Color name="String"   foreground="#E5C07B" />
-  <Color name="Number"   foreground="#9ECBFF" />
-  <Color name="Keyword"  foreground="#C678DD" fontWeight="bold" />
-  <Color name="Builtin"  foreground="#61AFEF" />
-  <Color name="Symbol"   foreground="#56B6C2" />
+  <Color name="Comment"   foreground="#3B8C4E" />                         <!-- texto #: ## ; % -->
+  <Color name="Directive" foreground="#8A5A00" fontWeight="bold" />       <!-- #deq #fplot -->
+  <Color name="EqTag"     foreground="#9A7AB0" fontStyle="italic" />      <!-- @@(etiqueta) -->
+  <Color name="String"    foreground="#B8860B" />
+  <Color name="Number"    foreground="#1A6FD0" />                         <!-- números: azul -->
+  <Color name="Keyword"   foreground="#9B30D0" fontWeight="bold" />       <!-- setf defun let for if -->
+  <Color name="Builtin"   foreground="#0E7C86" fontWeight="bold" />       <!-- Simplify Expand Slope … -->
+  <Color name="Variable"  foreground="#B5651D" fontStyle="italic" />      <!-- variables: naranja itálico -->
+  <Color name="Function"  foreground="#0057B8" fontWeight="bold" />       <!-- funciones f(…): azul negrita -->
+  <Color name="Bracket"   foreground="#7A5AA0" fontWeight="bold" />
 
-  <Color name="Bracket"  foreground="#56B6C2" fontWeight="bold" />
+  <RuleSet ignoreCase="false">
 
-  <RuleSet ignoreCase="true">
-
-    <!-- vectores / matrices: [ ... ]  El ; de adentro es SEPARADOR DE FILA, no
-         comentario. Por eso los corchetes son un bloque con su propia regla:
-         dentro solo se colorean numeros; el ; y los espacios quedan neutros. -->
-    <Span color="Bracket">
-      <Begin>\[</Begin>
-      <End>\]</End>
+    <!-- ===== #deq: directiva + ecuación (math) + etiqueta @@(...) ===== -->
+    <Span>
+      <Begin color="Directive">\#deq\b</Begin>
+      <End>$</End>
       <RuleSet>
+        <Span color="EqTag"><Begin>@@</Begin><End>$</End></Span>
+        <Span color="Bracket"><Begin>\[</Begin><End>\]</End>
+          <RuleSet><Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+</Rule></RuleSet></Span>
+        <Keywords color="Builtin">
+          <Word>Simplify</Word><Word>Expand</Word><Word>Factor</Word><Word>Slope</Word>
+          <Word>Sum</Word><Word>Product</Word><Word>Root</Word><Word>Area</Word><Word>Find</Word>
+          <Word>deriv</Word><Word>integ</Word><Word>diff</Word><Word>despejar</Word><Word>Partial</Word>
+        </Keywords>
         <Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?</Rule>
+        <Rule color="Function">[A-Za-zξηθρτλμνφψωαβγδε_][A-Za-z0-9ξηθρτλμνφψωαβγδε_]*(?=\s*\()</Rule>
+        <Rule color="Variable">[A-Za-zξηθρτλμνφψωαβγδε_][A-Za-z0-9ξηθρτλμνφψωαβγδε_]*</Rule>
       </RuleSet>
     </Span>
 
-    <!-- comentarios: ; de LISP  y  % de MATLAB, hasta fin de linea (fuera de [ ]) -->
-    <Span color="Comment"><Begin>;</Begin></Span>
-    <Span color="Comment"><Begin>%</Begin></Span>
+    <!-- ===== #fplot / #plot: directiva + expresión ===== -->
+    <Span>
+      <Begin color="Directive">\#(fplot|plot|ezplot|graficas?|grafico)\b</Begin>
+      <End>$</End>
+      <RuleSet>
+        <Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+</Rule>
+        <Rule color="Variable">[A-Za-zξηθρτ_][A-Za-z0-9ξηθρτ_]*</Rule>
+      </RuleSet>
+    </Span>
+
+    <!-- ===== etiqueta @@(…) al final de una ecuación → color de etiqueta (va a la derecha) ===== -->
+    <Span color="EqTag"><Begin>@@\(</Begin><End>\)</End></Span>
+
+    <!-- ===== texto markdown: #: ## #> #< #| #  → comentario (toda la línea) ===== -->
+    <Span color="Comment"><Begin>\#</Begin><End>$</End></Span>
+
+    <!-- comentarios LISP / MATLAB (modos expr LISP y Hekatan Lab) -->
+    <Span color="Comment"><Begin>;</Begin><End>$</End></Span>
+    <Span color="Comment"><Begin>%</Begin><End>$</End></Span>
 
     <!-- cadenas -->
     <Span color="String" multiline="false"><Begin>"</Begin><End>"</End></Span>
 
-    <!-- simbolo citado de LISP:  'x   '(...)  -->
-    <Rule color="Symbol">'[A-Za-z_][A-Za-z0-9_\-]*</Rule>
+    <!-- símbolo citado de LISP:  'x  '(...) -->
+    <Rule color="EqTag">'[A-Za-z_][A-Za-z0-9_\-]*</Rule>
+
+    <!-- vectores / matrices [ ... ] : dentro solo colorea números -->
+    <Span color="Bracket">
+      <Begin>\[</Begin><End>\]</End>
+      <RuleSet><Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?</Rule></RuleSet>
+    </Span>
 
     <!-- palabras clave de control (LISP + MATLAB) -->
     <Keywords color="Keyword">
@@ -46,23 +79,27 @@
       <Word>dolist</Word><Word>dotimes</Word><Word>function</Word><Word>end</Word>
     </Keywords>
 
-    <!-- funciones intrinsecas / del motor -->
+    <!-- operadores del motor / funciones intrínsecas -->
     <Keywords color="Builtin">
+      <Word>Simplify</Word><Word>Expand</Word><Word>Factor</Word><Word>Slope</Word><Word>Sum</Word>
+      <Word>Product</Word><Word>Root</Word><Word>Area</Word><Word>Find</Word><Word>Partial</Word>
+      <Word>deriv</Word><Word>integ</Word><Word>diff</Word><Word>despejar</Word>
       <Word>format</Word><Word>print</Word><Word>list</Word><Word>vector</Word><Word>aref</Word>
       <Word>car</Word><Word>cdr</Word><Word>cons</Word><Word>first</Word><Word>second</Word><Word>third</Word>
       <Word>expt</Word><Word>sqrt</Word><Word>exp</Word><Word>log</Word>
       <Word>sin</Word><Word>cos</Word><Word>tan</Word><Word>abs</Word><Word>mod</Word>
       <Word>max</Word><Word>min</Word><Word>floor</Word><Word>ceiling</Word><Word>round</Word>
-      <Word>numberp</Word><Word>symbolp</Word><Word>eq</Word><Word>equal</Word>
-      <Word>range</Word><Word>range3</Word><Word>deriv</Word><Word>simplif</Word><Word>dsimp</Word>
+      <Word>range</Word><Word>dsimp</Word><Word>meval</Word><Word>mprint</Word>
     </Keywords>
 
-    <!-- numeros: enteros, reales, cientificos, y razones 3/2 -->
-    <Rule color="Number">
-      \b\d+(\.\d*)?([eE][+-]?\d+)?
-      |
-      \.\d+([eE][+-]?\d+)?
-    </Rule>
+    <!-- números: enteros, reales, científicos -->
+    <Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?</Rule>
+
+    <!-- funciones f(…): identificador seguido de '(' → azul negrita (distinto de variable) -->
+    <Rule color="Function">[A-Za-zξηθρτλμνφψωαβγδε_][A-Za-z0-9ξηθρτλμνφψωαβγδε_]*(?=\s*\()</Rule>
+
+    <!-- variables (identificadores): naranja itálico, para distinguir de números -->
+    <Rule color="Variable">[A-Za-zξηθρτλμνφψωαβγδε_][A-Za-z0-9ξηθρτλμνφψωαβγδε_]*</Rule>
 
   </RuleSet>
 </SyntaxDefinition>

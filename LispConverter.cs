@@ -620,10 +620,20 @@ namespace HekatanLisp
             bool rowBig = nrows > RMAX + 1;             // >11 filas   → colapsa vertical
             if (!colBig && !rowBig)                     // ---- matriz chica: como siempre ----
             {
+                // separador vertical entre columnas si los elementos son SIMBÓLICOS (expresiones),
+                // como Hekatan Lab: distingue dónde termina cada elemento. Números/variables solos, no.
+                bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !c.IsAtom));
                 var sc = new StringBuilder();
                 foreach (var row in rows)
+                {
+                    int cj = 0;
                     foreach (var cell in row)
-                        sc.Append("<span class=\"m-cell\">").Append(ToHtml(cell, 0)).Append("</span>");
+                    {
+                        string st = symSep && cj > 0 ? " style=\"border-left:1px solid var(--sep);padding-left:.55em\"" : "";
+                        sc.Append("<span class=\"m-cell\"").Append(st).Append(">").Append(ToHtml(cell, 0)).Append("</span>");
+                        cj++;
+                    }
+                }
                 return "<span class=\"m-mat\"><span class=\"m-brk m-brl\"></span>" +
                        "<span class=\"m-mgrid\" style=\"grid-template-columns:repeat(" + ncols + ",auto)\">" +
                        sc + "</span><span class=\"m-brk m-brr\"></span></span>";
@@ -643,16 +653,19 @@ namespace HekatanLisp
         static string IndexedGrid(List<List<N>> rows, List<int> cols, List<int> rws, int ncols, int nrows)
         {
             bool showCol = ncols > 1, showRow = nrows > 1;
+            // separador vertical entre columnas de DATOS si la matriz es simbólica (como Hekatan Lab).
+            bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !c.IsAtom));
             int brkCol   = showRow ? 2 : 1;
             int dataCol0 = brkCol + 1;
             int brkRCol  = dataCol0 + cols.Count;
             int dataRow0 = showCol ? 2 : 1;
 
             var sb = new StringBuilder();
-            // la fila de índices de columna añade altura arriba → el centro del bloque sube y el '='
-            // exterior queda alto. Compenso bajando el bloque media fila de índices para que el '='
-            // caiga en la MITAD del corchete (sobre los datos).
-            string shift = showCol ? " style=\"transform:translateY(-0.55em)\"" : "";
+            // la fila de índices de columna añade altura ARRIBA → el centro del bloque sube y el '='
+            // exterior queda alto. Compenso con padding-bottom = altura de esa fila: así el centro del
+            // bloque baja hasta la MITAD del corchete (sobre los datos) SIN mover los índices hacia
+            // arriba (un translate los sacaría del área y .ws-eq los recortaría).
+            string shift = showCol ? " style=\"padding-bottom:1.15em\"" : "";
             sb.Append("<span class=\"m-matx\"").Append(shift).Append(">");
             if (showCol && showRow)
                 sb.Append("<span class=\"m-mh\" style=\"grid-row:1;grid-column:1\"></span>");
@@ -676,8 +689,9 @@ namespace HekatanLisp
                                : c < 0 ? "<span class=\"m-ell\">⋯</span>"
                                : r < 0 ? "<span class=\"m-ell\">⋮</span>"
                                : (c < rows[r].Count ? ToHtml(rows[r][c], 0) : "");
+                    string bl = symSep && ci > 0 ? ";border-left:1px solid var(--sep)" : "";
                     sb.Append("<span class=\"m-mc\" style=\"grid-row:").Append(dataRow0 + ri)
-                      .Append(";grid-column:").Append(dataCol0 + ci).Append("\">").Append(txt).Append("</span>");
+                      .Append(";grid-column:").Append(dataCol0 + ci).Append(bl).Append("\">").Append(txt).Append("</span>");
                 }
             sb.Append("</span>");
             return sb.ToString();
@@ -685,8 +699,8 @@ namespace HekatanLisp
 
         // ---------- pagina HTML completa (worksheet) — tema claro/oscuro como Hekatan Lab ----------
         public static bool Dark = true;
-        const string ROOT_DARK  = ":root{--bg:#14161a;--fg:#e8e8e8;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;}";
-        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#2a2418;--mut:#6E664F;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;}";
+        const string ROOT_DARK  = ":root{--bg:#14161a;--fg:#e8e8e8;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;--sep:#463f5c;}";
+        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#2a2418;--mut:#6E664F;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;--sep:#c9b8dd;}";
         const string CSS = @"
 *{box-sizing:border-box;}
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
@@ -696,6 +710,10 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   overflow-x:auto;overflow-y:hidden;max-width:100%;}   /* matriz muy ancha (12×12): recorta al panel y hace scroll interno */
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
+/* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
+.ws-deq{display:flex;align-items:center;gap:1.2em;}
+.ws-deq>.deq-body{flex:1 1 auto;min-width:0;overflow-x:auto;}
+.ws-deq>.deq-tag{flex:0 0 auto;color:var(--mut);font-size:.85em;white-space:nowrap;font-family:'Segoe UI',sans-serif;}
 /* texto con formato (directivas ; estilo Hekatan Lab) */
 .ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
 .ws-h1{font-weight:700;font-size:15pt;margin:.7em 0 .35em;}
@@ -819,10 +837,43 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             return t;
         }
 
+        // separador del tag de #deq: la línea de display trae  "...ecuación...\x02(etiqueta)".
+        public const char DeqSep = '\x02';
+
+        // convierte  <div class="ws-eq…">CONTENIDO</div>  en la versión con ETIQUETA a la derecha (#deq).
+        static string InjectDeqTag(string div, string tag)
+        {
+            int gt = div.IndexOf('>');
+            int end = div.LastIndexOf("</div>");
+            if (gt < 0 || end < 0 || end <= gt) return div;
+            string open = div.Substring(0, gt);
+            string content = div.Substring(gt + 1, end - gt - 1);
+            if (!open.Contains("ws-deq")) open = open.Replace("class=\"ws-eq", "class=\"ws-eq ws-deq");
+            return open + "><span class=\"deq-body\">" + content + "</span>" +
+                   "<span class=\"deq-tag\">(" + System.Net.WebUtility.HtmlEncode(tag) + ")</span></div>";
+        }
+
         public static string RenderPage(string text, bool fromLisp)
         {
             var body = new StringBuilder();
-            foreach (var raw in text.Replace("\r", "").Split('\n'))
+            foreach (var raw0 in text.Replace("\r", "").Split('\n'))
+            {
+                // #deq: la línea trae la ecuación y, tras \x02, la ETIQUETA que va a la derecha.
+                string raw = raw0, deqTag = null;
+                int ds = raw0.IndexOf(DeqSep);
+                if (ds >= 0) { deqTag = raw0.Substring(ds + 1); raw = raw0.Substring(0, ds); }
+                string div = RenderLineHtml(raw, fromLisp);
+                if (deqTag != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDeqTag(div, deqTag);
+                body.Append(div);
+            }
+            return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
+                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
+                   "</style></head><body>" + body + MAT_JS + "</body></html>";
+        }
+
+        // renderiza UNA línea de display (texto formateado o ecuación) a su <div>. "" si es vacía/omitida.
+        static string RenderLineHtml(string raw, bool fromLisp)
+        {
             {
                 // marcador de TEXTO con formato (viene de una directiva ; procesada en ComputeResult)
                 if (raw.StartsWith(TxtMark))
@@ -832,11 +883,10 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     string align = pz.Length > 3 ? pz[3] : "left";
                     string htmlC = pz.Length > 4 ? string.Join(TxtSep.ToString(), pz.Skip(4)) : "";
                     string cls = kind == "h1" ? "ws-h1" : kind == "h2" ? "ws-h2" : kind == "h3" ? "ws-h3" : "";
-                    body.Append("<div class=\"ws-fmt " + cls + " al-" + align + "\">").Append(htmlC).Append("</div>");
-                    continue;
+                    return "<div class=\"ws-fmt " + cls + " al-" + align + "\">" + htmlC + "</div>";
                 }
                 var line = raw.Trim();
-                if (line.Length == 0) continue;
+                if (line.Length == 0) return "";
                 string prefix = "";
                 var expr = line;
                 if (line.StartsWith("= ") || line.StartsWith("→ ")) { prefix = line.Substring(0, 2); expr = line.Substring(2).Trim(); }
@@ -850,13 +900,10 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     try
                     {
                         // "N1 = OPERACIÓN = RESULTADO": varios pasos separados por " = ".
-                        // Muestra la OPERACIÓN simbólica y su RESULTADO (como Hekatan Lab), no solo el final.
                         var partes = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"\s=\s");
                         var trees = new N[partes.Length];
                         for (int pi = 0; pi < partes.Length; pi++)
                             trees[pi] = fromLisp ? ParseLisp(partes[pi].Trim()) : ParseMath(partes[pi].Trim());
-                        // ¿el valor es un VECTOR (una fila)? → la variable principal lleva flecha (v → v⃗).
-                        // Las matrices NO llevan flecha (se distinguen por los corchetes grandes).
                         bool isVec = trees.Length > 0 && trees[0] != null && trees[0].Op == "vec";
                         var sb = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value, isVec));
                         foreach (var rt in trees)
@@ -864,8 +911,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                         html = sb.ToString();
                     }
                     catch { html = System.Net.WebUtility.HtmlEncode(line); }
-                    body.Append("<div class=\"ws-eq\">").Append(html).Append("</div>");
-                    continue;
+                    return "<div class=\"ws-eq\">" + html + "</div>";
                 }
                 // "forma = resultado" (sin NOMBRE): parte por " = " y lo renderiza TODO en UNA línea.
                 if (System.Text.RegularExpressions.Regex.IsMatch(expr, @"\s=\s"))
@@ -880,18 +926,13 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                             var rt = fromLisp ? ParseLisp(partes[pi].Trim()) : ParseMath(partes[pi].Trim());
                             sb.Append("<span class=\"m-expr\">").Append(ToHtml(rt)).Append("</span>");
                         }
-                        body.Append("<div class=\"ws-eq\">").Append(sb).Append("</div>");
-                        continue;
+                        return "<div class=\"ws-eq\">" + sb + "</div>";
                     }
                     catch { }   // si algún tramo no parsea, cae al manejo normal de abajo
                 }
-                // Prosa suelta de un programa (ej. "1D LINEAL (2 nodos):") no es UNA forma LISP:
-                // si intentáramos parsearla, ParseLisp toma solo el primer token ("1D"). Mostrar tal cual.
+                // Prosa suelta de un programa (ej. "1D LINEAL (2 nodos):") no es UNA forma LISP.
                 if (fromLisp && !expr.StartsWith("(") && expr.Contains(' '))
-                {
-                    body.Append("<div class=\"ws-eq ws-txt\">").Append(System.Net.WebUtility.HtmlEncode(line)).Append("</div>");
-                    continue;
-                }
+                    return "<div class=\"ws-eq ws-txt\">" + System.Net.WebUtility.HtmlEncode(line) + "</div>";
                 try
                 {
                     var tree = fromLisp ? ParseLisp(expr) : ParseMath(expr);
@@ -900,11 +941,8 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                         html = "<span class=\"m-op\">" + System.Net.WebUtility.HtmlEncode(prefix) + "</span>" + html;
                 }
                 catch { html = System.Net.WebUtility.HtmlEncode(line); }
-                body.Append("<div class=\"ws-eq\">").Append(html).Append("</div>");
+                return "<div class=\"ws-eq\">" + html + "</div>";
             }
-            return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
-                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
-                   "</style></head><body>" + body + MAT_JS + "</body></html>";
         }
 
         // el marco de la matriz es redimensionable con CSS (resize:both) — no hace falta JS.

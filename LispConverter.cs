@@ -625,7 +625,10 @@ namespace HekatanLisp
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;}
 .ws-eq{margin:0.4em 0;
-  font-family:'Georgia Pro','Century Schoolbook','Times New Roman',Times,serif;font-size:11.5pt;}
+  font-family:'Georgia Pro','Century Schoolbook','Times New Roman',Times,serif;font-size:11.5pt;
+  overflow-x:auto;overflow-y:hidden;}   /* matriz muy ancha (12×12): scroll horizontal */
+.ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
+.ws-eq.grab{cursor:grab;} .ws-eq.grabbing{cursor:grabbing;user-select:none;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 /* texto con formato (directivas ; estilo Hekatan Lab) */
 .ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
@@ -827,8 +830,19 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
-                   "</style></head><body>" + body + "</body></html>";
+                   "</style></head><body>" + body + DRAG_JS + "</body></html>";
         }
+
+        // arrastrar con el mouse una matriz/línea muy ancha para desplazarla (como Calcpad/Hekatan Lab).
+        const string DRAG_JS = @"<script>(function(){
+  function wire(el){ if(el.scrollWidth<=el.clientWidth) return; el.classList.add('grab');
+    var d=false,sx,sl;
+    el.addEventListener('mousedown',function(e){d=true;el.classList.add('grabbing');sx=e.pageX;sl=el.scrollLeft;e.preventDefault();});
+    window.addEventListener('mouseup',function(){d=false;el.classList.remove('grabbing');});
+    el.addEventListener('mousemove',function(e){ if(!d)return; el.scrollLeft=sl-(e.pageX-sx); });
+  }
+  document.querySelectorAll('.ws-eq').forEach(wire);
+})();</script>";
 
         // ---------- página de AYUDA (se muestra a la derecha cuando no hay script, como Hekatan Lab) ----------
         public static string HelpPage()

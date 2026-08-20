@@ -210,11 +210,30 @@ namespace HekatanLisp
             var sb = new StringBuilder();
             foreach (var f in forms)
             {
-                if (_view == "lisp") { sb.AppendLine(f); continue; }   // LISP tal cual (incluye "= …")
+                if (_view == "lisp") { var lv = ToLispView(f); if (lv != null) sb.AppendLine(lv); continue; }   // (setf name form)
                 if (f.StartsWith("= ")) sb.AppendLine("= " + ToMathView(f.Substring(2)));
                 else sb.AppendLine(ToMathView(f));
             }
             Output.Text = sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Vista "expr LISP": una línea de salida (que puede venir como "name = forma" o
+        /// "name = operación = resultado") a LISP VÁLIDO:  (setf name forma).  Una expresión suelta
+        /// se deja tal cual (ya es una forma LISP). El texto (#) se pasa como comentario ";".</summary>
+        private static string ToLispView(string f)
+        {
+            if (string.IsNullOrEmpty(f)) return null;
+            if (f.StartsWith(LispConverter.TxtMark))   // línea de texto (#): comentario LISP
+            {
+                var pz = f.Split(LispConverter.TxtSep);
+                var html = pz.Length > 4 ? string.Join("", pz.Skip(4)) : "";
+                var plain = System.Text.RegularExpressions.Regex.Replace(html, @"<[^>]+>", "").Trim();
+                return plain.Length > 0 ? "; " + System.Net.WebUtility.HtmlDecode(plain) : null;
+            }
+            var parts = System.Text.RegularExpressions.Regex.Split(f, @"\s=\s");
+            if (parts.Length >= 2 && System.Text.RegularExpressions.Regex.IsMatch(parts[0].Trim(), @"^[A-Za-z]\w*$"))
+                return "(setf " + parts[0].Trim() + " " + parts[1].Trim() + ")";   // definición → (setf …)
+            return parts[0].Trim();   // expresión suelta: ya es una forma LISP
         }
 
         // ;grafica en COMENTARIO (LISP lo ignora, la app lo dibuja): ";grafica s -1 1 [N1 N2 …]".

@@ -1,144 +1,84 @@
 # Hekatan LISP
 
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.0.0-blue)](https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases)
-[![Descargar](https://img.shields.io/badge/%E2%AC%87%20Descargar-Instalador%20Windows-success)](https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases/latest)
-[![Licencia](https://img.shields.io/badge/licencia-MIT-green)](#licencia)
-[![Motor SBCL](https://img.shields.io/badge/motor-SBCL%20embebido-orange)](#créditos)
+**Calculadora simbólica** de escritorio (WPF · .NET 8) con motor **LISP (SBCL)** embebido y render matemático a CSS — al estilo de Hekatan Lab.
 
-**Hekatan LISP** es un editor para **aprender y practicar cálculo simbólico** —la raíz histórica
-del cálculo por computadora—. Escribís **matemática al estilo MATLAB** (la que ya conocés) y con un
-botón la ves convertida a su **forma LISP**, que **se ejecuta de verdad** en un motor **SBCL**
-(Steel Bank Common Lisp) **embebido** dentro de la app. Interfaz WPF + editor **AvalonEdit** con
-resaltado, y **render matemático estilo Hekatan Lab**.
+Escribes matemática y texto en el panel izquierdo; el resultado aparece renderizado, bonito, a la derecha. Bajo el capó, tu notación se traduce a **LISP** y el motor la simplifica, deriva, integra y opera con matrices.
 
-> La idea: en LISP **vos construís la función** (no hay `sum` mágico). Por eso la suma se escribe con
-> el `for`, igual que en MATLAB, y el botón **⇒ a LISP** te muestra el `(loop …)` equivalente y lo corre.
-
-> ⚙️ **Autocontenido:** el motor **SBCL viaja dentro del app** — no hace falta instalar LISP aparte.
-> Windows 10/11 de 64 bits (requiere el runtime .NET 8).
+> Hereda el espíritu de **Calcpad** (Nedelcho Ganchovski) — hoja viva donde definición, fórmula y resultado conviven en la misma línea — llevado a un motor simbólico LISP propio.
 
 ---
 
-## Novedades — v1.0.0
+## La regla madre
 
-- **Matemática estilo MATLAB → LISP**: bucles `for i = 1:n`, `while`, `if/elseif/else`, funciones
-  `function y = f(x)`, asignaciones, vectores `[1 2 3]` y matrices `[1 2; 3 4]` — **sin nombres de
-  funciones de MATLAB**, porque la operación se arma con el loop (la filosofía de LISP).
-- **Botón ⇒ a LISP**: pasa la matemática del editor a su forma LISP **y la ejecuta** (SBCL).
-- **Motor real**: el LISP se corre de verdad; si el código devuelve un valor pero no lo imprime,
-  Hekatan LISP lo muestra igual (en LISP el valor no se ve salvo que lo imprimas).
-- **Editor AvalonEdit** con resaltado de sintaxis (LISP y matemática) y **render tipo libro**.
-
----
-
-## Características principales
-
-- **Cinco modos**: matemática → LISP · matemática → render · LISP → matemática · LISP → render ·
-  **Calcular** (ejecuta en SBCL).
-- **Conversión con árbol propio** (sin CAS): de la misma expresión salen LISP, MATLAB y el render
-  matemático (fracciones, superíndices, `·`).
-- **Programas imperativos**: `for` / `while` / `if` / `function` traducidos a `(loop …)`,
-  `(cond …)`, `(defun …)` ejecutables.
-- **Motor SBCL embebido**: define tus funciones y llámalas — se ejecutan al vuelo (deriv, simplif,
-  o lo que escribas).
-- **Render matemático estilo Hekatan Lab** en WebView2 (tema oscuro, math en serif).
-- **Canal `--ctl`** para manejar la ventana desde la terminal (tests de regresión).
-
----
-
-## Instalación
-
-Descargá el instalador desde **[Releases](https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases)**
-y ejecutalo. El motor **SBCL va embebido** (no necesitás instalar LISP). Requiere el runtime **.NET 8**.
-
-**Compilar desde el código:**
-
-```bash
-dotnet build -c Release
-```
-
-El build copia `sbcl.exe` + `sbcl.core` a la carpeta de salida (necesita SBCL instalado en la máquina
-de compilación; en runtime ya viaja dentro del app).
-
----
-
-## Cómo funciona
-
-1. **Escribí** matemática estilo MATLAB en el panel izquierdo (ej.: un `for` que suma `1..n`).
-2. Presioná **⇒ a LISP**: el editor pasa a la **forma LISP** y el panel derecho muestra el
-   **resultado** (ejecutado por SBCL).
-3. O usá los modos para ver el **render** matemático, o la vuelta **LISP → matemática**.
-
-Ejemplo (menú *Archivo → Cargar ejemplo (loop)*):
-
-```matlab
-n = 100
-s = 0
-for i = 1:n
-  s = s + i
-end
-s
-```
-
-⇒ a LISP:
-
-```lisp
-(let* ((n 0) (s 0))
-  (setf n 100)
-  (setf s 0)
-  (loop for i from 1 to n do
-    (setf s (+ s i)))
-  s)          ; => 5050
-```
-
----
-
-## El lenguaje
-
-Hekatan LISP entiende dos formas y las convierte entre sí:
-
-### 1) Expresiones (matemática ↔ LISP ↔ render)
-
-| Matemática | LISP | Render |
-|---|---|---|
-| `x^2 + 3*x` | `(+ (expt x 2) (* 3 x))` | x² + 3·x |
-| `(x+1)^2` | `(expt (+ x 1) 2)` | (x+1)² |
-| `3*x/2` | `(/ (* 3 x) 2)` | fracción 3·x / 2 |
-
-### 2) Programas (matemática estilo MATLAB → LISP ejecutable)
-
-| Matemática (MATLAB) | LISP |
+| Empieza con… | Es… |
 |---|---|
-| `s = s + i` | `(setf s (+ s i))` |
-| `for i = 1:n` · `1:2:n` | `(loop for i from 1 to n [by 2] do …)` |
-| `while cond` | `(loop while cond do …)` |
-| `if / elseif / else` | `(cond …)` |
-| `function y = f(n) … end` | `(defun f (n) (let* …) y)` |
-| `[1 2 3]` · `[1 2; 3 4]` | `(vector …)` |
-| `a == b` · `a ~= b` · `a <= b` | `(= a b)` · `(/= a b)` · `(<= a b)` |
-| `f(x)` · `a^b` | `(f x)` · `(expt a b)` |
+| `#` | **texto** (markdown) |
+| *(nada)* | **matemática** |
+| `;` | **LISP** crudo |
 
-**Sin nombres de funciones de MATLAB**: no hay `sum(1:n)`; la suma se hace con el `for`, que es
-justo lo que se pasa a LISP.
+Nada más. Una línea con `=` o una expresión suelta se **calcula y renderiza**; una línea con `#` es prosa con formato.
 
 ---
 
-## Créditos
+## Texto — markdown
 
-El **motor de ejecución** es **[SBCL — Steel Bank Common Lisp](https://www.sbcl.org/)** (dominio
-público / licencia BSD-style), empaquetado dentro del app.
+```
+# Título              ## Subtítulo         ### Sub-sub
+#: párrafo (izquierda)
+#| centrado           #> derecha           #< izquierda
+**negrita**   *cursiva*   __negrita__   _cursiva_
+@var          → "var = valor"     (variable inline)
+@{expr}       → solo el valor     (mezcla texto + matemática)
+```
 
-La **base de render e interfaz** (plantilla del reporte, panel WPF + WebView2, estilos de math)
-sigue el estilo del proyecto **[Calcpad](https://codeberg.org/proektsoft/Calcpad)** de
-**Nedelcho Ganchovski / PROEKTSOFT EOOD** (licencia MIT).
+## Matemática
 
-El resto —el **convertidor de árbol** matemática ↔ LISP ↔ MATLAB, el **traductor de programas**
-(`for`/`while`/`function` → `loop`/`cond`/`defun`), el editor y los modos— es desarrollo propio de
-**Hekatan Engineers**.
+```
+A = [1 2; 3 4]           # definir matriz / vector / número
+Inv = A^-1               # operación VISIBLE:  Inv = A⁻¹ = [resultado]
+A'   A*B   A+B   1:5      # transpuesta · producto · suma · rango
+f(x) = x^2 + 1  →  f(3)   # función y su aplicación  (= 10)
+v(i)   A(i,j)   N_1        # índice de vector · de matriz · subíndice
+Simplify{…}  Factor{…}  Expand{…}  Partial{f @ x}   # operaciones simbólicas
+```
+
+Las matrices siguen la sintaxis **MATLAB 2017a**: `,` o espacio = columna, `;` o salto de línea = fila, `...` = continuación. Se distingue **función** de **índice** por el contexto (cómo definiste el nombre), igual que MATLAB. Los vectores llevan **flecha** (`v → v⃗`).
 
 ---
 
-## Licencia
+## Qué sabe hacer el motor
 
-Distribuido bajo licencia **MIT**. Ver el archivo `LICENSE`. El crédito de la base de render/UI
-corresponde a PROEKTSOFT EOOD® (Calcpad, MIT); el motor SBCL a sus autores.
+- **Simbólico**: simplificar, factorizar, expandir, derivar (total y parcial `∂`), integrar (elemental), despejar, sumatorias/productos, sup/inf/find.
+- **Funciones**: `f(x) = …` y su aplicación por sustitución (β-reducción): `f(3)`, `f(a)`, composición `f(g(x))`.
+- **Álgebra de matrices**: transpuesta `A'`, producto `A*B`, suma, escala, **inversa** `A^-1` (Gauss-Jordan exacto, racionales), rango `1:n`. Verificado `A·A⁻¹ = I`.
+- **Render** idéntico a Calcpad/Hekatan Lab: fracciones, ∫ Σ ∏ con límites apilados, sub/superíndices, letras griegas, paréntesis que crecen, matrices con corchetes.
+- **Combinar** texto + operación + gráfica en una misma hoja.
+
+---
+
+## Exportar
+
+Un botón lleva la hoja a **LISP** ejecutable (`(defun …)`) o a **Hekatan Lab** (MATLAB). El motor real es SBCL empaquetado, autocontenido (no hay que instalar nada).
+
+---
+
+## Estructura
+
+```
+hekatan-lisp/
+├── LispConverter.cs   parser de "matemática" → árbol → LISP · y árbol → HTML/CSS
+├── LispEngine.cs      puente a SBCL (deriva, integra, opera; engine.core horneado)
+├── engine.lisp        el motor simbólico (partial, factor, expand, matrices, …)
+├── MainWindow.xaml    la ventana (AvalonEdit izquierda + WebView2 derecha)
+└── sbcl/              SBCL empaquetado + engine.core (motor precargado, ~3× más rápido)
+```
+
+---
+
+## Rendimiento
+
+El motor deriva una parcial en **~8 µs**. La app relanza SBCL por cálculo (~85 ms de arranque con el core horneado); para lotes conviene un proceso persistente.
+
+---
+
+*Parte del ecosistema **Hekatan**. El motor de cálculo de Calcpad es de Nedelcho Ganchovski; Hekatan LISP es una reimplementación simbólica sobre LISP con notación propia.*

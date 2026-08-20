@@ -41,6 +41,7 @@ namespace HekatanLisp
             { "slope", "slope-at" }, { "derivative", "slope-at" },
             { "sum", "suma-op" }, { "product", "producto-op" }, { "root", "root-op" },
             { "find", "find-op" }, { "sup", "sup-op" }, { "inf", "inf-op" }, { "repeat", "repeat-op" },
+            { "lim", "limite" }, { "limit", "limite" }, { "limite", "limite" },   // límite  lim_{x→a} f
             // tokens de operación simbólica (nuestra notación): computan inline
             { "partial", "partial" }, { "derivate", "derive-x" }, { "diff", "derive-x" },
             { "simplify", "factor" }, { "factor", "factor" }, { "expand", "expand*" },
@@ -183,7 +184,7 @@ namespace HekatanLisp
             { "producto-op", "product" }, { "root-op", "root" },
             { "find-op", "find" }, { "sup-op", "sup" }, { "inf-op", "inf" }, { "repeat-op", "repeat" },
             { "partial", "partial" }, { "derive-x", "derivate" }, { "integ-var", "integral" },
-            { "factor", "factor" }, { "expand*", "expand" },
+            { "factor", "factor" }, { "expand*", "expand" }, { "limite", "lim" },
         };
 
         static N ReadLisp(List<string> toks, ref int i)
@@ -227,6 +228,17 @@ namespace HekatanLisp
             string b = n.Items.Count > 3 ? conv(n.Items[3]) : null;
             return (f, v, a, b);
         }
+        // destino del límite: infinito (inf/∞) se muestra como ∞; si no, el valor tal cual.
+        static string LimTarget(N node, string aHtml)
+        {
+            if (node != null && node.IsAtom && node.Atom != null)
+            {
+                var s = node.Atom.ToLower();
+                if (s == "inf" || s == "infinity" || s == "infty" || s == "∞") return "∞";
+                if (s == "-inf" || s == "-infinity") return "−∞";
+            }
+            return aHtml;
+        }
         static string SolverToLisp(N n)   // → llamada al motor (f y var CITADOS)
         {
             var (f, v, a, b) = SolverParts(n, x => ToLisp(x));
@@ -241,6 +253,8 @@ namespace HekatanLisp
                 "expand" => $"(expand* '{f})",
                 "sum" => $"(suma '{f} '{v} {a} {b})",
                 "product" => $"(producto-op '{f} '{v} {a} {b})",
+                "lim" or "limit" or "limite" => $"(limite '{f} '{v} {a})",   // lím  x→a  f
+
                 "root" => $"(root-op '{f} '{v})",
                 "find" => $"(find-op '{f} '{v} {a} {b})",
                 "sup" => $"(sup-op '{f} '{v} {a} {b})",
@@ -308,6 +322,9 @@ namespace HekatanLisp
                 "integral" => b != null ? Nary("∫", a, b, "&hairsp;" + f + dx) : Nary("∫", "", "", "&hairsp;" + f + dx),
                 "sum" => Nary("Σ", idx, b ?? "", "&hairsp;" + f),
                 "product" => Nary("∏", idx, b ?? "", "&hairsp;" + f),
+                "lim" or "limit" or "limite" =>
+                    "<span class=\"m-lim\"><span class=\"m-lim-op\">lim</span><small class=\"m-lim-sub\">" + v +
+                    "→" + LimTarget(n.Items.Count > 2 ? n.Items[2] : null, a) + "</small></span>&hairsp;" + Paren(f),
                 "slope" or "derivative" => ddv + Paren(f) + "<span class=\"m-op\"> │</span><sub class=\"m-sub\">" + v + "=" + a + "</sub>",
                 "partial" => pdv + Paren(f),                           // ∂/∂x (f) — derivada PARCIAL
                 "derivate" or "diff" => ddv + Paren(f),                // d/dx (f) — derivada total
@@ -755,7 +772,11 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-2pt;margin:0 .12em;}
 .m-dvr small{font-family:Calibri,Candara,Corbel,sans-serif;font-size:70%;display:block;}
 .m-nary{display:block;font-size:235%;line-height:70%;font-weight:200;color:var(--nary);font-family:'Georgia Pro','Century Schoolbook','Times New Roman',serif;margin:0 1pt 2pt 1pt;}
-.m-cond{color:#e000d0;font-style:italic;padding:0 .05em;}";
+.m-cond{color:#e000d0;font-style:italic;padding:0 .05em;}
+/* límite:  lim  apilado con  x→a  debajo */
+.m-lim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .12em;}
+.m-lim-op{font-style:normal;}
+.m-lim-sub{font-family:Calibri,Candara,Corbel,sans-serif;font-size:.66em;margin-top:1px;color:var(--mut);}";
 
         // ---------- texto con FORMATO en un comentario ';' (Hekatan Lab/Calcpad-style) ----------
         // SBCL ignora la línea (es ';'); Hekatan LISP la DIBUJA. Al ejecutar el .lisp no se ve (es comentario).

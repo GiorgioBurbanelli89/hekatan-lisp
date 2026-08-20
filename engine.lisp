@@ -427,13 +427,36 @@
     (if (eq num :fail) (derive-x e) (poly->expr (poly-coef-h1 num)))))
 
 ;; SUMATORIA finita:  sum_{var=a}^{b} e
+;; FORMULAS CERRADAS de Faulhaber (sum_{i=1}^{n} i^k) para k = 0..3:
+(defun faulhaber (k n)
+  (case k
+    (0 n)
+    (1 (list '/ (list '* n (list '+ n 1)) 2))
+    (2 (list '/ (list '* (list '* n (list '+ n 1)) (list '+ (list '* 2 n) 1)) 6))
+    (3 (list 'expt (list '/ (list '* n (list '+ n 1)) 2) 2))
+    (t nil)))
+(defun suma-poly-1n (e var n)
+  "Sum_{var=1}^{n} e, con e POLINOMIO en var (grado<=3): Faulhaber + linealidad. nil si no aplica."
+  (let ((p (try-poly (expand* e))))
+    (if (eq p :fail) nil
+        (let ((d (poly-deg-in p var)))
+          (if (or (null d) (> d 3)) nil
+              (let ((acc 0))
+                (dotimes (k (1+ d))
+                  (let ((ck (poly-coef-of p var k)) (fk (faulhaber k n)))
+                    (unless (or (equal ck 0) (null fk))
+                      (setf acc (list '+ acc (list '* ck fk))))))
+                (simplify (expand* acc))))))))
 (defun suma (e var a b)
-  "Sumatoria de e con var de a a b. Con limites ENTEROS suma termino a termino y
-   simplifica; con limites SIMBOLICOS (n, lados) es NOTACION: devuelve la forma sin
-   evaluar, para que se dibuje la Σ y no se fabrique un resultado falso."
-  (if (and (integerp a) (integerp b))
-      (let ((acc 0)) (loop for i from a to b do (setf acc (simplify (list '+ acc (subst-var e var i))))) acc)
-      (list 'suma e var a b)))
+  "Sumatoria de e con var de a a b. Limites ENTEROS: suma termino a termino. Limite
+   inferior 1 y superior SIMBOLICO con sumando polinomial: FORMULA CERRADA (Faulhaber).
+   Resto de limites simbolicos: NOTACION (dibuja la Σ, no fabrica un resultado falso)."
+  (cond
+    ((and (integerp a) (integerp b))
+     (let ((acc 0)) (loop for i from a to b do (setf acc (simplify (list '+ acc (subst-var e var i))))) acc))
+    ((and (eql a 1) (not (integerp b)))
+     (or (suma-poly-1n e var b) (list 'suma e var a b)))
+    (t (list 'suma e var a b))))
 
 ;; SERIE DE TAYLOR alrededor de 0 hasta grado n:  sum f^(k)(0)/k! x^k
 (defun fct (n) (if (<= n 1) 1 (* n (fct (1- n)))))
@@ -446,16 +469,41 @@
       (setf term (eval-consts (simplify (derive-x term)))))
     (simplify acc)))
 
-;; LIMITE:  sustituye var=a; si da 0/0 aplica L'Hopital (deriva arriba y abajo).
-(defun limite (e var a)
-  "Limite de e cuando var->a. Sustituye; si 0/0, L'Hopital."
+;; LIMITE:  sustitucion directa; 0/0 -> L'Hopital; var->infinito -> comparar grados.
+(defun infinityp (a) (and (symbolp a) (member a '(inf infinity infty +inf oo))))
+(defun deg-in (e var)
+  "Grado de e como polinomio en var, o nil si no es polinomio en var."
+  (let ((p (try-poly (expand* e))))
+    (if (eq p :fail) nil (poly-deg-in p var))))
+(defun lead-coef-in (e var)
+  "Coeficiente lider de e (polinomio) en var, o 1 si no aplica."
+  (let ((p (try-poly (expand* e))) (d (deg-in e var)))
+    (if (or (eq p :fail) (null d)) 1 (poly-coef-of p var d))))
+(defun limite-inf (e var)
+  "Limite cuando var->infinito. Racional P/Q: por grados; polinomio: inf; constante: ella."
   (if (and (consp e) (eq (car e) '/))
-      (let ((nu (simplify (eval-consts (subst-var (second e) var a))))
-            (de (simplify (eval-consts (subst-var (third e) var a)))))
-        (if (and (eql nu 0) (eql de 0))
-            (limite (list '/ (partial (second e) var) (partial (third e) var)) var a)
-            (simplify (eval-consts (subst-var e var a)))))
-      (simplify (eval-consts (subst-var e var a)))))
+      (let ((dn (deg-in (second e) var)) (dd (deg-in (third e) var)))
+        (if (and dn dd)
+            (cond ((< dn dd) 0)                                    ; abajo domina -> 0
+                  ((> dn dd) 'inf)                                 ; arriba domina -> inf
+                  (t (simplify (list '/ (lead-coef-in (second e) var)   ; grados iguales -> razon de lideres
+                                       (lead-coef-in (third e) var)))))
+            (list 'limite e var 'inf)))
+      (let ((d (deg-in e var)))
+        (cond ((null d) (list 'limite e var 'inf))
+              ((zerop d) (simplify (eval-consts e)))
+              (t 'inf)))))
+(defun limite (e var a)
+  "Limite de e cuando var->a. Sustituye; si 0/0 aplica L'Hopital; var->inf por grados."
+  (cond
+    ((infinityp a) (limite-inf e var))
+    ((and (consp e) (eq (car e) '/))
+     (let ((nu (simplify (eval-consts (subst-var (second e) var a))))
+           (de (simplify (eval-consts (subst-var (third e) var a)))))
+       (if (and (eql nu 0) (eql de 0))
+           (limite (list '/ (partial (second e) var) (partial (third e) var)) var a)
+           (simplify (eval-consts (subst-var e var a))))))
+    (t (simplify (eval-consts (subst-var e var a))))))
 
 ;;;; ================= FACTORIZAR (lo contrario de expandir) =================
 ;;;; simplify = factorizar/compactar:  x^2+2x+1 -> (x+1)^2 ,  (x+1)^2 se queda (x+1)^2
@@ -637,7 +685,7 @@
 ;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
 (defparameter *op-calls*
   '(partial derive-x factor expand* integ-var integ-x area-under slope-at
-    suma producto-op root-op find-op sup-op inf-op repeat-op))
+    suma producto-op root-op find-op sup-op inf-op repeat-op limite))
 (defun evops (e)
   (cond
     ((atom e) e)

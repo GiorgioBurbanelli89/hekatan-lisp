@@ -91,6 +91,9 @@ namespace HekatanLisp
             Editor.PreviewMouseWheel += OnCtrlZoom;          // Ctrl+rueda = zoom (como el render)
             Output.PreviewMouseWheel += OnCtrlZoom;
             PoblarEjemplos();                                // menú Ejemplos ← carpeta ejemplos/
+            // --in <archivo>: carga ese .lisp en el editor (útil con --shot para capturar un contenido dado)
+            var inFile = ValueAfter(args, "--in");
+            if (inFile != null) { try { if (File.Exists(inFile)) Editor.Text = File.ReadAllText(inFile); } catch { } }
             if (string.IsNullOrWhiteSpace(Editor.Text))
             {
                 // arranque normal: recupera el trabajo NO guardado del respaldo temporal (si existe)
@@ -735,7 +738,7 @@ namespace HekatanLisp
         // ¿la forma LISP contiene alguna llamada de operación (Partial, Factor, ∫, …)?
         private static readonly string[] OpCalls = {
             "(partial","(derive-x","(factor","(expand*","(integ-var","(integ-x","(area-under","(slope-at",
-            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op" };
+            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite" };
         private static bool HasOpCall(string f) => f != null && System.Array.Exists(OpCalls, s => f.Contains(s));
 
         // la línea (matemática o LISP) → su ÁRBOL (para resolver etiquetas antes de pasar a LISP)

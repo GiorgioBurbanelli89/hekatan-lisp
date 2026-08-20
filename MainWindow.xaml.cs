@@ -486,8 +486,8 @@ namespace HekatanLisp
                                                               : lbl + " = " + opF + " = " + r);
                     }
                     else if (_op == "auto" && hasR &&
-                             System.Text.RegularExpressions.Regex.IsMatch(r, @"^-?\d+(\.\d+)?$"))
-                        display.Add(lbl + " = " + formOf[i] + " = " + r);   // f(3) = 3²+1 = 10 (numérico: muestra forma Y valor)
+                             System.Text.RegularExpressions.Regex.IsMatch(r, @"^-?\d+(\.\d+)?$|^-?\d+/\d+$"))
+                        display.Add(lbl + " = " + formOf[i] + " = " + r);   // giro = M·l/(2·EI) = 3/5 (número o racional exacto)
                     else
                     {
                         string rhs = (_op == "auto" || !hasR) ? formOf[i] : r;

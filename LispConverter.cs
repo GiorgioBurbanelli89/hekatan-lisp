@@ -627,6 +627,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
 .ws-h1{font-weight:700;font-size:15pt;margin:.7em 0 .35em;}
 .ws-h2{font-weight:600;font-size:12.5pt;margin:.55em 0 .3em;}
+.ws-h3{font-weight:600;font-size:11pt;margin:.45em 0 .25em;color:var(--mut);}
 .al-left{text-align:left;} .al-center{text-align:center;} .al-right{text-align:right;}
 .m-var{font-style:italic;color:var(--var);font-size:105%;} .m-num{color:var(--num);}
 .m-op{color:var(--mut);padding:0 .08em;}
@@ -664,12 +665,27 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             TxtMark + TxtSep + kind + TxtSep + align + TxtSep + html;
         public static (string kind, string align, string text)? TextDirective(string raw)
         {
-            var s = raw.TrimStart();
-            // marcador de TEXTO/comentario: '#' es el de MATEMÁTICA (como Octave); ';' es el de LISP.
-            // Se quita UNO solo → así '#' y '##' quedan libres para párrafo/encabezado.
-            if (s.Length == 0 || (s[0] != ';' && s[0] != '#')) return null;
-            s = s.Substring(1).Trim();
-            // las directivas de GRÁFICA (;fplot/;grafica) NO son texto: las dibuja el ploteador
+            var s0 = raw.TrimStart();
+            if (s0.Length == 0) return null;
+            char mk = s0[0];
+            if (mk != '#' && mk != ';') return null;
+            if (mk == '#')
+            {
+                // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
+                // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
+                if (Regex.IsMatch(s0, @"^#+\s*(fplot|plot|ezplot|graficas?|grafico)\b", RegexOptions.IgnoreCase)) return null;
+                if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
+                {
+                    var txt = s0.Substring(2).Trim();
+                    return s0[1] == '|' || s0[1] == '=' ? ("p", "center", txt)
+                         : s0[1] == '>' ? ("p", "right", txt) : ("p", "left", txt);   // ':' o '<'
+                }
+                int h = 0; while (h < s0.Length && s0[h] == '#') h++;
+                var body = s0.Substring(h).Trim();
+                return h >= 3 ? ("h3", "center", body) : h == 2 ? ("h2", "center", body) : ("h1", "center", body);
+            }
+            // LISP: ';' — esquema previo (compatibilidad)
+            var s = s0.Substring(1).Trim();
             if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
             if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
@@ -709,7 +725,10 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 var v = varLookup?.Invoke(m.Groups[1].Value.Trim());
                 return string.IsNullOrEmpty(v) ? m.Value : "<span class=\"m-expr\">" + v + "</span>";
             });
-            t = Regex.Replace(t, @"\*([^*]+)\*", "<b>$1</b>");
+            // markdown: **negrita** o __negrita__ ; *cursiva* o _cursiva_ (doble antes que simple)
+            t = Regex.Replace(t, @"\*\*([^*]+)\*\*", "<b>$1</b>");
+            t = Regex.Replace(t, @"__([^_]+)__", "<b>$1</b>");
+            t = Regex.Replace(t, @"\*([^*]+)\*", "<i>$1</i>");
             t = Regex.Replace(t, @"_([^_]+)_", "<i>$1</i>");
             return t;
         }
@@ -726,7 +745,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     string kind = pz.Length > 2 ? pz[2] : "p";
                     string align = pz.Length > 3 ? pz[3] : "left";
                     string htmlC = pz.Length > 4 ? string.Join(TxtSep.ToString(), pz.Skip(4)) : "";
-                    string cls = kind == "h1" ? "ws-h1" : kind == "h2" ? "ws-h2" : "";
+                    string cls = kind == "h1" ? "ws-h1" : kind == "h2" ? "ws-h2" : kind == "h3" ? "ws-h3" : "";
                     body.Append("<div class=\"ws-fmt " + cls + " al-" + align + "\">").Append(htmlC).Append("</div>");
                     continue;
                 }

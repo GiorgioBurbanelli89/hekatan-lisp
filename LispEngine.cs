@@ -194,7 +194,7 @@ namespace HekatanLisp
                 using var p = Process.Start(psi);
                 var o = p.StandardOutput.ReadToEnd();
                 var e = p.StandardError.ReadToEnd();
-                p.WaitForExit(5000);
+                p.WaitForExit(30000);   // hasta 30 s: el álgebra de matrices grande (12×12 con ∫∫) es pesada
                 return string.IsNullOrWhiteSpace(e) ? o : o + e;
             }
             catch (Exception ex) { return "; error motor SBCL: " + ex.Message; }

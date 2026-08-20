@@ -219,7 +219,7 @@ namespace HekatanLisp
         // Toma las funciones YA deducidas (etiquetas NAME = … = RESULTADO de la salida) y las grafica.
         // línea de comentario que empieza el comando de gráfica; el resto se parsea a mano
         private static readonly System.Text.RegularExpressions.Regex RxGraf = new System.Text.RegularExpressions.Regex(
-            @"^\s*;+\s*(fplot|plot|ezplot|graficas?|grafico)\b(.*)$",
+            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
 
         // separa por comas de PRIMER nivel (respeta [ ] y ( ))
@@ -387,7 +387,7 @@ namespace HekatanLisp
             {
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*;+\s*(fplot|plot|ezplot|graficas?|grafico)\b",
+                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }
@@ -475,7 +475,14 @@ namespace HekatanLisp
                     if (HasOpCall(formOf[i]) && hasR)
                         display.Add(lbl + " = " + formOf[i] + " = " + r);
                     else if (hasR && r.StartsWith("(vector") && r != formOf[i])
-                        display.Add(lbl + " = " + r);   // operación de matriz (A', A*B, A^-1…) → muestra la matriz resultado
+                    {
+                        // operación de matriz (A', A*B, A^-1…): muestra la OPERACIÓN con etiquetas
+                        // (A⁻¹, A·A) Y la matriz resultado, en la misma línea. La forma con etiquetas
+                        // viene del árbol ORIGINAL (treeOf), no del sustituido.
+                        string opF = treeOf[i] != null ? LispConverter.ToLisp(treeOf[i]) : formOf[i];
+                        display.Add(opF.StartsWith("(vector") ? lbl + " = " + r
+                                                              : lbl + " = " + opF + " = " + r);
+                    }
                     else if (_op == "auto" && hasR &&
                              System.Text.RegularExpressions.Regex.IsMatch(r, @"^-?\d+(\.\d+)?$"))
                         display.Add(lbl + " = " + formOf[i] + " = " + r);   // f(3) = 3²+1 = 10 (numérico: muestra forma Y valor)

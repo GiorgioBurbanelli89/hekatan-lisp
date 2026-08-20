@@ -194,6 +194,9 @@ namespace HekatanLisp
 
             // reconstruye el nodo SOLVER ($area, $slope…) para que se muestre con su notación
             if (SolverFn.TryGetValue(op, out var sv)) return new N { Op = "solver", Atom = sv, Items = args };
+            // operaciones de matriz: se vuelven a mostrar como Aᵀ y a:b (no "mtransp(A)")
+            if (op == "mtransp" && args.Count == 1) return new N { Op = "trans", A = args[0] };
+            if (op == "mrange") return new N { Op = "range", Items = args };
 
             if (op == "vector")
             {
@@ -662,8 +665,10 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         public static (string kind, string align, string text)? TextDirective(string raw)
         {
             var s = raw.TrimStart();
-            if (!s.StartsWith(";")) return null;
-            s = s.TrimStart(';').Trim();
+            // marcador de TEXTO/comentario: '#' es el de MATEMÁTICA (como Octave); ';' es el de LISP.
+            // Se quita UNO solo → así '#' y '##' quedan libres para párrafo/encabezado.
+            if (s.Length == 0 || (s[0] != ';' && s[0] != '#')) return null;
+            s = s.Substring(1).Trim();
             // las directivas de GRÁFICA (;fplot/;grafica) NO son texto: las dibuja el ploteador
             if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());

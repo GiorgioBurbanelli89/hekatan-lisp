@@ -909,6 +909,8 @@ namespace HekatanLisp
         {
             var t = Editor.Text ?? "";
             var ts = t.TrimStart();
+            // expr-LISP: el editor muestra (setf …); el ORIGINAL matemática vive en _lispBackup
+            if (_syntaxLisp && !_synFull && !_transliterated && _lispBackup != null) return _lispBackup;
             bool derivado = ts.StartsWith(";;;; Script LISP") || ts.StartsWith("% Hekatan Lab") || ts.StartsWith("% =====");
             return (derivado && _lispBackup != null) ? _lispBackup : t;
         }
@@ -918,8 +920,8 @@ namespace HekatanLisp
             _reprSwitch = true;   // solo cambia la representación izquierda → la derecha NO se recalcula
             try
             {
-                // veníamos de contenido DERIVADO (completo / Hekatan Lab / pseudocódigo) → restaura el ORIGINAL
-                if ((_synFull || _transliterated) && _lispBackup != null) { Editor.Text = _lispBackup; }
+                // veníamos de contenido DERIVADO (completo / Hekatan Lab / expr-LISP) → restaura el ORIGINAL
+                if ((_synFull || _transliterated || (_syntaxLisp && !toLisp)) && _lispBackup != null) { Editor.Text = _lispBackup; }
                 _synFull = false;
                 _transliterated = false;
                 // BLINDAJE: un PROGRAMA LISP (defun/loop/format…) NO se convierte a texto plano por línea.
@@ -929,6 +931,9 @@ namespace HekatanLisp
                     LblIn.Text = "escribes: LISP (programa — no se convierte a texto plano por línea)";
                     return;
                 }
+                // al ENTRAR a expr-LISP guardo el matemática original: el editor mostrará (setf …)
+                // pero el panel derecho debe seguir computando del ORIGINAL (vía SourceText).
+                if (toLisp && !_syntaxLisp) _lispBackup = Editor.Text;
                 Editor.Text = ConvertEditor(Editor.Text, toLisp);
                 _syntaxLisp = toLisp;
                 HighlightSyntax();
@@ -972,17 +977,31 @@ namespace HekatanLisp
                 // COMENTARIO/DIRECTIVA ';' (texto, gráfica, ;;): se conserva TAL CUAL en ambos sentidos.
                 // (si no, ToLab(ParseLisp(";# título")) leería solo el 1er token y borraría el texto)
                 if (l.StartsWith(";")) { sb.AppendLine(l); continue; }
-                // etiqueta  NOMBRE = expr  → convierte SOLO el lado derecho, conserva "NOMBRE = "
+                // REVERSO (a matemática): una definición LISP  (setf NOMBRE forma)  →  NOMBRE = math
+                var sm = System.Text.RegularExpressions.Regex.Match(l, @"^\(setf\s+([A-Za-z]\w*)\s+(.+)\)$");
+                if (!toLisp && sm.Success)
+                {
+                    try { sb.AppendLine(sm.Groups[1].Value + " = " + LispConverter.ToLab(LispConverter.ParseLisp(sm.Groups[2].Value.Trim()), 0)); }
+                    catch { sb.AppendLine(l); }
+                    continue;
+                }
+                // etiqueta  NOMBRE = expr  → a LISP es una DEFINICIÓN válida:  (setf NOMBRE forma)
                 var lm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
                 if (lm.Success)
                 {
                     string rhs = lm.Groups[2].Value.Trim();
                     try
                     {
-                        string conv = LooksLikeLisp(rhs)
-                            ? (toLisp ? rhs : LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0))
-                            : (toLisp ? LispConverter.MathToLisp(rhs) : rhs);
-                        sb.AppendLine(lm.Groups[1].Value + " = " + conv);
+                        if (toLisp)
+                        {
+                            string lispRhs = LooksLikeLisp(rhs) ? rhs : LispConverter.MathToLisp(rhs);
+                            sb.AppendLine("(setf " + lm.Groups[1].Value + " " + lispRhs + ")");   // LISP válido
+                        }
+                        else
+                        {
+                            string conv = LooksLikeLisp(rhs) ? LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0) : rhs;
+                            sb.AppendLine(lm.Groups[1].Value + " = " + conv);
+                        }
                     }
                     catch { sb.AppendLine(l); }
                     continue;

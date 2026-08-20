@@ -70,6 +70,8 @@ namespace HekatanLisp
                                    $"--eval \"(sb-ext:save-lisp-and-die \\\"{c}\\\")\"";
                         var psi = new ProcessStartInfo(Sbcl, args)
                         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+                        psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";
+                        psi.EnvironmentVariables["LC_ALL"] = "en_US.UTF-8";
                         using var p = Process.Start(psi);
                         p.StandardOutput.ReadToEnd(); p.StandardError.ReadToEnd();
                         p.WaitForExit(20000);
@@ -175,7 +177,7 @@ namespace HekatanLisp
                 code = System.Text.RegularExpressions.Regex.Replace(
                     code, @"(?im)^\s*\(load\s+""[^""]*engine\.lisp""\)\s*$", "");
             var tmp = Path.Combine(Path.GetTempPath(), $"hlisp_run_{Environment.ProcessId}.lisp");
-            File.WriteAllText(tmp, code);
+            File.WriteAllText(tmp, code, new UTF8Encoding(false));   // UTF-8 sin BOM (para ∂, ∇, letras)
             try
             {
                 var psi = new ProcessStartInfo(Sbcl, $"{CoreArg()}--script \"{tmp}\"")
@@ -184,7 +186,11 @@ namespace HekatanLisp
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
+                    StandardOutputEncoding = new UTF8Encoding(false),   // SBCL imprime UTF-8 → leerlo igual
+                    StandardErrorEncoding = new UTF8Encoding(false),
                 };
+                psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";       // SBCL lee el script como UTF-8
+                psi.EnvironmentVariables["LC_ALL"] = "en_US.UTF-8";
                 using var p = Process.Start(psi);
                 var o = p.StandardOutput.ReadToEnd();
                 var e = p.StandardError.ReadToEnd();

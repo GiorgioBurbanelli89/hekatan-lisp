@@ -449,7 +449,10 @@ namespace HekatanLisp
         }
 
         // ---------- render: arbol -> HTML matematico (estilo Hekatan Lab) ----------
-        static string Paren(string s) => "<span class=\"m-op\">(</span>" + s + "<span class=\"m-op\">)</span>";
+        // paréntesis que CRECEN con el contenido (arcos CSS, como los corchetes de matriz):
+        // así "( fracción )²" queda con los paréntesis del alto de la fracción, no pequeños.
+        static string Paren(string s) =>
+            "<span class=\"m-paren\"><span class=\"m-pl\"></span>" + s + "<span class=\"m-pr\"></span></span>";
 
         // nombre con SUBÍNDICE: "N1" -> N con 1 abajo · "sigma_x" -> sigma con x abajo.
         // Convención ingenieril: dígitos finales (o lo que sigue a "_") es subíndice.
@@ -641,6 +644,11 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-sqrt{display:inline-flex;align-items:flex-start;}
 .m-rad{font-size:1.05em;}
 .m-radarg{border-top:1.2px solid currentColor;padding:0 .2em;margin-left:-.05em;}
+/* paréntesis que crecen (arcos): inline-flex + border-radius, se estiran al alto del contenido */
+.m-paren{display:inline-flex;align-items:stretch;vertical-align:middle;}
+.m-paren>.m-pl,.m-paren>.m-pr{width:.26em;flex:0 0 auto;border:.075em solid var(--mut);border-radius:50%;}
+.m-paren>.m-pl{border-right:0;border-top-right-radius:0;border-bottom-right-radius:0;margin-right:.14em;}
+.m-paren>.m-pr{border-left:0;border-top-left-radius:0;border-bottom-left-radius:0;margin-left:.14em;}
 .m-mat{display:inline-flex;align-items:stretch;vertical-align:middle;margin:0 .2em;}
 .m-brk{width:.32em;}
 .m-brl{border:1.4px solid currentColor;border-right:none;}

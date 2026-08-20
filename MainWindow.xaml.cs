@@ -592,19 +592,38 @@ namespace HekatanLisp
         /// convierte a la forma LISP "a = b = c" que RenderPage dibuja lado a lado SIN evaluar.
         /// Devuelve null si no es notación (entonces sigue el camino normal de cálculo).
         /// El porqué: f(x)=x²+1 no es un cálculo, es una definición; hay que DIBUJARLA, no resolverla.</summary>
+        /// <summary>Posiciones de los '=' de NIVEL 0 (fuera de { } ( ) [ ]), que no sean == <= >= !=.
+        /// Así el '=' de los límites de un token — Slope{f @ x = a} — NO se confunde con una igualdad.</summary>
+        private static List<int> TopLevelEquals(string s)
+        {
+            var pos = new List<int>(); int depth = 0;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (c == '{' || c == '(' || c == '[') depth++;
+                else if (c == '}' || c == ')' || c == ']') { if (depth > 0) depth--; }
+                else if (c == '=' && depth == 0
+                         && (i == 0 || "=<>!".IndexOf(s[i - 1]) < 0)
+                         && (i == s.Length - 1 || s[i + 1] != '='))
+                    pos.Add(i);
+            }
+            return pos;
+        }
+
         private static string NotationLine(string raw)
         {
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("(")) return null;   // LISP crudo no
-            // signos '=' que NO son ==, <=, >=, != …
-            var eqs = System.Text.RegularExpressions.Regex.Matches(line, @"(?<![=<>!])=(?!=)");
+            var eqs = TopLevelEquals(line);   // solo '=' de NIVEL 0 (el '=' interno de Slope{f@x=a} NO cuenta)
             if (eqs.Count == 0) return null;
             // antes del PRIMER '=' ¿hay una llamada de función  id(  ?  (definición f(x)= …)
-            string lhs0 = line.Substring(0, eqs[0].Index);
+            string lhs0 = line.Substring(0, eqs[0]);
             bool funcDef = System.Text.RegularExpressions.Regex.IsMatch(lhs0, @"[A-Za-z_]\w*\s*\(");
             if (eqs.Count < 2 && !funcDef) return null;                  // un solo '=' sin función = cálculo normal
-            // partir en segmentos por cada '=' y pasar cada lado a LISP
-            var segs = System.Text.RegularExpressions.Regex.Split(line, @"\s*(?<![=<>!])=(?!=)\s*");
+            // partir en segmentos por cada '=' de nivel 0
+            var segs = new List<string>(); int prev = 0;
+            foreach (var pe in eqs) { segs.Add(line.Substring(prev, pe - prev)); prev = pe + 1; }
+            segs.Add(line.Substring(prev));
             var outParts = new List<string>();
             foreach (var s in segs)
             {
@@ -632,9 +651,13 @@ namespace HekatanLisp
         {
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("(")) return;
-            var segs = System.Text.RegularExpressions.Regex.Split(line, @"\s*(?<![=<>!])=(?!=)\s*");
-            if (segs.Length < 2) return;
-            for (int i = 0; i < segs.Length - 1; i++)
+            var eqs = TopLevelEquals(line);   // no partir por el '=' interno de un token solver
+            if (eqs.Count == 0) return;
+            var segs = new List<string>(); int prev = 0;
+            foreach (var pe in eqs) { segs.Add(line.Substring(prev, pe - prev)); prev = pe + 1; }
+            segs.Add(line.Substring(prev));
+            if (segs.Count < 2) return;
+            for (int i = 0; i < segs.Count - 1; i++)
             {
                 var m = System.Text.RegularExpressions.Regex.Match(segs[i].Trim(), @"^([A-Za-z]\w*)\s*\(([^)]*)\)$");
                 if (!m.Success) continue;

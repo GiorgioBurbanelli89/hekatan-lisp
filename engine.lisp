@@ -719,8 +719,13 @@
       (from-rows (apply #'append (mapcar #'to-rows elems)))
       (coerce elems 'vector)))
 
+;; integral DEFINIDA de una matriz respecto a var, de a a b: integra cada entrada
+;; (polinomio en var) con area-under. Sirve para H = ∫∫ QᵀDQ (aplicada dos veces).
+(defun mintegrate (mat var a b)
+  (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (area-under e var a b)) row)) (to-rows mat))))
+
 ;; meval: evalúa una expresión que MEZCLA matrices y escalares.
-;;   (vector …) construye ; mtransp/mrange ; + - * expt(-1)=inversa ; escalar·matriz.
+;;   (vector …) construye ; mtransp/mrange ; + - * expt(-1)=inversa ; escalar·matriz ; ∫ matriz.
 (defun meval (e)
   (cond
     ((atom e) e)
@@ -728,6 +733,14 @@
     ((eq (car e) 'vector) (build-mat (mapcar #'meval (cdr e))))
     ((eq (car e) 'mtransp) (mtransp (meval (second e))))
     ((eq (car e) 'mrange)  (apply #'mrange (mapcar #'meval (cdr e))))
+    ((eq (car e) 'area-under)          ; ∫ de una MATRIZ (entrada por entrada) o escalar
+     (let* ((fa (second e)) (va (third e))
+            (fform (if (and (consp fa) (eq (car fa) 'quote)) (second fa) fa))   ; desenvuelve '(...)
+            (var   (if (and (consp va) (eq (car va) 'quote)) (second va) va))
+            (m (meval fform)))
+       (if (vectorp m)
+           (mintegrate m var (meval (fourth e)) (meval (fifth e)))
+           (area-under fform var (meval (fourth e)) (meval (fifth e))))))
     ((eq (car e) '+) (m2 #'madd #'+ (meval (second e)) (meval (third e))))
     ((eq (car e) '-) (if (cddr e) (m2 #'msub #'- (meval (second e)) (meval (third e)))
                          (let ((v (meval (second e))))    ; menos unario: matriz -> escalar -1; escalar -> -x

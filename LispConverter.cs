@@ -32,7 +32,8 @@ namespace HekatanLisp
         // ---------- parse: MATEMATICA -> arbol ----------
         // $Nombre = operadores estilo Calcpad; {} = paréntesis; @ y : = bloque solver ($Op{f @ x = a : b}).
         // ∂ y ∇ cuentan como parte del identificador → así {∂N/∂s} renderiza la parcial en comentarios.
-        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:']");
+        // el '=' es necesario para los límites del solver:  Area{f @ x = a : b}  (antes se perdía)
+        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:'=]");
         // operadores solver de Calcpad → función del motor
         static readonly Dictionary<string, string> SolverOps = new Dictionary<string, string>
         {

@@ -190,6 +190,8 @@ namespace HekatanLisp
             if (IsRenderView)
             {
                 if (!_webReady) return;
+                // SIN SCRIPT → muestra la guía (help.html), como Hekatan Lab en la ventana derecha.
+                if (string.IsNullOrWhiteSpace(text)) { Viewer.NavigateToString(LispConverter.HelpPage()); return; }
                 // Programa: su salida (N1 = …, texto…) se RENDERIZA (RenderPage dibuja "N1 = fórmula"
                 // bonito y deja el texto suelto como está). Así la DEDUCCIÓN se ve como matemática.
                 string html;

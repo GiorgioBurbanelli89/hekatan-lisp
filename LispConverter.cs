@@ -821,6 +821,56 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                    "</style></head><body>" + body + "</body></html>";
         }
 
+        // ---------- página de AYUDA (se muestra a la derecha cuando no hay script, como Hekatan Lab) ----------
+        public static string HelpPage()
+        {
+            const string help = @"
+<style>
+.hp{max-width:760px;margin:0 auto;}
+.hp h1{font-weight:700;font-size:20pt;text-align:center;margin:.2em 0 .1em;}
+.hp .sub{text-align:center;color:var(--mut);margin:0 0 1.4em;font-size:11pt;}
+.hp h2{font-weight:600;font-size:13pt;color:var(--var);border-bottom:1px solid var(--mut);
+  padding-bottom:.2em;margin:1.4em 0 .5em;}
+.hp table{border-collapse:collapse;width:100%;margin:.3em 0 .8em;font-size:10.5pt;}
+.hp td{padding:.28em .6em;border-bottom:1px solid var(--mut);vertical-align:top;}
+.hp td:first-child{white-space:nowrap;width:40%;}
+.hp code{font-family:Consolas,'Cascadia Code',monospace;background:var(--bg);
+  border:1px solid var(--mut);border-radius:4px;padding:.05em .35em;color:var(--num);font-size:.95em;}
+.hp .rule{text-align:center;color:var(--mut);font-style:italic;margin:1.6em 0 .4em;}
+.hp .foot{text-align:center;color:var(--mut);margin-top:1.8em;font-size:10pt;}
+</style>
+<div class='hp'>
+<h1>Hekatan&nbsp;LISP</h1>
+<div class='sub'>Calculadora simbólica — escribe a la izquierda y el resultado aparece aquí.</div>
+
+<div class='rule'>La regla madre:&nbsp; <code>#</code> = texto (markdown) &nbsp;·&nbsp; sin <code>#</code> = matemática &nbsp;·&nbsp; <code>;</code> = LISP</div>
+
+<h2>Texto (markdown, con #)</h2>
+<table>
+<tr><td><code># Título</code> · <code>## Sub</code> · <code>### Sub-sub</code></td><td>encabezados H1 / H2 / H3</td></tr>
+<tr><td><code>#: texto</code></td><td>párrafo (izquierda)</td></tr>
+<tr><td><code>#| texto</code> · <code>#&gt; texto</code> · <code>#&lt; texto</code></td><td>centrado · derecha · izquierda</td></tr>
+<tr><td><code>**negrita**</code> · <code>*cursiva*</code></td><td>inline (también <code>__</code> y <code>_</code>)</td></tr>
+<tr><td><code>@var</code> · <code>@{expr}</code></td><td>combinar texto + variable: “var = valor” · valor</td></tr>
+</table>
+
+<h2>Matemática (sin #)</h2>
+<table>
+<tr><td><code>A = [1 2; 3 4]</code></td><td>definir matriz / vector / número</td></tr>
+<tr><td><code>Inv = A^-1</code></td><td>operación visible: <code>Inv = A⁻¹ = [resultado]</code></td></tr>
+<tr><td><code>A'</code> · <code>A*B</code> · <code>A+B</code> · <code>1:5</code></td><td>transpuesta · producto · suma · rango</td></tr>
+<tr><td><code>f(x)=x^2+1</code> → <code>f(3)</code></td><td>función y su aplicación (= 10)</td></tr>
+<tr><td><code>v(i)</code> · <code>A(i,j)</code> · <code>N_1</code></td><td>índice de vector · de matriz · subíndice</td></tr>
+<tr><td><code>Simplify{…}</code> · <code>Factor{…}</code> · <code>Partial{f @ x}</code></td><td>operaciones simbólicas</td></tr>
+</table>
+
+<div class='foot'>Botones de arriba: <b>Ejecutar</b> · <b>simplify / expand / diff / ∫</b> · copiar a <b>LISP</b> o <b>Hekatan&nbsp;Lab</b>.</div>
+</div>";
+            return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
+                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
+                   "</style></head><body>" + help + "</body></html>";
+        }
+
         // ---------- evaluador NUMERICO del arbol (para graficar) ----------
         // sustituye la variable por un numero y calcula. Devuelve NaN si hay algo que no sabe evaluar.
         public static double Eval(N n, string var, double x)

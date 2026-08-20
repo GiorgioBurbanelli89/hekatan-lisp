@@ -623,10 +623,10 @@ namespace HekatanLisp
         const string CSS = @"
 *{box-sizing:border-box;}
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
-  font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;}
+  font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
 .ws-eq{margin:0.4em 0;
   font-family:'Georgia Pro','Century Schoolbook','Times New Roman',Times,serif;font-size:11.5pt;
-  overflow-x:auto;overflow-y:hidden;}   /* matriz muy ancha (12×12): scroll horizontal */
+  overflow-x:auto;overflow-y:hidden;max-width:100%;}   /* matriz muy ancha (12×12): recorta al panel y hace scroll interno */
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
 .ws-eq.grab{cursor:grab;} .ws-eq.grabbing{cursor:grabbing;user-select:none;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}

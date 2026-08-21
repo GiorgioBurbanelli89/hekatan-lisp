@@ -525,7 +525,9 @@ namespace HekatanLisp
                 string lbl = labels[i];
                 string v = hasVar ? dvar : FirstVar(formOf[i]);
                 var r = resOf[i] ?? "";
-                bool hasR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && r != formOf[i];
+                // hasR = hay RESULTADO distinto de la entrada. Comparo NORMALIZANDO (sin comillas ni
+                // espacios): si el operador no cerró (devuelve la misma notación), no muestro "= <lo mismo>".
+                bool hasR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && !SameForm(r, formOf[i]);
 
                 if (_op == "deriv" || _op == "integ")
                 {   // d/dv(N1) = …   ó   ∫ N1 dv = …  TODO EN UNA LÍNEA (notación = resultado)
@@ -740,6 +742,11 @@ namespace HekatanLisp
             "(partial","(derive-x","(factor","(expand*","(integ-var","(integ-x","(area-under","(slope-at",
             "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite" };
         private static bool HasOpCall(string f) => f != null && System.Array.Exists(OpCalls, s => f.Contains(s));
+        // dos formas LISP son "la misma" salvo comillas de quote y espacios (un operador que NO cerró
+        // devuelve su propia notación: no debe mostrarse como "entrada = <lo mismo>").
+        private static string NormForm(string s) =>
+            s == null ? "" : s.Replace("(quote ", "(").Replace("'", "").Replace(" ", "");
+        private static bool SameForm(string a, string b) => NormForm(a) == NormForm(b);
 
         // la línea (matemática o LISP) → su ÁRBOL (para resolver etiquetas antes de pasar a LISP)
         /// <summary>Une las líneas de una MATRIZ que abarca varios renglones (el '[' quedó abierto).

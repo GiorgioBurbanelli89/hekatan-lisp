@@ -11,6 +11,8 @@
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <!-- SkiaSharp: dibuja superficies 3D/mapas de color de las funciones (off-screen → PNG en el render) -->
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
   </ItemGroup>
   <ItemGroup>
     <None Update="engine.lisp">

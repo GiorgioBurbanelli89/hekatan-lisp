@@ -38,7 +38,7 @@
 
     <!-- ===== #fplot / #plot: directiva + expresión ===== -->
     <Span>
-      <Begin color="Directive">\#(fplot|plot|ezplot|graficas?|grafico)\b</Begin>
+      <Begin color="Directive">\#(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b</Begin>
       <End>$</End>
       <RuleSet>
         <Rule color="Number">\b\d+(\.\d*)?([eE][+-]?\d+)?|\.\d+</Rule>

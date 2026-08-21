@@ -798,7 +798,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(fplot|plot|ezplot|graficas?|grafico)\b", RegexOptions.IgnoreCase)) return null;
+                if (Regex.IsMatch(s0, @"^#+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
                 {
                     var txt = s0.Substring(2).Trim();
@@ -811,7 +811,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             // LISP: ';' — esquema previo (compatibilidad)
             var s = s0.Substring(1).Trim();
-            if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico)\b", RegexOptions.IgnoreCase)) return null;
+            if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
             if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
             if (s.StartsWith("|") || s.StartsWith("=")) return ("p", "center", s.Substring(1).Trim());

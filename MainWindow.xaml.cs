@@ -204,6 +204,7 @@ namespace HekatanLisp
                 {
                     html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true);
                     var svg = BuildPlots(text, forms);   // ;grafica en comentario → dibuja las funciones
+                    svg += BuildSurfaces(text, forms, _dark);   // #surf(...) → superficie 3D (SkiaSharp → PNG)
                     if (!string.IsNullOrEmpty(svg))
                         html = html.Replace("</body>", "<hr style=\"border:0;border-top:1px solid var(--mut);opacity:.4;margin:1.2em 0\">" + svg + "</body>");
                 }
@@ -343,6 +344,68 @@ namespace HekatanLisp
             return outp.ToString();
         }
 
+        // SUPERFICIE 3D:  #surf(expr, [xa xb], [ya yb])  → SkiaSharp dibuja z=f(x,y) → PNG en el render.
+        // La expresión puede ser inline ((1-x)*(1-y), x*y) o el NOMBRE de una función ya deducida (N_1).
+        // Un solo rango [a b] → se usa igual para x e y. Alias: superficie, plot3d, mesh.
+        private static readonly System.Text.RegularExpressions.Regex RxSurf = new System.Text.RegularExpressions.Regex(
+            @"^\s*[;#]+\s*(?:surf|superficie|plot3d|mesh)\s*\((.*)\)\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        private static string BuildSurfaces(string editorText, List<string> forms, bool dark)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            // NOMBRE -> árbol del RESULTADO (igual que BuildPlots: permite #surf(N_1, [0 1]))
+            var byName = new Dictionary<string, LispConverter.N>();
+            var todas = (forms ?? new List<string>()).SelectMany(f => (f ?? "").Replace("\r", "").Split('\n'));
+            foreach (var raw in todas)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                if (!m.Success) continue;
+                var partes = System.Text.RegularExpressions.Regex.Split(m.Groups[2].Value, @"\s=\s");
+                try
+                {
+                    var tree = LispConverter.ParseLisp(partes[partes.Length - 1].Trim());
+                    if (!byName.ContainsKey(m.Groups[1].Value)) byName[m.Groups[1].Value] = tree;
+                }
+                catch { }
+            }
+            var outp = new StringBuilder();
+            int id = 0;
+            foreach (System.Text.RegularExpressions.Match d in RxSurf.Matches(editorText ?? ""))
+            {
+                var args = SplitTop(d.Groups[1].Value);
+                if (args.Count == 0) continue;
+                LispConverter.N f = null; string spec = null;
+                var ranges = new List<(double lo, double hi)>();
+                foreach (var a0 in args)
+                {
+                    var a = a0.Trim(); if (a.Length == 0) continue;
+                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
+                    if (rng.Success)
+                    {
+                        double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out var lo);
+                        double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out var hi);
+                        ranges.Add((lo, hi)); continue;
+                    }
+                    if (f == null) { spec = a; if (!byName.TryGetValue(a, out f)) { try { f = LispConverter.ParseMath(a); } catch { } } }
+                }
+                if (f == null) continue;
+                double xa = 0, xb = 1, ya = 0, yb = 1;
+                if (ranges.Count >= 1) { xa = ranges[0].lo; xb = ranges[0].hi; ya = xa; yb = xb; }
+                if (ranges.Count >= 2) { ya = ranges[1].lo; yb = ranges[1].hi; }
+                var vs = LispConverter.VarsOf(f);
+                string vx = vs.Count > 0 ? vs[0] : "x", vy = vs.Count > 1 ? vs[1] : "y";
+                string canvas;
+                try { canvas = SurfacePlot.SurfaceCanvas(f, vx, vy, xa, xb, ya, yb, id++); }
+                catch { continue; }
+                outp.Append("<div style=\"text-align:center;margin:1.1em 0\">").Append(canvas)
+                    .Append("<div style=\"color:var(--mut);font-size:.85em;margin-top:.2em\">z = ")
+                    .Append(System.Net.WebUtility.HtmlEncode(spec ?? "")).Append("  ·  <span style=\"opacity:.7\">arrastra para girar</span></div></div>");
+            }
+            if (id > 0) outp.Append(SurfacePlot.OrbitScript);   // el motor de orbit, una sola vez
+            return outp.ToString();
+        }
+
         // agrega una función: por NOMBRE ya deducido, o expresión MATLAB inline (1-s^2)
         private static void AddFn(List<(string, LispConverter.N)> sel, Dictionary<string, LispConverter.N> byName, string spec)
         {
@@ -443,7 +506,7 @@ namespace HekatanLisp
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico)\b",
+                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (textDir) continue;
                 var m = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(.*?)\s*@@\((.*?)\)\s*$");
@@ -458,7 +521,7 @@ namespace HekatanLisp
             {
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico)\b",
+                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }

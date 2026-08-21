@@ -351,6 +351,11 @@ namespace HekatanLisp
             @"^\s*[;#]+\s*(?:surf|superficie|plot3d|mesh)\s*\((.*)\)\s*$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
 
+        // MAPA DE COLOR 2D (planta):  #map(expr, [xa xb], [ya yb])  → SkiaSharp PNG estático. Alias: mapa/heatmap/contour/contourf.
+        private static readonly System.Text.RegularExpressions.Regex RxMap = new System.Text.RegularExpressions.Regex(
+            @"^\s*[;#]+\s*(?:map|mapa|heatmap|contourf?)\s*\((.*)\)\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
         private static string BuildSurfaces(string editorText, List<string> forms, bool dark)
         {
             var inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -403,6 +408,40 @@ namespace HekatanLisp
                     .Append(System.Net.WebUtility.HtmlEncode(spec ?? "")).Append("  ·  <span style=\"opacity:.7\">arrastra para girar</span></div></div>");
             }
             if (id > 0) outp.Append(SurfacePlot.OrbitScript);   // el motor de orbit, una sola vez
+            // MAPAS 2D: #map(expr, [xa xb], [ya yb]) → SkiaSharp PNG estático (2D no gira)
+            foreach (System.Text.RegularExpressions.Match d in RxMap.Matches(editorText ?? ""))
+            {
+                var args = SplitTop(d.Groups[1].Value);
+                if (args.Count == 0) continue;
+                LispConverter.N f = null; string spec = null;
+                var ranges = new List<(double lo, double hi)>();
+                foreach (var a0 in args)
+                {
+                    var a = a0.Trim(); if (a.Length == 0) continue;
+                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
+                    if (rng.Success)
+                    {
+                        double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out var lo);
+                        double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out var hi);
+                        ranges.Add((lo, hi)); continue;
+                    }
+                    if (f == null) { spec = a; if (!byName.TryGetValue(a, out f)) { try { f = LispConverter.ParseMath(a); } catch { } } }
+                }
+                if (f == null) continue;
+                double xa = 0, xb = 1, ya = 0, yb = 1;
+                if (ranges.Count >= 1) { xa = ranges[0].lo; xb = ranges[0].hi; ya = xa; yb = xb; }
+                if (ranges.Count >= 2) { ya = ranges[1].lo; yb = ranges[1].hi; }
+                var vs = LispConverter.VarsOf(f);
+                string vx = vs.Count > 0 ? vs[0] : "x", vy = vs.Count > 1 ? vs[1] : "y";
+                string b64;
+                try { b64 = SurfacePlot.MapPng(f, vx, vy, xa, xb, ya, yb, dark); }
+                catch { continue; }
+                outp.Append("<div style=\"text-align:center;margin:1.1em 0\">")
+                    .Append("<img alt=\"").Append(System.Net.WebUtility.HtmlEncode(spec ?? ""))
+                    .Append("\" style=\"max-width:100%;height:auto\" src=\"data:image/png;base64,").Append(b64).Append("\">")
+                    .Append("<div style=\"color:var(--mut);font-size:.85em;margin-top:.2em\">mapa de  ")
+                    .Append(System.Net.WebUtility.HtmlEncode(spec ?? "")).Append("  (planta)</div></div>");
+            }
             return outp.ToString();
         }
 
@@ -506,7 +545,7 @@ namespace HekatanLisp
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b",
+                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (textDir) continue;
                 var m = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(.*?)\s*@@\((.*?)\)\s*$");
@@ -521,7 +560,7 @@ namespace HekatanLisp
             {
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh)\b",
+                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }

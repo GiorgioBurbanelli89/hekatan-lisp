@@ -19,7 +19,13 @@ N_4 = y*(1-x) @@(nudo 4)
 #: Sumar las cuatro da un **plano plano en z=1**. Por eso interpolan cualquier valor entre los nudos sin inventar bultos:
 #surf((1-x)*(1-y)+x*(1-y)+x*y+y*(1-x), [0 1], [0 1])
 
-## 4 · Cómo se usa #surf
-#: `#surf(expr, [xa xb], [ya yb])`. Un solo rango `[a b]` se usa igual para x e y. La `expr` puede ser inline `(x*y)` o el **nombre** de algo ya deducido. Alias: `superficie`, `plot3d`, `mesh`.
-#: Otro ejemplo — una campana (paraboloide invertido):
+## 4 · La misma función en 2D (planta) — mapa de color
+#: Lo mismo visto **desde arriba**: la gráfica FEM clásica. Colores = valor (jet_r) + barra. Estático (2D no gira), dibujado con SkiaSharp:
+#map((1-x)*(1-y), [0 1], [0 1])
+#map(x*y, [0 1], [0 1])
+
+## 5 · Cómo se usan
+#: **3D girable:** `#surf(expr, [xa xb], [ya yb])`  ·  **2D planta:** `#map(expr, [xa xb], [ya yb])`. Un solo rango `[a b]` se usa igual para x e y. La `expr` puede ser inline `(x*y)` o el **nombre** de algo ya deducido.
+#: Otro ejemplo — una campana (paraboloide invertido), en 3D y en planta:
 #surf(1-(x^2+y^2), [-1 1], [-1 1])
+#map(1-(x^2+y^2), [-1 1], [-1 1])

@@ -189,5 +189,64 @@ namespace HekatanLisp
             using var data = img.Encode(SKEncodedImageFormat.Png, 90);
             return Convert.ToBase64String(data.ToArray());
         }
+
+        // ---- MAPA DE COLOR 2D (planta, visto desde arriba) con SkiaSharp → PNG base64 ----
+        // Es la gráfica FEM clásica: la función pintada sobre el dominio con jet_r + barra de color.
+        // Estático (2D no gira), por eso va con SkiaSharp y no con canvas.
+        public static string MapPng(LispConverter.N f, string vx, string vy,
+                                    double xa, double xb, double ya, double yb, bool dark)
+        {
+            const int nn = 90, W = 560, H = 430;
+            var (Z, zmin, zmax) = Sample(f, vx, vy, xa, xb, ya, yb, nn);
+            var inv = CultureInfo.InvariantCulture;
+            float pL = 50, pR = 84, pT = 16, pB = 42;
+            float pw = W - pL - pR, ph = H - pT - pB;
+            SKColor bg = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            SKColor fg = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            var info = new SKImageInfo(W, H);
+            using var surf = SKSurface.Create(info);
+            var cv = surf.Canvas;
+            cv.Clear(bg);
+            // celdas de color (j hacia ARRIBA en pantalla)
+            var cell = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
+            float cw = pw / nn, chh = ph / nn;
+            for (int i = 0; i < nn; i++)
+                for (int j = 0; j < nn; j++)
+                {
+                    double zc = (Z[i, j] + Z[i + 1, j] + Z[i, j + 1] + Z[i + 1, j + 1]) / 4;
+                    cell.Color = JetR((zc - zmin) / (zmax - zmin));
+                    cv.DrawRect(pL + i * cw, pT + (nn - 1 - j) * chh, cw + 1, chh + 1, cell);
+                }
+            var axis = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, Color = fg, StrokeWidth = 1 };
+            cv.DrawRect(pL, pT, pw, ph, axis);
+            var txt = new SKPaint { IsAntialias = true, Color = fg, TextSize = 11 };
+            string N(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", inv);
+            // ticks X (abajo) y Y (izquierda), 5 divisiones
+            for (int k = 0; k <= 4; k++)
+            {
+                float fx = pL + pw * k / 4; double vx0 = xa + (xb - xa) * k / 4;
+                cv.DrawLine(fx, pT + ph, fx, pT + ph + 4, axis);
+                txt.TextAlign = SKTextAlign.Center; cv.DrawText(N(vx0), fx, pT + ph + 17, txt);
+                float fy = pT + ph - ph * k / 4; double vy0 = ya + (yb - ya) * k / 4;
+                cv.DrawLine(pL - 4, fy, pL, fy, axis);
+                txt.TextAlign = SKTextAlign.Right; cv.DrawText(N(vy0), pL - 7, fy + 4, txt);
+            }
+            // BARRA DE COLOR a la derecha
+            float cbx = W - pR + 22, cbw = 15, cbTop = pT, cbH = ph;
+            var bar = new SKPaint { Style = SKPaintStyle.Fill };
+            for (int k = 0; k < (int)cbH; k++)
+            {
+                bar.Color = JetR(1.0 - k / cbH);           // arriba = máximo
+                cv.DrawRect(cbx, cbTop + k, cbw, 1.2f, bar);
+            }
+            cv.DrawRect(cbx, cbTop, cbw, cbH, axis);
+            txt.TextAlign = SKTextAlign.Left;
+            cv.DrawText(N(zmax), cbx + cbw + 4, cbTop + 9, txt);
+            cv.DrawText(N(zmin), cbx + cbw + 4, cbTop + cbH, txt);
+            cv.DrawText(N((zmin + zmax) / 2), cbx + cbw + 4, cbTop + cbH / 2 + 4, txt);
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 92);
+            return Convert.ToBase64String(data.ToArray());
+        }
     }
 }

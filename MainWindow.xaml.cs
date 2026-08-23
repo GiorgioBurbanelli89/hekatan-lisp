@@ -588,6 +588,14 @@ namespace HekatanLisp
             var results = LispEngine.EvalOp(forms, _op, dvar);
             var resOf = new string[lines.Length];
             for (int k = 0; k < idx.Count; k++) resOf[idx[k]] = k < results.Count ? results[k].Trim() : "";
+            // Integral INDEFINIDA ( Integral{f @ x} sin límites ) → añade la constante  + C  (rigor matemático).
+            for (int k = 0; k < idx.Count; k++)
+            {
+                int i = idx[k]; var t = treeOf[i];
+                if (t != null && t.Op == "solver" && t.Atom == "integral" && t.Items != null && t.Items.Count == 2
+                    && !string.IsNullOrEmpty(resOf[i]) && !resOf[i].StartsWith("(no-elem"))
+                    resOf[i] = "(+ " + resOf[i] + " C)";
+            }
 
             // Muestra el CÁLCULO: la ENTRADA (con nombre N1= y símbolo d/dx ó ∫ si aplica) y "= RESULTADO".
             var display = new List<string>();

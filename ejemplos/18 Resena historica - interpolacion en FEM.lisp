@@ -1,5 +1,28 @@
 # Reseña histórica: la interpolación en los elementos finitos, época por época
-#: Cómo, en cada época, se representó el desplazamiento DENTRO de un elemento: la fórmula que se usaba, su gráfica (dibujada por el motor) y a qué corresponde hoy. De la semilla matemática al método moderno.
+#: Primero el PROBLEMA (por qué hace falta interpolar), y de ahí la historia de cómo se resolvió, época por época: la fórmula de cada tiempo, su gráfica (dibujada por el motor) y a qué corresponde hoy.
+
+## 0 · El problema: del análisis salen PUNTOS, no una curva
+#: Resolver la estructura (K·u = F) te da SOLO números en los nudos: cuánto se movió cada uno. Por ejemplo, una viga con el extremo izquierdo fijo y el derecho bajando 1:  v₁ = 0,  v₂ = 1 (más sus giros). Son 2–4 **números sueltos**, NO una función.
+#: Entre los nudos no tienes NADA. Con solo esos puntos no puedes dibujar la forma del medio.
+
+## 0.1 · Lo más crudo: unir los nudos con una recta
+#: Sin ninguna regla fina, lo único que puedes hacer es unir los nudos con una línea recta:
+#fplot(x, [0 1])
+#: Ya es "una gráfica" del desplazamiento, pero la más pobre: una recta de nudo a nudo.
+
+## 0.2 · El problema: la viga real NO es recta
+#: Una viga se **curva**. La recta cruda se equivoca en todo el medio. Compara la recta (cruda) con la forma real de la viga (una cúbica):
+#fplot(x, 3*x^2-2*x^3, [0 1])
+#: La recta vs la deformada real. Por eso **unir puntos no basta**: hace falta una regla de relleno que respete la física.
+
+## 0.3 · Ahí entra la INTERPOLACIÓN
+#: La interpolación es esa regla: rellena entre nudos con la función correcta (recta para barras, cúbica para vigas, bilineal para placas…).
+
+## 0.4 · La razón DE FONDO: la física vive DENTRO del elemento
+#: No es solo para dibujar bonito. La **deformación** es la DERIVADA del desplazamiento (ε = du/dx), el **esfuerzo** es σ = E·ε, y la **rigidez** del elemento es una INTEGRAL:  K = ∫ Bᵀ·D·B dx. Para **derivar** e **integrar** necesitas una **función continua** — no puedes derivar puntos sueltos. La interpolación te da esa función a partir de los valores en los nudos. Ejemplo: de la deformada interpolada saco la deformación derivando:
+u_int = 3*x^2-2*x^3 @@(desplazamiento interpolado)
+deformacion = Diff{u_int @ x} @@(ε = du/dx, solo posible con una función)
+#: Da 6·x − 6·x²: la deformación en CADA punto — imposible desde puntos sueltos. **Esa es la razón: sin interpolación no hay deformación, ni esfuerzo, ni rigidez → no hay FEM.** Todo lo que sigue es la historia de cómo se llegó a ella.
 
 ## ~1795 · Lagrange — la interpolación polinómica
 #: La semilla. Lagrange dio la forma de pasar UNA curva suave por puntos dados. Con 3 puntos (0,0), (½,1), (1,0) sale una parábola:

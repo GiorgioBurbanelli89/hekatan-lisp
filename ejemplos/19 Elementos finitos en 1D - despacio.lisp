@@ -4,6 +4,13 @@
 ## 1 · El problema: del análisis salen PUNTOS, no una curva
 #: Resolver la estructura (K·u = F) te da SOLO números en los nudos: cuánto se movió cada uno. Entre los nudos no tienes nada. Para dibujar la forma del medio —y sobre todo para calcular la física ahí dentro— hay que **rellenar** entre nudos con una regla: eso es la **interpolación**. Veamos las dos reglas del 1D.
 
+## 1.5 · ¿A QUÉ aproxima la interpolación? (la deformada exacta)
+#: Antes de la interpolación hay que ver QUÉ aproxima. Toda estructura tiene UNA deformada **real y exacta** al cargarse. Matemáticamente es la **solución de la ecuación diferencial** del problema (viga: EI·v''''=carga, con sus apoyos): una función continua v(x), la deformada de verdad.
+#: **Antes de los elementos finitos**, esa solución se sacaba con **cálculo** (integrando la ecuación) → una **fórmula cerrada** (la resistencia de materiales clásica). Ejemplo: viga simplemente apoyada con carga uniforme → deformada exacta de grado 4. Normalizada (L=1):
+v_exacta = x^4 - 2*x^3 + x @@(deformada EXACTA — resistencia de materiales)
+#fplot(x^4-2*x^3+x, [0 1])
+#: Con esa **fórmula** se dibujaba la deformada exacta. Pero la fórmula SOLO existe para casos simples. En una estructura real (geometría rara, mil piezas) la ecuación NO se resuelve a mano → no hay fórmula. **A ESA deformada exacta —la que ya no puedes escribir— es a lo que la interpolación aproxima**, troceando y usando polinomios simples. (Y en la viga sin carga entre nudos, la solución exacta es una cúbica → por eso la Hermite ahí no aproxima: es EXACTA.)
+
 ## 2 · La BARRA (fuerza axial): se estira, NO se dobla
 ### 2.1 · El campo es una RECTA
 #: Una barra jalada de sus extremos se estira **parejo**: el desplazamiento crece lineal de un extremo al otro. Dos nudos → dos datos → recta:  u(x) = a + b·x.

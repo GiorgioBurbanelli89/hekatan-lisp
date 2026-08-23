@@ -303,6 +303,14 @@ namespace HekatanLisp
             string Nary(string sym, string sub, string sup, string expr) =>
                 "<span class=\"m-dvr\"><small>" + sup + "</small><span class=\"m-nary\">" + sym +
                 "</span><small>" + sub + "</small></span>" + expr;
+            // ∫ INLINE (como Hekatan Lab .intsym): símbolo + límites como sub/sup adyacentes.
+            string IntSym(string lo, string hi, string body)
+            {
+                var s = "<span class=\"m-int\">∫</span>";
+                if (!string.IsNullOrEmpty(lo)) s += "<sub>" + lo + "</sub>";
+                if (!string.IsNullOrEmpty(hi)) s += "<sup>" + hi + "</sup>";
+                return s + body;
+            }
             string idx = "<span class=\"m-var\">" + v + "</span><span class=\"m-op\">=</span>" + a;
             // d/dv (derivada total) como fracción vertical
             string ddv = "<span class=\"m-frac\"><span class=\"m-frn\"><span class=\"m-fn\">d</span></span>" +
@@ -318,8 +326,8 @@ namespace HekatanLisp
             string dx = " <span class=\"m-fn\">d</span><span class=\"m-var\">" + v + "</span>";
             return n.Atom switch
             {
-                "area" => Nary("∫", a, b ?? "", "&hairsp;" + f + dx),
-                "integral" => b != null ? Nary("∫", a, b, "&hairsp;" + f + dx) : Nary("∫", "", "", "&hairsp;" + f + dx),
+                "area" => IntSym(a, b ?? "", "&hairsp;" + f + dx),
+                "integral" => b != null ? IntSym(a, b, "&hairsp;" + f + dx) : IntSym("", "", "&hairsp;" + f + dx),
                 "sum" => Nary("Σ", idx, b ?? "", "&hairsp;" + f),
                 "product" => Nary("∏", idx, b ?? "", "&hairsp;" + f),
                 "lim" or "limit" or "limite" =>
@@ -728,8 +736,8 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 /* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
-.ws-deq{display:flex;align-items:center;gap:1.2em;}
-.ws-deq>.deq-body{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;}
+.ws-deq{display:flex;align-items:center;gap:1.2em;overflow:visible;}
+.ws-deq>.deq-body{flex:1 1 auto;min-width:0;overflow:visible;}
 .ws-deq>.deq-tag{flex:0 0 auto;color:var(--mut);font-size:.85em;white-space:nowrap;font-family:'Segoe UI',sans-serif;}
 /* texto con formato (directivas ; estilo Hekatan Lab) */
 .ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
@@ -768,10 +776,15 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-matx>.m-brl{min-width:.3em;margin-right:.18em;align-self:stretch;}
 .m-matx>.m-brr{min-width:.3em;margin-left:.18em;align-self:stretch;}
 .m-ell{color:var(--mut);}
-/* n-ario (∫ Σ Π) apilado — geometria exacta de Calcpad/Hekatan Lab */
-.m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-2pt;margin:0 .12em;}
+/* n-ario apilado (Σ Π) — medidas EXACTAS de Hekatan Lab (.dvr/.nary) */
+.m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-3pt;margin:0 .12em;}
 .m-dvr small{font-family:Calibri,Candara,Corbel,sans-serif;font-size:70%;display:block;}
-.m-nary{display:block;font-size:235%;line-height:70%;font-weight:200;color:var(--nary);font-family:'Georgia Pro','Century Schoolbook','Times New Roman',serif;margin:0 1pt 2pt 1pt;}
+.m-nary{display:block;font-size:240%;line-height:70%;font-weight:200;color:var(--nary);font-family:'Georgia Pro Light','Georgia Pro','Century Schoolbook',serif;margin:0 1pt 2.5pt 1pt;}
+/* ∫ INLINE — medidas EXACTAS de Hekatan Lab (.intsym) */
+.m-int{font-family:'Cambria Math','Georgia Pro',Georgia,serif;font-style:italic;font-size:180%;line-height:80%;vertical-align:-0.25em;color:var(--nary);margin:0 1pt;font-weight:200;}
+.m-int+sub,.m-int+sub+sup{font-size:65%;}
+.m-int+sub{vertical-align:-0.6em;margin-right:0.1em;}
+.m-int+sub+sup{vertical-align:0.8em;margin-left:-0.6em;margin-right:0.15em;}
 .m-cond{color:#e000d0;font-style:italic;padding:0 .05em;}
 /* límite:  lim  apilado con  x→a  debajo */
 .m-lim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .12em;}

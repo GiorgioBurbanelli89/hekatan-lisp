@@ -5,11 +5,12 @@
 #: Voladizo empotrado en la izquierda (x=0), libre en la derecha (x=L), con carga P hacia abajo en la punta. Normalizamos: P=1, L=1, EI=1.
 
 ## 2 · Método CLÁSICO (doble integración)
-#: Momento por equilibrio del trozo derecho:  M(x) = −P·(L−x) = x − 1  (máximo en el empotramiento, cero en la punta). La ley de la viga EI·v''=M; con EI=1, integro dos veces:
-M = x - 1 @@(momento, del equilibrio)
-vp = Integral{x-1 @ x} @@(v' = ∫ M dx ; con v'(0)=0)
-v_clasico = Integral{x^2/2-x @ x} @@(v = ∫ v' dx ; con v(0)=0)
-#: Da  v(x) = x³/6 − x²/2 = (x³−3x²)/6. La flecha en la punta:  v(1) = −1/3 = **−PL³/3EI** (el resultado clásico de libro).
+#: El momento sale del equilibrio del trozo derecho (máximo en el empotramiento, cero en la punta):
+M = x - 1 @@(M = −P·(L−x))
+#: La ley de la viga: rigidez × curvatura = momento. Con EI=1, integro el momento dos veces (con v'(0)=0 y v(0)=0):
+vp = Integral{x-1 @ x} @@(v' = ∫ M dx)
+v_clasico = Integral{x^2/2-x @ x} @@(v = ∫ v' dx)
+#: La flecha en la punta es −1/3 = −PL³/3EI (el resultado clásico de libro). La deformada:
 #fplot((x^3-3*x^2)/6, [0 1])
 
 ## 3 · Método FEM (1 elemento de viga)

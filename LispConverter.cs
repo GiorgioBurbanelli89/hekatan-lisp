@@ -1111,6 +1111,28 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             return step * mag;
         }
 
+        // etiqueta bonita para la leyenda del plot:  3*x^2-2*x^3 → 3·x²−2·x³  (·, superíndices, − real)
+        static string PrettyLabel(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s ?? "";
+            const string sup = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+            var o = new StringBuilder();
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (c == '*') o.Append('·');
+                else if (c == '-') o.Append('−');
+                else if (c == '^')
+                {
+                    i++;
+                    while (i < s.Length && char.IsDigit(s[i])) { o.Append(sup[s[i] - '0']); i++; }
+                    i--;
+                }
+                else o.Append(c);
+            }
+            return o.ToString();
+        }
+
         // ---------- grafica SVG de una o varias funciones f(var) sobre [lo,hi] ----------
         public static string PlotSvg(string var, double lo, double hi, List<(string name, N tree)> fns)
         {
@@ -1182,15 +1204,20 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 }
                 sb.Append("<polyline points=\"").Append(pts).Append("\" fill=\"none\" stroke=\"").Append(col).Append("\" stroke-width=\"2\"/>");
             }
-            // leyenda en CAJA (estilo MATLAB), arriba-derecha dentro de los ejes
-            int lw = 78, lh = 8 + series.Count * 17, lx = W - pR - lw - 8, lyTop = pT + 8;
+            // leyenda en CAJA, arriba-derecha DENTRO de los ejes. Ancho SEGÚN la etiqueta más larga
+            // (antes era fijo 78 y el texto se salía del cuadro) y etiquetas BONITAS (·, superíndices).
+            var pretty = series.ConvertAll(se => PrettyLabel(se.name));
+            int llen = 0; foreach (var p in pretty) llen = Math.Max(llen, p.Length);
+            int lw = 40 + llen * 7, lh = 8 + series.Count * 17;
+            int lx = W - pR - lw - 6; if (lx < pL + 4) lx = pL + 4;
+            int lyTop = pT + 8;
             sb.Append("<rect x=\"").Append(lx).Append("\" y=\"").Append(lyTop).Append("\" width=\"").Append(lw).Append("\" height=\"").Append(lh)
-              .Append("\" fill=\"var(--bg)\" fill-opacity=\".85\" stroke=\"var(--mut)\" stroke-width=\"1\"/>");
+              .Append("\" fill=\"var(--bg)\" fill-opacity=\".9\" stroke=\"var(--mut)\" stroke-width=\"1\"/>");
             for (int s = 0; s < series.Count; s++)
             {
                 int ly = lyTop + 14 + s * 17; string col = PlotColors[s % PlotColors.Length];
                 sb.Append("<line x1=\"").Append(lx + 8).Append("\" y1=\"").Append(ly).Append("\" x2=\"").Append(lx + 26).Append("\" y2=\"").Append(ly).Append("\" stroke=\"").Append(col).Append("\" stroke-width=\"2.5\"/>");
-                sb.Append("<text x=\"").Append(lx + 32).Append("\" y=\"").Append(ly + 4).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\">").Append(System.Net.WebUtility.HtmlEncode(series[s].name)).Append("</text>");
+                sb.Append("<text x=\"").Append(lx + 32).Append("\" y=\"").Append(ly + 4).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\">").Append(System.Net.WebUtility.HtmlEncode(pretty[s])).Append("</text>");
             }
             sb.Append("</svg></div>");
             return sb.ToString();

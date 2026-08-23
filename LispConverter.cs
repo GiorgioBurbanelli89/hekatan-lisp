@@ -861,6 +861,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         // separador del tag de #deq: la línea de display trae  "...ecuación...\x02(etiqueta)".
         public const char DeqSep = '\x02';
 
+        // marcador de una GRÁFICA en su posición dentro del documento (se reemplaza por el HTML de la gráfica).
+        public const string PlotSlot = "\x01PLOT\x01";
+
         // convierte  <div class="ws-eq…">CONTENIDO</div>  en la versión con ETIQUETA a la derecha (#deq).
         static string InjectDeqTag(string div, string tag)
         {
@@ -896,6 +899,8 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         static string RenderLineHtml(string raw, bool fromLisp)
         {
             {
+                // GRÁFICA en su posición: un hueco que MainWindow rellena con el HTML de la gráfica.
+                if (raw == PlotSlot) return "<div class=\"hk-plotslot\"></div>";
                 // marcador de TEXTO con formato (viene de una directiva ; procesada en ComputeResult)
                 if (raw.StartsWith(TxtMark))
                 {

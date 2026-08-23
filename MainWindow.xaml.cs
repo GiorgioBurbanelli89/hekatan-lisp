@@ -203,10 +203,11 @@ namespace HekatanLisp
                 else
                 {
                     html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true);
-                    var svg = BuildPlots(text, forms);   // ;grafica en comentario → dibuja las funciones
-                    svg += BuildSurfaces(text, forms, _dark);   // #surf(...) → superficie 3D (SkiaSharp → PNG)
-                    if (!string.IsNullOrEmpty(svg))
-                        html = html.Replace("</body>", "<hr style=\"border:0;border-top:1px solid var(--mut);opacity:.4;margin:1.2em 0\">" + svg + "</body>");
+                    // Gráficas INTERCALADAS: cada una en su posición del documento (marcador → HTML), en orden.
+                    var plots = BuildPlotsOrdered(text, forms, _dark, out bool anySurf);
+                    foreach (var ph in plots)
+                        html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>", ph ?? "");
+                    if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + "</body>");   // motor de orbit, una vez
                 }
                 Viewer.NavigateToString(html);
                 return;
@@ -289,10 +290,86 @@ namespace HekatanLisp
             return res.ToArray();
         }
 
-        private static string BuildPlots(string editorText, List<string> forms)
+        // Reemplaza SOLO la primera aparición (para rellenar los huecos de gráfica en orden).
+        private static string ReplaceFirst(string s, string find, string repl)
         {
+            int i = s.IndexOf(find, StringComparison.Ordinal);
+            return i < 0 ? s : s.Substring(0, i) + repl + s.Substring(i + find.Length);
+        }
+
+        // envoltura centrada + leyenda para una gráfica (superficie o mapa)
+        private static string PlotWrap(string inner, string caption) =>
+            "<div style=\"text-align:center;margin:1.1em 0\">" + inner +
+            "<div style=\"color:var(--mut);font-size:.85em;margin-top:.2em\">" + caption + "</div></div>";
+
+        // parsea  expr, [xa xb], [ya yb]  de un #surf/#map → (árbol, texto, rangos)
+        private static (LispConverter.N f, string spec, double xa, double xb, double ya, double yb)
+            ParseSurfArgs(string inside, Dictionary<string, LispConverter.N> byName, System.Globalization.CultureInfo inv)
+        {
+            LispConverter.N f = null; string spec = null;
+            var ranges = new List<(double lo, double hi)>();
+            foreach (var a0 in SplitTop(inside))
+            {
+                var a = a0.Trim(); if (a.Length == 0) continue;
+                var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
+                if (rng.Success)
+                {
+                    double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out var lo);
+                    double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out var hi);
+                    ranges.Add((lo, hi)); continue;
+                }
+                if (f == null) { spec = a; if (!byName.TryGetValue(a, out f)) { try { f = LispConverter.ParseMath(a); } catch { } } }
+            }
+            double xa = 0, xb = 1, ya = 0, yb = 1;
+            if (ranges.Count >= 1) { xa = ranges[0].lo; xb = ranges[0].hi; ya = xa; yb = xb; }
+            if (ranges.Count >= 2) { ya = ranges[1].lo; yb = ranges[1].hi; }
+            return (f, spec, xa, xb, ya, yb);
+        }
+
+        // UN #fplot (o ;grafica) → su SVG. rest = lo que sigue a la palabra clave.
+        private static string OneFplotHtml(string rest, Dictionary<string, LispConverter.N> byName,
+                                           List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv)
+        {
+            rest = (rest ?? "").Trim();
+            double lo = -1, hi = 1; string forcedVar = null;
+            var sel = new List<(string, LispConverter.N)>();
+            var paren = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (paren.Success)   // estilo MATLAB: fplot(N1, N2, [-1 1])
+            {
+                foreach (var a0 in SplitTop(paren.Groups[1].Value))
+                {
+                    var a = a0.Trim(); if (a.Length == 0) continue;
+                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
+                    if (rng.Success) { double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out lo); double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out hi); continue; }
+                    AddFn(sel, byName, a);
+                }
+            }
+            else   // forma simple: ;grafica s -1 1 [N1 N2 …]
+            {
+                var toks = rest.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                int k = 0;
+                if (toks.Length > 0 && !double.TryParse(toks[0], System.Globalization.NumberStyles.Any, inv, out _)) { forcedVar = toks[0]; k = 1; }
+                if (toks.Length >= k + 2 && double.TryParse(toks[k], System.Globalization.NumberStyles.Any, inv, out lo) && double.TryParse(toks[k + 1], System.Globalization.NumberStyles.Any, inv, out hi))
+                    for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
+            }
+            if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
+            if (sel.Count == 0) return "";
+            string var = forcedVar ?? LispConverter.FreeVar(sel[0].Item2);
+            return LispConverter.PlotSvg(var, lo, hi, sel) ?? "";
+        }
+
+        // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
+        // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
+        private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
+            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b(.*)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
+        {
+            anySurf = false;
             var inv = System.Globalization.CultureInfo.InvariantCulture;
-            // 1) recolecta NOMBRE -> arbol del RESULTADO (ultimo tramo tras " = ")
+            var outList = new List<string>();
+            // NOMBRE -> árbol del RESULTADO (permite referir por nombre: #surf(N_1,…), fplot(N1,…))
             var fns = new List<(string name, LispConverter.N tree)>();
             var byName = new Dictionary<string, LispConverter.N>();
             var todas = (forms ?? new List<string>()).SelectMany(f => (f ?? "").Replace("\r", "").Split('\n'));
@@ -308,141 +385,46 @@ namespace HekatanLisp
                 }
                 catch { }
             }
-            // 2) por cada directiva de gráfica, arma un SVG
-            var outp = new StringBuilder();
-            foreach (System.Text.RegularExpressions.Match d in RxGraf.Matches(editorText ?? ""))
+            int surfId = 0;
+            foreach (var lineRaw in (editorText ?? "").Replace("\r", "").Split('\n'))
             {
-                string rest = d.Groups[2].Value.Trim();
-                double lo = -1, hi = 1; string forcedVar = null;
-                var sel = new List<(string, LispConverter.N)>();
-
-                var paren = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
-                if (paren.Success)   // ---- estilo MATLAB: fplot(N1, N2, [-1 1]) o fplot(1-s^2, [-1 1]) ----
+                var mm = RxAnyPlot.Match(lineRaw);
+                if (!mm.Success) continue;
+                string kw = mm.Groups[1].Value.ToLowerInvariant();
+                string rest = mm.Groups[2].Value.Trim();
+                bool isSurf = kw is "surf" or "superficie" or "plot3d" or "mesh";
+                bool isMap = kw is "map" or "mapa" or "heatmap" or "contour" or "contourf";
+                if (isSurf || isMap)
                 {
-                    foreach (var a0 in SplitTop(paren.Groups[1].Value))
+                    var pm = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (!pm.Success) { outList.Add(""); continue; }
+                    var (f, spec, xa, xb, ya, yb) = ParseSurfArgs(pm.Groups[1].Value, byName, inv);
+                    if (f == null) { outList.Add(""); continue; }
+                    var vs = LispConverter.VarsOf(f);
+                    string vx = vs.Count > 0 ? vs[0] : "x", vy = vs.Count > 1 ? vs[1] : "y";
+                    string enc = System.Net.WebUtility.HtmlEncode(spec ?? "");
+                    try
                     {
-                        var a = a0.Trim(); if (a.Length == 0) continue;
-                        var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
-                        if (rng.Success) { double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out lo); double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out hi); continue; }
-                        AddFn(sel, byName, a);
+                        if (isSurf)
+                        {
+                            anySurf = true;
+                            string cv = SurfacePlot.SurfaceCanvas(f, vx, vy, xa, xb, ya, yb, surfId++);
+                            outList.Add(PlotWrap(cv, "z = " + enc + "  ·  <span style=\"opacity:.7\">arrastra para girar</span>"));
+                        }
+                        else
+                        {
+                            string b64 = SurfacePlot.MapPng(f, vx, vy, xa, xb, ya, yb, dark);
+                            outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "mapa de  " + enc + "  (planta)"));
+                        }
                     }
+                    catch { outList.Add(""); }
                 }
-                else   // ---- forma simple: ;grafica s -1 1 [N1 N2 …] ----
+                else   // familia fplot
                 {
-                    var toks = rest.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                    int k = 0;
-                    if (toks.Length > 0 && !double.TryParse(toks[0], System.Globalization.NumberStyles.Any, inv, out _)) { forcedVar = toks[0]; k = 1; }
-                    if (toks.Length >= k + 2 && double.TryParse(toks[k], System.Globalization.NumberStyles.Any, inv, out lo) && double.TryParse(toks[k + 1], System.Globalization.NumberStyles.Any, inv, out hi))
-                        for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
+                    outList.Add(OneFplotHtml(rest, byName, fns, inv));
                 }
-                if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
-                if (sel.Count == 0) continue;
-                string var = forcedVar ?? LispConverter.FreeVar(sel[0].Item2);
-                var svg = LispConverter.PlotSvg(var, lo, hi, sel);
-                if (!string.IsNullOrEmpty(svg)) outp.Append(svg);
             }
-            return outp.ToString();
-        }
-
-        // SUPERFICIE 3D:  #surf(expr, [xa xb], [ya yb])  → SkiaSharp dibuja z=f(x,y) → PNG en el render.
-        // La expresión puede ser inline ((1-x)*(1-y), x*y) o el NOMBRE de una función ya deducida (N_1).
-        // Un solo rango [a b] → se usa igual para x e y. Alias: superficie, plot3d, mesh.
-        private static readonly System.Text.RegularExpressions.Regex RxSurf = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(?:surf|superficie|plot3d|mesh)\s*\((.*)\)\s*$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
-
-        // MAPA DE COLOR 2D (planta):  #map(expr, [xa xb], [ya yb])  → SkiaSharp PNG estático. Alias: mapa/heatmap/contour/contourf.
-        private static readonly System.Text.RegularExpressions.Regex RxMap = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(?:map|mapa|heatmap|contourf?)\s*\((.*)\)\s*$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
-
-        private static string BuildSurfaces(string editorText, List<string> forms, bool dark)
-        {
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            // NOMBRE -> árbol del RESULTADO (igual que BuildPlots: permite #surf(N_1, [0 1]))
-            var byName = new Dictionary<string, LispConverter.N>();
-            var todas = (forms ?? new List<string>()).SelectMany(f => (f ?? "").Replace("\r", "").Split('\n'));
-            foreach (var raw in todas)
-            {
-                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
-                if (!m.Success) continue;
-                var partes = System.Text.RegularExpressions.Regex.Split(m.Groups[2].Value, @"\s=\s");
-                try
-                {
-                    var tree = LispConverter.ParseLisp(partes[partes.Length - 1].Trim());
-                    if (!byName.ContainsKey(m.Groups[1].Value)) byName[m.Groups[1].Value] = tree;
-                }
-                catch { }
-            }
-            var outp = new StringBuilder();
-            int id = 0;
-            foreach (System.Text.RegularExpressions.Match d in RxSurf.Matches(editorText ?? ""))
-            {
-                var args = SplitTop(d.Groups[1].Value);
-                if (args.Count == 0) continue;
-                LispConverter.N f = null; string spec = null;
-                var ranges = new List<(double lo, double hi)>();
-                foreach (var a0 in args)
-                {
-                    var a = a0.Trim(); if (a.Length == 0) continue;
-                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
-                    if (rng.Success)
-                    {
-                        double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out var lo);
-                        double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out var hi);
-                        ranges.Add((lo, hi)); continue;
-                    }
-                    if (f == null) { spec = a; if (!byName.TryGetValue(a, out f)) { try { f = LispConverter.ParseMath(a); } catch { } } }
-                }
-                if (f == null) continue;
-                double xa = 0, xb = 1, ya = 0, yb = 1;
-                if (ranges.Count >= 1) { xa = ranges[0].lo; xb = ranges[0].hi; ya = xa; yb = xb; }
-                if (ranges.Count >= 2) { ya = ranges[1].lo; yb = ranges[1].hi; }
-                var vs = LispConverter.VarsOf(f);
-                string vx = vs.Count > 0 ? vs[0] : "x", vy = vs.Count > 1 ? vs[1] : "y";
-                string canvas;
-                try { canvas = SurfacePlot.SurfaceCanvas(f, vx, vy, xa, xb, ya, yb, id++); }
-                catch { continue; }
-                outp.Append("<div style=\"text-align:center;margin:1.1em 0\">").Append(canvas)
-                    .Append("<div style=\"color:var(--mut);font-size:.85em;margin-top:.2em\">z = ")
-                    .Append(System.Net.WebUtility.HtmlEncode(spec ?? "")).Append("  ·  <span style=\"opacity:.7\">arrastra para girar</span></div></div>");
-            }
-            if (id > 0) outp.Append(SurfacePlot.OrbitScript);   // el motor de orbit, una sola vez
-            // MAPAS 2D: #map(expr, [xa xb], [ya yb]) → SkiaSharp PNG estático (2D no gira)
-            foreach (System.Text.RegularExpressions.Match d in RxMap.Matches(editorText ?? ""))
-            {
-                var args = SplitTop(d.Groups[1].Value);
-                if (args.Count == 0) continue;
-                LispConverter.N f = null; string spec = null;
-                var ranges = new List<(double lo, double hi)>();
-                foreach (var a0 in args)
-                {
-                    var a = a0.Trim(); if (a.Length == 0) continue;
-                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
-                    if (rng.Success)
-                    {
-                        double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out var lo);
-                        double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out var hi);
-                        ranges.Add((lo, hi)); continue;
-                    }
-                    if (f == null) { spec = a; if (!byName.TryGetValue(a, out f)) { try { f = LispConverter.ParseMath(a); } catch { } } }
-                }
-                if (f == null) continue;
-                double xa = 0, xb = 1, ya = 0, yb = 1;
-                if (ranges.Count >= 1) { xa = ranges[0].lo; xb = ranges[0].hi; ya = xa; yb = xb; }
-                if (ranges.Count >= 2) { ya = ranges[1].lo; yb = ranges[1].hi; }
-                var vs = LispConverter.VarsOf(f);
-                string vx = vs.Count > 0 ? vs[0] : "x", vy = vs.Count > 1 ? vs[1] : "y";
-                string b64;
-                try { b64 = SurfacePlot.MapPng(f, vx, vy, xa, xb, ya, yb, dark); }
-                catch { continue; }
-                outp.Append("<div style=\"text-align:center;margin:1.1em 0\">")
-                    .Append("<img alt=\"").Append(System.Net.WebUtility.HtmlEncode(spec ?? ""))
-                    .Append("\" style=\"max-width:100%;height:auto\" src=\"data:image/png;base64,").Append(b64).Append("\">")
-                    .Append("<div style=\"color:var(--mut);font-size:.85em;margin-top:.2em\">mapa de  ")
-                    .Append(System.Net.WebUtility.HtmlEncode(spec ?? "")).Append("  (planta)</div></div>");
-            }
-            return outp.ToString();
+            return outList;
         }
 
         // agrega una función: por NOMBRE ya deducido, o expresión MATLAB inline (1-s^2)
@@ -555,13 +537,14 @@ namespace HekatanLisp
                     deqTag[i] = m.Groups[2].Value;
                 }
             }
+            var isPlot = new bool[lines.Length];   // línea = directiva de gráfica → marca su POSICIÓN en el documento
             // PASO 1: parsear cada línea a árbol + detectar su etiqueta
             for (int i = 0; i < lines.Length; i++)
             {
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
                         @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b",
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }
                 CollectFuncDefs(lines[i], funcMap);   // registra  f(x)=…  para poder aplicar f(3) después
@@ -610,6 +593,7 @@ namespace HekatanLisp
             var display = new List<string>();
             for (int i = 0; i < lines.Length; i++)
             {
+                if (isPlot[i]) { display.Add(LispConverter.PlotSlot); continue; }   // gráfica: hueco en su posición
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {
                     var (kind, align, raw2) = textOf[i].Value;

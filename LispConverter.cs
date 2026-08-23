@@ -729,7 +729,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 /* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
 .ws-deq{display:flex;align-items:center;gap:1.2em;}
-.ws-deq>.deq-body{flex:1 1 auto;min-width:0;overflow-x:auto;}
+.ws-deq>.deq-body{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;}
 .ws-deq>.deq-tag{flex:0 0 auto;color:var(--mut);font-size:.85em;white-space:nowrap;font-family:'Segoe UI',sans-serif;}
 /* texto con formato (directivas ; estilo Hekatan Lab) */
 .ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}

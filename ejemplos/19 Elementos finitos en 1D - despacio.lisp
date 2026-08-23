@@ -57,5 +57,20 @@ v_carga = Diff{-12 @ x} @@(carga q = EI·v'''')
 #: La cadena queda:  **v** (flecha) → **v'** (giro) → **v''** (curvatura → momento) → **v'''** (cortante) → **v''''** (carga). El momento/curvatura es el centro; hacia un lado el giro y la flecha, hacia el otro el cortante y la carga. Aquí la carga da 0: es una viga SIN carga en el vano (por eso la cúbica es exacta).
 #: Y **aparte de esta cadena**, la viga de **Timoshenko** añade la deformación por **cortante** — Euler-Bernoulli la desprecia (supone que las secciones giran perpendiculares al eje). Importa en vigas **cortas o peraltadas**. Ese es el "algo más" fuera de la curvatura.
 
+## 3.6 · ¿Qué se necesita para CADA gráfica?
+#: Importante no confundirlas:
+#| · La DEFORMADA (la forma curva de la viga en el visor) → SOLO el desplazamiento:  v(x) = H₁·v₁ + H₂·θ₁ + H₃·v₂ + H₄·θ₂.  NO hace falta curvatura ni momento.
+#| · El DIAGRAMA DE MOMENTO → M = EI·v'' (la curvatura, 2ª derivada).
+#| · El DIAGRAMA DE CORTANTE → V = EI·v''' (3ª derivada).
+#: O sea: para **ver la estructura doblada** basta interpolar el desplazamiento con las Hermite. La curvatura y el momento son para los **diagramas de esfuerzos**, que son OTRAS gráficas. La deformada de §3.4 usó solo v(x): por eso no necesitó nada de la cadena.
+
+## 3.7 · ¿Por qué cada cosa se EMPAREJA con otra?
+#: Porque el **trabajo = fuerza × su desplazamiento**. Cada movimiento tiene UNA fuerza que "trabaja" con él, y por eso van en pareja (son duales):
+#| · desplazamiento v ↔ fuerza F   (trabajo = F·v)
+#| · giro (ángulo) θ ↔ momento M   (trabajo = M·θ)
+#| · curvatura κ = v'' ↔ momento interno M = EI·κ   (energía de flexión = ½·∫ M·κ dx)
+#: Un giro NO se empareja con una fuerza (no harían trabajo juntos): se empareja con el **momento**. Por eso en cada nudo de la viga hay **2 grados de libertad** (v y θ) con sus **2 fuerzas conjugadas** (F y M), y la rigidez los conecta:  la pareja de fuerzas (F, M) = K · (v, θ).
+#: Y el **ángulo tiene que ser un dato del nudo**: cuando dos vigas se unen ahí, deben compartir el MISMO giro para no formar un quiebre (continuidad de pendiente, C¹). Por eso la **viga lleva el giro** (2 GDL por nudo) y la **barra no** (solo v). Ese emparejamiento es lo que arma la matriz de rigidez.
+
 ## 4 · La razón DE FONDO (por qué interpolar, en 1D)
 #: No es solo dibujar: la **deformación** es la derivada del desplazamiento y la **rigidez** es una integral de eso —  K = ∫ EA·(N')ᵀ(N') dx  en la barra,  K = ∫ EI·(N'')ᵀ(N'') dx  en la viga. Para derivar e integrar necesitas una FUNCIÓN continua, no puntos sueltos. La interpolación te da esa función a partir de los valores en los nudos. **Sin interpolación no hay deformación, ni rigidez → no hay FEM.**

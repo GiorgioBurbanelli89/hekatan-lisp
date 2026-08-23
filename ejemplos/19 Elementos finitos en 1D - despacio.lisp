@@ -48,5 +48,14 @@ deformada = 3*x^2-2*x^3 + 0.5*(-x^2+x^3) @@(v(x))
 #fplot(deformada, [0 1])
 #: Esa curva suave es la deformada real (la que dibuja ETABS/SAP para vigas y columnas).
 
+## 3.5 · La teoría de la viga es una CADENA (la curvatura es UN eslabón)
+#: La curvatura no es todo: es el eslabón del medio. **Cada derivada del desplazamiento es una cantidad física.** El motor las saca todas, una tras otra, desde la deformada v = 3x²−2x³:
+v_giro = Diff{3*x^2-2*x^3 @ x} @@(giro θ = v')
+v_curv = Diff{6*x-6*x^2 @ x} @@(curvatura v'' → momento M = EI·v'')
+v_cort = Diff{6-12*x @ x} @@(cortante V = EI·v''')
+v_carga = Diff{-12 @ x} @@(carga q = EI·v'''')
+#: La cadena queda:  **v** (flecha) → **v'** (giro) → **v''** (curvatura → momento) → **v'''** (cortante) → **v''''** (carga). El momento/curvatura es el centro; hacia un lado el giro y la flecha, hacia el otro el cortante y la carga. Aquí la carga da 0: es una viga SIN carga en el vano (por eso la cúbica es exacta).
+#: Y **aparte de esta cadena**, la viga de **Timoshenko** añade la deformación por **cortante** — Euler-Bernoulli la desprecia (supone que las secciones giran perpendiculares al eje). Importa en vigas **cortas o peraltadas**. Ese es el "algo más" fuera de la curvatura.
+
 ## 4 · La razón DE FONDO (por qué interpolar, en 1D)
 #: No es solo dibujar: la **deformación** es la derivada del desplazamiento y la **rigidez** es una integral de eso —  K = ∫ EA·(N')ᵀ(N') dx  en la barra,  K = ∫ EI·(N'')ᵀ(N'') dx  en la viga. Para derivar e integrar necesitas una FUNCIÓN continua, no puntos sueltos. La interpolación te da esa función a partir de los valores en los nudos. **Sin interpolación no hay deformación, ni rigidez → no hay FEM.**

@@ -248,7 +248,7 @@ namespace HekatanLisp
                 "integral" => b != null ? $"(area-under '{f} '{v} {a} {b})" : $"(integ-var '{f} '{v})",
                 "slope" or "derivative" => $"(slope-at '{f} '{v} {a})",
                 "partial" => $"(partial '{f} '{v})",
-                "derivate" or "diff" => n.Items.Count > 1 ? $"(partial '{f} '{v})" : $"(derive-x '{f})",
+                "derivate" or "diff" => n.Items.Count > 1 ? $"(derive-x '{f} '{v})" : $"(derive-x '{f})",
                 "simplify" or "factor" => $"(factor '{f})",
                 "expand" => $"(expand* '{f})",
                 "sum" => $"(suma '{f} '{v} {a} {b})",

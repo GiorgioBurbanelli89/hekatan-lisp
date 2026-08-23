@@ -283,10 +283,10 @@
             (setf res (p+ res (list (cons m2 (* c k)))))))))
     res))
 
-(defun derive-x (e)
-  "Deriva respecto a la variable DETECTADA (no fija a x) y simplifica."
-  (let* ((vs (vars-of e)) (v (if vs (car vs) 'x)) (p (try-poly e)))
-    (if (eq p :fail) (simplify (deriv e v)) (poly->expr (poly-deriv p v)))))
+(defun derive-x (e &optional v)
+  "Derivada ORDINARIA d/dx. Si se da v, deriva respecto a v; si no, autodetecta la variable."
+  (let* ((var (or v (let ((vs (vars-of e))) (if vs (car vs) 'x)))) (p (try-poly e)))
+    (if (eq p :fail) (simplify (deriv e var)) (poly->expr (poly-deriv p var)))))
 
 (defun partial (e v)
   "Derivada PARCIAL respecto a la variable v (elegida). Para 2D: dN/ds, dN/dt.

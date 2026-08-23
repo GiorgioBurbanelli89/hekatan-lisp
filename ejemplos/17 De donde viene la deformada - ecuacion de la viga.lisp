@@ -12,13 +12,12 @@ v = Integral{3*c3*x^2 @ x} @@(v: ∫ cuadrática → CÚBICA)
 #: Partí de una **constante** y en 3 integrales llegué a una **cúbica** (c₃·x³). Cada ∫ añade una constante de integración → 4 constantes en total (c₀,c₁,c₂,c₃) = los **4 datos de los nudos** (v y θ en cada extremo). **De ahí vino la cúbica: es lo que sale de integrar la ecuación de la viga.**
 
 ## 3 · Comprobación: derivar la cúbica vuelve a 0
-#: Al revés: si derivo la cúbica cuatro veces, debe volver a 0 (así confirmo que cumple v''''=0).
-#: (El operador pinta ∂, pero aquí es **d/dx ordinaria**: v es de una sola variable, x. Mismo cálculo.)
+#: Al revés: si derivo la cúbica cuatro veces (d/dx ordinaria, v es de una sola variable), debe volver a 0 (así confirmo que cumple v''''=0).
 vc = c0 + c1*x + c2*x^2 + c3*x^3 @@(la deformada)
-d1 = Partial{vc @ x} @@(v')
-d2 = Partial{c1+2*c2*x+3*c3*x^2 @ x} @@(v'')
-d3 = Partial{2*c2+6*c3*x @ x} @@(v''' constante)
-d4 = Partial{6*c3 @ x} @@(v'''' = 0 ✓)
+d1 = Diff{vc @ x} @@(v')
+d2 = Diff{c1+2*c2*x+3*c3*x^2 @ x} @@(v'')
+d3 = Diff{2*c2+6*c3*x @ x} @@(v''' constante)
+d4 = Diff{6*c3 @ x} @@(v'''' = 0 ✓)
 #: **v'''' = 0** → la cúbica satisface exactamente la ecuación de la viga. Por eso la deformada dibujada ES la real: la viga, entre nudos sin carga, toma justo esa forma cúbica.
 
 ## 4 · La curvatura no es constante — por eso se ve "curva"

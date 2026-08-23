@@ -79,5 +79,18 @@ v_carga = Diff{-12 @ x} @@(carga q = EI·v'''')
 #: Un giro NO se empareja con una fuerza (no harían trabajo juntos): se empareja con el **momento**. Por eso en cada nudo de la viga hay **2 grados de libertad** (v y θ) con sus **2 fuerzas conjugadas** (F y M), y la rigidez los conecta:  la pareja de fuerzas (F, M) = K · (v, θ).
 #: Y el **ángulo tiene que ser un dato del nudo**: cuando dos vigas se unen ahí, deben compartir el MISMO giro para no formar un quiebre (continuidad de pendiente, C¹). Por eso la **viga lleva el giro** (2 GDL por nudo) y la **barra no** (solo v). Ese emparejamiento es lo que arma la matriz de rigidez.
 
+## 3.8 · ¿Por qué a veces RECTA (líneas sucesivas) y a veces CURVA?
+#: El visor solo conoce los valores en los NUDOS (v, θ). Entre nudos tiene DOS maneras de dibujar la deformada:
+#| 1) Unir los nudos con una RECTA (poligonal): rápido; cada barra = un segmento. Con muchos nudos → "líneas sucesivas".
+#| 2) Usar las funciones de forma (Hermite, con los GIROS θ): dibuja la CURVA real dentro de cada barra.
+#: La MISMA barra (nudo izq fijo, der baja 1), dibujada de las dos formas:
+recta = x @@(unir los nudos con recta)
+curva = 3*x^2-2*x^3 @@(Hermite: la curva real)
+#fplot(x, 3*x^2-2*x^3, [0 1])
+#: La recta solo conecta los extremos; la curva usa además los **giros** de los nudos → muestra la flexión. Por eso:
+#| · Barra AXIAL (solo estira): la deformada real ES recta → recta y curva coinciden.
+#| · Viga (flexión): la real es curva → si el visor solo une con rectas se ve angular; con Hermite se ve curva.
+#: Y si trozas una barra en MUCHOS elementos, la poligonal de muchos segmentitos se acerca a la curva (como un polígono a un círculo). Eso son las "líneas sucesivas": muchos trozos rectos que juntos aproximan la curva. Con un solo elemento de viga, la Hermite ya te da la curva exacta sin trocear.
+
 ## 4 · La razón DE FONDO (por qué interpolar, en 1D)
 #: No es solo dibujar: la **deformación** es la derivada del desplazamiento y la **rigidez** es una integral de eso —  K = ∫ EA·(N')ᵀ(N') dx  en la barra,  K = ∫ EI·(N'')ᵀ(N'') dx  en la viga. Para derivar e integrar necesitas una FUNCIÓN continua, no puntos sueltos. La interpolación te da esa función a partir de los valores en los nudos. **Sin interpolación no hay deformación, ni rigidez → no hay FEM.**

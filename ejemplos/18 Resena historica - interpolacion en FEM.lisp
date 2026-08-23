@@ -8,10 +8,29 @@
 #: Sin ninguna regla fina, lo único que puedes hacer es unir los nudos con una línea recta:
 #fplot(x, [0 1])
 
-## 0.2 · El problema: la viga real NO es recta
-#: Una viga se **curva**. La recta cruda se equivoca en todo el medio. Compara la recta con la forma real (una cúbica):
+## 0.15 · ¿Qué es la CURVATURA de una viga? (despacio)
+#: Imagina que doblas una regla con las manos: se **arquea**. La **curvatura** mide **qué tan cerrado es ese arco** en cada punto de la viga.
+#| Recta = sin arco → curvatura CERO.   ·   Arco muy cerrado = mucha curvatura.
+#: De hecho, un círculo de radio R tiene curvatura **κ = 1/R**: radio chico → curva muy cerrada → curvatura grande; radio infinito (una recta) → curvatura cero. La viga, al doblarse, forma en cada punto un pequeño arco, y κ mide ese arco.
+### ¿Por qué la curvatura es la SEGUNDA derivada?
+#: Piénsalo en dos pasos:
+#| 1) La PRIMERA derivada v'(x) es la **pendiente**: cuán inclinada está la viga en ese punto.
+#| 2) Si la pendiente NO cambia de un punto al otro → la viga va derecha (no se dobla). Si la pendiente CAMBIA → se está doblando.
+#: La curvatura es **cuánto cambia la pendiente** = la derivada de la pendiente = la **segunda derivada** v''. El motor lo muestra. Una **recta**: su pendiente es constante, así que su curvatura da cero:
+r_p = Diff{x @ x} @@(pendiente = 1, constante)
+r_k = Diff{1 @ x} @@(curvatura = 0 → NO se dobla)
+#: Cero: una recta no tiene curvatura. La **cúbica** sí se dobla, porque su pendiente cambia:
+c_p = Diff{3*x^2-2*x^3 @ x} @@(pendiente = 6x−6x², cambia)
+c_k = Diff{6*x-6*x^2 @ x} @@(curvatura = 6−12x, distinta de cero)
+### La física: qué produce la curvatura
+#: Lo que dobla la viga es el **momento flector M**. La ley de la viga dice  **M = EI·v''**: el momento es proporcional a la curvatura, y EI es lo rígida que es (E = material, I = forma de la sección). Donde hay momento hay curvatura; donde no, la viga va recta.
+#: La curvatura de la cúbica es 6 − 12x: cambia de signo en x = ½, o sea la viga se dobla hacia un lado y luego al otro (forma de **S**). Dibujada:
+#fplot(6-12*x, [0 1])
+
+## 0.2 · Por eso la viga real NO es recta
+#: Como la recta tiene curvatura CERO y la viga real tiene curvatura, la recta cruda se equivoca en todo el medio. Compara la recta con la forma real (la cúbica):
 #fplot(x, 3*x^2-2*x^3, [0 1])
-#: Por eso **unir puntos no basta**: hace falta una regla de relleno que respete la física.
+#: Por eso **unir puntos no basta**: hace falta una regla de relleno que respete la física (la curvatura).
 
 ## 0.3 · La razón DE FONDO: la física vive DENTRO del elemento
 #: No es solo dibujar. La **deformación** es la DERIVADA del desplazamiento (ε = du/dx) y la **rigidez** es una INTEGRAL (K = ∫ Bᵀ·D·B dx). Para derivar e integrar necesitas una **función continua**, no puntos. Ejemplo: de la deformada interpolada saco la deformación derivando:

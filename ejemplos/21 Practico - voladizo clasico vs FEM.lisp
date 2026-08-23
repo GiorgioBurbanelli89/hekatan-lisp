@@ -2,7 +2,8 @@
 #: El mismo voladizo por los dos caminos. Clásico (resistencia de materiales, integrando) y FEM (matriz de rigidez). Al final se comparan: deben cerrar EXACTO.
 
 ## 1 · El problema
-#: Voladizo empotrado en la izquierda (x=0), libre en la derecha (x=L), con carga P hacia abajo en la punta. Normalizamos: P=1, L=1, EI=1.
+#: Voladizo empotrado en la izquierda (x=0), libre en la derecha (x=L), con carga P hacia abajo en la punta. Normalizamos: P=1, L=1, EI=1. Así se ve la viga SIN deformar (empotramiento + carga):
+#beam(fixed-free, P@1)
 
 ## 2 · Método CLÁSICO (doble integración)
 #: El momento sale del equilibrio del trozo derecho (máximo en el empotramiento, cero en la punta):

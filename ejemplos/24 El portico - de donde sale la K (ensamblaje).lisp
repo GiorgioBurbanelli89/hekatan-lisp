@@ -1,8 +1,14 @@
 # El pórtico: de dónde sale la K (ensamblaje desde las barras)
 #: En el ejemplo del pórtico la matriz K apareció ya armada. Aquí se ve de dónde sale: se ENSAMBLA de las K de cada barra, que a su vez vienen de las funciones de forma. Todo con el motor.
 
-## 1 · La K de cada barra viene de las funciones de forma
-#: Deducida integrando las curvaturas de las Hermite (ejemplo anterior). Sus filas y columnas son los grados de libertad de la barra: desplazamiento y giro en cada extremo [v₁, θ₁, v₂, θ₂]:
+## 1 · Las FUNCIONES DE FORMA de cada barra (aquí están, dibujadas)
+#: Cada barra del pórtico (columna o viga) interpola su deformación con las 4 funciones de forma de Hermite — son los "pesos" de sus dos extremos (desplazamiento v y giro θ). Estas son:
+H1 = 1-3*x^2+2*x^3 @@(peso de v₁)
+H2 = x-2*x^2+x^3 @@(peso de θ₁)
+H3 = 3*x^2-2*x^3 @@(peso de v₂)
+H4 = -x^2+x^3 @@(peso de θ₂)
+#fplot(H1, H2, H3, H4, [0 1])
+#: Esas son las funciones de forma del pórtico: cada barra (las 2 columnas y la viga) usa estas mismas 4 curvas. La rigidez de la barra sale de integrar sus curvaturas (ejemplo anterior); sus filas y columnas son los GDL [v₁, θ₁, v₂, θ₂]:
 K_barra = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4] @@(rigidez de barra)
 
 ## 2 · Qué parte usa cada barra del pórtico

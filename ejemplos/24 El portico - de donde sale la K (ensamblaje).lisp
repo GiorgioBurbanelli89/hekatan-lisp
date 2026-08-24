@@ -8,10 +8,19 @@ H2 = x-2*x^2+x^3 @@(peso de θ₁)
 H3 = 3*x^2-2*x^3 @@(peso de v₂)
 H4 = -x^2+x^3 @@(peso de θ₂)
 #fplot(H1, H2, H3, H4, [0 1])
-#: Esas son las funciones de forma del pórtico: cada barra usa estas mismas 4 curvas. La rigidez de la barra es cada curvatura por la otra, integrada:  K_ij = EI·∫ N_i'' · N_j'' dx. Las curvaturas (segundas derivadas) de las Hermite son −6+12x, −4+6x, 6−12x, −2+6x. El motor integra sus productos (aquí con L=1) y da los coeficientes:
-k11 = Area{(-6+12*x)^2 @ x=0:1} @@(N₁''·N₁'')
-k12 = Area{(-6+12*x)*(-4+6*x) @ x=0:1} @@(N₁''·N₂'')
-k22 = Area{(-4+6*x)^2 @ x=0:1} @@(N₂''·N₂'')
+#: Esas son las funciones de forma del pórtico: cada barra usa estas mismas 4 curvas. Para llegar a la rigidez, de cada una saco la PENDIENTE (primera derivada) y de ahí la CURVATURA (segunda derivada). El motor deriva paso a paso:
+H1p = Diff{1-3*x^2+2*x^3 @ x} @@(H₁' pendiente)
+H1pp = Diff{-6*x+6*x^2 @ x} @@(H₁'' curvatura)
+H2p = Diff{x-2*x^2+x^3 @ x} @@(H₂' pendiente)
+H2pp = Diff{1-4*x+3*x^2 @ x} @@(H₂'' curvatura)
+H3p = Diff{3*x^2-2*x^3 @ x} @@(H₃' pendiente)
+H3pp = Diff{6*x-6*x^2 @ x} @@(H₃'' curvatura)
+H4p = Diff{-x^2+x^3 @ x} @@(H₄' pendiente)
+H4pp = Diff{-2*x+3*x^2 @ x} @@(H₄'' curvatura)
+#: Ya con las curvaturas, la rigidez es cada una por la otra, integrada:  K_ij = EI·∫ H_i'' · H_j'' dx. El motor integra los productos (con L=1) y da los coeficientes:
+k11 = Area{(-6+12*x)^2 @ x=0:1} @@(H₁''·H₁'')
+k12 = Area{(-6+12*x)*(-4+6*x) @ x=0:1} @@(H₁''·H₂'')
+k22 = Area{(-4+6*x)^2 @ x=0:1} @@(H₂''·H₂'')
 #: Dan 12, 6, 4 (así salen todos). El factor EI es la rigidez del material; las potencias de L las fija la UNIDAD de cada término: desplazamiento–desplazamiento va con EI/L³, desplazamiento–giro con EI/L², giro–giro con EI/L. Con eso se arma la matriz de barra (filas/columnas = GDL [v₁, θ₁, v₂, θ₂]) — simbólica = numérica (EI=1, L=1):
 K_barra = (EI/L^3)*[12, 6*L, -12, 6*L; 6*L, 4*L^2, -6*L, 2*L^2; -12, -6*L, 12, -6*L; 6*L, 2*L^2, -6*L, 4*L^2] = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4] @@(rigidez de barra: fórmula y valor)
 

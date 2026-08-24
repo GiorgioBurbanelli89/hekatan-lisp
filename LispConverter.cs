@@ -786,12 +786,12 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-brl{border:1.4px solid currentColor;border-right:none;}
 .m-brr{border:1.4px solid currentColor;border-left:none;}
 .m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
-.m-cell{color:var(--num);}
+.m-cell{color:var(--num);white-space:nowrap;}
 /* matriz GRANDE: índices en los bordes + centro colapsado (… ⋮ ⋱), como Hekatan Calc */
 .m-matx{display:inline-grid;vertical-align:middle;margin:0 .25em;row-gap:.05em;column-gap:0;align-items:center;justify-items:center;}
 .m-mh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .45em .1em;}
 .m-mrh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .35em 0 0;justify-self:end;}
-.m-mc{color:var(--num);padding:.12em .45em;text-align:center;}
+.m-mc{color:var(--num);padding:.12em .45em;text-align:center;white-space:nowrap;}
 .m-matx>.m-brl{min-width:.3em;margin-right:.18em;align-self:stretch;}
 .m-matx>.m-brr{min-width:.3em;margin-left:.18em;align-self:stretch;}
 .m-ell{color:var(--mut);}

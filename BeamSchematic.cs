@@ -169,6 +169,48 @@ namespace HekatanLisp
             return Convert.ToBase64String(data.ToArray());
         }
 
+        // PÓRTICO DEFORMADO: columnas y viga curvadas (Hermite) con el ladeo Δ y los giros θ, amplificado.
+        public static string FrameDeformedPng(double dx, double tB, double tC, bool dark)
+        {
+            const int W = 520, H = 320;
+            var bg = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            var fg = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            var acc = dark ? new SKColor(0x37, 0x8A, 0xDD) : new SKColor(0x18, 0x5F, 0xA5);
+            var info = new SKImageInfo(W, H);
+            using var surf = SKSurface.Create(info);
+            var cv = surf.Canvas; cv.Clear(bg);
+            var thin = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f };
+            var dash = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, PathEffect = SKPathEffect.CreateDash(new float[] { 5, 4 }, 0) };
+            var def = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3.5f };
+            var tf = new SKPaint { Color = fg, IsAntialias = true, TextSize = 13 };
+
+            float cxL = 120, cxR = W - 120, yTop = 75, yBase = H - 65;
+            float hpx = yBase - yTop, Lpx = cxR - cxL;
+            double amp = 45.0 / Math.Max(Math.Abs(dx), 1e-6);
+            double H3(double s) => 3 * s * s - 2 * s * s * s;
+            double H4(double s) => -s * s + s * s * s;
+            double H2(double s) => s - 2 * s * s + s * s * s;
+
+            // pórtico SIN deformar (punteado)
+            cv.DrawLine(cxL, yBase, cxL, yTop, dash); cv.DrawLine(cxR, yBase, cxR, yTop, dash); cv.DrawLine(cxL, yTop, cxR, yTop, dash);
+            // columnas deformadas
+            SKPath Col(float cx, double t) { var p = new SKPath(); for (int i = 0; i <= 30; i++) { double s = i / 30.0; double lat = dx * H3(s) + t * H4(s); float px = (float)(cx + amp * lat); float py = (float)(yBase - s * hpx); if (i == 0) p.MoveTo(px, py); else p.LineTo(px, py); } return p; }
+            using (var p = Col(cxL, tB)) cv.DrawPath(p, def);
+            using (var p = Col(cxR, tC)) cv.DrawPath(p, def);
+            // viga deformada (trasladada por el ladeo + flexión por los giros)
+            float bx0 = (float)(cxL + amp * dx), bx1 = (float)(cxR + amp * dx);
+            using (var p = new SKPath())
+            {
+                for (int i = 0; i <= 30; i++) { double t = i / 30.0; double w = tB * H2(t) + tC * H4(t); float px = (float)(bx0 + t * Lpx); float py = (float)(yTop + amp * w); if (i == 0) p.MoveTo(px, py); else p.LineTo(px, py); }
+                cv.DrawPath(p, def);
+            }
+            Ground(cv, "fixed", cxL, yBase, thin); Ground(cv, "fixed", cxR, yBase, thin);
+            cv.DrawText("- - -  sin deformar   —  deformada (amplificada ×" + Math.Round(amp) + ")", 20, H - 14, tf);
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
         static void Ground(SKCanvas cv, string kind, float x, float y, SKPaint p)   // apoyo en la base (suelo abajo)
         {
             switch (kind)

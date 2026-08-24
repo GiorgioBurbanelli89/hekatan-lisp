@@ -1,6 +1,6 @@
 ; Instalador de Hekatan LISP (Inno Setup 6)
 #define MyAppName "Hekatan LISP"
-#define MyAppVersion "1.19.0"
+#define MyAppVersion "1.19.1"
 #define MyAppPublisher "Hekatan Engineers"
 #define MyAppExeName "HekatanLisp.exe"
 #define MyOut "C:\Users\j-b-j\Documents\Hekatan Calc 1.0.0\hekatan-lisp\bin\Release\net8.0-windows"

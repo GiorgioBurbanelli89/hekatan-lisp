@@ -8,7 +8,11 @@ H2 = x-2*x^2+x^3 @@(peso de θ₁)
 H3 = 3*x^2-2*x^3 @@(peso de v₂)
 H4 = -x^2+x^3 @@(peso de θ₂)
 #fplot(H1, H2, H3, H4, [0 1])
-#: Esas son las funciones de forma del pórtico: cada barra (las 2 columnas y la viga) usa estas mismas 4 curvas. La rigidez de la barra sale de integrar sus curvaturas. Cada elemento es una fórmula con EI y L (filas/columnas = GDL [v₁, θ₁, v₂, θ₂]); con EI=1 y L=1 da su número — simbólica = numérica:
+#: Esas son las funciones de forma del pórtico: cada barra usa estas mismas 4 curvas. La rigidez de la barra es cada curvatura por la otra, integrada:  K_ij = EI·∫ N_i'' · N_j'' dx. Las curvaturas (segundas derivadas) de las Hermite son −6+12x, −4+6x, 6−12x, −2+6x. El motor integra sus productos (aquí con L=1) y da los coeficientes:
+k11 = Area{(-6+12*x)^2 @ x=0:1} @@(N₁''·N₁'')
+k12 = Area{(-6+12*x)*(-4+6*x) @ x=0:1} @@(N₁''·N₂'')
+k22 = Area{(-4+6*x)^2 @ x=0:1} @@(N₂''·N₂'')
+#: Dan 12, 6, 4 (así salen todos). El factor EI es la rigidez del material; las potencias de L las fija la UNIDAD de cada término: desplazamiento–desplazamiento va con EI/L³, desplazamiento–giro con EI/L², giro–giro con EI/L. Con eso se arma la matriz de barra (filas/columnas = GDL [v₁, θ₁, v₂, θ₂]) — simbólica = numérica (EI=1, L=1):
 K_barra = (EI/L^3)*[12, 6*L, -12, 6*L; 6*L, 4*L^2, -6*L, 2*L^2; -12, -6*L, 12, -6*L; 6*L, 2*L^2, -6*L, 4*L^2] = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4] @@(rigidez de barra: fórmula y valor)
 
 ## 2 · Qué parte usa cada barra del pórtico

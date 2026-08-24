@@ -8,10 +8,8 @@ H2 = x-2*x^2+x^3 @@(peso de θ₁)
 H3 = 3*x^2-2*x^3 @@(peso de v₂)
 H4 = -x^2+x^3 @@(peso de θ₂)
 #fplot(H1, H2, H3, H4, [0 1])
-#: Esas son las funciones de forma del pórtico: cada barra (las 2 columnas y la viga) usa estas mismas 4 curvas. La rigidez de la barra sale de integrar sus curvaturas. En forma GENERAL, cada elemento de la matriz es una fórmula con EI y L (filas y columnas = GDL [v₁, θ₁, v₂, θ₂]):
-K_barra = [12*EI/L^3, 6*EI/L^2, -12*EI/L^3, 6*EI/L^2; 6*EI/L^2, 4*EI/L, -6*EI/L^2, 2*EI/L; -12*EI/L^3, -6*EI/L^2, 12*EI/L^3, -6*EI/L^2; 6*EI/L^2, 2*EI/L, -6*EI/L^2, 4*EI/L] @@(rigidez de barra, simbólica)
-#: Con EI=1 y L=1 (normalizado), cada fórmula da su número:
-K_num = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4] @@(con EI=1, L=1)
+#: Esas son las funciones de forma del pórtico: cada barra (las 2 columnas y la viga) usa estas mismas 4 curvas. La rigidez de la barra sale de integrar sus curvaturas. Cada elemento es una fórmula con EI y L (filas/columnas = GDL [v₁, θ₁, v₂, θ₂]); con EI=1 y L=1 da su número — simbólica = numérica:
+K_barra = [12*EI/L^3, 6*EI/L^2, -12*EI/L^3, 6*EI/L^2; 6*EI/L^2, 4*EI/L, -6*EI/L^2, 2*EI/L; -12*EI/L^3, -6*EI/L^2, 12*EI/L^3, -6*EI/L^2; 6*EI/L^2, 2*EI/L, -6*EI/L^2, 4*EI/L] = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4]
 
 ## 2 · Qué parte usa cada barra del pórtico
 #: COLUMNA (base empotrada): en el tope, el desplazamiento transversal es el ladeo Δ y el giro es θ. De la K de barra toma el bloque del extremo 2 (v₂, θ₂):

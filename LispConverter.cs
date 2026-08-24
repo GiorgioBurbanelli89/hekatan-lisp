@@ -303,13 +303,13 @@ namespace HekatanLisp
             string Nary(string sym, string sub, string sup, string expr) =>
                 "<span class=\"m-dvr\"><small>" + sup + "</small><span class=\"m-nary\">" + sym +
                 "</span><small>" + sub + "</small></span>" + expr;
-            // ∫ INLINE (como Hekatan Lab .intsym): símbolo + límites como sub/sup adyacentes.
+            // ∫ APILADO — estructura EXACTA de Hekatan Lab: dvr[ small(sup) nary(<em>∫</em>) small(sub) ] f dx.
+            // El <em> lleva scaleX(0.7) rotate(7deg) → ∫ delgado e inclinado. &emsp;/&nbsp; empujan los límites.
             string IntSym(string lo, string hi, string body)
             {
-                var s = "<span class=\"m-int\">∫</span>";
-                if (!string.IsNullOrEmpty(lo)) s += "<sub>" + lo + "</sub>";
-                if (!string.IsNullOrEmpty(hi)) s += "<sup>" + hi + "</sup>";
-                return s + body;
+                string su = string.IsNullOrEmpty(hi) ? "" : "&emsp; " + hi;
+                string sb = string.IsNullOrEmpty(lo) ? "" : lo + "&nbsp;";
+                return "<span class=\"m-dvr\"><small>" + su + "</small><span class=\"m-nary\"><em>∫</em></span><small>" + sb + "</small></span>" + body;
             }
             string idx = "<span class=\"m-var\">" + v + "</span><span class=\"m-op\">=</span>" + a;
             // d/dv (derivada total) como fracción vertical
@@ -780,11 +780,8 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-3pt;margin:0 .12em;}
 .m-dvr small{font-family:Calibri,Candara,Corbel,sans-serif;font-size:70%;display:block;}
 .m-nary{display:block;font-size:240%;line-height:70%;font-weight:200;color:var(--nary);font-family:'Georgia Pro Light','Georgia Pro','Century Schoolbook',serif;margin:0 1pt 2.5pt 1pt;}
-/* ∫ INLINE — medidas EXACTAS de Hekatan Lab (.intsym) */
-.m-int{font-family:'Cambria Math','Georgia Pro',Georgia,serif;font-style:italic;font-size:180%;line-height:80%;vertical-align:-0.25em;color:var(--nary);margin:0 1pt;font-weight:200;}
-.m-int+sub,.m-int+sub+sup{font-size:65%;}
-.m-int+sub{vertical-align:-0.6em;margin-right:0.1em;}
-.m-int+sub+sup{vertical-align:0.8em;margin-left:-0.6em;margin-right:0.15em;}
+/* ∫ inclinado y delgado (como Hekatan Lab .nary em): scaleX 0.7 + rotate 7deg */
+.m-nary em{display:block;font-style:normal;transform:scaleX(0.7) rotate(7deg);}
 .m-cond{color:#e000d0;font-style:italic;padding:0 .05em;}
 /* límite:  lim  apilado con  x→a  debajo */
 .m-lim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .12em;}

@@ -375,7 +375,7 @@ namespace HekatanLisp
             var todas = (forms ?? new List<string>()).SelectMany(f => (f ?? "").Replace("\r", "").Split('\n'));
             foreach (var raw in todas)
             {
-                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");
                 if (!m.Success) continue;
                 var partes = System.Text.RegularExpressions.Regex.Split(m.Groups[2].Value, @"\s=\s");
                 try
@@ -578,7 +578,7 @@ namespace HekatanLisp
                 var nt = NotationLine(lines[i]);
                 if (nt != null) { notationOf[i] = nt; continue; }
                 var lm = System.Text.RegularExpressions.Regex.Match(lines[i].Trim(),
-                            @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");   // NAME = expr  (no ==)
+                            @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");   // NAME = expr  (no ==)
                 if (lm.Success) { labels[i] = lm.Groups[1].Value; exprText = lm.Groups[2].Value; }
                 treeOf[i] = TreeOfLine(exprText);
             }
@@ -1242,7 +1242,7 @@ namespace HekatanLisp
                 }
                 catch { return l; }
             }
-            var lm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+            var lm = System.Text.RegularExpressions.Regex.Match(l, @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");
             if (lm.Success)
             {
                 string rhs = lm.Groups[2].Value.Trim();
@@ -1251,10 +1251,10 @@ namespace HekatanLisp
                     if (toLisp)
                     {
                         string lispRhs = LooksLikeLisp(rhs) ? rhs : LispConverter.MathToLisp(rhs);
-                        return "(setf " + lm.Groups[1].Value + " " + lispRhs + ")";
+                        return "(setf " + LispConverter.SafeName(lm.Groups[1].Value) + " " + lispRhs + ")";
                     }
                     string conv = LooksLikeLisp(rhs) ? LispConverter.ToLab(LispConverter.ParseLisp(rhs), 0) : rhs;
-                    return lm.Groups[1].Value + " = " + conv;
+                    return LispConverter.SafeName(lm.Groups[1].Value) + " = " + conv;
                 }
                 catch { return l; }
             }
@@ -1505,7 +1505,7 @@ namespace HekatanLisp
                     if (line.Length == 0) { sb.AppendLine(); continue; }
                     if (line.StartsWith(";")) { sb.AppendLine(line); continue; }   // texto/gráfica/comentario: VERBATIM
                     // etiqueta NOMBRE = expr → usa el lado DERECHO (si no, ParseMath descarta el '=')
-                    var lm = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
+                    var lm = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");
                     var f = LispFormOfLine(lm.Success ? lm.Groups[2].Value : line);
                     if (f == null) continue;
                     string matlab; try { matlab = LispConverter.ToLab(LispConverter.ParseLisp(f), 0); } catch { matlab = f; }
@@ -1739,9 +1739,9 @@ namespace HekatanLisp
                     string tg = dq.Groups[2].Success ? "   % " + dq.Groups[2].Value : "";
                     // LHS puede ser  f(x)=…  (definición) o  N=…  (etiqueta); si no, expr suelta.
                     var fmd = System.Text.RegularExpressions.Regex.Match(eql, @"^([A-Za-z]\w*)\(([^)]*)\)\s*=\s*(?![=])(.+)$");
-                    var lmd = System.Text.RegularExpressions.Regex.Match(eql, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
-                    string lhs = fmd.Success ? fmd.Groups[1].Value + "(" + fmd.Groups[2].Value + ")"
-                               : lmd.Success ? lmd.Groups[1].Value : null;
+                    var lmd = System.Text.RegularExpressions.Regex.Match(eql, @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");
+                    string lhs = fmd.Success ? LispConverter.SafeName(fmd.Groups[1].Value) + "(" + fmd.Groups[2].Value + ")"
+                               : lmd.Success ? LispConverter.SafeName(lmd.Groups[1].Value) : null;
                     string rh  = fmd.Success ? fmd.Groups[3].Value : lmd.Success ? lmd.Groups[2].Value : eql;
                     string mx;
                     try
@@ -1788,9 +1788,9 @@ namespace HekatanLisp
                 var em = System.Text.RegularExpressions.Regex.Match(line, @"^(.*?)\s*@@\((.*?)\)\s*$");
                 if (em.Success) { mtag = "   % " + em.Groups[2].Value; line = em.Groups[1].Value.Trim(); }
                 var fmn = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\(([^)]*)\)\s*=\s*(?![=])(.+)$");
-                var lm  = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z]\w*)\s*=\s*(?![=])(.+)$");
-                string lhs2 = fmn.Success ? fmn.Groups[1].Value + "(" + fmn.Groups[2].Value + ")"
-                            : lm.Success ? lm.Groups[1].Value : null;
+                var lm  = System.Text.RegularExpressions.Regex.Match(line, @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");
+                string lhs2 = fmn.Success ? LispConverter.SafeName(fmn.Groups[1].Value) + "(" + fmn.Groups[2].Value + ")"
+                            : lm.Success ? LispConverter.SafeName(lm.Groups[1].Value) : null;
                 string rhs = fmn.Success ? fmn.Groups[3].Value : lm.Success ? lm.Groups[2].Value : line;
                 string mexpr;
                 try

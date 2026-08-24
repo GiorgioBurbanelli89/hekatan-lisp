@@ -2,23 +2,25 @@
 #: En el ejemplo del pórtico la matriz K apareció ya armada. Aquí se ve de dónde sale: se ENSAMBLA de las K de cada barra, que a su vez vienen de las funciones de forma. Todo con el motor.
 
 ## 1 · De dónde salen las FUNCIONES DE FORMA (el meollo)
-#: ¿De dónde salen esas 4 curvas? Se DEDUCEN. Suponemos que la barra se deforma como una cúbica: 4 términos, uno por cada dato de los extremos. La base son esos términos:
-base = [1 x x^2 x^3] @@(base cúbica)
-#: Los 4 datos son el desplazamiento v y la pendiente v'=θ en los 2 extremos. Evaluar la base (y su derivada) en x=0 y x=1 arma la matriz C — cada fila es v o v' en un nudo:
-C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(base y su derivada en los 2 nudos)
-Cinv = C^-1 @@(despeja: C⁻¹)
-N = base*Cinv @@(N = base·C⁻¹ = las funciones de forma)
+#: En simple: una función de forma es el **PESO** de un extremo de la barra — dice cuánto manda ese extremo sobre la forma que toma el medio. Hay 4 pesos, uno por cada dato de las puntas: cuánto baja y cuánto gira cada extremo.
+#: ¿Cómo se hallan? Supongo que la barra se dobla como una **cúbica** (una curva suave con 4 números de ajuste, uno por dato). Sus términos son la base:
+base = [1 x x^2 x^3] @@(los 4 términos de la cúbica)
+#: Los 4 números de ajuste no los conozco; pero SÍ conozco los 4 datos: cuánto baja (v) y cuánto gira (v') cada extremo. Al meter x=0 y x=1 en la base y en su derivada, cada fila dice qué mezcla de ajustes da ese dato. Esas 4 filas son la matriz **C** — el "puente" entre los ajustes y los datos que sí conozco:
+C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(C: puente ajustes ↔ datos de los extremos)
+#: La invierto (para ir al revés: de los datos a los ajustes) y multiplico la base por C⁻¹. Salen los pesos:
+Cinv = C^-1 @@(C⁻¹: el puente al revés)
+N = base*Cinv @@(N = base·C⁻¹ = los 4 pesos = las funciones de forma)
 #: ¡Ahí nacen! Salen las 4 de Hermite: H₁=1−3x²+2x³ (peso de v₁), H₂=x−2x²+x³ (θ₁), H₃=3x²−2x³ (v₂), H₄=−x²+x³ (θ₂). Dibujadas:
 #fplot(1-3*x^2+2*x^3, x-2*x^2+x^3, 3*x^2-2*x^3, -x^2+x^3, [0 1])
 #: Esas son las funciones de forma del pórtico: cada barra usa estas mismas 4 curvas. Para llegar a la rigidez, de cada una saco la PENDIENTE (primera derivada) y de ahí la CURVATURA (segunda derivada). El motor deriva paso a paso:
-H1p = Diff{1-3*x^2+2*x^3 @ x} @@(H₁' pendiente)
-H1pp = Diff{-6*x+6*x^2 @ x} @@(H₁'' curvatura)
-H2p = Diff{x-2*x^2+x^3 @ x} @@(H₂' pendiente)
-H2pp = Diff{1-4*x+3*x^2 @ x} @@(H₂'' curvatura)
-H3p = Diff{3*x^2-2*x^3 @ x} @@(H₃' pendiente)
-H3pp = Diff{6*x-6*x^2 @ x} @@(H₃'' curvatura)
-H4p = Diff{-x^2+x^3 @ x} @@(H₄' pendiente)
-H4pp = Diff{-2*x+3*x^2 @ x} @@(H₄'' curvatura)
+H1' = Diff{1-3*x^2+2*x^3 @ x} @@(pendiente de H₁)
+H1'' = Diff{-6*x+6*x^2 @ x} @@(curvatura de H₁)
+H2' = Diff{x-2*x^2+x^3 @ x} @@(pendiente de H₂)
+H2'' = Diff{1-4*x+3*x^2 @ x} @@(curvatura de H₂)
+H3' = Diff{3*x^2-2*x^3 @ x} @@(pendiente de H₃)
+H3'' = Diff{6*x-6*x^2 @ x} @@(curvatura de H₃)
+H4' = Diff{-x^2+x^3 @ x} @@(pendiente de H₄)
+H4'' = Diff{-2*x+3*x^2 @ x} @@(curvatura de H₄)
 #: Ya con las curvaturas, la rigidez es cada una por la otra, integrada:  K_ij = EI·∫ H_i'' · H_j'' dx. El motor integra los productos (con L=1) y da los coeficientes:
 k11 = Area{(-6+12*x)^2 @ x=0:1} @@(H₁''·H₁'')
 k12 = Area{(-6+12*x)*(-4+6*x) @ x=0:1} @@(H₁''·H₂'')

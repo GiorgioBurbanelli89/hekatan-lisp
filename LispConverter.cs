@@ -33,7 +33,7 @@ namespace HekatanLisp
         // $Nombre = operadores estilo Calcpad; {} = paréntesis; @ y : = bloque solver ($Op{f @ x = a : b}).
         // ∂ y ∇ cuentan como parte del identificador → así {∂N/∂s} renderiza la parcial en comentarios.
         // el '=' es necesario para los límites del solver:  Area{f @ x = a : b}  (antes se perdía)
-        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*|[-+*/^(),;\[\]{}@:'=]");
+        static readonly Regex Tok = new Regex(@"\d+\.?\d*|\$?[A-Za-z_∂∇][\w∂∇]*'*|[-+*/^(),;\[\]{}@:'=]");
         // operadores solver de Calcpad → función del motor
         static readonly Dictionary<string, string> SolverOps = new Dictionary<string, string>
         {
@@ -440,11 +440,26 @@ namespace HekatanLisp
         }
 
         // ---------- render: arbol -> LISP ----------
+        // nombre SEGURO para LISP/MATLAB: la prima ' (cita en LISP, transpuesta en MATLAB) → 'p'.
+        // Así  H1' → H1p,  H1'' → H1pp  al convertir; en matemática se sigue viendo H₁′.
+        // Nombre válido para LISP/MATLAB. La PRIMA usa el MISMO token que Hekatan Lab
+        // (sufijo de letras que su HtmlWriter dibuja como ′/″/‴): 'prime'/'pprime'/'tprime'.
+        // Así H1' → H1prime (válido en MATLAB y, al pegar en Hekatan Lab, se ve H1′).
+        public static string SafeName(string s)
+        {
+            if (string.IsNullOrEmpty(s) || s.IndexOf('\'') < 0) return s;
+            int i = s.Length; while (i > 0 && s[i - 1] == '\'') i--;
+            int n = s.Length - i;
+            string suf = n switch { 0 => "", 1 => "prime", 2 => "pprime", 3 => "tprime",
+                                    _ => string.Concat(System.Linq.Enumerable.Repeat("prime", n)) };
+            return (s.Substring(0, i) + suf).Replace("'", "");
+        }
+
         public static string ToLisp(N n)
         {
             if (n == null) return "";
             if (n.Op == "solver") return SolverToLisp(n);
-            if (n.IsAtom) return n.Atom;
+            if (n.IsAtom) return SafeName(n.Atom);
             if (n.Op == "neg") return "(- " + ToLisp(n.A) + ")";
             if (n.Op == "trans") return "(mtransp " + ToLisp(n.A) + ")";
             if (n.Op == "range") return "(mrange " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
@@ -459,7 +474,7 @@ namespace HekatanLisp
         {
             if (n == null) return "";
             if (n.Op == "solver") return SolverToLab(n);
-            if (n.IsAtom) return n.Atom;
+            if (n.IsAtom) return SafeName(n.Atom);
             if (n.Op == "neg") return "-" + ToLab(n.A, 3);
             if (n.Op == "fn")
             {
@@ -523,6 +538,9 @@ namespace HekatanLisp
 
         static string VarHtml(string name, bool vecArrow = false)
         {
+            // primas: apóstrofos al FINAL del nombre → ′ ″ ‴ (superíndice).  H1' = H₁′,  H1'' = H₁″
+            string primes = "";
+            while (name.Length > 1 && name[name.Length - 1] == '\'') { primes += "&prime;"; name = name.Substring(0, name.Length - 1); }
             string baseN, sub;
             int us = name.IndexOf('_');
             if (us > 0 && us < name.Length - 1) { baseN = name.Substring(0, us); sub = name.Substring(us + 1); }
@@ -538,6 +556,7 @@ namespace HekatanLisp
             var deco = vecArrow ? Over("&#8594;", DecorateBase(baseN)) : DecorateBase(baseN);   // theta→θ, Fvec→F⃗…
             var h = "<span class=\"m-var\">" + deco + "</span>";
             if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
+            if (primes.Length > 0) h += "<sup class=\"m-sup\">" + primes + "</sup>";
             return h;
         }
 

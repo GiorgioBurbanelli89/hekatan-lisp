@@ -119,5 +119,77 @@ namespace HekatanLisp
             cv.DrawPath(arc, pen);
             cv.DrawText(Label(t), x + 22, by - 14, txt);
         }
+
+        // ---------- PÓRTICO plano: 2 columnas + viga ----------
+        public static string FramePng(string spec, bool dark)
+        {
+            const int W = 520, H = 320;
+            var bg = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            var fg = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            var acc = dark ? new SKColor(0xE8, 0x82, 0x5A) : new SKColor(0xD8, 0x5A, 0x30);
+            var info = new SKImageInfo(W, H);
+            using var surf = SKSurface.Create(info);
+            var cv = surf.Canvas; cv.Clear(bg);
+            var mem = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 4 };
+            var thin = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f };
+            var lpen = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.2f };
+            var lfill = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var tac = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+
+            var parts = (spec ?? "").Split(',');
+            var sup = (parts.Length > 0 ? parts[0] : "fixed-fixed").Trim().ToLowerInvariant().Split('-');
+            string sL = sup.Length > 0 ? sup[0].Trim() : "fixed";
+            string sR = sup.Length > 1 ? sup[1].Trim() : "fixed";
+
+            float cxL = 110, cxR = W - 110, yTop = 70, yBase = H - 70;
+            // pórtico: columna izq, viga, columna der
+            cv.DrawLine(cxL, yBase, cxL, yTop, mem);
+            cv.DrawLine(cxR, yBase, cxR, yTop, mem);
+            cv.DrawLine(cxL, yTop, cxR, yTop, mem);
+            Ground(cv, sL, cxL, yBase, thin);
+            Ground(cv, sR, cxR, yBase, thin);
+            // cargas
+            for (int i = 1; i < parts.Length; i++)
+            {
+                var t = parts[i].Trim(); if (t.Length == 0) continue;
+                char c = char.ToLowerInvariant(t[0]);
+                if (c == 'h')   // carga lateral H → flecha horizontal en la esquina sup izq
+                {
+                    cv.DrawLine(cxL - 48, yTop, cxL - 4, yTop, lpen);
+                    using var head = new SKPath();
+                    head.MoveTo(cxL - 4, yTop); head.LineTo(cxL - 14, yTop - 5); head.LineTo(cxL - 14, yTop + 5); head.Close();
+                    cv.DrawPath(head, lfill);
+                    cv.DrawText(Label(t), cxL - 66, yTop + 5, tac);
+                }
+                else if (c == 'q' || c == 'w') Uniform(cv, cxL, cxR, yTop, lpen, lfill, tac, t);
+                else Point(cv, cxL, cxR, yTop, t, lpen, lfill, tac);
+            }
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
+        static void Ground(SKCanvas cv, string kind, float x, float y, SKPaint p)   // apoyo en la base (suelo abajo)
+        {
+            switch (kind)
+            {
+                case "fixed":
+                    cv.DrawLine(x - 26, y, x + 26, y, p);
+                    for (float xx = x - 24; xx <= x + 22; xx += 9) cv.DrawLine(xx, y, xx + 9, y + 10, p);
+                    break;
+                case "pin":
+                    using (var tri = new SKPath())
+                    { tri.MoveTo(x, y); tri.LineTo(x - 13, y + 22); tri.LineTo(x + 13, y + 22); tri.Close(); cv.DrawPath(tri, p); }
+                    cv.DrawLine(x - 20, y + 22, x + 20, y + 22, p);
+                    for (float xx = x - 16; xx <= x + 16; xx += 8) cv.DrawLine(xx, y + 22, xx - 7, y + 30, p);
+                    break;
+                case "roller":
+                    using (var tri = new SKPath())
+                    { tri.MoveTo(x, y); tri.LineTo(x - 13, y + 18); tri.LineTo(x + 13, y + 18); tri.Close(); cv.DrawPath(tri, p); }
+                    cv.DrawCircle(x - 7, y + 23, 4, p); cv.DrawCircle(x + 7, y + 23, 4, p);
+                    cv.DrawLine(x - 20, y + 28, x + 20, y + 28, p);
+                    break;
+            }
+        }
     }
 }

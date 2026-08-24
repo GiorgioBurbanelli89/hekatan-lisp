@@ -1,13 +1,15 @@
 # El pórtico: de dónde sale la K (ensamblaje desde las barras)
 #: En el ejemplo del pórtico la matriz K apareció ya armada. Aquí se ve de dónde sale: se ENSAMBLA de las K de cada barra, que a su vez vienen de las funciones de forma. Todo con el motor.
 
-## 1 · Las FUNCIONES DE FORMA de cada barra (aquí están, dibujadas)
-#: Cada barra del pórtico (columna o viga) interpola su deformación con las 4 funciones de forma de Hermite — son los "pesos" de sus dos extremos (desplazamiento v y giro θ). Estas son:
-H1 = 1-3*x^2+2*x^3 @@(peso de v₁)
-H2 = x-2*x^2+x^3 @@(peso de θ₁)
-H3 = 3*x^2-2*x^3 @@(peso de v₂)
-H4 = -x^2+x^3 @@(peso de θ₂)
-#fplot(H1, H2, H3, H4, [0 1])
+## 1 · De dónde salen las FUNCIONES DE FORMA (el meollo)
+#: ¿De dónde salen esas 4 curvas? Se DEDUCEN. Suponemos que la barra se deforma como una cúbica: 4 términos, uno por cada dato de los extremos. La base son esos términos:
+base = [1 x x^2 x^3] @@(base cúbica)
+#: Los 4 datos son el desplazamiento v y la pendiente v'=θ en los 2 extremos. Evaluar la base (y su derivada) en x=0 y x=1 arma la matriz C — cada fila es v o v' en un nudo:
+C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(base y su derivada en los 2 nudos)
+Cinv = C^-1 @@(despeja: C⁻¹)
+N = base*Cinv @@(N = base·C⁻¹ = las funciones de forma)
+#: ¡Ahí nacen! Salen las 4 de Hermite: H₁=1−3x²+2x³ (peso de v₁), H₂=x−2x²+x³ (θ₁), H₃=3x²−2x³ (v₂), H₄=−x²+x³ (θ₂). Dibujadas:
+#fplot(1-3*x^2+2*x^3, x-2*x^2+x^3, 3*x^2-2*x^3, -x^2+x^3, [0 1])
 #: Esas son las funciones de forma del pórtico: cada barra usa estas mismas 4 curvas. Para llegar a la rigidez, de cada una saco la PENDIENTE (primera derivada) y de ahí la CURVATURA (segunda derivada). El motor deriva paso a paso:
 H1p = Diff{1-3*x^2+2*x^3 @ x} @@(H₁' pendiente)
 H1pp = Diff{-6*x+6*x^2 @ x} @@(H₁'' curvatura)

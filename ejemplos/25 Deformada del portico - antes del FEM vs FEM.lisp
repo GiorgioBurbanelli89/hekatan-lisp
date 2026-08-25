@@ -4,8 +4,13 @@
 ## 0 · El problema — y de dónde salen los desplazamientos
 #: Pórtico de un vano: columnas de altura h=1, viga de luz L=1, rigidez EI=1 (unitarios, para ver los números limpios). Bases empotradas. Carga lateral H=1 en la esquina B. Sin deformar:
 #frame(fixed-fixed, H)
-#: Hay 3 incógnitas: el giro de cada esquina (θ_B, θ_C) y el ladeo del piso (Δ). Salen de la ecuación de rigidez K·u = F, o sea u = K⁻¹·F. La K se ensambla de las barras (ejemplo 24) y la carga H empuja el ladeo:
-K = [8, 2, -6; 2, 8, -6; -6, -6, 24] @@(rigidez del pórtico)
+#: Hay 3 incógnitas: el giro de cada esquina (θ_B, θ_C) y el ladeo del piso (Δ). Salen de la ecuación de rigidez K·u = F, o sea u = K⁻¹·F. ¿Y de dónde sale K? Se ENSAMBLA de las barras. Cada barra tiene su rigidez de flexión, deducida de las funciones de forma en el ejemplo 24:
+K_barra = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4] @@(rigidez de una barra: EI=1, L=1)
+#: En cada grado de libertad se SUMAN las barras que lo tocan. El giro θ_B lo comparten la viga (4) y la columna izquierda (4); el ladeo Δ lo empujan las dos columnas (12 y 12); el término θ_B–θ_C es solo la viga (2) y el giro–ladeo es la columna (−6):
+kBB = 4 + 4 @@(θ_B: viga + columna izq)
+kCC = 4 + 4 @@(θ_C: viga + columna der)
+kDD = 12 + 12 @@(Δ: las dos columnas)
+K = [kBB, 2, -6; 2, kCC, -6; -6, -6, kDD] @@(K del pórtico, ensamblada de las barras)
 F = [0; 0; 1] @@(la carga H va en el ladeo Δ)
 u = K^-1 * F @@(u = K⁻¹·F = [θ_B ; θ_C ; Δ])
 #: De ese vector saco cada desplazamiento (una fila selectora × u toma la componente):

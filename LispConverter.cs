@@ -508,6 +508,8 @@ namespace HekatanLisp
             {"eta","η"},{"theta","θ"},{"iota","ι"},{"kappa","κ"},{"lambda","λ"},{"mu","μ"},
             {"nu","ν"},{"xi","ξ"},{"omicron","ο"},{"rho","ρ"},{"sigma","σ"},{"tau","τ"},
             {"upsilon","υ"},{"phi","φ"},{"chi","χ"},{"psi","ψ"},{"omega","ω"},
+            {"eps","ε"},{"varepsilon","ε"},{"varphi","φ"},  // alias cortos frecuentes
+
             {"Alpha","Α"},{"Beta","Β"},{"Gamma","Γ"},{"Delta","Δ"},{"Theta","Θ"},{"Lambda","Λ"},
             {"Xi","Ξ"},{"Sigma","Σ"},{"Phi","Φ"},{"Psi","Ψ"},{"Omega","Ω"},
         };

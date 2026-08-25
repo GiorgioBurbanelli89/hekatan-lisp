@@ -2,11 +2,13 @@
 #: La misma curva por los dos caminos. **Antes** (clásico) se integraba la elástica de cada barra. **Ahora** (FEM) las funciones de forma ya llevan esa integración hecha. Mismo resultado, misma gráfica. Todo con el motor.
 
 ## 0 · El problema — y de dónde salen los desplazamientos
-#: Pórtico de un vano: columnas de altura h=1, viga de luz L=1, rigidez EI=1 (unitarios, para ver los números limpios). Bases empotradas. Carga lateral H=1 en la esquina B. Sin deformar:
+#: Pórtico de un vano, columnas y viga de igual longitud, bases empotradas, carga lateral H en la esquina B. Los datos del problema (primero las variables, luego se reemplazan):
+EI = 1 @@(rigidez de flexión del material)
+L = 1 @@(longitud de cada barra)
 #frame(fixed-fixed, H)
-#: Hay 3 incógnitas: el giro de cada esquina (θ_B, θ_C) y el ladeo del piso (Δ). Salen de la ecuación de rigidez K·u = F, o sea u = K⁻¹·F. ¿Y de dónde sale K? Se ENSAMBLA de las barras. Cada barra tiene su rigidez de flexión, deducida de las funciones de forma en el ejemplo 24:
-K_barra = [12, 6, -12, 6; 6, 4, -6, 2; -12, -6, 12, -6; 6, 2, -6, 4] @@(rigidez de una barra: EI=1, L=1)
-#: En cada grado de libertad se SUMAN las barras que lo tocan. El giro θ_B lo comparten la viga (4) y la columna izquierda (4); el ladeo Δ lo empujan las dos columnas (12 y 12); el término θ_B–θ_C es solo la viga (2) y el giro–ladeo es la columna (−6):
+#: Hay 3 incógnitas: el giro de cada esquina (θ_B, θ_C) y el ladeo del piso (Δ). Salen de la ecuación de rigidez K·u = F, o sea u = K⁻¹·F. ¿Y de dónde sale K? Se ENSAMBLA de las barras. Cada barra tiene su rigidez de flexión — en SÍMBOLOS (EI, L), y a la derecha con los valores de arriba (deducida de las funciones de forma en el ejemplo 24):
+K_barra = (EI/L^3)*[12, 6*L, -12, 6*L; 6*L, 4*L^2, -6*L, 2*L^2; -12, -6*L, 12, -6*L; 6*L, 2*L^2, -6*L, 4*L^2] @@(rigidez de barra: símbolo = valor)
+#: En cada grado de libertad se SUMAN las barras que lo tocan (esos 4, 12, 2, 6 son entradas de K_barra). El giro θ_B lo comparten la viga y la columna izquierda; el ladeo Δ lo empujan las dos columnas; θ_B–θ_C es solo la viga; giro–ladeo es la columna:
 kBB = 4 + 4 @@(θ_B: viga + columna izq)
 kCC = 4 + 4 @@(θ_C: viga + columna der)
 kDD = 12 + 12 @@(Δ: las dos columnas)

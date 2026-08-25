@@ -4,7 +4,7 @@
 ## 1 · De dónde salen las FUNCIONES DE FORMA (el meollo)
 #: Una función de forma es el **PESO** de un dato de la punta: dice cuánto manda ese dato sobre la curva que toma la barra en el medio. En las puntas hay 4 datos — cuánto BAJA (v) y cuánto GIRA (v') cada extremo — así que hay 4 pesos. El razonamiento para hallarlos, paso a paso:
 
-#: **1) La barra se dobla como una cúbica.** Una curva suave con 4 números de ajuste (a₀…a₃), uno por dato. Sus 4 ingredientes son la base; cualquier cúbica es una mezcla de estos cuatro:
+#: **1) La barra se dobla como una cúbica.** ¿Por qué esos 4 ingredientes (1, x, x², x³)? Por dos razones que caen juntas. **Contar:** en las puntas conozco 4 datos, así que necesito 4 "perillas" independientes para forzarlos; las más simples son las potencias, una por grado — **1** pone el nivel, **x** la inclinación, **x²** una curva, **x³** una curva que cambia. Cada una hace algo que las otras no pueden. **Física:** una viga a flexión se dobla exactamente como cúbica (momento lineal → curvatura lineal → dos integraciones → flecha cúbica). Los 4 ingredientes son la base; cualquier cúbica es una mezcla de estos cuatro:
 base = [1 x x^2 x^3] @@(los 4 ingredientes de la cúbica)
 #fplot(1, x, x^2, x^3, [0 1])
 

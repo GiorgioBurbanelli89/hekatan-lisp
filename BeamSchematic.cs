@@ -148,6 +148,27 @@ namespace HekatanLisp
             cv.DrawLine(cxL, yTop, cxR, yTop, mem);
             Ground(cv, sL, cxL, yBase, thin);
             Ground(cv, sR, cxR, yBase, thin);
+            // COTAS: luz L (abajo) y altura h (derecha), + nudos B, C — para leer la geometría
+            var dim = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.1f };
+            var tcen = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15, TextAlign = SKTextAlign.Center };
+            var tlft = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15, TextAlign = SKTextAlign.Left };
+            var tjt = new SKPaint { Color = fg, IsAntialias = true, TextSize = 14, FakeBoldText = true };
+            float yL = yBase + 40;
+            cv.DrawLine(cxL, yBase + 18, cxL, yL, dim);
+            cv.DrawLine(cxR, yBase + 18, cxR, yL, dim);
+            cv.DrawLine(cxL, yL, cxR, yL, dim);
+            cv.DrawLine(cxL, yL - 4, cxL, yL + 4, dim);
+            cv.DrawLine(cxR, yL - 4, cxR, yL + 4, dim);
+            cv.DrawText("L", (cxL + cxR) / 2, yL - 5, tcen);
+            float xh = cxR + 40;
+            cv.DrawLine(cxR + 6, yTop, xh, yTop, dim);
+            cv.DrawLine(cxR + 6, yBase, xh, yBase, dim);
+            cv.DrawLine(xh, yTop, xh, yBase, dim);
+            cv.DrawLine(xh - 4, yTop, xh + 4, yTop, dim);
+            cv.DrawLine(xh - 4, yBase, xh + 4, yBase, dim);
+            cv.DrawText("h", xh + 6, (yTop + yBase) / 2 + 5, tlft);
+            cv.DrawText("B", cxL + 8, yTop - 9, tjt);
+            cv.DrawText("C", cxR - 20, yTop - 9, tjt);
             // cargas
             for (int i = 1; i < parts.Length; i++)
             {

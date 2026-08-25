@@ -1,26 +1,36 @@
 # Deformada de un pórtico: cómo se dibujaba ANTES del FEM vs con FEM
 #: La misma curva por los dos caminos. **Antes** (clásico) se integraba la elástica de cada barra. **Ahora** (FEM) las funciones de forma ya llevan esa integración hecha. Mismo resultado, misma gráfica. Todo con el motor.
 
-## 0 · El problema
-#: Pórtico de un vano, bases empotradas, carga lateral H en la esquina superior izquierda. Sin deformar:
+## 0 · El problema — y de dónde salen los desplazamientos
+#: Pórtico de un vano: columnas de altura h=1, viga de luz L=1, rigidez EI=1 (unitarios, para ver los números limpios). Bases empotradas. Carga lateral H=1 en la esquina B. Sin deformar:
 #frame(fixed-fixed, H)
-#: Resolviendo la estructura (ejemplos 22 y 24) los nudos se mueven: el tope ladea Δ y las esquinas giran θ_B, θ_C. Con esos datos hay que DIBUJAR la curva que toma cada barra entre sus nudos:
-Delta = 5/84 @@(ladeo del tope)
-theta_B = 1/28 @@(giro esquina izquierda)
-theta_C = 1/28 @@(giro esquina derecha)
+#: Hay 3 incógnitas: el giro de cada esquina (θ_B, θ_C) y el ladeo del piso (Δ). Salen de la ecuación de rigidez K·u = F, o sea u = K⁻¹·F. La K se ensambla de las barras (ejemplo 24) y la carga H empuja el ladeo:
+K = [8, 2, -6; 2, 8, -6; -6, -6, 24] @@(rigidez del pórtico)
+F = [0; 0; 1] @@(la carga H va en el ladeo Δ)
+u = K^-1 * F @@(u = K⁻¹·F = [θ_B ; θ_C ; Δ])
+#: De ese vector saco cada desplazamiento (una fila selectora × u toma la componente):
+theta_B = [1 0 0]*u @@(giro esquina izquierda)
+theta_C = [0 1 0]*u @@(giro esquina derecha)
+Delta = [0 0 1]*u @@(ladeo del tope)
+#: Con esos datos hay que DIBUJAR la curva que toma cada barra entre sus nudos.
 
 ## 1 · ANTES del FEM — integrando la elástica (clásico)
-#: En un tramo sin carga la barra cumple EI·v'''' = 0. Cada integración sube el grado; integrando, v(x) sale CÚBICA. El motor muestra que una integral ya sube el grado:
-p1 = Integral{-2+3*x @ x} @@(integrar una lineal → una cuadrática)
-#: Entonces v es una cúbica con 4 constantes. Se fijan con los 4 datos de los EXTREMOS de la barra. Tomo la columna izquierda: abajo empotrada (ni baja ni gira) y arriba con el ladeo y el giro del nudo:
-u_col = [0; 0; Delta; theta_B] @@(abajo v=0,θ=0 · arriba Δ,θ)
-#: Meter esos 4 datos en la cúbica y en su pendiente arma el sistema C·a = u. Resolverlo (a mano se hacía integrando; aquí lo despejo) da las constantes de ESTA barra:
+#: ¿De dónde parte? De la física de la barra. Un tramo SIN carga cumple EI·v'''' = 0 (nada la dobla de más). Integrando esa ecuación cuatro veces —cada ∫ sube un grado: 0 → constante → recta → parábola → cúbica— la flecha v(x) queda como una CÚBICA con 4 constantes. Sus ingredientes:
+base = [1 x x^2 x^3] @@(v = a·base = una cúbica)
+#: Las 4 constantes se fijan con los 4 datos de los EXTREMOS de la barra. La columna izquierda: abajo empotrada (v=0, θ=0) y arriba con el ladeo Δ y el giro θ_B. De u global selecciono esos 4:
+u_col = [0 0 0; 0 0 0; 0 0 1; 1 0 0]*u @@(v,θ abajo=0 · arriba Δ=u₃, θ_B=u₁)
+#: Meter esos 4 datos en la cúbica y en su pendiente arma el sistema C·a = u_col. Despejando las constantes:
 C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(las 4 condiciones de los extremos)
-a = C^-1 * u_col @@(a = C⁻¹·u_col = las constantes de la cúbica)
-base = [1 x x^2 x^3]
-v_clasico = base*a @@(deformada de la columna = base·a)
+a = C^-1 * u_col @@(a = C⁻¹·u_col)
+v_clasico = base*a @@(la deformada de la columna)
 #: Esa cúbica es la curva que toma la columna. Dibujada:
 #fplot(x^2/7 - x^3/12, [0 1])
+#: ¿De veras es una barra sin carga? Se comprueba: derivo la flecha hasta la curvatura (2ª derivada) y tiene que salir LINEAL. El motor deriva:
+vp = Diff{x^2/7 - x^3/12 @ x} @@(pendiente = v')
+curv = Diff{2*x/7 - x^2/4 @ x} @@(curvatura = v'' → sale LINEAL)
+#: Y al revés — la doble integración de la elástica que se hacía A MANO: integro esa curvatura dos veces, con la base empotrada (pendiente y flecha valen 0 abajo → constantes 0), y RECUPERO la misma flecha:
+pend = Integral{2/7 - x/2 @ x} @@(∫ curvatura = pendiente)
+flecha = Integral{2*x/7 - x^2/4 @ x} @@(∫ pendiente = la misma flecha)
 #: Lo laborioso del clásico: esto había que rehacerlo barra por barra, cada una con su propio u.
 
 ## 2 · CON FEM — funciones de forma (sin integrar por barra)

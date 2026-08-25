@@ -2,16 +2,33 @@
 #: En el ejemplo del pórtico la matriz K apareció ya armada. Aquí se ve de dónde sale: se ENSAMBLA de las K de cada barra, que a su vez vienen de las funciones de forma. Todo con el motor.
 
 ## 1 · De dónde salen las FUNCIONES DE FORMA (el meollo)
-#: En simple: una función de forma es el **PESO** de un extremo de la barra — dice cuánto manda ese extremo sobre la forma que toma el medio. Hay 4 pesos, uno por cada dato de las puntas: cuánto baja y cuánto gira cada extremo.
-#: ¿Cómo se hallan? Supongo que la barra se dobla como una **cúbica** (una curva suave con 4 números de ajuste, uno por dato). Sus términos son la base:
-base = [1 x x^2 x^3] @@(los 4 términos de la cúbica)
-#: Los 4 números de ajuste no los conozco; pero SÍ conozco los 4 datos: cuánto baja (v) y cuánto gira (v') cada extremo. Al meter x=0 y x=1 en la base y en su derivada, cada fila dice qué mezcla de ajustes da ese dato. Esas 4 filas son la matriz **C** — el "puente" entre los ajustes y los datos que sí conozco:
-C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(C: puente ajustes ↔ datos de los extremos)
-#: La invierto (para ir al revés: de los datos a los ajustes) y multiplico la base por C⁻¹. Salen los pesos:
-Cinv = C^-1 @@(C⁻¹: el puente al revés)
+#: Una función de forma es el **PESO** de un dato de la punta: dice cuánto manda ese dato sobre la curva que toma la barra en el medio. En las puntas hay 4 datos — cuánto BAJA (v) y cuánto GIRA (v') cada extremo — así que hay 4 pesos. El razonamiento para hallarlos, paso a paso:
+
+#: **1) La barra se dobla como una cúbica.** Una curva suave con 4 números de ajuste (a₀…a₃), uno por dato. Sus 4 ingredientes son la base; cualquier cúbica es una mezcla de estos cuatro:
+base = [1 x x^2 x^3] @@(los 4 ingredientes de la cúbica)
+#fplot(1, x, x^2, x^3, [0 1])
+
+#: **2) Los ajustes a₀…a₃ no son físicos; los datos de las puntas SÍ.** Para pasar de unos a otros, evalúo la cúbica (da v) y su PENDIENTE (da v') en los dos extremos, x=0 y x=1. La pendiente la saca el motor:
+wd = Diff{a0 + a1*x + a2*x^2 + a3*x^3 @ x} @@(pendiente de la cúbica general)
+#: Meto x=0 y x=1 en la cúbica y en esa pendiente. Cada evaluación es una FILA: dice qué mezcla de ajustes da ese dato. Las 4 filas son la matriz **C**:
+C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(fila1=v(0), fila2=v'(0), fila3=v(1), fila4=v'(1))
+
+#: **3) Le doy la vuelta.** Los datos = C·ajustes, así que los ajustes = C⁻¹·datos. Y la deformada = base·ajustes = base·C⁻¹·datos. Ese **base·C⁻¹** es lo que multiplica a cada dato: son los pesos. Ahí nacen:
+Cinv = C^-1 @@(C⁻¹: de los datos a los ajustes)
 N = base*Cinv @@(N = base·C⁻¹ = los 4 pesos = las funciones de forma)
-#: ¡Ahí nacen! Salen las 4 de Hermite: H₁=1−3x²+2x³ (peso de v₁), H₂=x−2x²+x³ (θ₁), H₃=3x²−2x³ (v₂), H₄=−x²+x³ (θ₂). Dibujadas:
+
+#: **4) Qué son esos pesos (la clave).** Cada peso vale **1** en su propio dato y **0** en los otros 3. Por eso es el "peso" de ese dato. Los nombro (columnas de N) y los dibujo:
+H1 = 1-3*x^2+2*x^3 @@(peso de v₁)
+H2 = x-2*x^2+x^3 @@(peso de θ₁)
+H3 = 3*x^2-2*x^3 @@(peso de v₂)
+H4 = -x^2+x^3 @@(peso de θ₂)
 #fplot(1-3*x^2+2*x^3, x-2*x^2+x^3, 3*x^2-2*x^3, -x^2+x^3, [0 1])
+#: Mira la azul (H₁, peso de v₁): sale de 1 y baja a 0. La verde (H₃, peso de v₂): sube de 0 a 1. Cada una manda sobre SU dato y se anula en los otros tres.
+
+#: **5) La deformada real es la mezcla.** Se suman los 4 pesos, cada uno por su dato. Ejemplo: baja 1 a la izquierda y 0.5 a la derecha (giros 0):
+w = 1*H1 + 0.5*H3 @@(deformada = v₁·H₁ + v₂·H₃, con v₁=1, v₂=0.5)
+#fplot(1-1.5*x^2+x^3, [0 1])
+#: Ese es todo el meollo: se asume cúbica → se atan sus ajustes a los datos de las puntas (matriz C) → se invierte (C⁻¹) → base·C⁻¹ = los pesos. El FEM es exactamente esto.
 #: Esas son las funciones de forma del pórtico: cada barra usa estas mismas 4 curvas. Para llegar a la rigidez, de cada una saco la PENDIENTE (primera derivada) y de ahí la CURVATURA (segunda derivada). El motor deriva paso a paso:
 H1' = Diff{1-3*x^2+2*x^3 @ x} @@(pendiente de H₁)
 H1'' = Diff{-6*x+6*x^2 @ x} @@(curvatura de H₁)

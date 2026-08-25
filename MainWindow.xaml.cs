@@ -494,13 +494,21 @@ namespace HekatanLisp
 
             // CaseMap: recuerda cómo escribió el usuario cada identificador con mayúsculas
             // (L, EI, N1…) para restaurar el case en el render (el motor los devuelve en minúscula).
+            // SOLO líneas de matemática (no texto '#'/';'/'%' ni la etiqueta @@), para no cazar
+            // palabras de la prosa como «Y», «El», «La».
             LispConverter.CaseMap.Clear();
-            foreach (System.Text.RegularExpressions.Match idm in
-                     System.Text.RegularExpressions.Regex.Matches(text, @"[A-Za-z_][A-Za-z0-9_]*"))
+            foreach (var raw in text.Replace("\r", "").Split('\n'))
             {
-                string id = idm.Value; bool hasUp = false;
-                foreach (char c in id) if (c >= 'A' && c <= 'Z') { hasUp = true; break; }
-                if (hasUp) LispConverter.CaseMap[id.ToLowerInvariant()] = id;
+                var ln = raw.TrimStart();
+                if (ln.Length == 0 || ln[0] == '#' || ln[0] == ';' || ln[0] == '%') continue;
+                int at = ln.IndexOf("@@", StringComparison.Ordinal); if (at >= 0) ln = ln.Substring(0, at);
+                foreach (System.Text.RegularExpressions.Match idm in
+                         System.Text.RegularExpressions.Regex.Matches(ln, @"[A-Za-z_][A-Za-z0-9_]*"))
+                {
+                    string id = idm.Value; bool hasUp = false;
+                    foreach (char c in id) if (c >= 'A' && c <= 'Z') { hasUp = true; break; }
+                    if (hasUp) LispConverter.CaseMap[id.ToLowerInvariant()] = id;
+                }
             }
 
             // Programas: LISP (defun/loop/let) o matemática imperativa (for/while) → EJECUTAR.

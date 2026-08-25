@@ -1,8 +1,12 @@
 # De dónde sale la rigidez de una barra: EI y L, término a término
 #: En los ejemplos anteriores apareció K_barra = (EI/L³)·[12, 6L, …]. Aquí se DEDUCE de cero: funciones de forma → curvaturas → integral, con EI y L en símbolos. Cada 12, 6L, 4L² sale de una cuenta. Todo con el motor.
 
-## 1 · El principio: la rigidez es la integral de las curvaturas
-#: Al doblar la barra se guarda energía de flexión, y esa energía va con el cuadrado de la CURVATURA (v''). De ahí, cada término de la rigidez es la curvatura de una función de forma por la de otra, integradas por la barra y por EI:  K_ij = EI·∫ N_i''·N_j'' dx. O sea: las funciones de forma, curvadas dos veces e integradas. Vamos a hacerlo.
+## 1 · Por qué la rigidez es ∫ curvatura·curvatura (de dónde sale la fórmula)
+#: Parte de dos hechos de la viga. **(1) Momento–curvatura.** Una fibra a distancia y del eje se estira ε = −y·v'' (secciones planas), y su tensión es σ = E·ε (Hooke). El motor la arma:
+sigma = E*(-y*kappa) @@(tensión de la fibra = Hooke · secciones planas)
+#: El momento interno es la suma de esas tensiones por su brazo, en toda la sección: M = ∫σ·(−y)dA = E·v''·∫y²dA = EI·v'', con I = ∫y²dA (la inercia). O sea: doblar más (más v'') pide más momento, con rigidez EI.
+#: **(2) Energía de flexión.** Doblar guarda energía = ½·momento·curvatura, integrada por la barra: U = ½·∫ EI·(v'')² dx. Va con la curvatura AL CUADRADO — por eso todo gira en torno a v''.
+#: Ahora meto la deformada como funciones de forma: v = Σ Nᵢ·dᵢ (d = desplazamientos de los nudos). Su curvatura es v'' = Σ Nᵢ''·dᵢ. Al elevar al cuadrado, cada pareja (i,j) aporta dᵢ·dⱼ·Nᵢ''·Nⱼ''. La energía queda U = ½·Σᵢⱼ dᵢ·dⱼ·(EI·∫Nᵢ''·Nⱼ'' dx). Y como por definición la rigidez cumple U = ½·Σ dᵢ·K_ij·dⱼ, comparando término a término sale:  **K_ij = EI·∫ Nᵢ''·Nⱼ'' dx**. Ahí está de dónde viene: es la energía de flexión (curvatura²) escrita con las funciones de forma. Ahora la calculamos.
 
 ## 2 · Las funciones de forma en coordenada s = x/L
 #: Uso s = x/L, que va de 0 a 1. Son las 4 de Hermite (ejemplo 24). OJO: las de GIRO (N₂, N₄) llevan un factor L, porque multiplican a un giro θ y el peso de un giro tiene que dar una longitud:

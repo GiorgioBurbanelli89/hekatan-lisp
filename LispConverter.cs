@@ -536,8 +536,16 @@ namespace HekatanLisp
             return GreekSym(b);
         }
 
+        // Mapa mayúsculas: el motor LISP devuelve los nombres en minúscula (*print-case* :downcase),
+        // así "L" o "EI" del usuario vuelven como "l"/"ei". MainWindow lo llena con los identificadores
+        // TAL CUAL los escribió el usuario (lower→original) para restaurar el case en el render.
+        public static readonly System.Collections.Generic.Dictionary<string, string> CaseMap =
+            new(StringComparer.Ordinal);
+
         static string VarHtml(string name, bool vecArrow = false)
         {
+            // restaura el case original (el motor bajó "L"→"l", "EI"→"ei", …)
+            if (CaseMap.Count > 0 && CaseMap.TryGetValue(name, out var orig)) name = orig;
             // primas: apóstrofos al FINAL del nombre → ′ ″ ‴ (superíndice).  H1' = H₁′,  H1'' = H₁″
             string primes = "";
             while (name.Length > 1 && name[name.Length - 1] == '\'') { primes += "&prime;"; name = name.Substring(0, name.Length - 1); }

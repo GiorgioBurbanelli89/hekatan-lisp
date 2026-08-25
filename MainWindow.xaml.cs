@@ -492,6 +492,17 @@ namespace HekatanLisp
             _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
 
+            // CaseMap: recuerda cómo escribió el usuario cada identificador con mayúsculas
+            // (L, EI, N1…) para restaurar el case en el render (el motor los devuelve en minúscula).
+            LispConverter.CaseMap.Clear();
+            foreach (System.Text.RegularExpressions.Match idm in
+                     System.Text.RegularExpressions.Regex.Matches(text, @"[A-Za-z_][A-Za-z0-9_]*"))
+            {
+                string id = idm.Value; bool hasUp = false;
+                foreach (char c in id) if (c >= 'A' && c <= 'Z') { hasUp = true; break; }
+                if (hasUp) LispConverter.CaseMap[id.ToLowerInvariant()] = id;
+            }
+
             // Programas: LISP (defun/loop/let) o matemática imperativa (for/while) → EJECUTAR.
             if (LooksLikeLisp(text) && IsLispProgram(text))
             {

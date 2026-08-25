@@ -2,11 +2,16 @@
 #: En los ejemplos anteriores apareció K_barra = (EI/L³)·[12, 6L, …]. Aquí se DEDUCE de cero: funciones de forma → curvaturas → integral, con EI y L en símbolos. Cada 12, 6L, 4L² sale de una cuenta. Todo con el motor.
 
 ## 1 · Por qué la rigidez es ∫ curvatura·curvatura (de dónde sale la fórmula)
-#: Parte de dos hechos de la viga. **(1) Momento–curvatura.** Una fibra a distancia y del eje se estira ε = −y·v'' (secciones planas), y su tensión es σ = E·ε (Hooke). El motor la arma:
-sigma = E*(-y*kappa) @@(tensión de la fibra = Hooke · secciones planas)
-#: El momento interno es la suma de esas tensiones por su brazo, en toda la sección: M = ∫σ·(−y)dA = E·v''·∫y²dA = EI·v'', con I = ∫y²dA (la inercia). O sea: doblar más (más v'') pide más momento, con rigidez EI.
-#: **(2) Energía de flexión.** Doblar guarda energía = ½·momento·curvatura, integrada por la barra: U = ½·∫ EI·(v'')² dx. Va con la curvatura AL CUADRADO — por eso todo gira en torno a v''.
-#: Ahora meto la deformada como funciones de forma: v = Σ Nᵢ·dᵢ (d = desplazamientos de los nudos). Su curvatura es v'' = Σ Nᵢ''·dᵢ. Al elevar al cuadrado, cada pareja (i,j) aporta dᵢ·dⱼ·Nᵢ''·Nⱼ''. La energía queda U = ½·Σᵢⱼ dᵢ·dⱼ·(EI·∫Nᵢ''·Nⱼ'' dx). Y como por definición la rigidez cumple U = ½·Σ dᵢ·K_ij·dⱼ, comparando término a término sale:  **K_ij = EI·∫ Nᵢ''·Nⱼ'' dx**. Ahí está de dónde viene: es la energía de flexión (curvatura²) escrita con las funciones de forma. Ahora la calculamos.
+#: Dos hechos de la viga. Primero: una fibra a distancia y del eje se estira según la curvatura κ (secciones planas), y su tensión sigue a Hooke:
+eps = -y*kappa @@(deformación de la fibra: secciones planas)
+sigma = E*eps @@(Hooke: tensión = E · deformación)
+#: Sumando esa tensión por su brazo en toda la sección, el momento es rigidez por curvatura (EI reúne el material E y la inercia de la sección):
+M = EI*kappa @@(momento–curvatura)
+#: Segundo: la energía que se guarda al doblar va con la curvatura AL CUADRADO (por eso todo gira en torno a κ):
+u = 1/2*EI*kappa^2 @@(energía de flexión, por unidad de barra)
+#: Y la deformada es las funciones de forma por los desplazamientos de los nudos:
+v = N*d @@(deformada = formas · desplazamientos nodales)
+#: Su curvatura se arma igual, pero con las CURVATURAS de las formas (las N'', que salen en el paso 3). Al meterla en la energía κ² y sacar los desplazamientos afuera, cada pareja de nudos (i,j) deja multiplicando el aporte EI·∫Nᵢ''·Nⱼ''dx. Comparando con la rigidez (energía = ½·desplazamientos·K·desplazamientos), sale término a término: cada K_ij es la curvatura de una forma por la de otra, integradas. Es justo lo que se calcula en el paso 5.
 
 ## 2 · Las funciones de forma en coordenada s = x/L
 #: Uso s = x/L, que va de 0 a 1. Son las 4 de Hermite (ejemplo 24). OJO: las de GIRO (N₂, N₄) llevan un factor L, porque multiplican a un giro θ y el peso de un giro tiene que dar una longitud:

@@ -64,5 +64,10 @@ Jorge: "las variables se escriben fuera de comentarios, solo las llama". Mi erro
 - ✅ §2: prosa que llama {M},{V},{q},{EI} y describe geometría/material/encadenado en palabras; la prueba operacional de EI·v⁗=0 está en §3 (Diff chain).
 - Nota motor: no auto-simplifica (`V-(V+dV)` NO se reduce a `-dV`); igual la operación se ve bien y el comentario explica la cancelación.
 
+## ej26 §3 — de dónde SALE el polinomio: integrar v⁗=0 cuatro veces  [25-ago]
+Jorge: "el polinomio no se entiende". Antes §3 daba "una cúbica cualquiera a0+a1x+…" (asumida). Ahora se DEDUCE hacia adelante: integrar EI·v⁗=0 cuatro veces.
+- ✅ Motor: `Integral{}` es indefinida y AGREGA +C. Cadena: `kappa=Integral{c3}` → κ=c3·x+C (curvatura, recta); `theta=Integral{c3*x+c2}` → θ=c3·x²/2+c2·x+C (giro); `vdef=Integral{c3*x²/2+c2*x+c1}` → c3·x³/6+c2·x²/2+c1·x+C = CÚBICA. Cada ∫ mete una constante → 4 constantes = 4 datos de nudo. κ,θ en griego (nombre de variable).
+- Es la única forma cuya 4ª derivada se anula → conecta con la cúbica del paso 4. Reemplazó la cadena de Diff (que era el chequeo AL REVÉS).
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

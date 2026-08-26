@@ -29,19 +29,29 @@ EIv = Integral{-P*L*x + P*x^2/2 @ x} @@(EI·v, deflexión × EI; la +C = 0)
 vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 #: OJO al resultado: la deflexión salió un polinomio de grado 3 — una CÚBICA en {x}. No es casualidad: sin carga dentro del tramo, la ecuación es {EI}·v⁗ = 0 y su solución es SIEMPRE una cúbica (4 constantes). Aquí las fijó el empotramiento; en un elemento de dos nudos las fijan los 4 datos de nudo (descenso y giro en cada punta). Eso es el paso 4.
 
-## 4 · Las funciones de forma (una por cada dato de nudo)
-#: ¿Por qué una cúbica, y no otro polinomio? Razonémoslo. Dentro del elemento, entre nudo y nudo, no hay carga repartida; ahí la ecuación de la viga (paso 2) es {EI}·v⁗ = 0, o sea la CUARTA derivada de la deflexión es cero. Integrar eso cuatro veces (como el voladizo del paso 3) sólo puede dar un polinomio de grado 3 — ninguna potencia mayor sobrevive a que la 4ª derivada sea cero — y en cada integración aparece una constante: 4 constantes en total. Por eso la deformada del elemento es una CÚBICA. No la elijo yo: me la impone la física.
-#: Y esas 4 constantes calzan justo con los 4 datos de nudo del elemento (descenso y giro en cada extremo). Cada función de forma es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Trabajo en la coordenada {s} = {x/L}, de 0 a 1. OJO con el giro: como {s} = {x/L}, el giro físico es θ = {1/L}·dv/ds; por eso un giro unitario pide una pendiente {L} en {s}, y las funciones de giro salen multiplicadas por {L}.
-#: Parto de la cúbica en {s} y de su pendiente (la necesito para las condiciones de giro):
-vpol = a0 + a1*s + a2*s^2 + a3*s^3 @@(cúbica: 4 coeficientes por fijar)
-vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(la pendiente dv/ds)
-#: N1 — descenso unitario en el nudo izquierdo. En {s}=0 la cúbica vale 1 y no gira: eso da {a0}=1 y {a1}=0 (la pendiente en 0 es justo {a1}). En {s}=1 la cúbica vale 0 y no gira: con {a0}=1 y {a1}=0 esas dos condiciones son 1+{a2}+{a3}=0 y {a1}+2·{a2}+3·{a3}=0. De ahí sale {a3}=2 y {a2}=−3. Sustituyendo los cuatro en la cúbica:
+## 4 · La elástica de Timoshenko, la cúbica y las funciones de forma
+#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Dentro del elemento no hay carga repartida, así que (paso 1) el cortante es constante y el momento es una RECTA. La elástica manda integrar ese momento dos veces para llegar a la deflexión. Lo hago con una recta cualquiera, {m0} + {m1}·{x}:
+recta = m0 + m1*x @@(el momento M: una recta, porque no hay carga)
+EIv1 = Integral{m0 + m1*x @ x} @@(integro: EI·v′, sale una parábola)
+EIv2 = Integral{m0*x + m1*x^2/2 @ x} @@(integro otra vez: EI·v)
+#: Mira {EIv2}: es de GRADO 3. AHÍ nace la cúbica — integrar dos veces una recta da un polinomio de grado 3. La deflexión v es eso entre {EI}: una cúbica con 4 constantes (las {m0}, {m1} y las dos de integración). Reagrupo esas 4 constantes como {a0}…{a3} y paso a la coordenada {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
+vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
+#: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:
+vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(pendiente dv/ds)
+#: OJO con el giro: como {s} = {x/L}, el giro físico es θ = {1/L}·dv/ds; por eso un giro unitario pide una pendiente {L} en {s}, y las funciones de giro llevan {L}.
+#: N1 — descenso unitario en el izquierdo. En {s}=0: la cúbica vale 1 y no gira → {a0}=1, {a1}=0. En {s}=1: vale 0 y no gira → 1+{a2}+{a3}=0 y {a1}+2·{a2}+3·{a3}=0 → {a3}=2, {a2}=−3:
 N1 = 1 - 3*s^2 + 2*s^3 @@(descenso izquierdo)
-#: N2 — giro unitario en el izquierdo. Ahora la cúbica no baja pero gira 1 en {s}=0: como θ = {1/L}·dv/ds, un giro 1 pide pendiente {L}, o sea {a0}=0 y {a1}={L}. Con v=0 y sin giro en {s}=1 salen {a2}=−2·{L} y {a3}={L}: por eso N2 lleva el {L}:
+#: N2 — giro unitario en el izquierdo: no baja pero gira 1 en {s}=0 → {a1}={L} (y {a0}=0); con nada en {s}=1 salen {a2}=−2·{L}, {a3}={L}. Por eso lleva el {L}:
 N2 = L*(s - 2*s^2 + s^3) @@(giro izquierdo, con su L)
-#: N3 y N4 son lo mismo pero con el descenso y el giro unitarios en el extremo DERECHO ({s}=1):
+#: N3 y N4: lo mismo con descenso y giro unitarios en el extremo DERECHO ({s}=1):
 N3 = 3*s^2 - 2*s^3 @@(descenso derecho)
 N4 = L*(-s^2 + s^3) @@(giro derecho, con su L)
+#: Ahora las VEO. Cada Nᵢ es la forma que toma la viga con su dato de nudo = 1. Las de descenso: N1 baja de 1 (izquierda) a 0 (derecha); N3 al revés:
+#fplot(N1, N3, [0 1])
+#: Las de giro (dibujo la parte sin el {L}, que sólo las escala): arrancan de cero, se arquean y vuelven a cero, una a cada lado:
+N2f = s - 2*s^2 + s^3
+N4f = -s^2 + s^3
+#fplot(N2f, N4f, [0 1])
 
 ## 5 · La curvatura de cada peso (segunda derivada)
 #: Derivo cada función dos veces respecto a {s}. Salen lineales (la curvatura de una cúbica):

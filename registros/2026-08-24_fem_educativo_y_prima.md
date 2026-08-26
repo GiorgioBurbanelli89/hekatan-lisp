@@ -97,5 +97,10 @@ Jorge: "N1 = 1−3s²+2s³, ¿de dónde sale? falta agregarlo". Yo daba las cond
 Jorge: "no entiendo la cúbica, por qué usas ese polinomio, razóname". Yo asumía "la cúbica del paso 3".
 - ✅ Agregado el razonamiento al inicio de §4: sin carga en el tramo → EI·v⁗=0 → 4ª derivada cero → integrar 4 veces solo puede dar grado 3 (nada mayor sobrevive) con 4 constantes → CÚBICA. "No la elijo yo: me la impone la física." Y las 4 constantes calzan con los 4 datos de nudo.
 
+## ej26 §4 — la cúbica NACE de la elástica de Timoshenko + GRÁFICAS  [25-ago]
+Jorge: "vpol parece de memoria, no entiendo de dónde viene ni por qué lo usas; quiero como Timoshenko puro simbólico; y grafica hazlo entendible".
+- ✅ §4 arranca de la elástica EI·v″=M (Timoshenko). Sin carga → cortante constante → momento RECTA (m0+m1·x). `EIv1=Integral{recta}` (parábola, EI·v′), `EIv2=Integral{}` (grado 3, EI·v). "AHÍ nace la cúbica: integrar 2 veces una recta da grado 3." Luego se reagrupan las 4 constantes en a0..a3 y se pasa a s=x/L → vcubica. Ya NO es de memoria.
+- ✅ GRÁFICAS con `#fplot`: `#fplot(N1, N3, [0 1])` (descensos, se cruzan en 0.5) y `#fplot(N2f, N4f, [0 1])` (giros, la parte sin L, se arquean ±). Se VE la forma que toma la viga con cada dato de nudo. `#fplot` acepta varias curvas por nombre.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

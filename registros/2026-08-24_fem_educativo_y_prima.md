@@ -58,5 +58,11 @@ Jorge: "no entiendo, no explicas cómo empieza todo". El §2 daba por sentado el
 Jorge: "no estás combinando, veo texto plano allí" (las leyes dV/dx=−q, dM/dx=V estaban TECLEADAS como texto). Ahora van con `{}` inline: `{V - (V + dV) - q*dx} = 0`, `{dV/dx} = {-q}` (fracción de verdad), `{dM/dx} = {V}`, y en §2 `{V} = {dM/dx}`, `{-dV/dx} = {q}`, `{M} = {EI}·κ`.
 - Motor (dos reglas para `{}` inline): (a) un `=` DENTRO de las llaves ROMPE — se pierde lo que va tras el `=`; usar `{lhs} = {rhs}` con el `=` literal afuera. (b) las PRIMAS dentro de `{}` se pierden (`{v''''}`→"v"); dejar `v″`/`v⁗` como texto literal, combinar solo lo demás. Los diferenciales `dV`,`dM`,`dx` sí son un solo símbolo y `{dV/dx}` sale como fracción.
 
+## ej26 §1/§2 — las variables van FUERA del comentario, el comentario solo las llama  [25-ago]
+Jorge: "las variables se escriben fuera de comentarios, solo las llama". Mi error: metí fórmulas ({V-(V+dV)-q*dx}, {dV/dx}) DENTRO de los `#:`. Regla suya (ver [[feedback_hekatan_lisp_solo_operaciones_no_texto]]): las fórmulas son LÍNEAS DE OPERACIÓN del motor; en el comentario solo se llama la variable por nombre.
+- ✅ §1: `Fy = V - (V + dV) - q*dx` y `Mo = (M + dM) - M - V*dx` como operaciones (con label en palabras). Los `#:` solo llaman variables sueltas: {V}, {dV}, {q}, {M}, {dM}. Las leyes (cortante cae con la carga, momento crece con el cortante) en palabras.
+- ✅ §2: prosa que llama {M},{V},{q},{EI} y describe geometría/material/encadenado en palabras; la prueba operacional de EI·v⁗=0 está en §3 (Diff chain).
+- Nota motor: no auto-simplifica (`V-(V+dV)` NO se reduce a `-dV`); igual la operación se ve bien y el comentario explica la cancelación.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

@@ -4,14 +4,16 @@
 ## 1 · El comienzo: el equilibrio de un trocito de viga
 #: Todo empieza aquí. Corto un pedacito de viga de ancho {dx} y le miro las fuerzas. En la cara izquierda actúan el momento {M} y el cortante {V}; en la derecha, un poco cambiados: {M + dM} y {V + dV}. Encima, la carga repartida {q}. El trocito está quieto, así que fuerzas y momentos se equilibran:
 #slice
-#: Dos condiciones de equilibrio, y de cada una sale una ley:
-#: (1) Fuerzas verticales, la suma es cero: {V - (V + dV) - q*dx} = 0. Se cancela {V}, queda {-dV} = {q*dx}, es decir {dV/dx} = {-q}. El cortante cae al ritmo de la carga.
-#: (2) Momentos, la suma es cero (los términos {dx*dx} son despreciables): {dM - V*dx} = 0, o sea {dM/dx} = {V}. El momento crece al ritmo del cortante.
+#: Dos condiciones de equilibrio, y de cada una sale una ley. Sumo las fuerzas verticales de las dos caras más la carga (todo el trocito, y vale cero):
+Fy = V - (V + dV) - q*dx @@(fuerzas verticales = 0)
+#: Se cancela {V} y sobra el cambio {dV} contra la carga {q}: el cortante cae al ritmo de la carga. Ahora sumo los momentos respecto a una cara (también cero, los términos con dx·dx se desprecian):
+Mo = (M + dM) - M - V*dx @@(momentos = 0)
+#: Se cancela {M} y sobra el cambio {dM} contra el cortante {V}: el momento crece al ritmo del cortante.
 
-## 2 · Geometría y material: la ecuación de la viga EI·v⁗ = q
-#: Falta ligar el momento con la FORMA de la viga. Geometría (flechas pequeñas): la curvatura es la segunda derivada de la deflexión, κ = v″ — cuánto se dobla. Material + sección: por Hooke, la fibra a distancia {y} del eje tiene tensión σ = E·(−{y}·κ); sumando esa tensión por su brazo en toda la sección sale el momento {M} = {EI}·κ (el {EI} reúne el módulo E y la inercia de la sección). Juntando, {M} = {EI}·v″.
-#: Ahora encadeno las tres leyes: de (2), {V} = {dM/dx}; de (1), {-dV/dx} = {q}. Derivando {M} = {EI}·v″ dos veces y sustituyendo, la ecuación de la viga es {EI}·v⁗ = {q}.
-#: DENTRO del tramo, entre nudo y nudo, no hay carga repartida: {q} = 0. Por lo tanto {EI}·v⁗ = 0. Esa es la ecuación que gobierna la deformada de la barra.
+## 2 · Geometría y material: la ecuación de la viga
+#: Falta ligar el momento {M} con la FORMA de la viga, en dos pasos. Geometría (flechas pequeñas): la curvatura es la segunda derivada de la deflexión — cuánto se dobla. Material y sección: por Hooke cada fibra tira según su distancia al eje; al sumar esas tensiones por su brazo, el momento {M} es la rigidez {EI} por la curvatura (la {EI} reúne el módulo E y la inercia de la sección).
+#: Ahora junto las tres leyes. Del paso 1: la pendiente del momento es el cortante {V}, y la pendiente del cortante es menos la carga {q}. Y acá: el momento {M} es {EI} por la curvatura. Encadenándolas, la carga {q} queda igual a {EI} por la CUARTA derivada de la deflexión: esa es la ecuación de la viga.
+#: DENTRO del tramo, entre nudo y nudo, no hay carga repartida: la carga {q} vale cero. Entonces la cuarta derivada de la deflexión es cero. Eso es lo que resuelvo, con el motor, en el paso 3.
 
 ## 3 · {EI}·v⁗ = 0 quiere decir: la deformada es CÚBICA
 #: Compruebo que una cúbica cualquiera {a0 + a1*x + a2*x^2 + a3*x^3} cumple v⁗ = 0. Derivo, paso a paso, y cada derivada tiene su nombre físico:

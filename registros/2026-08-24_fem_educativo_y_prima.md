@@ -89,5 +89,9 @@ Jorge: "hazlo como el libro de resistencia de materiales, sin operaciones numér
 - ✅ §8: quitado "con EI=1 y L=1 da los números". K = (EI/L³)·K_coef, todo en símbolos.
 - Regla nueva de Jorge → memoria: TODO simbólico (EI, L), sin meter números, hasta nuevo aviso.
 
+## ej26 §4 — DEDUCIR los coeficientes de N1 (de dónde sale 1,−3,2)  [25-ago]
+Jorge: "N1 = 1−3s²+2s³, ¿de dónde sale? falta agregarlo". Yo daba las condiciones en palabras y saltaba al resultado.
+- ✅ Ahora: `vpol = a0+a1*s+a2*s^2+a3*s^3` (cúbica), `vslope = Diff{}` = 3a3·s²+2a2·s+a1 (operaciones). Condiciones: s=0 → a0=1, a1=0; s=1 → 1+a2+a3=0 y a1+2a2+3a3=0 → a3=2, a2=−3 → N1. N2 con el L (giro 1 pide pendiente L → a1=L → a2=−2L, a3=L). N3/N4 por simetría.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

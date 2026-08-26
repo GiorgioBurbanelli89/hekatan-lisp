@@ -31,13 +31,15 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 
 ## 4 · Las funciones de forma (una por cada dato de nudo)
 #: La deformada del elemento es la cúbica del paso 3. Cada función de forma es esa cúbica cuando UN dato de nudo vale 1 y los otros tres valen 0 — así, multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Trabajo en la coordenada {s} = {x/L}, de 0 a 1. OJO con el giro: como {s} = {x/L}, el giro físico es θ = {1/L}·dv/ds; por eso un giro unitario pide una pendiente {L} en {s}, y las funciones de giro salen multiplicadas por {L}.
-#: N1 — descenso unitario en el nudo izquierdo: la cúbica que vale 1 y no gira en {s}=0, y vale 0 y no gira en {s}=1. Esas 4 condiciones dan:
+#: Parto de la cúbica en {s} y de su pendiente (la necesito para las condiciones de giro):
+vpol = a0 + a1*s + a2*s^2 + a3*s^3 @@(cúbica: 4 coeficientes por fijar)
+vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(la pendiente dv/ds)
+#: N1 — descenso unitario en el nudo izquierdo. En {s}=0 la cúbica vale 1 y no gira: eso da {a0}=1 y {a1}=0 (la pendiente en 0 es justo {a1}). En {s}=1 la cúbica vale 0 y no gira: con {a0}=1 y {a1}=0 esas dos condiciones son 1+{a2}+{a3}=0 y {a1}+2·{a2}+3·{a3}=0. De ahí sale {a3}=2 y {a2}=−3. Sustituyendo los cuatro en la cúbica:
 N1 = 1 - 3*s^2 + 2*s^3 @@(descenso izquierdo)
-#: N2 — giro unitario en el izquierdo: no baja pero gira 1 en {s}=0, y nada en {s}=1. El giro mete el {L}:
+#: N2 — giro unitario en el izquierdo. Ahora la cúbica no baja pero gira 1 en {s}=0: como θ = {1/L}·dv/ds, un giro 1 pide pendiente {L}, o sea {a0}=0 y {a1}={L}. Con v=0 y sin giro en {s}=1 salen {a2}=−2·{L} y {a3}={L}: por eso N2 lleva el {L}:
 N2 = L*(s - 2*s^2 + s^3) @@(giro izquierdo, con su L)
-#: N3 — descenso unitario en el nudo DERECHO ({s}=1), nada en el izquierdo:
+#: N3 y N4 son lo mismo pero con el descenso y el giro unitarios en el extremo DERECHO ({s}=1):
 N3 = 3*s^2 - 2*s^3 @@(descenso derecho)
-#: N4 — giro unitario en el derecho, nada más (otra vez el {L}):
 N4 = L*(-s^2 + s^3) @@(giro derecho, con su L)
 
 ## 5 · La curvatura de cada peso (segunda derivada)

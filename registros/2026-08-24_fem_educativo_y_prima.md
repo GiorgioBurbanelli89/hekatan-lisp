@@ -107,5 +107,9 @@ Jorge confundía: "¿de la función lineal la derivo 4 veces?". No — es INTEGR
 - ✅ Nota aclaratoria + gráfica `#fplot(Mg, v1g, v2g, [0 1])` con c0=c1=1 de ejemplo: recta (momento) → parábola (∫) → cúbica (∫∫). Cada integral sube un grado. (Derivar bajaría: cúbica→…→0.)
 - ✅ m0/m1 → c0/c1 (parecían masa): c0=valor en 0, c1=pendiente de la recta.
 
+## ej26 §4 — una gráfica DESPUÉS DE CADA ecuación  [25-ago]
+Jorge: "no entiendo, grafícala, ponla luego de cada ecuación". Antes tenía una sola gráfica combinada al final.
+- ✅ PASO 1 recta (símbolo + recta_g=1+x) → #fplot línea. PASO 2 EIv1 (∫) + EIv1_g → #fplot parábola. PASO 3 EIv2 (∫∫) + EIv2_g → #fplot cúbica. Cada ecuación con su gráfica justo debajo; se ve subir de grado paso a paso.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

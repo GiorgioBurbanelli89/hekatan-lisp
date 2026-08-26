@@ -31,15 +31,19 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 
 ## 4 · La elástica de Timoshenko, la cúbica y las funciones de forma
 #: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Dentro del elemento no hay carga repartida, así que (paso 1) el cortante es constante y el momento es una RECTA. La elástica manda integrar ese momento dos veces para llegar a la deflexión. Escribo la recta con dos constantes cualquiera, {c0} (el valor en {x}=0) y {c1} (la pendiente) — son sólo los dos números que definen la recta, NADA de masa:
-recta = c0 + c1*x @@(el momento M: una recta, porque no hay carga)
-EIv1 = Integral{c0 + c1*x @ x} @@(integro: EI·v′, sale una parábola)
-EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(integro otra vez: EI·v)
-#: OJO al mecanismo: subo INTEGRANDO, no derivando. El momento es {EI}·v″; integrar una vez da {EI}·v′, y otra vez {EI}·v. Cada integral SUBE un grado: recta → parábola → cúbica. (Derivar sería al revés, bajando: cúbica → parábola → recta → … hasta 0.) Lo dibujo con {c0}=1 y {c1}=1 de ejemplo, sólo para ver las formas:
-Mg = 1 + x @@(el momento: una recta)
-v1g = x + x^2/2 @@(al integrar: parábola)
-v2g = x^2/2 + x^3/6 @@(al integrar otra vez: cúbica)
-#fplot(Mg, v1g, v2g, [0 1])
-#: Mira {EIv2}: es de GRADO 3. AHÍ nace la cúbica — integrar dos veces una recta da un polinomio de grado 3. La deflexión v es eso entre {EI}: una cúbica con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo esas 4 constantes como {a0}…{a3} y paso a la coordenada {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
+#: PASO 1 — el momento es una recta (sin carga). En símbolos, y con {c0}=1, {c1}=1 para dibujarla:
+recta = c0 + c1*x @@(el momento M: una recta)
+recta_g = 1 + x @@(la misma, con c0=1 c1=1, para ver)
+#fplot(recta_g, [0 1])
+#: PASO 2 — integro esa recta una vez. SUBE de grado y sale una PARÁBOLA (es {EI}·v′, la pendiente por EI):
+EIv1 = Integral{c0 + c1*x @ x} @@(EI·v′: una parábola)
+EIv1_g = x + x^2/2 @@(la parábola, para ver)
+#fplot(EIv1_g, [0 1])
+#: PASO 3 — integro otra vez. SUBE de nuevo y sale una CÚBICA (es {EI}·v, la deflexión por EI):
+EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(EI·v: una cúbica)
+EIv2_g = x^2/2 + x^3/6 @@(la cúbica, para ver)
+#fplot(EIv2_g, [0 1])
+#: Ese es el mecanismo: recta → parábola → cúbica; cada integral SUBE un grado (INTEGRO, no derivo — derivar bajaría de vuelta a la recta y a 0). Por eso la deflexión es de GRADO 3. En símbolos, {EIv2} entre {EI} es esa cúbica, con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo esas 4 como {a0}…{a3} y paso a {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
 vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
 #: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:
 vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(pendiente dv/ds)

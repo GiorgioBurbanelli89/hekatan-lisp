@@ -131,5 +131,9 @@ Jorge: "preferible cada gráfica vaya con su viga" y "¿qué es q=0, se supone?"
 Jorge captó: "está reemplazando, cómo decir 3x+4x² es ax+bx², explícalo".
 - ✅ Explicado: los coeficientes de la cúbica integrada son mezcla de c0,c1,EI,constantes, pero esos valores no importan aún; lo que importa es que es cúbica con 4 números libres → les pongo letras a0..a3 (como 3x+4x² → ax+bx²), que se FIJAN después con las 4 condiciones de nudo.
 
+## Render — el ∫ se cortaba por arriba (CSS)  [25-ago]
+Jorge: "no se ve toda la integral, arregla eso en el CSS".
+- ✅ Causa: `.ws-eq` (contenedor de cada línea math) tenía `overflow-y:hidden` (puesto para matrices 12×12 anchas) → recortaba el glifo alto del ∫ (m-nary 240% + m-dvr top:-3pt). Fix: `padding:.4em 0 .25em` en `.ws-eq` → el ∫ cabe dentro de la caja y ya no se corta. Verificado con ∫ indefinido y definido.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

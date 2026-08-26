@@ -82,5 +82,12 @@ Jorge: "no se entiende, vas directo a las c; quiero ver una integral simbólica,
 - ❌→✅ Leak: definir `M` en §3 pisaba el `{M}` de §2 y el `M` del `Mo` de §1 → renombrado `Mvol`.
 - El `∫` que "se cortaba" era por 3 integrales APILADAS (sin prosa entre ellas); con prosa entre cada operación el `∫` sale completo. (Nota: el clip de integrales apiladas sigue latente en el CSS — `.m-dvr top:-3pt` + `.m-nary` 240% — no crítico.)
 
+## ej26 — estilo LIBRO de resistencia, simbólico, sin números  [25-ago]
+Jorge: "hazlo como el libro de resistencia de materiales, sin operaciones numéricas hasta que te diga".
+- Motor NO puede `∫₀ᴸ` con L simbólico (da "?"). Confirmado con probe. Por eso se mantiene la sustitución s=x/L (que el libro también usa) para las integrales de rigidez.
+- ✅ §4: fuera la inversión de matriz NUMÉRICA (A=[números], Ainv). Ahora estilo libro: cada función de forma = la cúbica con UN dato de nudo=1 y los otros 0; condiciones en palabras; el L del giro explicado (θ=(1/L)dv/ds). N1..N4 quedan como operaciones (resultado).
+- ✅ §8: quitado "con EI=1 y L=1 da los números". K = (EI/L³)·K_coef, todo en símbolos.
+- Regla nueva de Jorge → memoria: TODO simbólico (EI, L), sin meter números, hasta nuevo aviso.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

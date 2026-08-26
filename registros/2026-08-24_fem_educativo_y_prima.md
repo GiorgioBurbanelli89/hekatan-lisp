@@ -121,5 +121,11 @@ Jorge: "prefiero ver la viga en la misma gráfica y debajo la carga para entende
 - ✅ Nueva directiva `#diag` (BeamSchematic.BeamDiagramsPng): voladizo con carga P arriba, y ALINEADOS debajo (mismo eje x, guías punteadas en los nudos): q=0 (plano), V (franja constante), M (triángulo/recta), v (cúbica). La figura clásica de resistencia.
 - ✅ §4 ahora abre con `#diag` y la deducción camina por el diagrama (integrar de arriba abajo: q→V→M→v). Quitadas las #fplot sueltas (qcero/Vcteg/recta_g/EIv1_g/EIv2_g).
 
+## ej26 §4 — cada diagrama CON su viga + aclarar q=0  [25-ago]
+Jorge: "preferible cada gráfica vaya con su viga" y "¿qué es q=0, se supone?".
+- ✅ `#diag` ahora acepta cuál: `#diag(carga|cortante|momento|deflexion)` dibuja la viga + ESE diagrama; `#diag` (sin arg) los 4. §4 camina paso a paso, cada uno con su viga.
+- ✅ Aclarado q=0: el elemento solo recibe fuerzas en los NUDOS (extremos); la P está en la punta, no repartida → a lo largo del tramo q=0. No es supuesto: define al elemento.
+- Colisión regex: un encabezado que empiece con "diag" dispara la directiva (como pasó con "deflexion"). En ej26 no ocurre (headers no empiezan así).
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

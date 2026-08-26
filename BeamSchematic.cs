@@ -422,15 +422,27 @@ namespace HekatanLisp
             return Convert.ToBase64String(data.ToArray());
         }
 
-        // ---- La viga y, ALINEADOS debajo, sus diagramas: carga q, cortante V, momento M, deflexión v ----
-        // Caso: voladizo (empotrado izq) con carga P en la punta. Sintaxis: #diag
-        public static string BeamDiagramsPng(bool dark)
+        // ---- La viga (voladizo con carga P) y, debajo, sus diagramas alineados ----
+        // Sintaxis: #diag  (los 4)  ·  #diag(carga|cortante|momento|deflexion)  (uno, con su viga)
+        public static string BeamDiagramsPng(bool dark, string which)
         {
-            const int W = 660, H = 720;
+            which = (which ?? "all").Trim().ToLowerInvariant();
+            var panels = new System.Collections.Generic.List<string>();
+            if (which is "q" or "carga") panels.Add("q");
+            else if (which is "cortante" or "cortante v") panels.Add("cortante");
+            else if (which is "m" or "momento") panels.Add("momento");
+            else if (which is "v" or "deflexion" or "deflexión" or "elastica" or "elástica") panels.Add("deflexion");
+            else panels.AddRange(new[] { "q", "cortante", "momento", "deflexion" });
+
+            const int W = 660;
+            float x0 = 170, x1 = W - 55;
+            float yBeam = 70, yFirst = 195, dy = 118;
+            int H = (int)(yFirst + panels.Count * dy + 15);
+
             var bg   = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
             var fg   = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
-            var acc  = dark ? new SKColor(0xE8, 0x82, 0x5A) : new SKColor(0xD8, 0x5A, 0x30);  // carga P
-            var blu  = dark ? new SKColor(0x6E, 0xA8, 0xE8) : new SKColor(0x2B, 0x66, 0xC4);  // diagramas
+            var acc  = dark ? new SKColor(0xE8, 0x82, 0x5A) : new SKColor(0xD8, 0x5A, 0x30);
+            var blu  = dark ? new SKColor(0x6E, 0xA8, 0xE8) : new SKColor(0x2B, 0x66, 0xC4);
             var fillc = dark ? new SKColor(0x6E, 0xA8, 0xE8, 0x40) : new SKColor(0x2B, 0x66, 0xC4, 0x33);
             using var surf = SKSurface.Create(new SKImageInfo(W, H));
             var cv = surf.Canvas; cv.Clear(bg);
@@ -448,68 +460,61 @@ namespace HekatanLisp
             var tblu = new SKPaint { Color = blu, IsAntialias = true, TextSize = 15, FakeBoldText = true };
             var tacc = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
 
-            float x0 = 170, x1 = W - 55;
-            float yBeam = 70, yQ = 205, yV = 320, yM = 445, yVdef = 590;
+            // guías verticales (los dos nudos), para ver que todo alinea con la viga
+            cv.DrawLine(x0, 45, x0, H - 25, guide);
+            cv.DrawLine(x1, 45, x1, H - 25, guide);
 
-            // guías verticales punteadas (los dos nudos), para VER que todo está alineado
-            cv.DrawLine(x0, 45, x0, 640, guide);
-            cv.DrawLine(x1, 45, x1, 640, guide);
-
-            // ---- 1) LA VIGA: voladizo empotrado a la izquierda, carga P en la punta
+            // LA VIGA (voladizo empotrado izq, carga P en la punta) — siempre arriba
             cv.DrawText("viga (voladizo)", 8, yBeam - 22, tlab);
-            for (float yy = yBeam - 24; yy <= yBeam + 24; yy += 8) cv.DrawLine(x0, yy, x0 - 10, yy + 8, thin); // muro rayado
+            for (float yy = yBeam - 24; yy <= yBeam + 24; yy += 8) cv.DrawLine(x0, yy, x0 - 10, yy + 8, thin);
             cv.DrawLine(x0, yBeam - 26, x0, yBeam + 26, thin);
             cv.DrawLine(x0, yBeam, x1, yBeam, beam);
-            cv.DrawLine(x1, yBeam - 46, x1, yBeam - 4, lpen);                                   // flecha P
+            cv.DrawLine(x1, yBeam - 46, x1, yBeam - 4, lpen);
             using (var h = new SKPath()) { h.MoveTo(x1, yBeam - 4); h.LineTo(x1 - 5, yBeam - 15); h.LineTo(x1 + 5, yBeam - 15); h.Close(); cv.DrawPath(h, lfill); }
             cv.DrawText("P", x1 + 6, yBeam - 30, tacc);
-
-            // helper de panel: baseline + etiqueta
-            void Panel(float yb, string lab, SKPaint tp)
-            {
-                cv.DrawLine(x0, yb, x1, yb, baseln);
-                cv.DrawText(lab, 8, yb + 4, tp);
-            }
-
-            // ---- 2) CARGA q = 0 (no hay): la curva coincide con la línea base
-            Panel(yQ, "q = 0", tblu);
-            cv.DrawText("(sin carga)", 8, yQ + 20, tsub);
-            using (var p = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3 })
-                cv.DrawLine(x0, yQ, x1, yQ, p);
-
-            // ---- 3) CORTANTE V = constante (= P): línea horizontal + relleno (rectángulo)
-            Panel(yV, "V", tblu);
-            cv.DrawText("(constante)", 8, yV + 20, tsub);
-            float vTop = yV - 42;
-            using (var rect = new SKPath()) { rect.MoveTo(x0, yV); rect.LineTo(x0, vTop); rect.LineTo(x1, vTop); rect.LineTo(x1, yV); rect.Close(); cv.DrawPath(rect, fillp); }
-            cv.DrawLine(x0, vTop, x1, vTop, curve);
-            cv.DrawLine(x0, yV, x0, vTop, curve);
-
-            // ---- 4) MOMENTO M = recta (−P·(L−x)): triángulo, máximo en el empotramiento, 0 en la punta
-            Panel(yM, "M", tblu);
-            cv.DrawText("(recta)", 8, yM + 20, tsub);
-            float mBot = yM + 44;  // M negativo → por debajo de la base
-            using (var tri = new SKPath()) { tri.MoveTo(x0, yM); tri.LineTo(x0, mBot); tri.LineTo(x1, yM); tri.Close(); cv.DrawPath(tri, fillp); }
-            cv.DrawLine(x0, mBot, x1, yM, curve);
-
-            // ---- 5) DEFLEXIÓN v = cúbica: curva que baja, máximo en la punta
-            Panel(yVdef, "v", tblu);
-            cv.DrawText("(cúbica)", 8, yVdef + 20, tsub);
-            using (var p = new SKPath())
-            {
-                p.MoveTo(x0, yVdef);
-                for (float t = 0; t <= 1.0001f; t += 0.02f)
-                {
-                    float xx = x0 + t * (x1 - x0);
-                    float sh = (3 * t * t - t * t * t) / 2f;   // forma del voladizo, máx 1 en la punta
-                    p.LineTo(xx, yVdef + 48 * sh);
-                }
-                cv.DrawPath(p, curve);
-            }
-
-            // eje x común
-            cv.DrawText("x", x1 + 6, yVdef + 50, tsub);
             cv.DrawText("L", (x0 + x1) / 2 - 4, 40, tsub);
+
+            // cada panel pedido, debajo, alineado
+            for (int i = 0; i < panels.Count; i++)
+            {
+                float yb = yFirst + i * dy;
+                cv.DrawLine(x0, yb, x1, yb, baseln);   // línea base (cero)
+                string t = panels[i];
+                if (t == "q")
+                {
+                    cv.DrawText("q = 0", 8, yb + 4, tblu); cv.DrawText("(sin carga)", 8, yb + 22, tsub);
+                    using var p = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3 };
+                    cv.DrawLine(x0, yb, x1, yb, p);
+                }
+                else if (t == "cortante")
+                {
+                    cv.DrawText("V", 8, yb + 4, tblu); cv.DrawText("(constante)", 8, yb + 22, tsub);
+                    float top = yb - 42;
+                    using (var rect = new SKPath()) { rect.MoveTo(x0, yb); rect.LineTo(x0, top); rect.LineTo(x1, top); rect.LineTo(x1, yb); rect.Close(); cv.DrawPath(rect, fillp); }
+                    cv.DrawLine(x0, top, x1, top, curve); cv.DrawLine(x0, yb, x0, top, curve);
+                }
+                else if (t == "momento")
+                {
+                    cv.DrawText("M", 8, yb + 4, tblu); cv.DrawText("(recta)", 8, yb + 22, tsub);
+                    float bot = yb + 44;
+                    using (var tri = new SKPath()) { tri.MoveTo(x0, yb); tri.LineTo(x0, bot); tri.LineTo(x1, yb); tri.Close(); cv.DrawPath(tri, fillp); }
+                    cv.DrawLine(x0, bot, x1, yb, curve);
+                }
+                else // deflexion
+                {
+                    cv.DrawText("v", 8, yb + 4, tblu); cv.DrawText("(cúbica)", 8, yb + 22, tsub);
+                    using var p = new SKPath();
+                    p.MoveTo(x0, yb);
+                    for (float tt = 0; tt <= 1.0001f; tt += 0.02f)
+                    {
+                        float xx = x0 + tt * (x1 - x0);
+                        float sh = (3 * tt * tt - tt * tt * tt) / 2f;
+                        p.LineTo(xx, yb + 48 * sh);
+                    }
+                    cv.DrawPath(p, curve);
+                }
+            }
+            cv.DrawText("x", x1 + 6, yFirst + (panels.Count - 1) * dy + 4, tsub);
 
             using var img = surf.Snapshot();
             using var data = img.Encode(SKEncodedImageFormat.Png, 92);

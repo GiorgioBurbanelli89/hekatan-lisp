@@ -402,7 +402,9 @@ namespace HekatanLisp
                 bool isDiag = kw is "diag" or "vmd";
                 if (isDiag)
                 {
-                    try { string b64 = BeamSchematic.BeamDiagramsPng(dark); outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "la viga y sus diagramas (q, V, M, v)")); }
+                    var pmd = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    string dspec = pmd.Success ? pmd.Groups[1].Value.Trim() : rest.Trim();
+                    try { string b64 = BeamSchematic.BeamDiagramsPng(dark, dspec); outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "la viga y su diagrama")); }
                     catch { outList.Add(""); }
                     continue;
                 }

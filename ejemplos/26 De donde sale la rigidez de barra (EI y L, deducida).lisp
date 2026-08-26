@@ -30,15 +30,19 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 #: OJO al resultado: la deflexión salió un polinomio de grado 3 — una CÚBICA en {x}. No es casualidad: sin carga dentro del tramo, la ecuación es {EI}·v⁗ = 0 y su solución es SIEMPRE una cúbica (4 constantes). Aquí las fijó el empotramiento; en un elemento de dos nudos las fijan los 4 datos de nudo (descenso y giro en cada punta). Eso es el paso 4.
 
 ## 4 · La elástica de Timoshenko, la cúbica y las funciones de forma
-#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Para verlo TODO junto, dibujo la viga —un voladizo con una carga P en la punta— y, ALINEADOS debajo con el mismo eje x, sus diagramas: la carga q, el cortante V, el momento M y la deflexión v:
-#diag
-#: Lo leo de arriba hacia abajo, INTEGRANDO (cada integral sube un grado). No hay carga repartida, así que {q} = 0. El cortante es la integral de −q; integrar cero da una CONSTANTE (en el diagrama, V es una franja plana):
+#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Uso un voladizo con una carga P en la punta, y voy paso a paso — cada diagrama CON su viga arriba, integrando (cada integral sube un grado).
+#: 1) La CARGA. ¿Qué es {q}=0? El elemento sólo recibe fuerzas en sus NUDOS (los extremos): la P está EN la punta, no repartida a lo largo de la viga. Por eso, a lo largo del tramo, la carga repartida es cero, {q}=0. No es un supuesto al azar: es lo que define al elemento. En el diagrama, una línea plana:
+#diag(carga)
+#: 2) El CORTANTE es la integral de −q (ley dV/dx=−q). Integrar cero da una CONSTANTE — el cortante no cambia (franja plana):
 Vcte = Integral{0 @ x} @@(V = ∫(−q) = c1, constante)
-#: El momento es la integral del cortante; integrar una constante da una RECTA (en el diagrama, M es un triángulo, una recta):
+#diag(cortante)
+#: 3) El MOMENTO es la integral del cortante (ley dM/dx=V). Integrar una constante da una RECTA (un triángulo):
 Mrecta = Integral{c1 @ x} @@(M = ∫V = c1·x + c0, recta)
-#: Y la elástica manda integrar el momento (la recta {c0} + {c1}·{x}) dos veces más. Integrar una recta → PARÁBOLA (es {EI}·v′); integrar otra vez → CÚBICA (es {EI}·v, el último diagrama):
+#diag(momento)
+#: 4) La DEFLEXIÓN. La elástica manda integrar el momento (la recta {c0}+{c1}·{x}) dos veces más: una vez → PARÁBOLA (es {EI}·v′), otra vez → CÚBICA (es {EI}·v):
 EIv1 = Integral{c0 + c1*x @ x} @@(EI·v′: parábola)
 EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(EI·v: cúbica)
+#diag(deflexion)
 #: Ahí está: {EIv2} es de GRADO 3. La deflexión v es una cúbica con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo las 4 como {a0}…{a3} y paso a {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
 vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
 #: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:

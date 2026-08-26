@@ -30,11 +30,11 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 #: OJO al resultado: la deflexión salió un polinomio de grado 3 — una CÚBICA en {x}. No es casualidad: sin carga dentro del tramo, la ecuación es {EI}·v⁗ = 0 y su solución es SIEMPRE una cúbica (4 constantes). Aquí las fijó el empotramiento; en un elemento de dos nudos las fijan los 4 datos de nudo (descenso y giro en cada punta). Eso es el paso 4.
 
 ## 4 · La elástica de Timoshenko, la cúbica y las funciones de forma
-#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Dentro del elemento no hay carga repartida, así que (paso 1) el cortante es constante y el momento es una RECTA. La elástica manda integrar ese momento dos veces para llegar a la deflexión. Lo hago con una recta cualquiera, {m0} + {m1}·{x}:
-recta = m0 + m1*x @@(el momento M: una recta, porque no hay carga)
-EIv1 = Integral{m0 + m1*x @ x} @@(integro: EI·v′, sale una parábola)
-EIv2 = Integral{m0*x + m1*x^2/2 @ x} @@(integro otra vez: EI·v)
-#: Mira {EIv2}: es de GRADO 3. AHÍ nace la cúbica — integrar dos veces una recta da un polinomio de grado 3. La deflexión v es eso entre {EI}: una cúbica con 4 constantes (las {m0}, {m1} y las dos de integración). Reagrupo esas 4 constantes como {a0}…{a3} y paso a la coordenada {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
+#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Dentro del elemento no hay carga repartida, así que (paso 1) el cortante es constante y el momento es una RECTA. La elástica manda integrar ese momento dos veces para llegar a la deflexión. Escribo la recta con dos constantes cualquiera, {c0} (el valor en {x}=0) y {c1} (la pendiente) — son sólo los dos números que definen la recta, NADA de masa:
+recta = c0 + c1*x @@(el momento M: una recta, porque no hay carga)
+EIv1 = Integral{c0 + c1*x @ x} @@(integro: EI·v′, sale una parábola)
+EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(integro otra vez: EI·v)
+#: Mira {EIv2}: es de GRADO 3. AHÍ nace la cúbica — integrar dos veces una recta da un polinomio de grado 3. La deflexión v es eso entre {EI}: una cúbica con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo esas 4 constantes como {a0}…{a3} y paso a la coordenada {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
 vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
 #: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:
 vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(pendiente dv/ds)

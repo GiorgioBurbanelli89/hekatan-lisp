@@ -102,5 +102,10 @@ Jorge: "vpol parece de memoria, no entiendo de dónde viene ni por qué lo usas;
 - ✅ §4 arranca de la elástica EI·v″=M (Timoshenko). Sin carga → cortante constante → momento RECTA (m0+m1·x). `EIv1=Integral{recta}` (parábola, EI·v′), `EIv2=Integral{}` (grado 3, EI·v). "AHÍ nace la cúbica: integrar 2 veces una recta da grado 3." Luego se reagrupan las 4 constantes en a0..a3 y se pasa a s=x/L → vcubica. Ya NO es de memoria.
 - ✅ GRÁFICAS con `#fplot`: `#fplot(N1, N3, [0 1])` (descensos, se cruzan en 0.5) y `#fplot(N2f, N4f, [0 1])` (giros, la parte sin L, se arquean ±). Se VE la forma que toma la viga con cada dato de nudo. `#fplot` acepta varias curvas por nombre.
 
+## ej26 §4 — gráfica del mecanismo INTEGRAR (recta→parábola→cúbica)  [25-ago]
+Jorge confundía: "¿de la función lineal la derivo 4 veces?". No — es INTEGRAR (subir), no derivar (bajar). Desde el momento (recta) integro 2 veces.
+- ✅ Nota aclaratoria + gráfica `#fplot(Mg, v1g, v2g, [0 1])` con c0=c1=1 de ejemplo: recta (momento) → parábola (∫) → cúbica (∫∫). Cada integral sube un grado. (Derivar bajaría: cúbica→…→0.)
+- ✅ m0/m1 → c0/c1 (parecían masa): c0=valor en 0, c1=pendiente de la recta.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

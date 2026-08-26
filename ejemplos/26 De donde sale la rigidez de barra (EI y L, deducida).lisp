@@ -34,6 +34,11 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 recta = c0 + c1*x @@(el momento M: una recta, porque no hay carga)
 EIv1 = Integral{c0 + c1*x @ x} @@(integro: EI·v′, sale una parábola)
 EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(integro otra vez: EI·v)
+#: OJO al mecanismo: subo INTEGRANDO, no derivando. El momento es {EI}·v″; integrar una vez da {EI}·v′, y otra vez {EI}·v. Cada integral SUBE un grado: recta → parábola → cúbica. (Derivar sería al revés, bajando: cúbica → parábola → recta → … hasta 0.) Lo dibujo con {c0}=1 y {c1}=1 de ejemplo, sólo para ver las formas:
+Mg = 1 + x @@(el momento: una recta)
+v1g = x + x^2/2 @@(al integrar: parábola)
+v2g = x^2/2 + x^3/6 @@(al integrar otra vez: cúbica)
+#fplot(Mg, v1g, v2g, [0 1])
 #: Mira {EIv2}: es de GRADO 3. AHÍ nace la cúbica — integrar dos veces una recta da un polinomio de grado 3. La deflexión v es eso entre {EI}: una cúbica con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo esas 4 constantes como {a0}…{a3} y paso a la coordenada {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
 vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
 #: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:

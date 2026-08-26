@@ -33,5 +33,12 @@ Meta: enseñar de dónde sale la K del FEM (funciones de forma → curvatura →
   - Hekatan Lab (MATLAB): `H1prime = …` `H1pprime = …`  → al pegarlo en Hekatan Lab se ve H1′ / H1″
 - Porqué: en LISP/MATLAB el `'` no es válido (en MATLAB es transpuesta). No inventé `p`: Hekatan Lab YA tenía su token (`prime/pprime/tprime`); uso el mismo para que sea coherente y redibuje la prima.
 
+## ej26 §2 — las funciones de forma DEDUCIDAS (no copiadas)  [25-ago]
+Jorge: "de dónde viene ese polinomio, ¿te lo inventas?". Antes §2 solo declaraba las Hermite. Ahora se DEDUCEN con el motor:
+- ✅ Cadena: deformada cúbica (sin carga → EI·v⁗=0) → 4 coef fijados por 4 datos de nudo → matriz A (evaluaciones de v y pendiente en s=0,1) → `Ainv = A^-1` → `Nnat = base·Ainv` (formas SIN L) → `Ldiag = diag(1,L,1,L)` → `Nrow = base·Ainv·Ldiag` = Hermite CON L. Idénticas al ej24.
+- ✅ El motor invierte la 4×4 numérica y multiplica base(1×4 simbólica)·matriz. Verificado en probe.png y ej26.png.
+- ✅ Porqué del L: el giro es dv/dx y s=x/L, así que en los datos el giro entra como L·θ; devolver ese L a las columnas 2 y 4 = la diagonal. Ahí nace, no es adorno.
+- ❌→✅ FUGA de `{}`: en prosa `#:`, `{v}` y `{N}` se EXPANDÍAN (v y N estaban definidas) → volcaban vectorones. Regla: en prosa, `{}` SOLO para símbolos NO definidos (EI, L, s, θ…); a las variables definidas se las nombra en texto plano. Renombré la matriz a `Nrow` (así `{N}` de §1 vuelve a ser símbolo) y saqué `{v}`,`{A}`,`{A^-1}`,`{K_coef}` de la prosa.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

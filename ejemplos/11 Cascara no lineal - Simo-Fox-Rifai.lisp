@@ -58,7 +58,15 @@ C_b = D_b·[1 0.3 0; 0.3 1 0; 0 0 0.35]
 #: El factor 1/(1−ν²) es la rigidización por **estado plano** —la misma D₀ que ya usamos en las placas.
 ### (c) El truco anti-bloqueo: cortante supuesto (MITC4)
 #: Un QUAD ingenuo **se bloquea** a cortante (sale infinitamente rígido al adelgazar). Simo lo evita evaluando el cortante **no en los puntos de Gauss** sino en los **puntos medios de los lados** A,B,C,D (ec. A.6–A.7). Es el método de **Bathe–Dvorkin / MITC4** —el mismo patrón que aislaste en el Q4 de ETABS.
-### (d) Las matrices del elemento son grandes → colapso automático
+### (d) La rigidez del elemento: una DOBLE integral
+#: Con la constitutiva ℂ (la C_b de arriba) y la matriz **B** —que liga la deformación con los desplazamientos de nudo— la rigidez del elemento es una **doble integral** sobre el cuadrado natural ξ,η ∈ [−1,1]:
+#|  K_e  =  ∫₋₁¹ ∫₋₁¹  Bᵀ · ℂ · B · det J  dξ dη
+#: Esa integral **no se resuelve a mano**: se aproxima por **cuadratura de Gauss** —evaluar el integrando en unos pocos puntos y sumar con pesos. Para el QUAD bilineal basta **2×2** (cuatro puntos), en ξ,η = ±1/√3, todos con peso 1. Es el mismo Gauss de §7c.
+pg = 1/sqrt(3)
+#: Lo pruebo con un término escalar tipo BᵀℂB —un polinomio de grado 2, f = ξ²+η², cuya doble integral exacta sobre [−1,1]² es 8/3—. Sumo Gauss en los 4 puntos (±1/√3, ±1/√3):
+K_gauss = (pg^2 + pg^2) + (pg^2 + pg^2) + (pg^2 + pg^2) + (pg^2 + pg^2)
+#: El motor da **8/3 = 2.6667**, clavado al valor exacto: Gauss 2×2 integra sin error hasta grado 3, y BᵀℂB de un QUAD bilineal cae justo en ese rango. Así se arma, punto de Gauss a punto de Gauss, **cada una de las 12×12 entradas** de K_e —la matriz del paso siguiente.
+### (e) Las matrices del elemento son grandes → colapso automático
 #: La constitutiva C_b es 3×3 (chica). Pero la **rigidez del elemento** K_e es **12×12** (4 nudos × 3 GDL). Cuando una matriz pasa de 9 columnas u 11 filas —o un vector de más de 9— Hekatan LISP pone los **índices en los bordes** y **colapsa el centro** con … ⋮ ⋱ (como NumPy/MATLAB). Demostración con la identidad 12×12 (a la que converge K_e·K_e⁻¹) y un vector de 15:
 Id = [1 0 0 0 0 0 0 0 0 0 0 0; 0 1 0 0 0 0 0 0 0 0 0 0; 0 0 1 0 0 0 0 0 0 0 0 0; 0 0 0 1 0 0 0 0 0 0 0 0; 0 0 0 0 1 0 0 0 0 0 0 0; 0 0 0 0 0 1 0 0 0 0 0 0; 0 0 0 0 0 0 1 0 0 0 0 0; 0 0 0 0 0 0 0 1 0 0 0 0; 0 0 0 0 0 0 0 0 1 0 0 0; 0 0 0 0 0 0 0 0 0 1 0 0; 0 0 0 0 0 0 0 0 0 0 1 0; 0 0 0 0 0 0 0 0 0 0 0 1]
 gdl = 1:15

@@ -127,5 +127,9 @@ Jorge: "preferible cada gráfica vaya con su viga" y "¿qué es q=0, se supone?"
 - ✅ Aclarado q=0: el elemento solo recibe fuerzas en los NUDOS (extremos); la P está en la punta, no repartida → a lo largo del tramo q=0. No es supuesto: define al elemento.
 - Colisión regex: un encabezado que empiece con "diag" dispara la directiva (como pasó con "deflexion"). En ej26 no ocurre (headers no empiezan así).
 
+## ej26 §4 — explicar el REAGRUPAR a a0..a3 (analogía de Jorge)  [25-ago]
+Jorge captó: "está reemplazando, cómo decir 3x+4x² es ax+bx², explícalo".
+- ✅ Explicado: los coeficientes de la cúbica integrada son mezcla de c0,c1,EI,constantes, pero esos valores no importan aún; lo que importa es que es cúbica con 4 números libres → les pongo letras a0..a3 (como 3x+4x² → ax+bx²), que se FIJAN después con las 4 condiciones de nudo.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

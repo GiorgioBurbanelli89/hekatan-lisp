@@ -43,8 +43,9 @@ Mrecta = Integral{c1 @ x} @@(M = ∫V = c1·x + c0, recta)
 EIv1 = Integral{c0 + c1*x @ x} @@(EI·v′: parábola)
 EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(EI·v: cúbica)
 #diag(deflexion)
-#: Ahí está: {EIv2} es de GRADO 3. La deflexión v es una cúbica con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo las 4 como {a0}…{a3} y paso a {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
-vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
+#: Ahí está: {EIv2} es de GRADO 3. Mira sus coeficientes: cada uno es una mezcla de {c0}, {c1}, {EI} y las constantes de integración. Pero esos valores exactos NO me importan todavía. Lo único que importa es que es una CÚBICA con 4 números libres.
+#: Así que a esos 4 números, valgan lo que valgan, les pongo letras genéricas {a0}, {a1}, {a2}, {a3} — es como decir que 3·x + 4·x² lo escribes a·x + b·x². No estoy inventando: sólo cambio los coeficientes enredados por letras limpias, que voy a FIJAR después con las 4 condiciones de nudo. Y paso a la coordenada {s} = {x/L} (de 0 a 1):
+vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la cúbica con 4 letras por fijar)
 #: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:
 vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(pendiente dv/ds)
 #: OJO con el giro: como {s} = {x/L}, el giro físico es θ = {1/L}·dv/ds; por eso un giro unitario pide una pendiente {L} en {s}, y las funciones de giro llevan {L}.

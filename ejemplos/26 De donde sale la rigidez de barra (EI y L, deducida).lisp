@@ -30,8 +30,16 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 #: OJO al resultado: la deflexión salió un polinomio de grado 3 — una CÚBICA en {x}. No es casualidad: sin carga dentro del tramo, la ecuación es {EI}·v⁗ = 0 y su solución es SIEMPRE una cúbica (4 constantes). Aquí las fijó el empotramiento; en un elemento de dos nudos las fijan los 4 datos de nudo (descenso y giro en cada punta). Eso es el paso 4.
 
 ## 4 · La elástica de Timoshenko, la cúbica y las funciones de forma
-#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Dentro del elemento no hay carga repartida, así que (paso 1) el cortante es constante y el momento es una RECTA. La elástica manda integrar ese momento dos veces para llegar a la deflexión. Escribo la recta con dos constantes cualquiera, {c0} (el valor en {x}=0) y {c1} (la pendiente) — son sólo los dos números que definen la recta, NADA de masa:
-#: PASO 1 — el momento es una recta (sin carga). En símbolos, y con {c0}=1, {c1}=1 para dibujarla:
+#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. La elástica manda integrar el momento dos veces para llegar a la deflexión. Pero primero: ¿por qué el momento es una RECTA?
+#: Se deduce del equilibrio (paso 1), integrando desde la carga hacia arriba. Dentro del elemento no hay carga repartida, así que {q} = 0. El cortante es la integral de −{q} (ley dV/dx = −q); integrar cero da una CONSTANTE — el cortante no cambia:
+Vcte = Integral{0 @ x} @@(V = ∫(−q): una constante, llamémosla V0)
+#: El momento es la integral del cortante (ley dM/dx = V); integrar esa constante {V0} da una RECTA — el momento sube a ritmo constante:
+Mrecta = Integral{V0 @ x} @@(M = ∫V = V0·x + M0: una RECTA)
+#: Grafico la carga (cero, plano) y el cortante (constante, horizontal) — de ahí sale que el momento es una recta:
+qcero = 0*x @@(carga q = 0)
+Vcteg = 2 + 0*x @@(cortante V: constante, ejemplo = 2)
+#fplot(qcero, Vcteg, [0 1])
+#: PASO 1 — ya tengo el momento: una RECTA. La escribo genérica con dos constantes, {c0} (valor en {x}=0) y {c1} (pendiente) — NADA de masa — y la grafico con {c0}=1, {c1}=1:
 recta = c0 + c1*x @@(el momento M: una recta)
 recta_g = 1 + x @@(la misma, con c0=1 c1=1, para ver)
 #fplot(recta_g, [0 1])

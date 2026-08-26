@@ -111,5 +111,10 @@ Jorge confundía: "¿de la función lineal la derivo 4 veces?". No — es INTEGR
 Jorge: "no entiendo, grafícala, ponla luego de cada ecuación". Antes tenía una sola gráfica combinada al final.
 - ✅ PASO 1 recta (símbolo + recta_g=1+x) → #fplot línea. PASO 2 EIv1 (∫) + EIv1_g → #fplot parábola. PASO 3 EIv2 (∫∫) + EIv2_g → #fplot cúbica. Cada ecuación con su gráfica justo debajo; se ve subir de grado paso a paso.
 
+## ej26 §4 — DEDUCIR por qué M es recta (simbólico + gráfico)  [25-ago]
+Jorge: "¿de dónde se deduce que M es recta? debe haber razonamiento, explícalo gráficamente y con variables simbólicas".
+- ✅ Antes de PASO 1: sin carga q=0 → V=Integral{0}=constante → M=Integral{V0}=V0·x+M0=RECTA. Simbólico con `Integral` (engine) y gráfico `#fplot(qcero, Vcteg,[0 1])` (q plano en 0, V horizontal). Cadena completa: q=0 → V cte → M recta → v′ parábola → v cúbica.
+- Motor: `#fplot` grafica constantes (`0*x`, `2+0*x`).
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

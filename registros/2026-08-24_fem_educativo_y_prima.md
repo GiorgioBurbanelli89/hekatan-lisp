@@ -40,5 +40,13 @@ Jorge: "de dónde viene ese polinomio, ¿te lo inventas?". Antes §2 solo declar
 - ✅ Porqué del L: el giro es dv/dx y s=x/L, así que en los datos el giro entra como L·θ; devolver ese L a las columnas 2 y 4 = la diagonal. Ahí nace, no es adorno.
 - ❌→✅ FUGA de `{}`: en prosa `#:`, `{v}` y `{N}` se EXPANDÍAN (v y N estaban definidas) → volcaban vectorones. Regla: en prosa, `{}` SOLO para símbolos NO definidos (EI, L, s, θ…); a las variables definidas se las nombra en texto plano. Renombré la matriz a `Nrow` (así `{N}` de §1 vuelve a ser símbolo) y saqué `{v}`,`{A}`,`{A^-1}`,`{K_coef}` de la prosa.
 
+## ej26 §2 nuevo — se DEDUCE EI·v⁗=0 (equilibrio), con θ y κ griegas  [25-ago]
+Jorge: "¿de dónde viene ese polinomio, te lo inventas?" (señalando EI·v⁗) y "giro/curvatura/deflexión tienen símbolos griegos, úsalos".
+- ✅ Nuevo §2 "De dónde sale EI·v⁗=0": cadena de derivadas de la deflexión con nombre físico. `θ=Diff{cúbica}` (giro=v′), `κ=Diff{giro}` (curvatura=v″), `cortante=Diff{}` (∝V), `carga=Diff{}` (∝q) → **0**. Sin carga (q=0) ⇒ EI·v⁗=0; integrando 4 veces ⇒ cúbica con 4 constantes = 4 datos de nudo. Renumerado: formas §3, curvatura §4, cambio var §5, integral §6 (y "paso 3/5"→"paso 4/6").
+- ✅ θ y κ salen en GRIEGO en el lado izquierdo (nombrar la variable `theta`/`kappa` la dibuja θ/κ). El Diff en su propia línea de definición MUESTRA la derivación (d/dx[...] = resultado) — bien.
+- ❌→✅ Trampa: si §1 REFERENCIA `kappa` (p.ej. `M = EI*kappa`) y §2 define `kappa = Diff{...}`, §1 hereda el Diff crudo y sale `M = EI·d/dx[...]` FEO. Además la definición global concretiza κ en toda la hoja. Arreglo: pasé ε, σ, M, u de §1 a PROSA con κ literal → `kappa` queda libre, §2 lo define sin ensuciar §1 (que sigue abstracto).
+- Motor: `unicode θ/κ` NO valen como nombre de variable (LHS vacío). `Diff{expr explícita}` evalúa y propaga el valor; `Diff{variable-con-Diff}` = anidado, no reduce. `{E}` en prosa se dibuja minúscula (no hay CaseMap para E sola) → usar E literal.
+- ✅ Motor: `--shot` ahora SALTEA el mutex single-instance (App.xaml.cs) → captura headless sin cerrar la ventana abierta.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

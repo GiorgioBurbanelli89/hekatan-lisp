@@ -133,7 +133,7 @@ Jorge captó: "está reemplazando, cómo decir 3x+4x² es ax+bx², explícalo".
 
 ## Render — el ∫ se cortaba por arriba (CSS)  [25-ago]
 Jorge: "no se ve toda la integral, arregla eso en el CSS".
-- ✅ Causa: `.ws-eq` (contenedor de cada línea math) tenía `overflow-y:hidden` (puesto para matrices 12×12 anchas) → recortaba el glifo alto del ∫ (m-nary 240% + m-dvr top:-3pt). Fix: `padding:.4em 0 .25em` en `.ws-eq` → el ∫ cabe dentro de la caja y ya no se corta. Verificado con ∫ indefinido y definido.
+- ✅ Causa: el contenedor de línea math recorta el glifo alto del ∫ (m-nary 240% + m-dvr top:-3pt). Fix: `padding:.4em 0 .25em`. OJO: hay DOS contenedores — `.ws-eq` (línea normal) y `.ws-deq>.deq-body` (línea con etiqueta `@@`). Las líneas de ej26 tienen `@@`, así que la clave era `.ws-deq>.deq-body` (el primer intento solo tocó `.ws-eq`). Verificado con la línea Mrecta (con `@@`).
 
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

@@ -10,8 +10,11 @@ Fy = V - (V + dV) - q*dx @@(fuerzas verticales = 0)
 Mo = (M + dM) - M - V*dx @@(momentos = 0)
 #: Se cancela {M} y sobra el cambio {dM} contra el cortante {V}: el momento crece al ritmo del cortante.
 
-## 2 · Geometría y material: la ecuación de la viga
-#: Falta ligar el momento {M} con la FORMA de la viga, en dos pasos. Geometría (flechas pequeñas): la curvatura es la segunda derivada de la deflexión — cuánto se dobla. Material y sección: por Hooke cada fibra tira según su distancia al eje; al sumar esas tensiones por su brazo, el momento {M} es la rigidez {EI} por la curvatura (la {EI} reúne el módulo E y la inercia de la sección).
+## 2 · Qué es v (la deflexión) y la ecuación de la viga
+#: Primero, qué es v. La deflexión v es cuánto BAJA el eje de la viga en cada punto x — la forma que toma al cargarse. Es la INCÓGNITA de todo el problema. OJO: v (minúscula, la deflexión) NO es V (mayúscula, el cortante del paso 1); son cosas distintas.
+#defl
+#: Sus derivadas tienen nombre propio: la 1ª, v′, es el giro (la pendiente del eje); la 2ª, v″, es la curvatura (cuánto se dobla); y la 4ª, v⁗, es la que aparece en la ecuación de la viga.
+#: Ahora ligo el momento {M} con esa forma, en dos pasos. Geometría (flechas pequeñas): la curvatura es la segunda derivada de la deflexión — v″. Material y sección: por Hooke cada fibra tira según su distancia al eje; al sumar esas tensiones por su brazo, el momento {M} es la rigidez {EI} por la curvatura (la {EI} reúne el módulo E y la inercia de la sección).
 #: Ahora junto las tres leyes. Del paso 1: la pendiente del momento es el cortante {V}, y la pendiente del cortante es menos la carga {q}. Y acá: el momento {M} es {EI} por la curvatura. Encadenándolas, la carga {q} queda igual a {EI} por la CUARTA derivada de la deflexión: esa es la ecuación de la viga.
 #: DENTRO del tramo, entre nudo y nudo, no hay carga repartida: la carga {q} vale cero. Entonces la cuarta derivada de la deflexión es cero. Eso es lo que resuelvo, con el motor, en el paso 3.
 

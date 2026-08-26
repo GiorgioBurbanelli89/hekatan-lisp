@@ -357,5 +357,69 @@ namespace HekatanLisp
             h.Close();
             cv.DrawPath(h, fill);
         }
+
+        // ---- Qué es v: la DEFLEXIÓN (cuánto baja el eje de la viga en cada x) ----
+        // Sintaxis:  #defl   (sin argumentos)
+        public static string DeflPng(bool dark)
+        {
+            const int W = 620, H = 250;
+            var bg  = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            var fg  = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            var blu = dark ? new SKColor(0x6E, 0xA8, 0xE8) : new SKColor(0x2B, 0x66, 0xC4);  // la deformada v
+            var gray = dark ? new SKColor(0x6A, 0x6E, 0x74) : new SKColor(0x9A, 0x8F, 0x7C);
+            using var surf = SKSurface.Create(new SKImageInfo(W, H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var axis = new SKPaint { Color = gray, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f, PathEffect = SKPathEffect.CreateDash(new float[] { 7, 5 }, 0) };
+            var sup  = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.8f };
+            var curve= new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3.2f };
+            var vpen = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.8f };
+            var vfill= new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var dim  = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f };
+            var tfg  = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15 };
+            var tblu = new SKPaint { Color = blu, IsAntialias = true, TextSize = 17, FakeBoldText = true };
+            var tgr  = new SKPaint { Color = gray, IsAntialias = true, TextSize = 14 };
+
+            float x0 = 70, x1 = W - 60, y0 = 80, amp = 62;
+            // eje sin deformar (línea de puntos) + apoyos
+            cv.DrawLine(x0, y0, x1, y0, axis);
+            Support(cv, "pin", x0, y0, true, sup);
+            Support(cv, "roller", x1, y0, false, sup);
+
+            // la deformada v(x): forma de viga simplemente apoyada (seno), hacia ABAJO
+            using (var p = new SKPath())
+            {
+                p.MoveTo(x0, y0);
+                for (float t = 0; t <= 1.0001f; t += 0.02f)
+                {
+                    float x = x0 + t * (x1 - x0);
+                    float y = y0 + amp * (float)Math.Sin(Math.PI * t);
+                    p.LineTo(x, y);
+                }
+                cv.DrawPath(p, curve);
+            }
+            cv.DrawText("deformada v(x)", x1 - 150, y0 + amp + 26, tblu);
+
+            // en un x concreto, la flecha vertical = v (cuánto bajó el eje)
+            float tx = 0.32f;
+            float xx = x0 + tx * (x1 - x0);
+            float yy = y0 + amp * (float)Math.Sin(Math.PI * tx);
+            cv.DrawLine(xx, y0, xx, yy, vpen);                 // del eje a la curva
+            var hh = new SKPath(); hh.MoveTo(xx, yy); hh.LineTo(xx - 4, yy - 10); hh.LineTo(xx + 4, yy - 10); hh.Close(); cv.DrawPath(hh, vfill);
+            cv.DrawText("v", xx + 7, (y0 + yy) / 2 + 5, tblu);
+            // marca de x
+            cv.DrawLine(xx, y0, xx, y0 - 4, dim);
+            cv.DrawText("x", xx - 4, y0 - 8, tgr);
+
+            // eje x hacia la derecha (abajo)
+            float yx = H - 22;
+            cv.DrawLine(x0, yx, x1 - 20, yx, dim);
+            ArrowH(cv, x1 - 20, yx, dim, new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Fill });
+            cv.DrawText("x", x1 - 16, yx + 5, tfg);
+
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 92);
+            return Convert.ToBase64String(data.ToArray());
+        }
     }
 }

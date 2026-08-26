@@ -69,5 +69,11 @@ Jorge: "el polinomio no se entiende". Antes §3 daba "una cúbica cualquiera a0+
 - ✅ Motor: `Integral{}` es indefinida y AGREGA +C. Cadena: `kappa=Integral{c3}` → κ=c3·x+C (curvatura, recta); `theta=Integral{c3*x+c2}` → θ=c3·x²/2+c2·x+C (giro); `vdef=Integral{c3*x²/2+c2*x+c1}` → c3·x³/6+c2·x²/2+c1·x+C = CÚBICA. Cada ∫ mete una constante → 4 constantes = 4 datos de nudo. κ,θ en griego (nombre de variable).
 - Es la única forma cuya 4ª derivada se anula → conecta con la cúbica del paso 4. Reemplazó la cadena de Diff (que era el chequeo AL REVÉS).
 
+## ej26 §2 — explicar QUÉ ES v (la deflexión), con dibujo  [25-ago]
+Jorge: "ni siquiera explicas el término v". Usaba v/v′/v″/v⁗ sin decir qué es.
+- ✅ Nueva directiva `#defl` (BeamSchematic.DeflPng): viga simplemente apoyada con su deformada v(x) (curva seno hacia abajo), la flecha v marcada en un x, eje x. Aclara además v (deflexión, minúscula) ≠ V (cortante, mayúscula).
+- ✅ §2 arranca explicando v = cuánto baja el eje en cada x = la incógnita; y nombra sus derivadas (v′ giro, v″ curvatura, v⁗ en la ecuación).
+- Trampa del regex de directivas: un encabezado `# Deflexion` disparaba la directiva (empieza con la palabra). Dejé solo la clave `defl` (no `deflexion`/`deformada`) para no chocar con títulos.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

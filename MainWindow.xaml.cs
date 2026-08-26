@@ -93,7 +93,7 @@ namespace HekatanLisp
             PoblarEjemplos();                                // menú Ejemplos ← carpeta ejemplos/
             // --in <archivo>: carga ese .lisp en el editor (útil con --shot para capturar un contenido dado)
             var inFile = ValueAfter(args, "--in");
-            if (inFile != null) { try { if (File.Exists(inFile)) { Editor.Text = File.ReadAllText(inFile); SetCurrentFile(inFile); } } catch { } }
+            if (inFile != null) { try { if (File.Exists(inFile)) { var it = File.ReadAllText(inFile); if (string.Equals(Path.GetExtension(inFile), ".m", StringComparison.OrdinalIgnoreCase)) it = LispConverter.MatlabToHlisp(it); Editor.Text = it; SetCurrentFile(inFile); } } catch { } }
             if (string.IsNullOrWhiteSpace(Editor.Text))
             {
                 // arranque normal: recupera el trabajo NO guardado del respaldo temporal (si existe)
@@ -1506,6 +1506,25 @@ namespace HekatanLisp
             catch { }
         }
 
+        // Guardar el LISP EJECUTABLE (script completo, corre en SBCL) a un archivo .lisp.
+        private void MenuGuardarLisp(object s, RoutedEventArgs e)
+        {
+            var text = Editor.Text;
+            if (string.IsNullOrWhiteSpace(text)) return;
+            var script = BuildFullLisp(text);
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "LISP ejecutable (*.lisp)|*.lisp",
+                InitialDirectory = !string.IsNullOrEmpty(_currentFile) ? Path.GetDirectoryName(_currentFile) : DocsDir,
+                FileName = (!string.IsNullOrEmpty(_currentFile) ? Path.GetFileNameWithoutExtension(_currentFile) : "mi_script") + "_ejecutable.lisp"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                try { File.WriteAllText(dlg.FileName, script); }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
+            }
+        }
+
         // El LISP COMPLETO y EJECUTABLE: carga el motor, cita ('), imprime. Se copia a un .lisp
         // en blanco y CORRE en SBCL tal cual. (La vista "LISP" y el botón "📋 LISP completo" lo usan.)
         private string BuildFullLisp(string text)
@@ -1637,7 +1656,11 @@ namespace HekatanLisp
         {
             try
             {
-                Editor.Text = File.ReadAllText(path);
+                string txt = File.ReadAllText(path);
+                // .m (MATLAB / Hekatan Lab) → se CONVIERTE a notación de Hekatan LISP al abrir
+                if (string.Equals(Path.GetExtension(path), ".m", StringComparison.OrdinalIgnoreCase))
+                    txt = LispConverter.MatlabToHlisp(txt);
+                Editor.Text = txt;
                 _synFull = false; _transliterated = false;
                 _syntaxLisp = LooksLikeLisp(Editor.Text);
                 HighlightSyntax();
@@ -1652,7 +1675,7 @@ namespace HekatanLisp
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "LISP (*.lisp)|*.lisp|Todos (*.*)|*.*",
+                Filter = "Hekatan LISP (*.hlisp;*.lisp)|*.hlisp;*.lisp|MATLAB / Hekatan Lab (*.m)|*.m|Todos (*.*)|*.*",
                 InitialDirectory = DocsDir
             };
             if (dlg.ShowDialog() == true) CargarArchivo(dlg.FileName);
@@ -1674,9 +1697,9 @@ namespace HekatanLisp
         {
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
-                Filter = "LISP (*.lisp)|*.lisp",
+                Filter = "Hekatan LISP (*.hlisp)|*.hlisp|LISP (*.lisp)|*.lisp",
                 InitialDirectory = !string.IsNullOrEmpty(_currentFile) ? Path.GetDirectoryName(_currentFile) : DocsDir,
-                FileName = !string.IsNullOrEmpty(_currentFile) ? Path.GetFileName(_currentFile) : "mi_script.lisp"
+                FileName = !string.IsNullOrEmpty(_currentFile) ? Path.GetFileName(_currentFile) : "mi_script.hlisp"
             };
             if (dlg.ShowDialog() == true)
             {

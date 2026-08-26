@@ -140,5 +140,12 @@ Jorge: "Hekatan Lab muestra el nombre arriba al abrir/guardar; en Hekatan LISP n
 - ✅ TextBlock `LblFile` en la fila 0 (arriba derecha), italic/muted, actualizado en `SetCurrentFile`. Además `--in` ahora llama `SetCurrentFile(inFile)` (antes no seteaba nombre ni título). Verificado con captura de VENTANA (`--view lisp --shot` usa RenderTargetBitmap → incluye el chrome): muestra "26 De donde sale...lisp".
 - Nota Hekatan Lab render: [[reference_hekatan_lab_css_eq_vs_graficas]] — sus ecuaciones no llevan overflow-y:hidden (no cortan el ∫); el ∫ del ejemplo se verifica abriendo Lab con un .m posicional (`HekatanLab.exe archivo.m`, NO `--in`).
 
+## Hekatan LISP ↔ Hekatan Lab interop — abrir .m y convertir  [25-ago]
+Jorge: menú para guardar-en-lisp; abrir un .m y convertirlo a Hekatan LISP; extensión nativa .hlisp; probar abriendo archivos con --ctl. Además confirmó que el ∫ en Hekatan Lab NO se corta (render lab_int.png: ∫ c1 dx = c1·x, ∫₀¹(-6+12x)² = 12) — igual que el WebView2 de LISP.
+- ✅ Conversor `LispConverter.MatlabToHlisp`: `%%`→`#`, `%`→`#:`, `syms`/clc/plot-setup→omitir, `;` final y comentario inline fuera; `int(f,x)`→`Integral{f @ x}`, `int(f,x,a,b)`→`Area{f @ x=a:b}`, `diff(f,x)`→`Diff{f @ x}` (parser de paréntesis balanceados). 
+- ✅ `CargarArchivo` y `--in`: si el archivo es `.m`, convierte al abrir. Diálogo Abrir acepta `*.hlisp;*.lisp` / `*.m`. Guardar como ofrece `.hlisp` (nativo). Nuevo menú "Guardar como LISP ejecutable (archivo)" (BuildFullLisp → .lisp que corre en SBCL).
+- ✅ Verificado con `--ctl` (gettext) y `--shot`: test_conv.m → Integral{}/Area{}/Diff{} correctos, render OK.
+- ✅ Instalado Hekatan Lab abre `.m` como argumento POSICIONAL (no `--in`): `HekatanLab.exe archivo.m`. Su `--shot` funciona (lento, motor MATLAB).
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

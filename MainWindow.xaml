@@ -132,6 +132,7 @@
                 <MenuItem Header="Cargar ejemplo" Click="MenuEjemplo"/>
                 <MenuItem Header="Cargar ejemplo (loop)" Click="MenuEjemploLoop"/>
                 <Separator/>
+                <MenuItem Header="Guardar como LISP ejecutable (archivo)…" Click="MenuGuardarLisp"/>
                 <MenuItem Header="Copiar como LISP ejecutable (portapapeles)" Click="OnExportLisp"/>
                 <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>

@@ -440,6 +440,76 @@ namespace HekatanLisp
         }
 
         // ---------- render: arbol -> LISP ----------
+        // ---- MATLAB / Hekatan Lab (.m) → notación de Hekatan LISP (worksheet matemática) ----
+        // %% → encabezado #, % → prosa #:, int()/diff() → Integral{}/Diff{}/Area{}, se omiten
+        // syms y comandos sin salida (clc, plot setup); se quita el ; final y el comentario inline.
+        public static string MatlabToHlisp(string matlab)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var raw in (matlab ?? "").Replace("\r", "").Split('\n'))
+            {
+                string t = raw.TrimStart();
+                if (t.Length == 0) { sb.Append('\n'); continue; }
+                if (t.StartsWith("%%")) { sb.Append("# ").Append(t.Substring(2).Trim()).Append('\n'); continue; }
+                if (t.StartsWith("%")) { sb.Append("#: ").Append(t.Substring(1).Trim()).Append('\n'); continue; }
+                if (Regex.IsMatch(t, @"^(syms|clc|clear|close|format|hold|grid|legend|xlabel|ylabel|title|figure|axis|set|colormap|colorbar|disp|fprintf|printf|sprintf|pretty|end|function)\b"))
+                    continue;
+                string line = raw;
+                int pc = TopLevelPercent(line);
+                if (pc >= 0) line = line.Substring(0, pc);
+                line = Regex.Replace(line, @"\s*;\s*$", "");
+                if (line.Trim().Length == 0) continue;
+                line = ConvMatlabCalls(line);
+                sb.Append(line.TrimEnd()).Append('\n');
+            }
+            return sb.ToString().TrimEnd('\n');
+        }
+
+        static int TopLevelPercent(string s)
+        {
+            bool inStr = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (s[i] == '\'') inStr = !inStr;
+                else if (s[i] == '%' && !inStr) return i;
+            }
+            return -1;
+        }
+
+        static string ConvMatlabCalls(string s)
+        {
+            s = ConvCall(s, "int", a => a.Count == 2 ? $"Integral{{{a[0]} @ {a[1]}}}" : a.Count == 4 ? $"Area{{{a[0]} @ {a[1]}={a[2]}:{a[3]}}}" : null);
+            s = ConvCall(s, "diff", a => a.Count == 2 ? $"Diff{{{a[0]} @ {a[1]}}}" : a.Count == 1 ? $"Diff{{{a[0]} @ x}}" : null);
+            return s;
+        }
+
+        // reemplaza name(a,b,…) balanceado por conv(args); si conv da null (firma no soportada) se deja igual
+        static string ConvCall(string s, string name, System.Func<System.Collections.Generic.List<string>, string> conv)
+        {
+            var re = new Regex(@"\b" + name + @"\s*\(");
+            int from = 0;
+            for (int guard = 0; guard < 100; guard++)
+            {
+                var m = re.Match(s, from);
+                if (!m.Success) break;
+                int open = m.Index + m.Length - 1, depth = 0, close = -1, start = open + 1;
+                var args = new System.Collections.Generic.List<string>();
+                for (int i = open; i < s.Length; i++)
+                {
+                    char c = s[i];
+                    if (c == '(') depth++;
+                    else if (c == ')') { depth--; if (depth == 0) { args.Add(s.Substring(start, i - start).Trim()); close = i; break; } }
+                    else if (c == ',' && depth == 1) { args.Add(s.Substring(start, i - start).Trim()); start = i + 1; }
+                }
+                if (close < 0) break;
+                string repl = conv(args);
+                if (repl == null) { from = close + 1; continue; }   // no soportada: sigue tras ella
+                s = s.Substring(0, m.Index) + repl + s.Substring(close + 1);
+                from = m.Index + repl.Length;
+            }
+            return s;
+        }
+
         // nombre SEGURO para LISP/MATLAB: la prima ' (cita en LISP, transpuesta en MATLAB) → 'p'.
         // Así  H1' → H1p,  H1'' → H1pp  al convertir; en matemática se sigue viendo H₁′.
         // Nombre válido para LISP/MATLAB. La PRIMA usa el MISMO token que Hekatan Lab

@@ -30,28 +30,16 @@ vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
 #: OJO al resultado: la deflexión salió un polinomio de grado 3 — una CÚBICA en {x}. No es casualidad: sin carga dentro del tramo, la ecuación es {EI}·v⁗ = 0 y su solución es SIEMPRE una cúbica (4 constantes). Aquí las fijó el empotramiento; en un elemento de dos nudos las fijan los 4 datos de nudo (descenso y giro en cada punta). Eso es el paso 4.
 
 ## 4 · La elástica de Timoshenko, la cúbica y las funciones de forma
-#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. La elástica manda integrar el momento dos veces para llegar a la deflexión. Pero primero: ¿por qué el momento es una RECTA?
-#: Se deduce del equilibrio (paso 1), integrando desde la carga hacia arriba. Dentro del elemento no hay carga repartida, así que {q} = 0. El cortante es la integral de −{q} (ley dV/dx = −q); integrar cero da una CONSTANTE — el cortante no cambia:
-Vcte = Integral{0 @ x} @@(V = ∫(−q): una constante, llamémosla V0)
-#: El momento es la integral del cortante (ley dM/dx = V); integrar esa constante {V0} da una RECTA — el momento sube a ritmo constante:
-Mrecta = Integral{V0 @ x} @@(M = ∫V = V0·x + M0: una RECTA)
-#: Grafico la carga (cero, plano) y el cortante (constante, horizontal) — de ahí sale que el momento es una recta:
-qcero = 0*x @@(carga q = 0)
-Vcteg = 2 + 0*x @@(cortante V: constante, ejemplo = 2)
-#fplot(qcero, Vcteg, [0 1])
-#: PASO 1 — ya tengo el momento: una RECTA. La escribo genérica con dos constantes, {c0} (valor en {x}=0) y {c1} (pendiente) — NADA de masa — y la grafico con {c0}=1, {c1}=1:
-recta = c0 + c1*x @@(el momento M: una recta)
-recta_g = 1 + x @@(la misma, con c0=1 c1=1, para ver)
-#fplot(recta_g, [0 1])
-#: PASO 2 — integro esa recta una vez. SUBE de grado y sale una PARÁBOLA (es {EI}·v′, la pendiente por EI):
-EIv1 = Integral{c0 + c1*x @ x} @@(EI·v′: una parábola)
-EIv1_g = x + x^2/2 @@(la parábola, para ver)
-#fplot(EIv1_g, [0 1])
-#: PASO 3 — integro otra vez. SUBE de nuevo y sale una CÚBICA (es {EI}·v, la deflexión por EI):
-EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(EI·v: una cúbica)
-EIv2_g = x^2/2 + x^3/6 @@(la cúbica, para ver)
-#fplot(EIv2_g, [0 1])
-#: Ese es el mecanismo: recta → parábola → cúbica; cada integral SUBE un grado (INTEGRO, no derivo — derivar bajaría de vuelta a la recta y a 0). Por eso la deflexión es de GRADO 3. En símbolos, {EIv2} entre {EI} es esa cúbica, con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo esas 4 como {a0}…{a3} y paso a {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
+#: La regla de oro de la viga (Timoshenko) liga la FORMA con el momento: la rigidez por la curvatura es el momento, {EI}·v″ = M. Para verlo TODO junto, dibujo la viga —un voladizo con una carga P en la punta— y, ALINEADOS debajo con el mismo eje x, sus diagramas: la carga q, el cortante V, el momento M y la deflexión v:
+#diag
+#: Lo leo de arriba hacia abajo, INTEGRANDO (cada integral sube un grado). No hay carga repartida, así que {q} = 0. El cortante es la integral de −q; integrar cero da una CONSTANTE (en el diagrama, V es una franja plana):
+Vcte = Integral{0 @ x} @@(V = ∫(−q) = c1, constante)
+#: El momento es la integral del cortante; integrar una constante da una RECTA (en el diagrama, M es un triángulo, una recta):
+Mrecta = Integral{c1 @ x} @@(M = ∫V = c1·x + c0, recta)
+#: Y la elástica manda integrar el momento (la recta {c0} + {c1}·{x}) dos veces más. Integrar una recta → PARÁBOLA (es {EI}·v′); integrar otra vez → CÚBICA (es {EI}·v, el último diagrama):
+EIv1 = Integral{c0 + c1*x @ x} @@(EI·v′: parábola)
+EIv2 = Integral{c0*x + c1*x^2/2 @ x} @@(EI·v: cúbica)
+#: Ahí está: {EIv2} es de GRADO 3. La deflexión v es una cúbica con 4 constantes ({c0}, {c1} y las dos de integración). Reagrupo las 4 como {a0}…{a3} y paso a {s} = {x/L}, de 0 a 1. ESO es de dónde viene el polinomio:
 vcubica = a0 + a1*s + a2*s^2 + a3*s^3 @@(la deflexión: cúbica, 4 constantes por fijar)
 #: Ahora, las funciones de forma. Cada una es esa cúbica cuando UN dato de nudo vale 1 y los otros tres 0; multiplicando cada forma por su dato de nudo y sumando, se arma cualquier deformada. Las 4 constantes se fijan con los 4 datos de nudo. Necesito también la pendiente de la cúbica:
 vslope = Diff{a0 + a1*s + a2*s^2 + a3*s^3 @ s} @@(pendiente dv/ds)

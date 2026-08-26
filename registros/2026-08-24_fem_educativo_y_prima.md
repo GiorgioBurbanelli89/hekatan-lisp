@@ -116,5 +116,10 @@ Jorge: "¿de dónde se deduce que M es recta? debe haber razonamiento, explícal
 - ✅ Antes de PASO 1: sin carga q=0 → V=Integral{0}=constante → M=Integral{V0}=V0·x+M0=RECTA. Simbólico con `Integral` (engine) y gráfico `#fplot(qcero, Vcteg,[0 1])` (q plano en 0, V horizontal). Cadena completa: q=0 → V cte → M recta → v′ parábola → v cúbica.
 - Motor: `#fplot` grafica constantes (`0*x`, `2+0*x`).
 
+## ej26 §4 — figura de LIBRO: viga + diagramas apilados y alineados  [25-ago]
+Jorge: "prefiero ver la viga en la misma gráfica y debajo la carga para entender, no entiendo nada". Las #fplot sueltas no ayudaban.
+- ✅ Nueva directiva `#diag` (BeamSchematic.BeamDiagramsPng): voladizo con carga P arriba, y ALINEADOS debajo (mismo eje x, guías punteadas en los nudos): q=0 (plano), V (franja constante), M (triángulo/recta), v (cúbica). La figura clásica de resistencia.
+- ✅ §4 ahora abre con `#diag` y la deducción camina por el diagrama (integrar de arriba abajo: q→V→M→v). Quitadas las #fplot sueltas (qcero/Vcteg/recta_g/EIv1_g/EIv2_g).
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

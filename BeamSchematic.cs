@@ -421,5 +421,99 @@ namespace HekatanLisp
             using var data = img.Encode(SKEncodedImageFormat.Png, 92);
             return Convert.ToBase64String(data.ToArray());
         }
+
+        // ---- La viga y, ALINEADOS debajo, sus diagramas: carga q, cortante V, momento M, deflexión v ----
+        // Caso: voladizo (empotrado izq) con carga P en la punta. Sintaxis: #diag
+        public static string BeamDiagramsPng(bool dark)
+        {
+            const int W = 660, H = 720;
+            var bg   = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            var fg   = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            var acc  = dark ? new SKColor(0xE8, 0x82, 0x5A) : new SKColor(0xD8, 0x5A, 0x30);  // carga P
+            var blu  = dark ? new SKColor(0x6E, 0xA8, 0xE8) : new SKColor(0x2B, 0x66, 0xC4);  // diagramas
+            var fillc = dark ? new SKColor(0x6E, 0xA8, 0xE8, 0x40) : new SKColor(0x2B, 0x66, 0xC4, 0x33);
+            using var surf = SKSurface.Create(new SKImageInfo(W, H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var beam = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 4 };
+            var thin = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f };
+            var curve = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.6f };
+            var fillp = new SKPaint { Color = fillc, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var lpen = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.2f };
+            var lfill = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var baseln = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f };
+            var guide = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0) };
+            var tlab = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15, FakeBoldText = true };
+            var tsub = new SKPaint { Color = fg, IsAntialias = true, TextSize = 13 };
+            var tblu = new SKPaint { Color = blu, IsAntialias = true, TextSize = 15, FakeBoldText = true };
+            var tacc = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+
+            float x0 = 170, x1 = W - 55;
+            float yBeam = 70, yQ = 205, yV = 320, yM = 445, yVdef = 590;
+
+            // guías verticales punteadas (los dos nudos), para VER que todo está alineado
+            cv.DrawLine(x0, 45, x0, 640, guide);
+            cv.DrawLine(x1, 45, x1, 640, guide);
+
+            // ---- 1) LA VIGA: voladizo empotrado a la izquierda, carga P en la punta
+            cv.DrawText("viga (voladizo)", 8, yBeam - 22, tlab);
+            for (float yy = yBeam - 24; yy <= yBeam + 24; yy += 8) cv.DrawLine(x0, yy, x0 - 10, yy + 8, thin); // muro rayado
+            cv.DrawLine(x0, yBeam - 26, x0, yBeam + 26, thin);
+            cv.DrawLine(x0, yBeam, x1, yBeam, beam);
+            cv.DrawLine(x1, yBeam - 46, x1, yBeam - 4, lpen);                                   // flecha P
+            using (var h = new SKPath()) { h.MoveTo(x1, yBeam - 4); h.LineTo(x1 - 5, yBeam - 15); h.LineTo(x1 + 5, yBeam - 15); h.Close(); cv.DrawPath(h, lfill); }
+            cv.DrawText("P", x1 + 6, yBeam - 30, tacc);
+
+            // helper de panel: baseline + etiqueta
+            void Panel(float yb, string lab, SKPaint tp)
+            {
+                cv.DrawLine(x0, yb, x1, yb, baseln);
+                cv.DrawText(lab, 8, yb + 4, tp);
+            }
+
+            // ---- 2) CARGA q = 0 (no hay): la curva coincide con la línea base
+            Panel(yQ, "q = 0", tblu);
+            cv.DrawText("(sin carga)", 8, yQ + 20, tsub);
+            using (var p = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3 })
+                cv.DrawLine(x0, yQ, x1, yQ, p);
+
+            // ---- 3) CORTANTE V = constante (= P): línea horizontal + relleno (rectángulo)
+            Panel(yV, "V", tblu);
+            cv.DrawText("(constante)", 8, yV + 20, tsub);
+            float vTop = yV - 42;
+            using (var rect = new SKPath()) { rect.MoveTo(x0, yV); rect.LineTo(x0, vTop); rect.LineTo(x1, vTop); rect.LineTo(x1, yV); rect.Close(); cv.DrawPath(rect, fillp); }
+            cv.DrawLine(x0, vTop, x1, vTop, curve);
+            cv.DrawLine(x0, yV, x0, vTop, curve);
+
+            // ---- 4) MOMENTO M = recta (−P·(L−x)): triángulo, máximo en el empotramiento, 0 en la punta
+            Panel(yM, "M", tblu);
+            cv.DrawText("(recta)", 8, yM + 20, tsub);
+            float mBot = yM + 44;  // M negativo → por debajo de la base
+            using (var tri = new SKPath()) { tri.MoveTo(x0, yM); tri.LineTo(x0, mBot); tri.LineTo(x1, yM); tri.Close(); cv.DrawPath(tri, fillp); }
+            cv.DrawLine(x0, mBot, x1, yM, curve);
+
+            // ---- 5) DEFLEXIÓN v = cúbica: curva que baja, máximo en la punta
+            Panel(yVdef, "v", tblu);
+            cv.DrawText("(cúbica)", 8, yVdef + 20, tsub);
+            using (var p = new SKPath())
+            {
+                p.MoveTo(x0, yVdef);
+                for (float t = 0; t <= 1.0001f; t += 0.02f)
+                {
+                    float xx = x0 + t * (x1 - x0);
+                    float sh = (3 * t * t - t * t * t) / 2f;   // forma del voladizo, máx 1 en la punta
+                    p.LineTo(xx, yVdef + 48 * sh);
+                }
+                cv.DrawPath(p, curve);
+            }
+
+            // eje x común
+            cv.DrawText("x", x1 + 6, yVdef + 50, tsub);
+            cv.DrawText("L", (x0 + x1) / 2 - 4, 40, tsub);
+
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 92);
+            return Convert.ToBase64String(data.ToArray());
+        }
     }
 }

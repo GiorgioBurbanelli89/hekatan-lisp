@@ -54,5 +54,9 @@ Jorge: "no entiendo, no explicas cómo empieza todo". El §2 daba por sentado el
 - ✅ Reorden lógico de la hoja: §1 EQUILIBRIO del trocito (de ahí dV/dx=−q y dM/dx=V, deducidas de ΣF=0 y ΣM=0) → §2 geometría+material (κ=v″, Hooke→M=EI·κ, encadenar → EI·v⁗=q, en el tramo q=0) → §3 cúbica (cadena θ,κ,V,q→0) → §4 formas → §5 curvaturas → §6 cambio var → §7 energía (por qué K=∫κκ) → §8 integral→K. La energía (antes §1) se movió al final: justifica la integral, no es el comienzo.
 - ✅ Refs "paso N" reajustadas; headers con EI LITERAL (no {EI}: la sustitución {} no corre en `##`). Recordatorio: `{E}` en prosa se dibuja "e" minúscula → usar E literal siempre.
 
+## ej26 §1/§2 — combinar variables y texto (no texto plano)  [25-ago]
+Jorge: "no estás combinando, veo texto plano allí" (las leyes dV/dx=−q, dM/dx=V estaban TECLEADAS como texto). Ahora van con `{}` inline: `{V - (V + dV) - q*dx} = 0`, `{dV/dx} = {-q}` (fracción de verdad), `{dM/dx} = {V}`, y en §2 `{V} = {dM/dx}`, `{-dV/dx} = {q}`, `{M} = {EI}·κ`.
+- Motor (dos reglas para `{}` inline): (a) un `=` DENTRO de las llaves ROMPE — se pierde lo que va tras el `=`; usar `{lhs} = {rhs}` con el `=` literal afuera. (b) las PRIMAS dentro de `{}` se pierden (`{v''''}`→"v"); dejar `v″`/`v⁗` como texto literal, combinar solo lo demás. Los diferenciales `dV`,`dM`,`dx` sí son un solo símbolo y `{dV/dx}` sale como fracción.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

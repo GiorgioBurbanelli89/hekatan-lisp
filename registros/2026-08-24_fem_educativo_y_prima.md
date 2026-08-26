@@ -93,5 +93,9 @@ Jorge: "hazlo como el libro de resistencia de materiales, sin operaciones numér
 Jorge: "N1 = 1−3s²+2s³, ¿de dónde sale? falta agregarlo". Yo daba las condiciones en palabras y saltaba al resultado.
 - ✅ Ahora: `vpol = a0+a1*s+a2*s^2+a3*s^3` (cúbica), `vslope = Diff{}` = 3a3·s²+2a2·s+a1 (operaciones). Condiciones: s=0 → a0=1, a1=0; s=1 → 1+a2+a3=0 y a1+2a2+3a3=0 → a3=2, a2=−3 → N1. N2 con el L (giro 1 pide pendiente L → a1=L → a2=−2L, a3=L). N3/N4 por simetría.
 
+## ej26 §4 — RAZONAR por qué la cúbica (no elegirla)  [25-ago]
+Jorge: "no entiendo la cúbica, por qué usas ese polinomio, razóname". Yo asumía "la cúbica del paso 3".
+- ✅ Agregado el razonamiento al inicio de §4: sin carga en el tramo → EI·v⁗=0 → 4ª derivada cero → integrar 4 veces solo puede dar grado 3 (nada mayor sobrevive) con 4 constantes → CÚBICA. "No la elijo yo: me la impone la física." Y las 4 constantes calzan con los 4 datos de nudo.
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

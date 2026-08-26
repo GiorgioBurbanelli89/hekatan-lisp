@@ -254,5 +254,108 @@ namespace HekatanLisp
                     break;
             }
         }
+
+        // ---- Trocito diferencial de viga: el EQUILIBRIO de donde salen dM/dx=V y dV/dx=-q ----
+        // Sintaxis:  #slice   (sin argumentos)
+        public static string SlicePng(bool dark)
+        {
+            const int W = 640, H = 300;
+            var bg  = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            var fg  = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            var acc = dark ? new SKColor(0xE8, 0x82, 0x5A) : new SKColor(0xD8, 0x5A, 0x30);  // carga q (externa)
+            var blu = dark ? new SKColor(0x6E, 0xA8, 0xE8) : new SKColor(0x2B, 0x66, 0xC4);  // fuerzas internas V, M
+            var faint = dark ? new SKColor(0x22, 0x26, 0x2c) : new SKColor(0xEC, 0xE4, 0xD2);
+            using var surf = SKSurface.Create(new SKImageInfo(W, H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var body  = new SKPaint { Color = fg,  IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3 };
+            var fill  = new SKPaint { Color = faint, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var qpen  = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
+            var qfill = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var fpen  = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.6f };
+            var ffill = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Fill };
+            var dim   = new SKPaint { Color = fg,  IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f };
+            var tfg   = new SKPaint { Color = fg,  IsAntialias = true, TextSize = 15 };
+            var tblu  = new SKPaint { Color = blu, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+            var tacc  = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+
+            float x0 = 245, x1 = 400, yT = 120, yB = 205, cy = (yT + yB) / 2;
+
+            // el trocito
+            cv.DrawRect(new SKRect(x0, yT, x1, yB), fill);
+            cv.DrawRect(new SKRect(x0, yT, x1, yB), body);
+
+            // carga repartida q: flechas hacia abajo sobre el techo
+            float qy = yT - 36;
+            cv.DrawLine(x0, qy, x1, qy, qpen);
+            for (float x = x0; x <= x1 + 0.1f; x += (x1 - x0) / 6f) ArrowV(cv, x, qy, yT - 3, qpen, qfill);
+            cv.DrawText("q", (x0 + x1) / 2 - 4, qy - 8, tacc);
+
+            // cara IZQUIERDA: cortante V (arriba) y momento M
+            ArrowV(cv, x0, yB + 20, yT + 18, fpen, ffill);
+            cv.DrawText("V", x0 - 34, cy + 4, tblu);
+            MomentArc(cv, x0, cy, 17, true, fpen, ffill);
+            cv.DrawText("M", x0 - 40, cy - 26, tblu);
+
+            // cara DERECHA: cortante V+dV (abajo) y momento M+dM
+            ArrowV(cv, x1, yT + 18, yB + 20, fpen, ffill);
+            cv.DrawText("V + dV", x1 + 24, cy + 4, tblu);
+            MomentArc(cv, x1, cy, 17, false, fpen, ffill);
+            cv.DrawText("M + dM", x1 + 12, cy - 26, tblu);
+
+            // cota dx
+            float dy = yB + 40;
+            cv.DrawLine(x0, dy - 6, x0, dy + 6, dim);
+            cv.DrawLine(x1, dy - 6, x1, dy + 6, dim);
+            cv.DrawLine(x0, dy, x1, dy, dim);
+            cv.DrawText("dx", (x0 + x1) / 2 - 9, dy - 8, tfg);
+
+            // eje x
+            cv.DrawLine(70, cy, 165, cy, dim);
+            ArrowH(cv, 165, cy, dim, new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Fill });
+            cv.DrawText("x", 168, cy + 5, tfg);
+
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
+        // flecha vertical: línea de y0 a y1, punta en y1 (en el sentido del recorrido)
+        static void ArrowV(SKCanvas cv, float x, float y0, float y1, SKPaint pen, SKPaint fill)
+        {
+            cv.DrawLine(x, y0, x, y1, pen);
+            float d = y1 > y0 ? 1 : -1;
+            using var h = new SKPath();
+            h.MoveTo(x, y1); h.LineTo(x - 5, y1 - d * 11); h.LineTo(x + 5, y1 - d * 11); h.Close();
+            cv.DrawPath(h, fill);
+        }
+
+        // flecha horizontal hacia la derecha, punta en (x,y)
+        static void ArrowH(SKCanvas cv, float x, float y, SKPaint pen, SKPaint fill)
+        {
+            using var h = new SKPath();
+            h.MoveTo(x, y); h.LineTo(x - 10, y - 4); h.LineTo(x - 10, y + 4); h.Close();
+            cv.DrawPath(h, fill);
+        }
+
+        // arco de momento (~270°) con punta; ccw=true gira antihorario
+        static void MomentArc(SKCanvas cv, float cx, float cy, float r, bool ccw, SKPaint pen, SKPaint fill)
+        {
+            var rect = new SKRect(cx - r, cy - r, cx + r, cy + r);
+            float start = ccw ? 45 : 135;
+            float sweep = ccw ? 270 : -270;
+            using (var p = new SKPath()) { p.AddArc(rect, start, sweep); cv.DrawPath(p, pen); }
+            double a = (start + sweep) * Math.PI / 180.0;
+            float ex = cx + r * (float)Math.Cos(a), ey = cy + r * (float)Math.Sin(a);
+            // tangente en el extremo (sentido del giro)
+            float s = ccw ? 1 : -1;
+            float tx = -(float)Math.Sin(a) * s, ty = (float)Math.Cos(a) * s;
+            using var h = new SKPath();
+            h.MoveTo(ex, ey);
+            h.LineTo(ex - tx * 11 - ty * 5, ey - ty * 11 + tx * 5);
+            h.LineTo(ex - tx * 11 + ty * 5, ey - ty * 11 - tx * 5);
+            h.Close();
+            cv.DrawPath(h, fill);
+        }
     }
 }

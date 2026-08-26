@@ -1,25 +1,28 @@
 # De dónde sale la rigidez de una barra: EI y L, término a término
-#: En los ejemplos anteriores la rigidez de una barra apareció ya hecha: el factor {EI/L^3} por una matriz de {12}, {6*L}, {4*L^2}. Aquí se DEDUCE de cero — equilibrio → funciones de forma → curvaturas → integral — con {EI} y {L} en símbolos. Cada número sale de una cuenta. Todo con el motor.
+#: Aquí se DEDUCE de cero, empezando por un trocito de viga: equilibrio → ecuación de la viga → forma cúbica → funciones de forma → curvaturas → energía → integral. Con {EI} y {L} en símbolos, cada número sale de una cuenta. Todo con el motor.
 
-## 1 · Por qué la rigidez es ∫ curvatura·curvatura (de dónde sale la fórmula)
-#: Dos hechos de la viga. Primero: una fibra a distancia {y} del eje se estira según la curvatura κ (secciones planas). Por la ley de Hooke la deformación es ε = −{y}·κ y la tensión σ = E·ε.
-#: Sumando esa tensión por su brazo en toda la sección, el momento es rigidez por curvatura: M = {EI}·κ (el {EI} reúne el material E y la inercia de la sección).
-#: Segundo: la energía que se guarda al doblar va con la curvatura AL CUADRADO (por eso todo gira en torno a κ): la energía por unidad de barra es u = ½·EI·κ².
-#: Y la deformada es las funciones de forma {N} por los desplazamientos de los nudos {d}:
-v = N*d @@(deformada de la barra)
-#: Su curvatura se arma igual, pero con las CURVATURAS de las formas (las {N''}, que salen en el paso 4). Metida en la energía κ² e integrada por la barra, cada pareja de nudos deja multiplicando la integral de {N''} por {N''}, por {EI}. Comparando con la rigidez, sale término a término: cada entrada {K} es la curvatura de una forma por la de otra, integradas. Es justo lo que se calcula en el paso 6.
+## 1 · El comienzo: el equilibrio de un trocito de viga
+#: Todo empieza aquí. Corto un pedacito de viga de ancho dx y le miro las fuerzas. En la cara izquierda actúan el momento M y el cortante V; en la derecha, un poco cambiados: M + dM y V + dV. Encima, la carga repartida q. El trocito está quieto, así que fuerzas y momentos se equilibran:
+#slice
+#: Dos condiciones de equilibrio, y de cada una sale una ley:
+#: (1) Suma de fuerzas verticales = 0: V − (V + dV) − q·dx = 0. Se cancela V y queda −dV = q·dx, es decir dV/dx = −q. El cortante cae al ritmo de la carga.
+#: (2) Suma de momentos = 0 (los términos con dx·dx son despreciables): dM − V·dx = 0, o sea dM/dx = V. El momento crece al ritmo del cortante.
 
-## 2 · De dónde sale {EI}·v⁗ = 0 (por qué la deformada es cúbica)
-#: Antes de las funciones de forma, hay que justificar que la deformada del tramo es una CÚBICA. Sale de las derivadas de la deflexión v — cada una tiene su nombre físico. El giro es la pendiente de la deflexión, θ = dv/dx; la curvatura, la pendiente del giro, κ = dθ/dx = v″. Por el paso 1, el momento es M = {EI}·κ. El equilibrio del trocito manda: el cortante es la pendiente del momento, V = dM/dx; y la carga repartida, la del cortante, q = dV/dx. Encadenando, q = {EI}·v⁗.
-#: Lo veo con una cúbica cualquiera {a0 + a1*x + a2*x^2 + a3*x^3} y derivo, paso a paso, hasta la 4ª:
+## 2 · Geometría y material: la ecuación de la viga EI·v⁗ = q
+#: Falta ligar el momento con la FORMA de la viga. Geometría (flechas pequeñas): la curvatura es la segunda derivada de la deflexión, κ = v″ — cuánto se dobla. Material + sección: por Hooke, la fibra a distancia {y} del eje tiene tensión σ = E·(−{y}·κ); sumando esa tensión por su brazo en toda la sección sale el momento M = {EI}·κ (el {EI} reúne el módulo E y la inercia de la sección). Juntando, M = {EI}·v″.
+#: Ahora encadeno las tres leyes: de (2), V = dM/dx; de (1), −dV/dx = q. Derivando M = {EI}·v″ dos veces y sustituyendo, la ecuación de la viga es {EI}·v⁗ = q.
+#: DENTRO del tramo, entre nudo y nudo, no hay carga repartida: q = 0. Por lo tanto {EI}·v⁗ = 0. Esa es la ecuación que gobierna la deformada de la barra.
+
+## 3 · {EI}·v⁗ = 0 quiere decir: la deformada es CÚBICA
+#: Compruebo que una cúbica cualquiera {a0 + a1*x + a2*x^2 + a3*x^3} cumple v⁗ = 0. Derivo, paso a paso, y cada derivada tiene su nombre físico:
 theta = Diff{a0 + a1*x + a2*x^2 + a3*x^3 @ x} @@(giro θ = v′)
 kappa = Diff{a1 + 2*a2*x + 3*a3*x^2 @ x} @@(curvatura κ = v″)
 cortante = Diff{2*a2 + 6*a3*x @ x} @@(∝ cortante V = EI·v‴)
 carga = Diff{6*a3 @ x} @@(∝ carga q = EI·v⁗)
-#: La 4ª derivada da 0: dentro del tramo no hay carga repartida (q=0), así que {EI}·v⁗ = 0. Al revés, integrar cuatro veces devuelve la cúbica, con 4 constantes de integración — que son justo los 4 datos de nudo (descenso y giro en cada extremo). Por eso entre nudos la deformada es cúbica. De esa cúbica saco ahora las funciones de forma.
+#: La 4ª derivada da 0: se cumple {EI}·v⁗ = 0. Al revés, integrar cuatro veces devuelve la cúbica, con 4 constantes de integración — que son justo los 4 datos de nudo (descenso y giro en cada extremo). Por eso entre nudos la deformada es cúbica. De esa cúbica saco ahora las funciones de forma.
 
-## 3 · De dónde salen las funciones de forma (se DEDUCEN)
-#: La deformada es esa CÚBICA (paso 2): {a0 + a1*s + a2*s^2 + a3*s^3}. Tiene 4 coeficientes {a0}…{a3}, y se fijan con los 4 datos de los nudos: descenso y giro en cada extremo. Uso {s} = {x/L}, de 0 a 1.
+## 4 · De dónde salen las funciones de forma (se DEDUCEN)
+#: La deformada es esa CÚBICA (paso 3): {a0 + a1*s + a2*s^2 + a3*s^3}. Tiene 4 coeficientes {a0}…{a3}, y se fijan con los 4 datos de los nudos: descenso y giro en cada extremo. Uso {s} = {x/L}, de 0 a 1.
 #: Evalúo esa cúbica y su pendiente en los dos extremos ({s}=0 y {s}=1). Eso relaciona los coeficientes con los datos de nudo mediante la matriz A (fila 1 = valor en 0, fila 2 = pendiente en 0, fila 3 = valor en 1, fila 4 = pendiente en 1):
 A = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(evaluaciones de v y su pendiente)
 #: La invierto para tener los coeficientes en función de los datos de nudo (coef = A⁻¹·datos):
@@ -36,7 +39,7 @@ N2 = L*(s - 2*s^2 + s^3) @@(giro izquierdo, con su L)
 N3 = 3*s^2 - 2*s^3 @@(descenso derecho)
 N4 = L*(-s^2 + s^3) @@(giro derecho, con su L)
 
-## 4 · La curvatura de cada peso (segunda derivada)
+## 5 · La curvatura de cada peso (segunda derivada)
 #: Derivo cada función dos veces respecto a {s}. Salen lineales (la curvatura de una cúbica):
 N1s = Diff{1 - 3*s^2 + 2*s^3 @ s} @@(pendiente de N₁)
 N1ss = Diff{-6*s + 6*s^2 @ s} @@(curvatura de N₁)
@@ -45,10 +48,15 @@ N2ss = Diff{L - 4*L*s + 3*L*s^2 @ s} @@(curvatura de N₂)
 N3ss = Diff{6*s - 6*s^2 @ s} @@(curvatura de N₃)
 N4ss = Diff{-2*L*s + 3*L*s^2 @ s} @@(curvatura de N₄)
 
-## 5 · El cambio de variable trae las potencias de L
+## 6 · El cambio de variable trae las potencias de L
 #: Aquí nace el {EI/L^3}. Como {s} = {x/L}, derivar respecto a {x} mete un {1/L} por cada derivada: dos derivadas → {1/L^2}. Y al integrar en {x} aparece un factor {L} más. Juntando los tres, el factor común que sale afuera es {EI/L^3}; adentro quedan las curvaturas en {s}, con sus factores {L} de N2 y N4.
 
-## 6 · La integral: de dónde salen 12, 6L, 4L²
+## 7 · La energía: por qué la rigidez es ∫ curvatura·curvatura
+#: Ya tengo las curvaturas de las formas. Falta ver por qué la rigidez es su integral. La energía que guarda la viga al doblarse va con la curvatura AL CUADRADO: la energía por unidad de barra es u = ½·{EI}·κ². Y la deformada es las funciones de forma por los desplazamientos de nudo:
+v = N*d @@(deformada de la barra)
+#: Su curvatura son las CURVATURAS de las formas (las {N''} del paso 5) por esos mismos desplazamientos. Al meter κ² en la energía e integrarla por la barra, cada pareja de nudos deja multiplicando la integral de {N''} por {N''}, por {EI}. Esa es justo la entrada {K} de la rigidez: cada término es EI·∫ curvatura·curvatura. Es lo que se calcula en el paso 8.
+
+## 8 · La integral: de dónde salen 12, 6L, 4L²
 #: Cada término es la integral del producto de dos curvaturas, de 0 a 1. Los factores {L} de las funciones de giro quedan dentro y suben la potencia de {L}:
 k11 = Area{(-6+12*s)^2 @ s=0:1} @@(descenso izq con descenso izq)
 k12 = Area{(-6+12*s)*L*(-4+6*s) @ s=0:1} @@(descenso izq con giro izq)

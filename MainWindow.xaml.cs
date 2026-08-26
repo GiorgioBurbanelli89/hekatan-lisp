@@ -361,7 +361,7 @@ namespace HekatanLisp
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
         // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
         private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef)\b(.*)$",
+            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
@@ -397,7 +397,13 @@ namespace HekatanLisp
                 bool isBeam = kw is "beam" or "viga" or "esquema";
                 bool isFrame = kw is "frame" or "portico";
                 bool isFrameDef = kw is "framedef" or "porticodef";
-                if (isFrameDef)
+                bool isSlice = kw is "slice" or "trozo" or "elemento";
+                if (isSlice)
+                {
+                    try { string b64 = BeamSchematic.SlicePng(dark); outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "equilibrio del trocito (dx)")); }
+                    catch { outList.Add(""); }
+                }
+                else if (isFrameDef)
                 {
                     var pm = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
                     var a = SplitTop(pm.Success ? pm.Groups[1].Value : rest);
@@ -569,7 +575,7 @@ namespace HekatanLisp
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef)\b",
+                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (textDir) continue;
                 var m = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(.*?)\s*@@\((.*?)\)\s*$");
@@ -585,7 +591,7 @@ namespace HekatanLisp
             {
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef)\b",
+                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }

@@ -18,12 +18,16 @@ Mo = (M + dM) - M - V*dx @@(momentos = 0)
 #: Ahora junto las tres leyes. Del paso 1: la pendiente del momento es el cortante {V}, y la pendiente del cortante es menos la carga {q}. Y acá: el momento {M} es {EI} por la curvatura. Encadenándolas, la carga {q} queda igual a {EI} por la CUARTA derivada de la deflexión: esa es la ecuación de la viga.
 #: DENTRO del tramo, entre nudo y nudo, no hay carga repartida: la carga {q} vale cero. Entonces la cuarta derivada de la deflexión es cero. Eso es lo que resuelvo, con el motor, en el paso 3.
 
-## 3 · Integrar {EI}·v⁗ = 0 da el polinomio: una CÚBICA
-#: {EI}·v⁗ = 0 quiere decir que la CUARTA derivada de la deflexión es cero. Para bajar de la 4ª derivada hasta la deflexión, integro cuatro veces. Cada integral agrega una constante (el motor la escribe +C; la renombro c3, c2, c1 para distinguir las cuatro). La 3ª derivada es la integral de cero: una constante, {c3}. Y sigo subiendo:
-kappa = Integral{c3 @ x} @@(2ª derivada, la curvatura κ: una recta)
-theta = Integral{c3*x + c2 @ x} @@(1ª derivada, el giro θ)
-vdef = Integral{c3*x^2/2 + c2*x + c1 @ x} @@(la deflexión: ¡una CÚBICA!)
-#: Ahí sale el polinomio: {vdef} es de grado 3, con 4 constantes ({c3}, {c2}, {c1} y la +C). La deflexión entre nudos es una CÚBICA — la única forma cuya 4ª derivada se anula. En el paso 4 la escribo como a0 + a1·x + a2·x² + a3·x³ y fijo esas 4 constantes con los 4 datos de los nudos.
+## 3 · Una viga de verdad: el voladizo, resuelto con L
+#: Para ver el mecanismo con FÓRMULAS reales, resuelvo primero una viga concreta de largo {L}: un voladizo (empotrado a la izquierda, libre a la derecha) con una carga {P} en la punta. Por estática, el momento a una distancia {x} del empotramiento es:
+Mvol = -P*(L - x) @@(momento del voladizo)
+#: La ecuación de la viga dice que {EI} por la curvatura es el momento. Integro el momento una vez y sale {EI} por el giro. El empotramiento no deja girar en el arranque (el giro en {x}=0 es cero), así que la constante de integración es cero:
+EIvp = Integral{-P*(L - x) @ x} @@(EI·v′, giro × EI; la +C = 0)
+#: Integro otra vez y sale {EI} por la deflexión. El empotramiento tampoco deja bajar en el arranque (la deflexión en {x}=0 es cero), así que otra vez la constante es cero:
+EIv = Integral{-P*L*x + P*x^2/2 @ x} @@(EI·v, deflexión × EI; la +C = 0)
+#: {EIv} dividido por {EI} es la deflexión. En la punta ({x}={L}) da la fórmula clásica del voladizo, {vpunta}:
+vpunta = -P*L^3/(3*EI) @@(flecha en la punta)
+#: OJO al resultado: la deflexión salió un polinomio de grado 3 — una CÚBICA en {x}. No es casualidad: sin carga dentro del tramo, la ecuación es {EI}·v⁗ = 0 y su solución es SIEMPRE una cúbica (4 constantes). Aquí las fijó el empotramiento; en un elemento de dos nudos las fijan los 4 datos de nudo (descenso y giro en cada punta). Eso es el paso 4.
 
 ## 4 · De dónde salen las funciones de forma (se DEDUCEN)
 #: La deformada es esa CÚBICA (paso 3): {a0 + a1*s + a2*s^2 + a3*s^3}. Tiene 4 coeficientes {a0}…{a3}, y se fijan con los 4 datos de los nudos: descenso y giro en cada extremo. Uso {s} = {x/L}, de 0 a 1.

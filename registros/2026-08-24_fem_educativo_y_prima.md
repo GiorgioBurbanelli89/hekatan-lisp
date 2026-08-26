@@ -75,5 +75,12 @@ Jorge: "ni siquiera explicas el término v". Usaba v/v′/v″/v⁗ sin decir qu
 - ✅ §2 arranca explicando v = cuánto baja el eje en cada x = la incógnita; y nombra sus derivadas (v′ giro, v″ curvatura, v⁗ en la ecuación).
 - Trampa del regex de directivas: un encabezado `# Deflexion` disparaba la directiva (empieza con la palabra). Dejé solo la clave `defl` (no `deflexion`/`deformada`) para no chocar con títulos.
 
+## ej26 §3 — VIGA REAL (voladizo con L) en vez de constantes abstractas  [25-ago]
+Jorge: "no se entiende, vas directo a las c; quiero ver una integral simbólica, la solución de una viga L con fórmulas (cortante, deflexión)". Las constantes c3,c2,c1 abstractas no se entendían.
+- ✅ §3 ahora resuelve un VOLADIZO concreto (largo L, carga P en la punta): `Mvol = -P*(L-x)` → `EIvp = Integral{}` (EI·v′) → `EIv = Integral{}` (EI·v = P·x³/6 - L·P·x²/2) → `vpunta = -P·L³/(3·EI)` (la flecha clásica). El empotramiento hace ambas constantes = 0 (v(0)=0, v'(0)=0), así el motor no necesita resolver el sistema. Fórmulas REALES con L, integral simbólica visible.
+- ✅ Cierre: la deflexión salió CÚBICA → generaliza: sin carga EI·v⁗=0 ⇒ siempre cúbica (4 constantes) ⇒ en el elemento las fijan los 4 datos de nudo (paso 4).
+- ❌→✅ Leak: definir `M` en §3 pisaba el `{M}` de §2 y el `M` del `Mo` de §1 → renombrado `Mvol`.
+- El `∫` que "se cortaba" era por 3 integrales APILADAS (sin prosa entre ellas); con prosa entre cada operación el `∫` sale completo. (Nota: el clip de integrales apiladas sigue latente en el CSS — `.m-dvr top:-3pt` + `.m-nary` 240% — no crítico.)
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

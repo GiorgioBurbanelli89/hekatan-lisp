@@ -135,5 +135,10 @@ Jorge captó: "está reemplazando, cómo decir 3x+4x² es ax+bx², explícalo".
 Jorge: "no se ve toda la integral, arregla eso en el CSS".
 - ✅ Causa: el contenedor de línea math recorta el glifo alto del ∫ (m-nary 240% + m-dvr top:-3pt). Fix: `padding:.4em 0 .25em`. OJO: hay DOS contenedores — `.ws-eq` (línea normal) y `.ws-deq>.deq-body` (línea con etiqueta `@@`). Las líneas de ej26 tienen `@@`, así que la clave era `.ws-deq>.deq-body` (el primer intento solo tocó `.ws-eq`). Verificado con la línea Mrecta (con `@@`).
 
+## Hekatan LISP — nombre del archivo VISIBLE arriba (como Hekatan Lab)  [25-ago]
+Jorge: "Hekatan Lab muestra el nombre arriba al abrir/guardar; en Hekatan LISP no veo esa parte".
+- ✅ TextBlock `LblFile` en la fila 0 (arriba derecha), italic/muted, actualizado en `SetCurrentFile`. Además `--in` ahora llama `SetCurrentFile(inFile)` (antes no seteaba nombre ni título). Verificado con captura de VENTANA (`--view lisp --shot` usa RenderTargetBitmap → incluye el chrome): muestra "26 De donde sale...lisp".
+- Nota Hekatan Lab render: [[reference_hekatan_lab_css_eq_vs_graficas]] — sus ecuaciones no llevan overflow-y:hidden (no cortan el ∫); el ∫ del ejemplo se verifica abriendo Lab con un .m posicional (`HekatanLab.exe archivo.m`, NO `--in`).
+
 ## Falta / opcional
 - ⏳ nada bloqueante; commit + instalador + push de esta tanda.

@@ -167,6 +167,12 @@
             </MenuItem>
         </Menu>
 
+        <!-- nombre del archivo abierto/guardado (arriba a la derecha, como Hekatan Lab) -->
+        <TextBlock x:Name="LblFile" Grid.Row="0" Grid.ColumnSpan="3" Text="(sin guardar)"
+                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                   FontStyle="Italic" FontSize="12" Foreground="{DynamicResource ThemeTextMuted}"
+                   TextTrimming="CharacterEllipsis" IsHitTestVisible="False"/>
+
         <!-- ============ botones de modo ============ -->
         <DockPanel Grid.Row="1" Grid.ColumnSpan="3" Background="{DynamicResource ThemeWindowBg}" LastChildFill="False" Margin="0,4">
             <TextBlock DockPanel.Dock="Left" Text="Hekatan LISP" Foreground="{DynamicResource ThemeAccentGold}"

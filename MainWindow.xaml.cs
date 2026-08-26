@@ -93,7 +93,7 @@ namespace HekatanLisp
             PoblarEjemplos();                                // menú Ejemplos ← carpeta ejemplos/
             // --in <archivo>: carga ese .lisp en el editor (útil con --shot para capturar un contenido dado)
             var inFile = ValueAfter(args, "--in");
-            if (inFile != null) { try { if (File.Exists(inFile)) Editor.Text = File.ReadAllText(inFile); } catch { } }
+            if (inFile != null) { try { if (File.Exists(inFile)) { Editor.Text = File.ReadAllText(inFile); SetCurrentFile(inFile); } } catch { } }
             if (string.IsNullOrWhiteSpace(Editor.Text))
             {
                 // arranque normal: recupera el trabajo NO guardado del respaldo temporal (si existe)
@@ -1610,7 +1610,9 @@ namespace HekatanLisp
         private void SetCurrentFile(string path)
         {
             _currentFile = path;
-            Title = string.IsNullOrEmpty(path) ? "Hekatan LISP" : "Hekatan LISP — " + Path.GetFileName(path);
+            string name = string.IsNullOrEmpty(path) ? "(sin guardar)" : Path.GetFileName(path);
+            Title = string.IsNullOrEmpty(path) ? "Hekatan LISP" : "Hekatan LISP — " + name;
+            if (LblFile != null) LblFile.Text = name;   // nombre visible arriba (como Hekatan Lab)
             // ya hay archivo REAL → el respaldo temporal sobra (bórralo)
             if (!string.IsNullOrEmpty(path))
                 try { if (File.Exists(AutoSavePath)) File.Delete(AutoSavePath); } catch { }

@@ -779,6 +779,19 @@
                (setf acc (list (if (evenp j) '+ '-) acc term))))
            (simplify acc))))))
 
+;; INVERSA SIMBÓLICA por adjunta/determinante: inv(A) = (1/det A)·adj(A), con
+;; adj = transpuesta de la matriz de cofactores C_ij = (-1)^(i+j)·minor(i,j).
+;; A diferencia de minv (numérica), funciona con entradas simbólicas (Jᵀ, J⁻¹ del FEM).
+(defun msinv (x)
+  (let* ((rows (to-rows x)) (n (length rows)) (d (mdet x)))
+    (if (= n 1)
+        (from-rows (list (list (simplify (list '/ 1 (caar rows))))))
+        (let ((cof (loop for i from 0 below n collect
+                     (loop for j from 0 below n collect
+                       (let ((m (mdet (from-rows (mminor rows i j)))))
+                         (if (evenp (+ i j)) m (simplify (list '- m))))))))
+          (mscale (simplify (list '/ 1 d)) (mtransp (from-rows cof)))))))
+
 ;; construye la matriz de un literal [ … ]: si los elementos ya son matrices/filas,
 ;; los apila por filas (vertcat); si son escalares, es una sola fila.
 (defun build-mat (elems)
@@ -804,6 +817,7 @@
     ((eq (car e) 'transpose) (mtransp (meval (second e))))
     ;; det(M): determinante simbólico (para detJ del Jacobiano, etc.).
     ((eq (car e) 'det) (mdet (meval (second e))))
+    ((eq (car e) 'inv) (msinv (meval (second e))))
     ;; parciales/derivadas DENTRO de una matriz: si no se evalúan aquí, un
     ;; J = [∂x/∂ξ …] guarda la forma ∂ sin reducir y det(J) opera sobre símbolos
     ;; opacos. Evaluándolas, la matriz de un Jacobiano queda con sus valores.

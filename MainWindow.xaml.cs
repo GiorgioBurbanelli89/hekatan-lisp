@@ -677,8 +677,17 @@ namespace HekatanLisp
                 if (notationOf[i] != null) { display.Add(notationOf[i]); continue; }   // notación: ya viene en forma LISP "a = b = c"
                 if (formOf[i] == null) { display.Add(""); continue; }
                 // DEFINICIÓN de vector/matriz: es solo el dato, no lleva "= resultado".
+                // EXCEPCIÓN: si las entradas tienen OPERADORES (Partial, det, inv…), la matriz
+                // NO es un dato — se evalúa y se muestra la matriz RESULTADO (limpia), no las ∂.
                 if (labels[i] != null && formOf[i].StartsWith("(vector"))
-                { display.Add(labels[i] + " = " + formOf[i]); continue; }
+                {
+                    var rm = resOf[i];
+                    if (HasOpCall(formOf[i]) && rm != null && rm.StartsWith("(vector") && !SameForm(rm, formOf[i]))
+                        display.Add(labels[i] + " = " + rm);
+                    else
+                        display.Add(labels[i] + " = " + formOf[i]);
+                    continue;
+                }
                 string lbl = labels[i];
                 string v = hasVar ? dvar : FirstVar(formOf[i]);
                 var r = resOf[i] ?? "";

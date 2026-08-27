@@ -147,7 +147,7 @@ namespace HekatanLisp
             foreach (var ex in lispExprs)
             {
                 // ¿MATRIZ? (vector/transpuesta/rango) → evaluar con meval e imprimir como (vector …)
-                bool hasMat = ex.Contains("(vector") || ex.Contains("(mtransp") || ex.Contains("(mrange");
+                bool hasMat = ex.Contains("(vector") || ex.Contains("(mtransp") || ex.Contains("(mrange") || ex.Contains("(ngauss");
                 // ¿la forma tiene ALGÚN token de operación (aunque sea anidado)? → evaluar con evops
                 bool hasOp = System.Array.Exists(OpCallNames, nm => ex.Contains("(" + nm));
                 if (hasMat)  // álgebra de matrices simbólica/numérica

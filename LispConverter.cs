@@ -42,6 +42,7 @@ namespace HekatanLisp
             { "sum", "suma-op" }, { "product", "producto-op" }, { "root", "root-op" },
             { "find", "find-op" }, { "sup", "sup-op" }, { "inf", "inf-op" }, { "repeat", "repeat-op" },
             { "lim", "limite" }, { "limit", "limite" }, { "limite", "limite" },   // límite  lim_{x→a} f
+            { "ngauss", "ngauss" },   // integral de Gauss 2x2 NUMERICA de una matriz: NGauss{ M @ xi, eta }
             // tokens de operación simbólica (nuestra notación): computan inline
             { "partial", "partial" }, { "derivate", "derive-x" }, { "diff", "derive-x" },
             { "simplify", "factor" }, { "factor", "factor" }, { "expand", "expand*" },
@@ -119,6 +120,8 @@ namespace HekatanLisp
                         Eat();
                         string vv = Peek(); Eat();               // variable
                         items.Add(N.Leaf(vv));
+                        // 2ª variable tras coma → operadores 2D (NGauss{ M @ xi , eta })
+                        if (Peek() == ",") { Eat(); items.Add(N.Leaf(Peek())); Eat(); }
                         // 'a' (y 'b') SOLO si hay '=' — así Partial{f @ x} queda con 2 campos (sin comerse el '}')
                         if (Peek() == "=")
                         {
@@ -203,6 +206,7 @@ namespace HekatanLisp
             // operaciones de matriz: se vuelven a mostrar como Aᵀ y a:b (no "mtransp(A)")
             if (op == "mtransp" && args.Count == 1) return new N { Op = "trans", A = args[0] };
             if (op == "mrange") return new N { Op = "range", Items = args };
+            if (op == "ngauss" && args.Count == 3) return new N { Op = "solver", Atom = "ngauss", Items = args };
 
             if (op == "vector")
             {
@@ -260,6 +264,7 @@ namespace HekatanLisp
                 "sup" => $"(sup-op '{f} '{v} {a} {b})",
                 "inf" => $"(inf-op '{f} '{v} {a} {b})",
                 "repeat" => $"(repeat-op '{f} '{v} {a} {b})",
+                "ngauss" => $"(ngauss '{f} '{v} '{a})",   // a = 2ª variable (v2); Gauss 2x2 numerico
                 _ => $"({n.Atom} '{f} '{v} {a})",
             };
         }
@@ -344,6 +349,9 @@ namespace HekatanLisp
                 "sup" => Kw("sup", f + "<span class=\"m-op\">;</span> " + interval),
                 "inf" => Kw("inf", f + "<span class=\"m-op\">;</span> " + interval),
                 "repeat" => Kw("repeat", f + " <span class=\"m-cond\">para</span> " + vv + " <span class=\"m-op\">=</span> " + a + "…" + (b ?? "")),
+                // NGauss: doble integral por Gauss 2x2 sobre [-1,1]^2 → ∬ f dξ dη
+                "ngauss" => IntSym("−1", "1", IntSym("−1", "1",
+                    "&hairsp;" + f + " <span class=\"m-fn\">d</span>" + v + "<span class=\"m-fn\">d</span>" + a)),
                 _ => "<span class=\"m-fn\">" + n.Atom + "</span>" + Paren(f),
             };
         }

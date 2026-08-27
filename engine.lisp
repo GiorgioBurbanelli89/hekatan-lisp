@@ -757,6 +757,22 @@
     (loop for i below r do (loop for j below c do
       (setf (aref a i j) (apply (the function (aref fns i j)) args))))
     a))
+
+;; NGAUSS: integral de GAUSS 2x2 NUMERICA de una matriz M(v1,v2) sobre [-1,1]^2.
+;; Es el patron FEM: construir M simbolico UNA vez (meval) y evaluar rapido (neval)
+;; en los 4 puntos de Gauss, sumando (pesos = 1). Devuelve matriz de numeros.
+;;   K = NGauss{ transpose(B)*D*B*detJ @ xi , eta }
+(defun ngauss (mexpr v1 v2)
+  (let* ((m (if (vectorp mexpr) mexpr (meval mexpr)))
+         (g 0.5773502691896258d0)
+         (pts (list (list (- g) (- g)) (list g (- g)) (list g g) (list (- g) g)))
+         (rows (to-rows m)) (nr (length rows)) (nc (length (car rows)))
+         (acc (make-array (list nr nc) :element-type 'double-float :initial-element 0d0)))
+    (dolist (p pts)
+      (let ((env (list (cons v1 (first p)) (cons v2 (second p)))))
+        (loop for i below nr do (loop for j below nc do
+          (incf (aref acc i j) (float (neval (nth j (nth i rows)) env) 1d0))))))
+    (from-rows (loop for i below nr collect (loop for j below nc collect (nclean (aref acc i j)))))))
 ;; FAST-PATH NUMERICO: las ops de matriz construyen formas (* a b) y llaman simplify,
 ;; aun con numeros. Si TODAS las entradas son numeros, se hace aritmetica nativa de
 ;; SBCL (sin simplify): ~1000x mas rapido en numerico, misma respuesta simbolica.
@@ -871,6 +887,9 @@
     ;; det(M): determinante simbólico (para detJ del Jacobiano, etc.).
     ((eq (car e) 'det) (mdet (meval (second e))))
     ((eq (car e) 'inv) (msinv (meval (second e))))
+    ((eq (car e) 'ngauss)
+     (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
+       (ngauss (meval (unq (second e))) (unq (third e)) (unq (fourth e)))))
     ;; parciales/derivadas DENTRO de una matriz: si no se evalúan aquí, un
     ;; J = [∂x/∂ξ …] guarda la forma ∂ sin reducir y det(J) opera sobre símbolos
     ;; opacos. Evaluándolas, la matriz de un Jacobiano queda con sus valores.
@@ -903,10 +922,17 @@
         (t (simplify (list '* a b)))))
 
 ;; imprime el resultado como forma (vector …) para que el parser de C# lo lea y renderice.
+;; imprime un float sin el sufijo d0/e0 de SBCL y sin ceros de cola (1.3333, 12.0->12)
+(defun fmt-float (x)
+  (let* ((s (format nil "~f" x)))
+    (when (find #\. s)
+      (setf s (string-right-trim "0" s))
+      (when (char= (char s (1- (length s))) #\.) (setf s (concatenate 'string s "0"))))
+    s))
 (defun mprint (x)
-  (if (vectorp x)
-      (format nil "(vector ~{~a~^ ~})" (map 'list #'mprint x))
-      (format nil "~a" x)))
+  (cond ((vectorp x) (format nil "(vector ~{~a~^ ~})" (map 'list #'mprint x)))
+        ((floatp x) (fmt-float x))
+        (t (format nil "~a" x))))
 
 ;; ---- SERVIDOR PERSISTENTE: un proceso SBCL vivo que evalua formas de stdin y responde ----
 ;; Elimina el arranque (~80 ms) por evaluacion. El WPF manda las formas (que hacen format t) y

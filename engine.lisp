@@ -737,6 +737,26 @@
     (loop for i below r do (loop for j below c do
       (setf (aref a i j) (float (neval (nth j (nth i rows)) env) 1d0))))
     a))
+
+;; COMPILAR a codigo nativo: una expresion SIMBOLICA se vuelve una funcion de
+;; `vars` compilada por SBCL (una sola vez). Llamarla luego es velocidad de codigo
+;; maquina — el ultimo salto sobre neval (que interpreta el arbol). Las ops del
+;; arbol (+ - * / expt sqrt sin cos ...) ya son funciones de Common Lisp.
+(defun ncompile (expr vars)
+  (compile nil `(lambda ,vars (declare (ignorable ,@vars)) (float (progn ,expr) 1d0))))
+;; compila cada entrada de una matriz -> array 2D de funciones; ncmat-eval las corre.
+(defun ncmat-compile (m vars)
+  (let* ((rows (to-rows m)) (r (length rows)) (c (length (car rows)))
+         (a (make-array (list r c))))
+    (loop for i below r do (loop for j below c do
+      (setf (aref a i j) (ncompile (nth j (nth i rows)) vars))))
+    a))
+(defun ncmat-eval (fns args)
+  (let* ((r (array-dimension fns 0)) (c (array-dimension fns 1))
+         (a (make-array (list r c) :element-type 'double-float)))
+    (loop for i below r do (loop for j below c do
+      (setf (aref a i j) (apply (the function (aref fns i j)) args))))
+    a))
 ;; FAST-PATH NUMERICO: las ops de matriz construyen formas (* a b) y llaman simplify,
 ;; aun con numeros. Si TODAS las entradas son numeros, se hace aritmetica nativa de
 ;; SBCL (sin simplify): ~1000x mas rapido en numerico, misma respuesta simbolica.

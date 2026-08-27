@@ -1037,6 +1037,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         // separador del tag de #deq: la línea de display trae  "...ecuación...\x02(etiqueta)".
         public const char DeqSep = '\x02';
 
+        // Separa asignaciones que venían de la MISMA línea (a=2; b=3) → se dibujan LADO A LADO en una fila.
+        public const char SbsSep = '\x03';
+
         // marcador de una GRÁFICA en su posición dentro del documento (se reemplaza por el HTML de la gráfica).
         public const string PlotSlot = "\x01PLOT\x01";
 
@@ -1062,13 +1065,34 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 string raw = raw0, deqTag = null;
                 int ds = raw0.IndexOf(DeqSep);
                 if (ds >= 0) { deqTag = raw0.Substring(ds + 1); raw = raw0.Substring(0, ds); }
-                string div = RenderLineHtml(raw, fromLisp);
+                string div = raw.IndexOf(SbsSep) >= 0 ? RenderSideBySide(raw, fromLisp)
+                                                      : RenderLineHtml(raw, fromLisp);
                 if (deqTag != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDeqTag(div, deqTag);
                 body.Append(div);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
                    "</style></head><body>" + body + MAT_JS + "</body></html>";
+        }
+
+        // Varias asignaciones de la MISMA línea (a=2; b=3) → una sola fila .ws-eq con las celdas lado a lado,
+        // igual que Hekatan Lab. Renderiza cada parte como ecuación y le quita su envoltura <div> para meterlas
+        // en una fila flex.
+        static string RenderSideBySide(string raw, bool fromLisp)
+        {
+            var cells = new System.Text.StringBuilder();
+            foreach (var part in raw.Split(SbsSep))
+            {
+                if (part.Trim().Length == 0) continue;
+                string d = RenderLineHtml(part, fromLisp);
+                int gt = d.IndexOf('>'); int end = d.LastIndexOf("</div>");
+                string inner = (gt >= 0 && end > gt) ? d.Substring(gt + 1, end - gt - 1) : d;
+                cells.Append("<span class=\"sbs-cell\">").Append(inner).Append("</span>");
+            }
+            // El flex va en un span INTERNO (hijo único), no en el .ws-eq: el auto-fit (MAT_JS) mete todos
+            // los hijos del .ws-eq en un solo span y colapsaría el flex si estuviera en el .ws-eq.
+            return "<div class=\"ws-eq\"><span style=\"display:inline-flex;flex-wrap:wrap;"
+                   + "gap:.5em 3em;align-items:baseline\">" + cells + "</span></div>";
         }
 
         // renderiza UNA línea de display (texto formateado o ecuación) a su <div>. "" si es vacía/omitida.

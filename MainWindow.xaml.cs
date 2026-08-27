@@ -267,13 +267,18 @@ namespace HekatanLisp
         // El ';' separa SOLO a nivel 0 (no dentro de [ ] { } ( ), donde ';' es separador de fila de matriz).
         // No toca líneas de texto (#), LISP/comentario (;) ni MATLAB (%).
         private static string[] ExpandMathSemicolons(string[] lines)
+            => ExpandMathSemicolons(lines, out _);
+
+        // 'cont[k]' = true si la línea de salida k es CONTINUACIÓN (2ª parte en adelante) de una línea con ';'
+        // → se dibuja en la MISMA fila que la anterior (lado a lado, estilo Hekatan Lab).
+        private static string[] ExpandMathSemicolons(string[] lines, out List<bool> cont)
         {
-            var res = new List<string>();
+            var res = new List<string>(); cont = new List<bool>();
             foreach (var raw in lines)
             {
                 var t = raw.TrimStart();
                 if (t.StartsWith("#") || t.StartsWith(";") || t.StartsWith("%") || raw.IndexOf(';') < 0)
-                { res.Add(raw); continue; }
+                { res.Add(raw); cont.Add(false); continue; }
                 int depth = 0; var cur = new StringBuilder(); var parts = new List<string>();
                 foreach (char c in raw)
                 {
@@ -283,9 +288,9 @@ namespace HekatanLisp
                     else cur.Append(c);
                 }
                 parts.Add(cur.ToString());
-                bool any = false;
-                foreach (var p in parts) if (p.Trim().Length > 0) { res.Add(p.Trim()); any = true; }
-                if (!any) res.Add(raw);
+                bool first = true;
+                foreach (var p in parts) if (p.Trim().Length > 0) { res.Add(p.Trim()); cont.Add(!first); first = false; }
+                if (first) { res.Add(raw); cont.Add(false); }   // no hubo ninguna parte no vacía
             }
             return res.ToArray();
         }
@@ -577,7 +582,7 @@ namespace HekatanLisp
             // Expresiones (matemática o LISP) → aplicar la operación elegida.
             // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
             // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
-            var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'));
+            var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'), out var contLine);
             var formOf = new string[lines.Length];
             var labels = new string[lines.Length];   // nombre que DEFINE cada línea (N1, N2…) si es "NAME = expr"
             var textOf = new (string kind, string align, string text)?[lines.Length];  // directiva de TEXTO (; formato)
@@ -758,7 +763,18 @@ namespace HekatanLisp
             for (int i = 0; i < lines.Length && i < display.Count; i++)
                 if (deqTag[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark))
                     display[i] += LispConverter.DeqSep + deqTag[i];
-            return display;
+            // Lado a lado: las asignaciones que venían de la MISMA línea (a=2; b=3) van en UNA fila.
+            bool Mergeable(string s) => s.Length > 0 && !s.StartsWith(LispConverter.TxtMark) && s != LispConverter.PlotSlot;
+            var merged = new List<string>();
+            for (int i = 0; i < display.Count; i++)
+            {
+                bool cont = i < contLine.Count && contLine[i];
+                if (cont && merged.Count > 0 && Mergeable(display[i]) && Mergeable(merged[merged.Count - 1]))
+                    merged[merged.Count - 1] += LispConverter.SbsSep + display[i];
+                else
+                    merged.Add(display[i]);
+            }
+            return merged;
         }
 
         /// <summary>¿La forma LISP tiene alguna VARIABLE LIBRE? (un identificador que no sea función/

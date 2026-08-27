@@ -8,8 +8,7 @@
 
 ## 2 · Las funciones de forma
 #: Cada extremo tiene su función de forma. {N1} vale 1 en el nudo 1 ({xi} = −1) y 0 en el nudo 2; {N2} al revés:
-N1 = (1-xi)/2
-N2 = (1+xi)/2
+N1 = (1-xi)/2; N2 = (1+xi)/2
 #: Entre las dos interpolan en línea recta: cualquier cosa (posición, desplazamiento) se arma como {N1} por su valor en el nudo 1 más {N2} por su valor en el nudo 2. Dibujadas sobre {xi} ∈ [−1,1] —se cruzan en el centro, donde cada una vale 1/2:
 #fplot((1-x)/2, (1+x)/2, [-1 1])
 

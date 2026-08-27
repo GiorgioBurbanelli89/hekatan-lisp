@@ -10,6 +10,12 @@
 #: Las funciones de forma no se postulan de memoria: se deducen. El elemento tiene dos nodos, es decir dos grados de libertad, de modo que la función más simple que los interpola es una recta: N = {a} + {b}·{xi}, con dos números por determinar, {a} y {b}.
 #: Esa misma recta se escribe como un producto de la base [1, {xi}] por el vector de coeficientes [{a}; {b}]. No es nada nuevo: el producto fila·columna multiplica término a término y suma —uno por {a}, más {xi} por {b}—, que reproduce exactamente la recta {N_i}:
 N_i = [1, xi] * [a; b]
+#: Ese producto se llama producto punto, y se hace por partes: se emparejan los elementos en el mismo orden y se multiplica cada pareja. El primero de la fila (1) con el primero de la columna ({a}); el segundo de la fila ({xi}) con el segundo de la columna ({b}):
+p_1 = 1*a
+p_2 = xi*b
+#: La primera pareja da 1 por {a} = {a}; la segunda da {xi} por {b}. Se suman las dos parejas, y esa suma es la recta completa:
+suma = 1*a + xi*b
+#: Es decir {suma}. Eso es todo el producto punto: emparejar, multiplicar cada pareja, sumar.
 #: ¿Por qué el rodeo? Porque SEPARA dos cosas distintas: la base [1, {xi}] contiene lo que depende de la posición {xi}; el vector [{a}; {b}] contiene los coeficientes que busco. Esa separación hace mecánico el paso siguiente.
 #: Los coeficientes se fijan con la propiedad de delta de Kronecker: la función de forma de un nodo vale la unidad en ese nodo y se anula en el otro. Aplicarla es sencillo: evaluar la recta en un nodo significa meter el valor de {xi} de ese nodo. Al hacerlo, solo cambia la base —el vector de coeficientes [{a}; {b}] queda intacto—.
 #: Nodo 1 ({xi} = −1): al meter {xi} = −1 la base [1, {xi}] se vuelve [1, −1], de modo que la función de forma en ese punto es:

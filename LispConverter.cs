@@ -141,6 +141,10 @@ namespace HekatanLisp
                     var args = new List<N>();
                     if (Peek() != close) { args.Add(Expr()); while (Peek() == ",") { Eat(); args.Add(Expr()); } }
                     if (Peek() == close) Eat();
+                    // transpose(X) → nodo TRANS: se muestra Xᵀ (forma de libro), no la palabra
+                    // "transpose"; y ToLisp lo emite como (mtransp X), que el motor computa.
+                    if (fname0.Equals("transpose", System.StringComparison.OrdinalIgnoreCase) && args.Count == 1)
+                        return new N { Op = "trans", A = args[0] };
                     return new N { Op = "fn", Atom = fname0, Items = args };
                 }
                 return N.Leaf(fname0);
@@ -204,7 +208,7 @@ namespace HekatanLisp
             // reconstruye el nodo SOLVER ($area, $slope…) para que se muestre con su notación
             if (SolverFn.TryGetValue(op, out var sv)) return new N { Op = "solver", Atom = sv, Items = args };
             // operaciones de matriz: se vuelven a mostrar como Aᵀ y a:b (no "mtransp(A)")
-            if (op == "mtransp" && args.Count == 1) return new N { Op = "trans", A = args[0] };
+            if ((op == "mtransp" || op == "transpose") && args.Count == 1) return new N { Op = "trans", A = args[0] };
             if (op == "mrange") return new N { Op = "range", Items = args };
             if (op == "ngauss" && args.Count == 3) return new N { Op = "solver", Atom = "ngauss", Items = args };
 
@@ -661,7 +665,7 @@ namespace HekatanLisp
                 return parentPrec > 3 ? Paren(r) : r;
             }
             if (n.Op == "trans")   // transpuesta: Aᵀ
-                return ToHtml(n.A, 5) + "<sup class=\"m-sup\">T</sup>";
+                return "<span class=\"m-transp-wrap\">" + ToHtml(n.A, 5) + "<span class=\"m-transp\">T</span></span>";
             if (n.Op == "range")   // rango a:b  ó  a:s:b
                 return string.Join("<span class=\"m-op\">:</span>", n.Items.Select(x => ToHtml(x, 2)));
             if (n.Op == "fn") return FnHtml(n);
@@ -887,6 +891,8 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-brk{width:.32em;}
 .m-brl{border:1.4px solid currentColor;border-right:none;}
 .m-brr{border:1.4px solid currentColor;border-left:none;}
+.m-transp-wrap{display:inline-flex;align-items:flex-start;vertical-align:middle;}
+.m-transp{font-size:.72em;font-style:normal;line-height:1;margin-left:1px;}
 .m-detl{border-left:1.4px solid currentColor;}
 .m-detr{border-right:1.4px solid currentColor;}
 .m-detbar{color:currentColor;margin:0 .08em;}

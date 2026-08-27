@@ -1,24 +1,20 @@
-# Cómo opera la derivada — regla por regla
-#: La derivada de la función de forma respecto a ξ, mostrando el procedimiento: qué regla se aplica en cada paso, no solo el resultado.
+# Cómo opera la derivada — paso a paso
+#: La derivada de la función de forma respecto a ξ, mostrando CADA operación intermedia —igual que se hace a mano—, no solo el resultado final. Al final, la misma derivada calculada por el motor y cronometrada.
 
 ## 1 · Se expande la función
-#: El producto {(1+xi)/2 * L} no muestra su estructura. Expandido en potencias de ξ se ve de qué está hecho —un término lineal y uno constante:
+#: El producto {(1+xi)/2 * L} no muestra su estructura. Expandido en potencias de ξ se ve un término constante y uno lineal:
 f = Expand{(1+xi)/2 * L}
 
-## 2 · Regla de la suma
-#: La derivada de una suma es la suma de las derivadas de cada término. Se deriva {L*xi/2} y {L/2} por separado y se suman:
-suma = Diff{L*xi/2 @ xi} + Diff{L/2 @ xi}
+## 2 · Derivada del término lineal (L/2)·ξ, paso por paso
+#: Se sigue la cadena: la constante {L/2} sale de la derivada (factor constante), la derivada de ξ es 1 (regla de la potencia), y se multiplica:
+dl = Diff{(L/2)*xi @ xi} = (L/2)*Diff{xi @ xi} = (L/2)*1 = L/2
 
-## 3 · Regla del factor constante y de la potencia
-#: En el término lineal, la constante {L/2} sale de la derivada (regla del factor constante) y multiplica a la derivada de ξ:
-factor = (L/2) * Diff{xi @ xi}
-#: La derivada de ξ es 1 (regla de la potencia: ξ¹ baja el exponente, 1·ξ⁰ = 1):
-d_xi = Diff{xi @ xi}
-#: El término constante {L/2} no depende de ξ, de modo que su derivada es 0:
-cero = Diff{L/2 @ xi}
+## 3 · La derivada completa, paso por paso
+#: Primero se expande, luego la regla de la suma reparte la derivada en cada término: el constante {L/2} da 0 y el lineal da {L/2}. Sumando:
+J = Diff{(1+xi)/2*L @ xi} = Diff{L/2 + (L/2)*xi @ xi} = 0 + L/2 = L/2
 
-## 4 · La derivada total y su tiempo
-#: Juntando todo: el término lineal da {factor} y el constante da {cero}, así que la derivada es {factor}. La operación completa, cronometrada con tic/toc:
+## 4 · La misma derivada, calculada por el motor y cronometrada
+#: Ahora el motor la calcula de una sola vez (esto SÍ lo computa, no es notación), con su tiempo:
 tic
-J = Diff{L*xi/2 + L/2 @ xi}
+Jm = Diff{(1+xi)/2 * L @ xi}
 toc

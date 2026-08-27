@@ -170,6 +170,26 @@ namespace HekatanLisp
             return res;
         }
 
+        /// <summary>CRONÓMETRO (tic/toc): corre las formas de operación N veces en SBCL y devuelve
+        /// los MICROSEGUNDOS por operación. Mide el cálculo puro, como el tic/toc de Hekatan Lab.</summary>
+        public static double TimeOps(List<string> forms, int n)
+        {
+            if (forms == null || forms.Count == 0 || n <= 0) return 0;
+            var sb = new StringBuilder();
+            sb.Append("(setf *print-case* :downcase)\n");
+            sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
+            sb.Append("(let ((t0 (get-internal-real-time)))\n  (dotimes (i ").Append(n).Append(")\n");
+            foreach (var f in forms)
+                sb.Append("    (ignore-errors (evops '").Append(f).Append("))\n");
+            sb.Append("  )\n  (format t \"~,4f~%\" (/ (* 1000000.0 (- (get-internal-real-time) t0)) (* internal-time-units-per-second ")
+              .Append(n).Append("))))\n");
+            foreach (var l in Run(sb.ToString()).Replace("\r", "").Split('\n'))
+                if (double.TryParse(l.Trim(), System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0)
+                    return v;
+            return 0;
+        }
+
         private static string Run(string code)
         {
             // si el motor está HORNEADO en el core, quita los (load "…engine.lisp") — recargarlo sería lento

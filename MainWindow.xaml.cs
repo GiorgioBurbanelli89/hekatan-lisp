@@ -609,6 +609,20 @@ namespace HekatanLisp
             // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
             // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
             var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'), out var contLine);
+            // tic / toc (cronómetro, estilo Hekatan Lab): 'toc' mide el tiempo de las operaciones desde 'tic'.
+            var isTic = new bool[lines.Length];
+            var isToc = new bool[lines.Length];
+            var tocOps = new Dictionary<int, List<int>>();   // índice del 'toc' → índices de líneas a cronometrar
+            {
+                int ticStart = -1; var pend = new List<int>();
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var tl = lines[i].Trim().ToLowerInvariant();
+                    if (tl == "tic") { isTic[i] = true; ticStart = i; pend = new List<int>(); }
+                    else if (tl == "toc") { isToc[i] = true; tocOps[i] = pend; pend = new List<int>(); ticStart = -1; }
+                    else if (ticStart >= 0) pend.Add(i);
+                }
+            }
             var formOf = new string[lines.Length];
             var labels = new string[lines.Length];   // nombre que DEFINE cada línea (N1, N2…) si es "NAME = expr"
             var textOf = new (string kind, string align, string text)?[lines.Length];  // directiva de TEXTO (; formato)
@@ -623,6 +637,7 @@ namespace HekatanLisp
             // Las líneas de TEXTO (#: ## #> ; %) y las gráficas no llevan etiqueta.
             for (int i = 0; i < lines.Length; i++)
             {
+                if (isTic[i] || isToc[i]) continue;   // tic/toc: no son expresiones
                 var s = lines[i].TrimStart();
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
@@ -641,6 +656,7 @@ namespace HekatanLisp
             // PASO 1: parsear cada línea a árbol + detectar su etiqueta
             for (int i = 0; i < lines.Length; i++)
             {
+                if (isTic[i] || isToc[i]) continue;   // tic/toc: no se parsean como expresión
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
                         @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b",
@@ -701,6 +717,25 @@ namespace HekatanLisp
             var display = new List<string>();
             for (int i = 0; i < lines.Length; i++)
             {
+                if (isTic[i]) { display.Add(""); continue; }   // tic: solo marca el inicio, no dibuja
+                if (isToc[i])                                   // toc: cronometra las operaciones desde el tic
+                {
+                    var opForms = new List<string>();
+                    if (tocOps.TryGetValue(i, out var ops))
+                        foreach (var oi in ops) if (formOf[oi] != null) opForms.Add(formOf[oi]);
+                    string html;
+                    if (opForms.Count == 0)
+                        html = "<span style=\"color:var(--mut)\">⏱ tic/toc sin operaciones que medir</span>";
+                    else
+                    {
+                        double us = LispEngine.TimeOps(opForms, 10000);
+                        html = "<span style=\"color:var(--var);font-weight:600\">⏱ " +
+                               us.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) +
+                               " µs</span> por operación <span style=\"color:var(--mut)\">(10 000 iteraciones, motor de polinomios en SBCL)</span>";
+                    }
+                    display.Add(LispConverter.TxtLine("p", "left", html));
+                    continue;
+                }
                 if (isPlot[i]) { display.Add(LispConverter.PlotSlot); continue; }   // gráfica: hueco en su posición
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {

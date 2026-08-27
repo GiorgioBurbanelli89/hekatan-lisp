@@ -1114,8 +1114,18 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
         }
 
-        // el marco de la matriz es redimensionable con CSS (resize:both) — no hace falta JS.
-        const string MAT_JS = "";
+        // AUTO-FIT: una ecuación más ancha que la página se ESCALA para caber entera (sin scroll,
+        // sin recorte). Antes las matrices anchas (p.ej. J⁻¹ de un quad general) se cortaban y había
+        // que usar la barra. Se envuelve el contenido en un span y se le aplica transform:scale.
+        const string MAT_JS =
+            "<script>(function(){function fit(){document.querySelectorAll('.ws-eq,.deq-body').forEach(function(eq){try{" +
+            "if(eq.dataset.fit)return;var w=eq.clientWidth;if(w<8)return;" +
+            "var inner=eq.querySelector(':scope>.ws-fit');if(!inner){inner=document.createElement('span');inner.className='ws-fit';" +
+            "inner.style.display='inline-block';inner.style.transformOrigin='left top';while(eq.firstChild)inner.appendChild(eq.firstChild);eq.appendChild(inner);}" +
+            "var cw=inner.scrollWidth;if(cw>w+2){var s=w/cw;inner.style.transform='scale('+s+')';eq.style.height=(inner.offsetHeight*s)+'px';eq.style.overflowX='hidden';}" +
+            "eq.dataset.fit='1';}catch(e){}});}" +
+            "window.addEventListener('load',function(){setTimeout(fit,40);setTimeout(fit,250);});" +
+            "if(document.readyState!=='loading')setTimeout(fit,40);})();</script>";
 
         // ---------- página de AYUDA (se muestra a la derecha cuando no hay script, como Hekatan Lab) ----------
         public static string HelpPage()

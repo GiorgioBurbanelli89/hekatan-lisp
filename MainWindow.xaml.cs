@@ -709,6 +709,18 @@ namespace HekatanLisp
                 }
                 else if (lbl != null)   // auto/simplify/expand con nombre → "N1 = <expr o resultado>"
                 {
+                    // Operación de MATRIZ sobre una etiqueta: det(J)/inv(J)/transpose(J) se muestran
+                    // con el SÍMBOLO (|J|, J⁻¹, Jᵀ) —como Hekatan Lab—, NO la matriz expandida. Se usa
+                    // treeOf (que conserva la etiqueta J), no formOf (que la sustituyó por su matriz).
+                    var tp = treeOf[i];
+                    bool matOp = tp != null && (tp.Op == "trans" ||
+                        (tp.Op == "fn" && tp.Items != null && tp.Items.Count == 1 &&
+                         (tp.Atom == "det" || tp.Atom == "inv" || tp.Atom == "transpose")));
+                    if (matOp && hasR && (tp.A?.IsAtom == true || (tp.Items != null && tp.Items.Count == 1 && tp.Items[0].IsAtom)))
+                    {
+                        display.Add(lbl + " = " + LispConverter.ToLisp(tp) + " = " + r);
+                    }
+                    else
                     // si la fórmula tiene TOKENS (Partial, Factor…) muestra TÉRMINO = RESULTADO
                     // (el término entero renderiza a CSS, y al lado su valor simbólico).
                     if (HasOpCall(formOf[i]) && hasR)

@@ -652,6 +652,30 @@ namespace HekatanLisp
             return h;
         }
 
+        // Factor escalar común de una matriz: si toda entrada es (* factor x) con el MISMO factor
+        // (los 0 valen como factor·0), devuelve (factor, filas reducidas). factor=null si no hay.
+        static (N factor, List<List<N>> rows) MatCommonFactor(N mat)
+        {
+            N factor = null; string facStr = null;
+            var rows = new List<List<N>>();
+            foreach (var row in mat.Items)
+            {
+                var cells = new List<N>();
+                foreach (var c in row.Items)
+                {
+                    if (c != null && c.IsAtom && c.Atom == "0") { cells.Add(c); continue; }   // 0 = factor·0
+                    if (c == null || c.Op != "*" || c.A == null || c.B == null) return (null, null);
+                    string fs = ToLisp(c.A);
+                    if (factor == null) { factor = c.A; facStr = fs; }
+                    else if (fs != facStr) return (null, null);
+                    cells.Add(c.B);
+                }
+                rows.Add(cells);
+            }
+            if (factor == null || facStr == "1") return (null, null);   // sin factor común no trivial
+            return (factor, rows);
+        }
+
         public static string ToHtml(N n, int parentPrec = 0)
         {
             if (n == null) return "";
@@ -670,7 +694,16 @@ namespace HekatanLisp
                 return string.Join("<span class=\"m-op\">:</span>", n.Items.Select(x => ToHtml(x, 2)));
             if (n.Op == "fn") return FnHtml(n);
             if (n.Op == "vec") return GridHtml(new List<List<N>> { n.Items });
-            if (n.Op == "mat") return GridHtml(n.Items.Select(r => r.Items).ToList());
+            if (n.Op == "mat")
+            {
+                // FACTORIZAR escalar común: si toda entrada es (factor · x) con el MISMO factor
+                // (los ceros valen como factor·0), se saca afuera: factor · [x…]. Forma de libro y
+                // MUCHO más angosto (J⁻¹ = 1/detJ·[adj], D = E/(1−ν²)·[…]).
+                var fac = MatCommonFactor(n);
+                if (fac.factor != null)
+                    return ToHtml(fac.factor, 3) + "<span class=\"m-op\">·</span>" + GridHtml(fac.rows);
+                return GridHtml(n.Items.Select(r => r.Items).ToList());
+            }
             switch (n.Op)
             {
                 case "^":

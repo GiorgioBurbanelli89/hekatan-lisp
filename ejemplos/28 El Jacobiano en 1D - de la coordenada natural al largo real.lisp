@@ -5,11 +5,13 @@
 #: En el método de los elementos finitos cada elemento del dominio físico se formula sobre un elemento de referencia de geometría fija, parametrizado por la coordenada natural {xi}. Para el elemento lineal de dos nodos, {xi} recorre el intervalo [−1, 1], según la convención isoparamétrica estándar (Zienkiewicz, Bathe, Hughes).
 #: El intervalo simétrico [−1, 1] no es arbitrario: sitúa el origen paramétrico en el centro del elemento y coincide con el dominio de integración de la cuadratura de Gauss–Legendre, con la que se evalúa la matriz de rigidez. La geometría real, de longitud {L}, se recupera mediante la transformación isoparamétrica, cuyo factor de escala es el Jacobiano. El elemento de referencia {xi} ∈ [−1, 1] y su imagen en el dominio físico [0, {L}]:
 #bar1d
+#: En esta gráfica se aprecia el mismo elemento visto de dos maneras: arriba, en coordenada natural {xi} (de −1 a +1, siempre igual, mida lo que mida la barra); abajo, en la barra real (de 0 a {L}). La flecha es el mapa que estira el segmento de referencia sobre la barra física.
 
 ## 2 · Deducción de las funciones de forma
 #: Las funciones de forma no se postulan de memoria: se deducen. El elemento tiene dos nodos, es decir dos grados de libertad, de modo que la función más simple que los interpola es una recta: N = {a} + {b}·{xi}, con dos números por determinar, {a} y {b}.
 #: Cuidado con un malentendido común: {a} y {b} NO son puntos de la barra —esa es la geometría, la de arriba—. Son los dos números que definen la recta, igual que en y = m·x + c: {a} es el intercepto (la altura de N en el centro, {xi} = 0) y {b} es la pendiente (cuánto cambia N por cada paso de {xi}). Para la función de forma del nodo 1 se ven así:
 #recta
+#: En esta gráfica se aprecia que la función de forma es una recta que baja de 1 (en su nodo) a 0 (en el otro). El punto verde es {a}: la altura de la recta en el centro ({xi} = 0). El triángulo ámbar es {b}: la pendiente, cuánto baja la recta al avanzar 1 en {xi}. Ni {a} ni {b} son puntos de la barra; son la altura y la inclinación de esta recta.
 #: Esa misma recta se escribe como un producto de la base [1, {xi}] por el vector de coeficientes [{a}; {b}]. No es nada nuevo: el producto fila·columna multiplica término a término y suma —uno por {a}, más {xi} por {b}—, que reproduce exactamente la recta {N_i}:
 N_i = [1, xi] * [a; b]
 #: Ese producto se llama producto punto. Se hace por partes: se emparejan los elementos en el mismo orden, se multiplica cada pareja y se suman. En el dibujo, cada pareja lleva un color —1 con {a} en azul, {xi} con {b} en coral—:
@@ -38,13 +40,14 @@ N = [1, xi] * inv(M)
 N_1 = (1-xi)/2; N_2 = (1+xi)/2
 #: Todo campo interpolado —geometría o desplazamiento— se expresa como combinación lineal de las funciones de forma ponderadas por los valores nodales: {N_1} por el valor en el nodo 1 más {N_2} por el valor en el nodo 2. Al ser de primer grado, la interpolación es exacta para campos lineales. Trazadas sobre {xi} ∈ [−1, 1], cada función de forma es una recta que pasa por 1 en su nodo y por 0 en el otro; se cruzan en {xi} = 0, donde ambas valen 1/2:
 #fplot((1-x)/2, (1+x)/2, [-1 1])
+#: En esta gráfica se aprecian las dos funciones de forma juntas: {N_1} (azul) baja de 1 a 0, {N_2} (naranja) sube de 0 a 1. Cada una vale 1 en su propio nodo y 0 en el otro —la propiedad de delta de Kronecker— y ambas se cruzan en el centro, donde valen 1/2. Que sumen 1 en todo punto garantiza que la interpolación reproduce cualquier campo constante.
 
-#salto
 ## 3 · El mapeo isoparamétrico: de ξ a la coordenada física x
 #: En la formulación isoparamétrica la geometría y el campo de desplazamientos se interpolan con las mismas funciones de forma. La coordenada física {x} se obtiene interpolando las coordenadas nodales; con el nodo 1 en el origen y el nodo 2 en {L}, subsiste únicamente el término asociado a {N_2}:
 x = N_2 * L
 #: Se comprueban los valores en los extremos: en {xi} = −1 se recupera el nodo 1 ({x} = 0) y en {xi} = +1 el nodo 2 ({x} = {L}). La transformación aplica el elemento de referencia, de medida 2, sobre el dominio físico de longitud {L}. La relación entre la coordenada física {x} y la natural {xi} es una recta; en gráfica:
 #mapa1d
+#: En esta gráfica se aprecia que la coordenada física {x} crece en línea recta con la natural {xi}: en {xi} = −1 vale 0, en {xi} = +1 vale {L}, y en el centro {L}/2. Esa recta ES el mapa isoparamétrico; su inclinación constante es justamente el Jacobiano que sigue.
 
 ## 4 · El Jacobiano de la transformación
 #: El Jacobiano de la transformación isoparamétrica es la derivada de la coordenada física respecto de la coordenada natural: mide la razón de cambio entre ambos dominios. Para el elemento lineal es un escalar:

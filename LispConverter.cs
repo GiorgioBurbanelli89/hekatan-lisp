@@ -693,9 +693,19 @@ namespace HekatanLisp
             if (n.Op == "range")   // rango a:b  ó  a:s:b
                 return string.Join("<span class=\"m-op\">:</span>", n.Items.Select(x => ToHtml(x, 2)));
             if (n.Op == "fn") return FnHtml(n);
-            if (n.Op == "vec") return GridHtml(new List<List<N>> { n.Items });
+            if (n.Op == "vec")
+            {
+                // Un vector de UN solo elemento es un escalar (resultado típico de un producto punto
+                // fila·columna): se dibuja sin corchetes.
+                if (n.Items.Count == 1) return ToHtml(n.Items[0], parentPrec);
+                return GridHtml(new List<List<N>> { n.Items });
+            }
             if (n.Op == "mat")
             {
+                // Matriz 1×1 = ESCALAR: un producto fila·columna (producto punto) da un 1×1; se dibuja
+                // como escalar, sin corchetes (p.ej. N₁ = [1 ξ]·c₁ = ½ − ξ/2, no [ ½ − ξ/2 ]).
+                if (n.Items.Count == 1 && n.Items[0].Items != null && n.Items[0].Items.Count == 1)
+                    return ToHtml(n.Items[0].Items[0], parentPrec);
                 // FACTORIZAR escalar común: si toda entrada es (factor · x) con el MISMO factor
                 // (los ceros valen como factor·0), se saca afuera: factor · [x…]. Forma de libro y
                 // MUCHO más angosto (J⁻¹ = 1/detJ·[adj], D = E/(1−ν²)·[…]).

@@ -8,15 +8,19 @@ N1 = (1-xi)/2; N2 = (1+xi)/2
 x = N2 * L
 
 ## 2 · Forma 1 — La derivada directa
-#: El Jacobiano es, por definición, la derivada de la coordenada física {x} respecto de la natural {xi}. Se deriva el mapeo:
+#: El Jacobiano es, por definición, la derivada de la coordenada física {x} respecto de la natural {xi}. Se deriva el mapeo, cronometrado con tic/toc:
+tic
 J1 = Diff{(1+xi)/2 * L @ xi}
+toc
 #: Resulta {J1}: constante, porque el mapeo es lineal.
 
 ## 3 · Forma 2 — La fórmula isoparamétrica (manual)
 #: El mismo Jacobiano sale sin derivar el mapeo completo: como {x} = Σ Nᵢ·xᵢ, su derivada es la suma de las derivadas de cada función de forma por la coordenada de su nodo, J = Σ (dNᵢ/dξ)·xᵢ. Primero las derivadas de las funciones de forma:
 dN1 = Diff{(1-xi)/2 @ xi}; dN2 = Diff{(1+xi)/2 @ xi}
-#: Salen {dN1} y {dN2}, constantes. La fórmula isoparamétrica es el producto punto del vector de esas derivadas por el vector de coordenadas nodales [x₁; x₂] = [0; {L}]:
+#: Salen {dN1} y {dN2}, constantes. La fórmula isoparamétrica es el producto punto del vector de esas derivadas por el vector de coordenadas nodales [x₁; x₂] = [0; {L}], también cronometrado:
+tic
 J2 = [dN1, dN2] * [0; L]
+toc
 #: El nodo 1 (en x = 0) no aporta; solo el nodo 2 (en x = {L}) contribuye con {dN2}·{L}.
 
 ## 4 · Las dos coinciden

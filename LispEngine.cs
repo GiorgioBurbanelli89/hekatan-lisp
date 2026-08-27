@@ -180,7 +180,11 @@ namespace HekatanLisp
             sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
             sb.Append("(let ((t0 (get-internal-real-time)))\n  (dotimes (i ").Append(n).Append(")\n");
             foreach (var f in forms)
-                sb.Append("    (ignore-errors (evops '").Append(f).Append("))\n");
+            {
+                // matrices (vector/transpuesta) se evalúan con meval; el resto con evops
+                bool isMat = f.Contains("(vector") || f.Contains("(mtransp") || f.Contains("(mrange") || f.Contains("(ngauss");
+                sb.Append("    (ignore-errors (").Append(isMat ? "meval" : "evops").Append(" '").Append(f).Append("))\n");
+            }
             sb.Append("  )\n  (format t \"~,4f~%\" (/ (* 1000000.0 (- (get-internal-real-time) t0)) (* internal-time-units-per-second ")
               .Append(n).Append("))))\n");
             foreach (var l in Run(sb.ToString()).Replace("\r", "").Split('\n'))

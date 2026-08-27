@@ -320,6 +320,71 @@ namespace HekatanLisp
             return Convert.ToBase64String(data.ToArray());
         }
 
+        // ---- Elemento 1D: la coordenada natural ξ ∈ [−1,1] y su MAPA al largo real [0,L] ----
+        // Sintaxis:  #bar1d   (sin argumentos)
+        public static string Bar1DPng(bool dark)
+        {
+            const int W = 660, H = 320;
+            var bg  = dark ? new SKColor(0x14,0x16,0x1a) : new SKColor(0xFB,0xF7,0xEC);
+            var fg  = dark ? new SKColor(0xC8,0xCC,0xD0) : new SKColor(0x33,0x33,0x33);
+            var blu = dark ? new SKColor(0x6E,0xA8,0xE8) : new SKColor(0x2B,0x66,0xC4);   // natural (ξ)
+            var acc = dark ? new SKColor(0xE8,0x82,0x5A) : new SKColor(0xD8,0x5A,0x30);   // físico (barra)
+            var faint = dark ? new SKColor(0x22,0x26,0x2c) : new SKColor(0xEC,0xE4,0xD2);
+            using var surf = SKSurface.Create(new SKImageInfo(W,H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var seg   = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=3};
+            var barB  = new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=3};
+            var fill  = new SKPaint{Color=faint,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var dim   = new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.2f};
+            var nfillB= new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var nfillA= new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var mapPen= new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.8f};
+            var mapFill=new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Fill};
+            var tfg = new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Center};
+            var tfgL= new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
+            var tblu= new SKPaint{Color=blu,IsAntialias=true,TextSize=16,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tacc= new SKPaint{Color=acc,IsAntialias=true,TextSize=16,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tnum= new SKPaint{Color=fg, IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+
+            // NATURAL: segmento ξ de −1 a +1
+            float nx0=185, nx1=475, ny=88, nxc=(nx0+nx1)/2;
+            cv.DrawLine(nx0,ny,nx1,ny,seg);
+            cv.DrawLine(nxc,ny-5,nxc,ny+5,seg);
+            cv.DrawCircle(nx0,ny,6,nfillB); cv.DrawCircle(nx1,ny,6,nfillB);
+            cv.DrawText("1",nx0,ny-14,tnum); cv.DrawText("2",nx1,ny-14,tnum);
+            cv.DrawText("ξ = −1",nx0,ny+28,tblu); cv.DrawText("ξ = +1",nx1,ny+28,tblu);
+            cv.DrawText("ξ = 0",nxc,ny+28,tfg);
+            // cota del segmento natural (largo 2)
+            float ndy=ny-34;
+            cv.DrawLine(nx0,ndy-5,nx0,ndy+5,dim); cv.DrawLine(nx1,ndy-5,nx1,ndy+5,dim);
+            cv.DrawLine(nx0,ndy,nx1,ndy,dim);
+            cv.DrawText("segmento natural (largo 2)",nxc,ndy-8,tfg);
+
+            // MAPA: flecha del centro natural al centro físico
+            float mx=nxc, my0=ny+44, my1=210;
+            cv.DrawLine(mx,my0,mx,my1,mapPen);
+            using(var h=new SKPath()){h.MoveTo(mx,my1);h.LineTo(mx-5,my1-11);h.LineTo(mx+5,my1-11);h.Close();cv.DrawPath(h,mapFill);}
+            cv.DrawText("el mapa  x = L·(1+ξ)/2",mx+16,(my0+my1)/2+5,tfgL);
+
+            // FÍSICO: la barra de 0 a L
+            float bx0=235, bx1=425, byy=242, bh=14f, bxc=(bx0+bx1)/2;
+            cv.DrawRect(new SKRect(bx0,byy-bh/2,bx1,byy+bh/2),fill);
+            cv.DrawRect(new SKRect(bx0,byy-bh/2,bx1,byy+bh/2),barB);
+            cv.DrawCircle(bx0,byy,6,nfillA); cv.DrawCircle(bx1,byy,6,nfillA);
+            cv.DrawText("1",bx0,byy-16,tnum); cv.DrawText("2",bx1,byy-16,tnum);
+            cv.DrawText("x = 0",bx0,byy+32,tacc); cv.DrawText("x = L",bx1,byy+32,tacc);
+            // cota de la barra real (largo L)
+            float bdy=byy+50;
+            cv.DrawLine(bx0,bdy-5,bx0,bdy+5,dim); cv.DrawLine(bx1,bdy-5,bx1,bdy+5,dim);
+            cv.DrawLine(bx0,bdy,bx1,bdy,dim);
+            cv.DrawText("barra real (largo L)",bxc,bdy+18,tfg);
+
+            using var img=surf.Snapshot();
+            using var data=img.Encode(SKEncodedImageFormat.Png,92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
         // flecha vertical: línea de y0 a y1, punta en y1 (en el sentido del recorrido)
         static void ArrowV(SKCanvas cv, float x, float y0, float y1, SKPaint pen, SKPaint fill)
         {

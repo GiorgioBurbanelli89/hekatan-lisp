@@ -294,6 +294,45 @@
   (let ((p (try-poly e)))
     (if (eq p :fail) (simplify (deriv e v)) (poly->expr (poly-deriv p v)))))
 
+;;;; --- derivada que MUESTRA SU TRABAJO: la regla de la potencia con su aritmetica ---
+(defun mono-drop (m v) "El monomio m sin la variable v." (remove v m :key #'car))
+
+(defun drule-term (m c v)
+  "Un termino c*(monomio m) derivado por la REGLA DE LA POTENCIA, SIN reducir:
+   c*v^n  ->  (c*n) * resto * v^(n-1).  Muestra el producto c*n y el exponente n-1.
+   Si v no aparece (n=0), la derivada del termino es 0."
+  (let ((n (or (cdr (assoc v m)) 0)))
+    (if (= n 0) 0
+        (let* ((rest (mono-drop m v))
+               (restx (if rest (mono->expr rest) nil))
+               (powx  (if (> (- n 1) 0) (list 'expt v (- n 1)) nil))
+               (coef  (list '* (coeff->expr c) n))          ; deja  c*n  a la vista
+               (tail  (cond ((and restx powx) (list '* restx powx))
+                            (restx restx) (powx powx) (t nil))))
+          (if tail (list '* coef tail) coef)))))
+
+(defun deriv-steps (e v)
+  "Derivada MOSTRANDO EL TRABAJO. Devuelve (steps s0 s1 s2 s3), una cadena de igualdades:
+   s0 = d/dv[e] (la derivada a resolver), s1 = regla de la suma (d/dv de cada termino),
+   s2 = regla de la potencia con su aritmetica (c*n*v^(n-1)), s3 = resultado reducido.
+   Solo polinomios; si no lo es, cae al resultado normal."
+  (let ((p (try-poly e)))
+    (if (eq p :fail)
+        (list 'steps (list 'derive-x e v) (simplify (deriv e v)))
+        (let* ((bydeg (sort (copy-alist p) #'> :key (lambda (tm) (mono-degree (car tm)))))
+               (s0 (list 'derive-x e v))
+               (term-forms (mapcar (lambda (tm)
+                              (let ((te (if (minusp (cdr tm))
+                                            (neg-expr (term->expr (car tm) (- (cdr tm))))
+                                            (term->expr (car tm) (cdr tm)))))
+                                (list 'derive-x te v)))
+                            bydeg))
+               (s1 (if term-forms (reduce (lambda (a b) (list '+ a b)) term-forms) 0))
+               (rule-terms (mapcar (lambda (tm) (drule-term (car tm) (cdr tm) v)) bydeg))
+               (s2 (if rule-terms (reduce (lambda (a b) (list '+ a b)) rule-terms) 0))
+               (s3 (poly->expr (poly-deriv p v))))
+          (list 'steps s0 s1 s2 s3)))))
+
 (defun poly-integ (p v)
   "Integral indefinida del polinomio p respecto a v:  c*v^n -> c/(n+1) * v^(n+1)."
   (let ((res nil))
@@ -691,7 +730,7 @@
 ;;;; evops recorre la expresión, EVALUA cada llamada de operación a su resultado
 ;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
 (defparameter *op-calls*
-  '(partial derive-x factor expand* integ-var integ-x area-under slope-at
+  '(partial derive-x deriv-steps factor expand* integ-var integ-x area-under slope-at
     suma producto-op root-op find-op sup-op inf-op repeat-op limite))
 (defun evops (e)
   (cond

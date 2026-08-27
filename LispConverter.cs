@@ -45,6 +45,7 @@ namespace HekatanLisp
             { "ngauss", "ngauss" },   // integral de Gauss 2x2 NUMERICA de una matriz: NGauss{ M @ xi, eta }
             // tokens de operación simbólica (nuestra notación): computan inline
             { "partial", "partial" }, { "derivate", "derive-x" }, { "diff", "derive-x" },
+            { "pasos", "deriv-steps" }, { "diffpasos", "deriv-steps" },   // derivada MOSTRANDO el trabajo (regla de la potencia)
             { "simplify", "factor" }, { "factor", "factor" }, { "expand", "expand*" },
         };
 
@@ -257,6 +258,7 @@ namespace HekatanLisp
                 "slope" or "derivative" => $"(slope-at '{f} '{v} {a})",
                 "partial" => $"(partial '{f} '{v})",
                 "derivate" or "diff" => n.Items.Count > 1 ? $"(derive-x '{f} '{v})" : $"(derive-x '{f})",
+                "pasos" or "diffpasos" => $"(deriv-steps '{f} '{v})",
                 "simplify" or "factor" => $"(factor '{f})",
                 "expand" => $"(expand* '{f})",
                 "sum" => $"(suma '{f} '{v} {a} {b})",
@@ -344,7 +346,7 @@ namespace HekatanLisp
                     "→" + LimTarget(n.Items.Count > 2 ? n.Items[2] : null, a) + "</small></span>&hairsp;" + Paren(f),
                 "slope" or "derivative" => ddv + Paren(f) + "<span class=\"m-op\"> │</span><sub class=\"m-sub\">" + v + "=" + a + "</sub>",
                 "partial" => pdv + Paren(f),                           // ∂/∂x (f) — derivada PARCIAL
-                "derivate" or "diff" => ddv + Paren(f),                // d/dx (f) — derivada total
+                "derivate" or "diff" or "pasos" or "diffpasos" => ddv + Paren(f),   // d/dx (f) — derivada total (pasos = mostrando el trabajo)
                 // simplify/factor/expand NO tienen símbolo matemático: se muestra solo la EXPRESIÓN,
                 // y el " = resultado" (que agrega el display) ya dice que se operó. Matemática pura.
                 "simplify" or "factor" or "expand" => f,
@@ -677,6 +679,32 @@ namespace HekatanLisp
         }
 
         static bool IsMinusOne(N n) => n != null && n.IsAtom && (n.Atom == "-1" || n.Atom == "−1");
+
+        /// <summary>De  (steps f0 f1 f2 …)  → la lista [f0, f1, f2, …] (formas LISP de nivel superior).
+        /// Para la derivada que muestra su trabajo (deriv-steps): cada forma es un paso de la cadena.</summary>
+        public static List<string> TopLevelArgs(string s)
+        {
+            var res = new List<string>();
+            if (string.IsNullOrEmpty(s)) return res;
+            s = s.Trim();
+            if (!s.StartsWith("(")) return res;
+            int i = 1;
+            while (i < s.Length && !char.IsWhiteSpace(s[i]) && s[i] != ')') i++;   // salta el nombre "steps"
+            while (i < s.Length)
+            {
+                while (i < s.Length && char.IsWhiteSpace(s[i])) i++;
+                if (i >= s.Length || s[i] == ')') break;
+                int start = i;
+                if (s[i] == '(')
+                {
+                    int depth = 1; i++;
+                    while (i < s.Length && depth > 0) { if (s[i] == '(') depth++; else if (s[i] == ')') depth--; i++; }
+                }
+                else while (i < s.Length && !char.IsWhiteSpace(s[i]) && s[i] != ')' && s[i] != '(') i++;
+                res.Add(s.Substring(start, i - start));
+            }
+            return res;
+        }
 
         public static string ToHtml(N n, int parentPrec = 0)
         {

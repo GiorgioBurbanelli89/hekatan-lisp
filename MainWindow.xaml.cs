@@ -763,6 +763,17 @@ namespace HekatanLisp
                 string lbl = labels[i];
                 string v = hasVar ? dvar : FirstVar(formOf[i]);
                 var r = resOf[i] ?? "";
+                // Pasos{f @ x}: la derivada MOSTRANDO su trabajo. El motor devuelve (steps s0 s1 s2 s3),
+                // una cadena de igualdades que se dibuja como  lbl = d/dx[f] = Σd/dx[tᵢ] = c·n·xⁿ⁻¹ = resultado.
+                if (r.StartsWith("(steps"))
+                {
+                    var pasos = LispConverter.TopLevelArgs(r);
+                    if (pasos.Count > 0)
+                    {
+                        display.Add((lbl != null ? lbl + " = " : "") + string.Join(" = ", pasos));
+                        continue;
+                    }
+                }
                 // hasR = hay RESULTADO distinto de la entrada. Comparo NORMALIZANDO (sin comillas ni
                 // espacios): si el operador no cerró (devuelve la misma notación), no muestro "= <lo mismo>".
                 bool hasR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && !SameForm(r, formOf[i]);

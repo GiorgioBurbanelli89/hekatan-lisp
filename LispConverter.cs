@@ -899,6 +899,8 @@ namespace HekatanLisp
         const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#2a2418;--mut:#6E664F;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;--sep:#c9b8dd;}";
         const string CSS = @"
 *{box-sizing:border-box;}
+.pagebreak{break-before:page;page-break-before:always;height:0;margin:0;border:0;}
+@media print{ body{background:#fff;} .pagebreak{break-before:page;page-break-before:always;} }
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
 .ws-eq{margin:0.4em 0;padding:.4em 0 .25em;
@@ -984,7 +986,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot)\b", RegexOptions.IgnoreCase)) return null;
+                if (Regex.IsMatch(s0, @"^#+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
                 {
                     var txt = s0.Substring(2).Trim();
@@ -997,7 +999,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             // LISP: ';' — esquema previo (compatibilidad)
             var s = s0.Substring(1).Trim();
-            if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot)\b", RegexOptions.IgnoreCase)) return null;
+            if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
             if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
             if (s.StartsWith("|") || s.StartsWith("=")) return ("p", "center", s.Substring(1).Trim());

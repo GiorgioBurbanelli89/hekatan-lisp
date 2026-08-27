@@ -28,7 +28,8 @@ namespace HekatanLisp
             // Se salta en modos de automatización (--ctl, --shot): pueden coexistir con la ventana abierta.
             bool headless = Array.Exists(args, a =>
                 string.Equals(a, "--ctl", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase));
+                string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--pdf", StringComparison.OrdinalIgnoreCase));
             if (!headless)
             {
                 _mutex = new System.Threading.Mutex(true, "HekatanLisp_SingleInstance_v1", out bool creada);

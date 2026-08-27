@@ -438,6 +438,109 @@ namespace HekatanLisp
             return Convert.ToBase64String(data.ToArray());
         }
 
+        // Qué son a y b: la función de forma N = a + b·ξ es una RECTA. a = intercepto (altura en ξ=0),
+        // b = pendiente. Dibuja N₁ (de (−1,1) a (+1,0)) marcando a y b. Aclara que NO son puntos de la barra.
+        public static string RectaAbPng(bool dark)
+        {
+            const int W = 620, H = 400;
+            var bg  = dark ? new SKColor(0x14,0x16,0x1a) : new SKColor(0xFB,0xF7,0xEC);
+            var fg  = dark ? new SKColor(0xC8,0xCC,0xD0) : new SKColor(0x33,0x33,0x33);
+            var blu = dark ? new SKColor(0x6E,0xA8,0xE8) : new SKColor(0x2B,0x66,0xC4);
+            var acc = dark ? new SKColor(0xE8,0x82,0x5A) : new SKColor(0xD8,0x5A,0x30);
+            var grn = dark ? new SKColor(0x5D,0xCA,0xA5) : new SKColor(0x0F,0x6E,0x45);
+            var amb = dark ? new SKColor(0xEF,0x9F,0x27) : new SKColor(0x85,0x4F,0x0B);
+            using var surf = SKSurface.Create(new SKImageInfo(W,H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var axis = new SKPaint{Color=fg,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.4f};
+            var line = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=3};
+            var dashG= new SKPaint{Color=grn,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.6f,PathEffect=SKPathEffect.CreateDash(new float[]{5,4},0)};
+            var penA = new SKPaint{Color=amb,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=2f};
+            var fblu = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var facc = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var fgrn = new SKPaint{Color=grn,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var tL   = new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
+            var tC   = new SKPaint{Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Center};
+            var tblu = new SKPaint{Color=blu,IsAntialias=true,TextSize=13,TextAlign=SKTextAlign.Left};
+            var tacc = new SKPaint{Color=acc,IsAntialias=true,TextSize=13,TextAlign=SKTextAlign.Left};
+            var tgrn = new SKPaint{Color=grn,IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tamb = new SKPaint{Color=amb,IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+
+            // ejes: ξ horizontal (N=0) y N vertical
+            float x_1=100, x0=300, x1=500, yN1=90, yNh=210, yN0=330, xAx=70;
+            cv.DrawLine(xAx,70,xAx,yN0,axis); cv.DrawLine(xAx,yN0,530,yN0,axis);
+            cv.DrawText("N",xAx-16,80,tL); cv.DrawText("ξ",536,yN0+4,tL);
+            cv.DrawText("1",xAx-14,yN1+4,tC); cv.DrawText("½",xAx-14,yNh+4,tC);
+            cv.DrawText("ξ = −1",x_1,yN0+20,tC); cv.DrawText("ξ = 0",x0,yN0+20,tC); cv.DrawText("ξ = +1",x1,yN0+20,tC);
+
+            // la recta N1 de (−1,1) a (+1,0)
+            cv.DrawLine(x_1,yN1,x1,yN0,line);
+            cv.DrawCircle(x_1,yN1,6,fblu); cv.DrawCircle(x1,yN0,6,facc);
+            cv.DrawText("nodo 1 (N = 1)",x_1+12,yN1-6,tblu);
+            cv.DrawText("nodo 2 (N = 0)",x1-118,yN0-10,tacc);
+
+            // a = intercepto (altura en ξ=0)
+            cv.DrawLine(x0,yN0,x0,yNh,dashG); cv.DrawLine(xAx,yNh,x0,yNh,dashG);
+            cv.DrawCircle(x0,yNh,5,fgrn);
+            cv.DrawText("a = ½   (la altura de la recta en ξ = 0)",x0+10,yNh-8,tgrn);
+
+            // b = pendiente (triángulo run 1 → baja ½)
+            cv.DrawLine(x0,yNh,x1,yNh,penA); cv.DrawLine(x1,yNh,x1,yN0,penA);
+            cv.DrawText("avanzo 1 en ξ",x0+40,yNh+18,tamb);
+            cv.DrawText("b = −½",x1+8,(yNh+yN0)/2,tamb);
+            cv.DrawText("(baja ½)",x1+8,(yNh+yN0)/2+18,tamb);
+
+            using var img=surf.Snapshot();
+            using var data=img.Encode(SKEncodedImageFormat.Png,92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
+        // La relación coordenada física x ↔ natural ξ como GRÁFICA (ejes): x = L·(1+ξ)/2 es una recta que
+        // va de (ξ=−1, x=0) a (ξ=+1, x=L). El mapa isoparamétrico en forma de función.
+        public static string MapXiPng(bool dark)
+        {
+            const int W = 620, H = 400;
+            var bg  = dark ? new SKColor(0x14,0x16,0x1a) : new SKColor(0xFB,0xF7,0xEC);
+            var fg  = dark ? new SKColor(0xC8,0xCC,0xD0) : new SKColor(0x33,0x33,0x33);
+            var blu = dark ? new SKColor(0x6E,0xA8,0xE8) : new SKColor(0x2B,0x66,0xC4);
+            var acc = dark ? new SKColor(0xE8,0x82,0x5A) : new SKColor(0xD8,0x5A,0x30);
+            var grn = dark ? new SKColor(0x5D,0xCA,0xA5) : new SKColor(0x0F,0x6E,0x45);
+            using var surf = SKSurface.Create(new SKImageInfo(W,H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var axis = new SKPaint{Color=fg,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.4f};
+            var line = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=3};
+            var dashG= new SKPaint{Color=grn,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.4f,PathEffect=SKPathEffect.CreateDash(new float[]{5,4},0)};
+            var fblu = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var facc = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var tL   = new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
+            var tC   = new SKPaint{Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Center};
+            var tR   = new SKPaint{Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Right};
+            var tblu = new SKPaint{Color=blu,IsAntialias=true,TextSize=13,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tacc = new SKPaint{Color=acc,IsAntialias=true,TextSize=13,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+
+            float x_1=100, x0=300, x1=500, yx0=330, yxh=210, yxL=90, xAx=88;
+            // ejes
+            cv.DrawLine(xAx,70,xAx,yx0,axis); cv.DrawLine(xAx,yx0,530,yx0,axis);
+            cv.DrawText("x",xAx-16,80,tL); cv.DrawText("ξ",536,yx0+4,tL);
+            // marcas eje x (físico): 0, L/2, L
+            cv.DrawText("0",xAx-10,yx0+4,tR); cv.DrawText("L/2",xAx-10,yxh+4,tR); cv.DrawText("L",xAx-10,yxL+4,tR);
+            cv.DrawText("ξ = −1",x_1,yx0+20,tC); cv.DrawText("ξ = 0",x0,yx0+20,tC); cv.DrawText("ξ = +1",x1,yx0+20,tC);
+            // la recta x = L(1+ξ)/2  de (−1,0) a (+1,L)
+            cv.DrawLine(x_1,yx0,x1,yxL,line);
+            cv.DrawCircle(x_1,yx0,6,fblu); cv.DrawCircle(x1,yxL,6,facc);
+            cv.DrawText("nodo 1:  ξ = −1 → x = 0",x_1+12,yx0-12,tblu);
+            cv.DrawText("nodo 2:  ξ = +1 → x = L",x1-190,yxL+22,tacc);
+            // punto medio: ξ=0 → x=L/2
+            cv.DrawLine(x0,yx0,x0,yxh,dashG); cv.DrawLine(xAx,yxh,x0,yxh,dashG);
+            cv.DrawText("ξ = 0 → x = L/2",x0+10,yxh-8,tL);
+            cv.DrawText("x = L·(1+ξ)/2",150,120,tblu);
+
+            using var img=surf.Snapshot();
+            using var data=img.Encode(SKEncodedImageFormat.Png,92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
         // corchete vertical [ o ]: línea vertical con dos ganchos (left=true dibuja "[")
         static void Bracket(SKCanvas cv, float x, float yTop, float yBot, bool left, SKPaint pen)
         {

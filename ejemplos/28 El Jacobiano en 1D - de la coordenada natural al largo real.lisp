@@ -8,6 +8,8 @@
 
 ## 2 · Deducción de las funciones de forma
 #: Las funciones de forma no se postulan de memoria: se deducen. El elemento tiene dos nodos, es decir dos grados de libertad, de modo que la función más simple que los interpola es una recta: N = {a} + {b}·{xi}, con dos números por determinar, {a} y {b}.
+#: Cuidado con un malentendido común: {a} y {b} NO son puntos de la barra —esa es la geometría, la de arriba—. Son los dos números que definen la recta, igual que en y = m·x + c: {a} es el intercepto (la altura de N en el centro, {xi} = 0) y {b} es la pendiente (cuánto cambia N por cada paso de {xi}). Para la función de forma del nodo 1 se ven así:
+#recta
 #: Esa misma recta se escribe como un producto de la base [1, {xi}] por el vector de coeficientes [{a}; {b}]. No es nada nuevo: el producto fila·columna multiplica término a término y suma —uno por {a}, más {xi} por {b}—, que reproduce exactamente la recta {N_i}:
 N_i = [1, xi] * [a; b]
 #: Ese producto se llama producto punto. Se hace por partes: se emparejan los elementos en el mismo orden, se multiplica cada pareja y se suman. En el dibujo, cada pareja lleva un color —1 con {a} en azul, {xi} con {b} en coral—:
@@ -37,10 +39,12 @@ N_1 = (1-xi)/2; N_2 = (1+xi)/2
 #: Todo campo interpolado —geometría o desplazamiento— se expresa como combinación lineal de las funciones de forma ponderadas por los valores nodales: {N_1} por el valor en el nodo 1 más {N_2} por el valor en el nodo 2. Al ser de primer grado, la interpolación es exacta para campos lineales. Trazadas sobre {xi} ∈ [−1, 1], cada función de forma es una recta que pasa por 1 en su nodo y por 0 en el otro; se cruzan en {xi} = 0, donde ambas valen 1/2:
 #fplot((1-x)/2, (1+x)/2, [-1 1])
 
+#salto
 ## 3 · El mapeo isoparamétrico: de ξ a la coordenada física x
 #: En la formulación isoparamétrica la geometría y el campo de desplazamientos se interpolan con las mismas funciones de forma. La coordenada física {x} se obtiene interpolando las coordenadas nodales; con el nodo 1 en el origen y el nodo 2 en {L}, subsiste únicamente el término asociado a {N_2}:
 x = N_2 * L
-#: Se comprueban los valores en los extremos: en {xi} = −1 se recupera el nodo 1 ({x} = 0) y en {xi} = +1 el nodo 2 ({x} = {L}). La transformación aplica el elemento de referencia, de medida 2, sobre el dominio físico de longitud {L}.
+#: Se comprueban los valores en los extremos: en {xi} = −1 se recupera el nodo 1 ({x} = 0) y en {xi} = +1 el nodo 2 ({x} = {L}). La transformación aplica el elemento de referencia, de medida 2, sobre el dominio físico de longitud {L}. La relación entre la coordenada física {x} y la natural {xi} es una recta; en gráfica:
+#mapa1d
 
 ## 4 · El Jacobiano de la transformación
 #: El Jacobiano de la transformación isoparamétrica es la derivada de la coordenada física respecto de la coordenada natural: mide la razón de cambio entre ambos dominios. Para el elemento lineal es un escalar:

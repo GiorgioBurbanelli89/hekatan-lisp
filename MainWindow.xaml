@@ -135,6 +135,8 @@
                 <MenuItem Header="Guardar como LISP ejecutable (archivo)…" Click="MenuGuardarLisp"/>
                 <MenuItem Header="Copiar como LISP ejecutable (portapapeles)" Click="OnExportLisp"/>
                 <Separator/>
+                <MenuItem Header="Exportar a PDF…  (para imprimir / LinkedIn)" Click="MenuPdf"/>
+                <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>
             </MenuItem>
             <MenuItem Header="_Ver resultado" Foreground="{DynamicResource ThemeText}">

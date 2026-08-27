@@ -32,7 +32,7 @@ namespace HekatanLisp
         private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
         private string _op = "auto";               // operación: "auto" | "simplify" | "expand" | "deriv"
         private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
-        private string _shot, _ctl;
+        private string _shot, _ctl, _pdf;
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private bool _ranProgram = false;          // el último resultado vino de EJECUTAR un programa (stdout de consola)
@@ -54,7 +54,9 @@ namespace HekatanLisp
         {
             var args = Environment.GetCommandLineArgs();
             _shot = ValueAfter(args, "--shot");
+            _pdf = ValueAfter(args, "--pdf");
             _ctl = ValueAfter(args, "--ctl");
+            if (_pdf != null) _view = "render";   // el PDF sale de la HOJA renderizada
             var v = ValueAfter(args, "--view");
             if (v is "render" or "lisp" or "math") _view = v;
             var o = ValueAfter(args, "--op");
@@ -106,6 +108,7 @@ namespace HekatanLisp
 
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
+            if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
         }
 
         // Ctrl + rueda del ratón → zoom del texto (agranda/achica la fuente del editor/salida)
@@ -366,7 +369,7 @@ namespace HekatanLisp
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
         // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
         private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot)\b(.*)$",
+            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
@@ -406,6 +409,9 @@ namespace HekatanLisp
                 bool isDefl = kw is "defl";
                 bool isBar1d = kw is "bar1d" or "barra" or "natural" or "elem1d";
                 bool isDot = kw is "punto" or "dotprod" or "producto" or "dot";
+                bool isRecta = kw is "recta" or "ab" or "interceptopendiente";
+                bool isMapXi = kw is "mapa1d" or "xdexi" or "mapnatural";
+                bool isSalto = kw is "salto" or "pagebreak" or "nuevapagina" or "pagina" or "newpage";
                 bool isDiag = kw is "diag" or "vmd";
                 if (isDiag)
                 {
@@ -434,6 +440,20 @@ namespace HekatanLisp
                 {
                     try { string b64 = BeamSchematic.DotProductPng(dark); outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "producto punto: emparejar, multiplicar, sumar")); }
                     catch { outList.Add(""); }
+                }
+                else if (isRecta)
+                {
+                    try { string b64 = BeamSchematic.RectaAbPng(dark); outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "a = intercepto (altura en ξ=0), b = pendiente")); }
+                    catch { outList.Add(""); }
+                }
+                else if (isMapXi)
+                {
+                    try { string b64 = BeamSchematic.MapXiPng(dark); outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "la coordenada física x en función de la natural ξ")); }
+                    catch { outList.Add(""); }
+                }
+                else if (isSalto)   // salto de PÁGINA (para el PDF): fuerza empezar en página nueva al imprimir
+                {
+                    outList.Add("<div class=\"pagebreak\"></div>");
                 }
                 else if (isFrameDef)
                 {
@@ -607,7 +627,7 @@ namespace HekatanLisp
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot)\b",
+                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (textDir) continue;
                 var m = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(.*?)\s*@@\((.*?)\)\s*$");
@@ -623,7 +643,7 @@ namespace HekatanLisp
             {
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot)\b",
+                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }
@@ -1488,6 +1508,35 @@ namespace HekatanLisp
             }
             catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }
             finally { Application.Current.Shutdown(); }
+        }
+
+        // Imprime la HOJA renderizada a PDF (WebView2). Respeta los saltos de página (#salto) y los fondos.
+        private async Task PrintPdfAndExit(string path)
+        {
+            try { await ExportPdf(path); }
+            catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }
+            finally { Application.Current.Shutdown(); }
+        }
+
+        private async Task ExportPdf(string path)
+        {
+            await Task.Delay(300);
+            var st = Viewer.CoreWebView2.Environment.CreatePrintSettings();
+            st.ShouldPrintBackgrounds = true;                 // conserva el fondo crema y los colores
+            st.MarginTop = 0.4; st.MarginBottom = 0.4; st.MarginLeft = 0.55; st.MarginRight = 0.55;
+            await Viewer.CoreWebView2.PrintToPdfAsync(path, st);
+        }
+
+        // Botón/menu «Exportar PDF»: pregunta dónde guardar y escribe el PDF de la hoja.
+        private async void MenuPdf(object sender, RoutedEventArgs e)
+        {
+            if (!IsRenderView || !_webReady || Viewer.CoreWebView2 is null)
+            { MessageBox.Show("Cambia a la vista renderizada (Matemática) antes de exportar el PDF."); return; }
+            var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "PDF (*.pdf)|*.pdf", DefaultExt = ".pdf",
+                FileName = Path.GetFileNameWithoutExtension(_currentFile ?? "hoja") + ".pdf" };
+            if (dlg.ShowDialog() != true) return;
+            try { await ExportPdf(dlg.FileName); MessageBox.Show("PDF guardado:\n" + dlg.FileName); }
+            catch (Exception ex) { MessageBox.Show("No se pudo exportar el PDF:\n" + ex.Message); }
         }
 
         // ---------- calculadora de simbolos + menus ----------

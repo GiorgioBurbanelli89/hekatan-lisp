@@ -676,6 +676,8 @@ namespace HekatanLisp
             return (factor, rows);
         }
 
+        static bool IsMinusOne(N n) => n != null && n.IsAtom && (n.Atom == "-1" || n.Atom == "−1");
+
         public static string ToHtml(N n, int parentPrec = 0)
         {
             if (n == null) return "";
@@ -723,6 +725,9 @@ namespace HekatanLisp
                            "</span><span class=\"m-frd\">" + ToHtml(n.B, 0) + "</span></span>";
                 case "*":
                 {
+                    // −1·x  o  x·−1  →  −x  (evita el feo "-1·b" en la adjunta del inverso 2×2)
+                    if (IsMinusOne(n.A)) { var rn = "<span class=\"m-op\">−</span>" + ToHtml(n.B, 2); return parentPrec > 2 ? Paren(rn) : rn; }
+                    if (IsMinusOne(n.B)) { var rn = "<span class=\"m-op\">−</span>" + ToHtml(n.A, 2); return parentPrec > 2 ? Paren(rn) : rn; }
                     var r = ToHtml(n.A, 2) + "<span class=\"m-op\">·</span>" + ToHtml(n.B, 2);
                     return parentPrec > 2 ? Paren(r) : r;
                 }

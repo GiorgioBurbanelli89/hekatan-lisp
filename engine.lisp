@@ -263,10 +263,95 @@
                         (t     (list '+ acc e))))))
         acc)))
 
+;;;; --- FUNCIONES RACIONALES (num/den polinomios) con cancelacion: para 1/L, L/L^2, dN/dx, EA/L ---
+(defun to-ratpoly (e)
+  "Expresion -> (num-poly . den-poly). Lanza 'notrat si no es racional (sin, sqrt, ...)."
+  (cond
+    ((numberp e) (cons (p-const e) (p-const 1)))
+    ((symbolp e) (cons (p-var e) (p-const 1)))
+    ((consp e)
+     (let ((op (car e)))
+       (cond
+         ((eq op '+) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                       (cons (p+ (p* (car a) (cdr b)) (p* (car b) (cdr a))) (p* (cdr a) (cdr b)))))
+         ((eq op '-) (if (cddr e)
+                         (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                           (cons (p+ (p* (car a) (cdr b)) (p-scale (p* (car b) (cdr a)) -1)) (p* (cdr a) (cdr b))))
+                         (let ((a (to-ratpoly (second e)))) (cons (p-scale (car a) -1) (cdr a)))))
+         ((eq op '*) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                       (cons (p* (car a) (car b)) (p* (cdr a) (cdr b)))))
+         ((eq op '/) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                       (cons (p* (car a) (cdr b)) (p* (cdr a) (car b)))))
+         ((eq op 'expt) (let ((n (third e)))
+                          (if (and (integerp n) (>= n 0))
+                              (let ((a (to-ratpoly (second e))) (rn (cons (p-const 1) (p-const 1))))
+                                (dotimes (i n) (setf rn (cons (p* (car rn) (car a)) (p* (cdr rn) (cdr a))))) rn)
+                              (throw 'notrat :fail))))
+         (t (throw 'notrat :fail)))))
+    (t (throw 'notrat :fail))))
+(defun try-ratpoly (e) (catch 'notrat (to-ratpoly e)))
+
+(defun gcd-rat (a b)
+  "MCD de dos racionales: gcd(numeradores)/lcm(denominadores)."
+  (if (or (zerop a) (zerop b)) (+ (abs a) (abs b))
+      (/ (gcd (numerator a) (numerator b)) (lcm (denominator a) (denominator b)))))
+
+(defun ratcontent (p)
+  "Contenido racional de un polinomio: gcd(|numeradores|)/lcm(denominadores) de sus coefs."
+  (if (null p) 1
+      (let ((gn 0) (ld 1))
+        (dolist (tm p) (setf gn (gcd gn (abs (numerator (cdr tm)))) ld (lcm ld (denominator (cdr tm)))))
+        (if (zerop gn) 1 (/ gn ld)))))
+
+(defun mono-min (terms)
+  "Monomio con la potencia MINIMA de cada variable entre TODOS los terminos (factor comun)."
+  (if (null terms) nil
+      (let ((m (copy-alist (caar terms))))
+        (dolist (tm (cdr terms))
+          (let ((tmm (car tm)) (new nil))
+            (dolist (pr m)
+              (let ((cell (assoc (car pr) tmm)))
+                (when cell (push (cons (car pr) (min (cdr pr) (cdr cell))) new))))
+            (setf m new)))
+        (remove-if (lambda (pr) (zerop (cdr pr))) m))))
+
+(defun poly-div-mono (p m)
+  "Divide cada termino de p por el monomio m (que divide a todos)."
+  (if (null m) p
+      (mapcar (lambda (tm)
+                (let ((res (copy-alist (car tm))))
+                  (dolist (pr m)
+                    (let ((cell (assoc (car pr) res)))
+                      (when cell (decf (cdr cell) (cdr pr)))))
+                  (cons (remove-if (lambda (x) (zerop (cdr x))) res) (cdr tm))))
+              p)))
+
+(defun cancel-ratpoly (r)
+  "Cancela el monomio y el factor numerico comunes entre numerador y denominador."
+  (let ((num (car r)) (den (cdr r)))
+    (if (null num) (cons nil (p-const 1))
+        (let ((mm (mono-min (append num den))))
+          (when mm (setf num (poly-div-mono num mm) den (poly-div-mono den mm)))
+          (let ((g (gcd-rat (ratcontent num) (ratcontent den))))
+            (when (and (/= g 0) (/= g 1)) (setf num (p-scale num (/ 1 g)) den (p-scale den (/ 1 g)))))
+          ;; si el denominador es una constante negativa, pasa el signo al numerador
+          (let ((dc (p-constant den)))
+            (when (and (numberp dc) (minusp dc)) (setf num (p-scale num -1) den (p-scale den -1))))
+          (cons num den)))))
+
+(defun ratpoly->expr (r)
+  "(num . den) -> expresion legible; si el den es constante lo reparte, si no deja num/den."
+  (let* ((num (car r)) (den (cdr r)) (dc (p-constant den)))
+    (cond ((and (numberp dc) (= dc 1)) (poly->expr num))
+          ((numberp dc) (poly->expr (p-scale num (/ 1 dc))))
+          (t (list '/ (poly->expr num) (poly->expr den))))))
+
 (defun simplify (e)
-  "Simplifica EXACTO via polinomios; si no es polinomio, cae al motor viejo."
+  "Simplifica EXACTO: polinomio; si no, funcion RACIONAL (num/den con cancelacion); si no, motor viejo."
   (let ((p (try-poly e)))
-    (if (eq p :fail) (collect-in (simp* e)) (poly->expr p))))
+    (if (not (eq p :fail)) (poly->expr p)
+        (let ((r (try-ratpoly e)))
+          (if (eq r :fail) (collect-in (simp* e)) (ratpoly->expr (cancel-ratpoly r)))))))
 
 (defun expand* (e) "Expande y simplifica (mismo motor de polinomios)." (simplify e))
 
@@ -593,10 +678,13 @@
       (cond ((null parts) 1) ((null (cdr parts)) (car parts))
             (t (reduce (lambda (x y) (list '* x y)) parts))))))
 (defun factor (e)
-  "Factoriza un polinomio de UNA variable (raices racionales). Si no puede, lo reduce."
-  (let ((p (try-poly e)))
-    (if (eq p :fail) e (let ((vs (vars-of e)))
-      (if (/= (length vs) 1) (poly->expr p) (factor-coeffs (poly->coeffs p (car vs)) (car vs)))))))
+  "Factoriza un polinomio de UNA variable (raices racionales). Si no es polinomio, cae a
+   simplify (que maneja funciones racionales: 1/L, dN/dx, EA/L). Si no, lo reduce.
+   Primero resuelve operaciones anidadas (Diff{} dentro de Simplify{})."
+  (let* ((e (eval-ops-tree e)) (p (try-poly e)))
+    (if (eq p :fail) (simplify e)
+        (let ((vs (vars-of e)))
+          (if (/= (length vs) 1) (poly->expr p) (factor-coeffs (poly->coeffs p (car vs)) (car vs)))))))
 
 ;;;; ================= DESPEJAR (resolver una ecuacion para una variable) =================
 (defun psqrt (e)   ; (sqrt n) con n cuadrado perfecto -> raiz entera
@@ -743,6 +831,15 @@
     ((member (car e) '(+ - * / expt))                    ; aritmética → simplifica lo combinado
      (simplify (cons (car e) (mapcar #'evops (cdr e)))))
     (t e)))
+
+(defun eval-ops-tree (e)
+  "Evalua las llamadas de operacion (derive-x, partial, factor, area-under, …) que aparezcan
+   DENTRO de e, dejando el resto igual. Sirve para que Simplify{ … Diff{} … } resuelva las
+   operaciones anidadas antes de simplificar (el quote impedia evaluarlas)."
+  (cond ((atom e) e)
+        ((eq (car e) 'quote) (eval-ops-tree (second e)))
+        ((member (car e) *op-calls*) (evops e))
+        (t (cons (car e) (mapcar #'eval-ops-tree (cdr e))))))
 
 ;;;; ================= ÁLGEBRA DE MATRICES (simbólica/numérica) =================
 ;;;; Forma externa (del parser): fila = #(a b c) ; matriz = #(#(..) #(..)).

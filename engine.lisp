@@ -714,21 +714,51 @@
 (defun matp (x) (vectorp x))                                      ; un valor matriz/vector
 
 (defun mtransp (x) (from-rows (apply #'mapcar #'list (to-rows x))))
+;; EVALUADOR NUMERICO rapido: recorre el arbol de una expresion SIMBOLICA con
+;; aritmetica nativa (sin construir formas ni simplify), dadas las variables en
+;; `env` (alist var->numero). Patron FEM: construir B/detJ simbolicos UNA vez y
+;; luego neval en cada punto de Gauss / elemento -> velocidad de codigo compilado.
+(defun neval (e env)
+  (cond ((numberp e) e)
+        ((symbolp e) (let ((p (assoc e env))) (if p (cdr p) (error "neval: ~a sin valor" e))))
+        ((consp e)
+         (let ((a (mapcar (lambda (x) (neval x env)) (cdr e))))
+           (case (car e)
+             (+ (apply #'+ a)) (- (apply #'- a)) (* (apply #'* a)) (/ (apply #'/ a))
+             (expt (expt (first a) (second a))) (sqrt (sqrt (first a)))
+             (sin (sin (first a))) (cos (cos (first a))) (tan (tan (first a)))
+             (exp (exp (first a))) (log (log (first a))) (abs (abs (first a)))
+             (t (error "neval: op ~a" (car e))))))
+        (t (error "neval: ~a" e))))
+;; nevala matriz simbolica -> matriz de numeros (array 2D double-float)
+(defun nmat (m env)
+  (let* ((rows (to-rows m)) (r (length rows)) (c (length (car rows)))
+         (a (make-array (list r c) :element-type 'double-float)))
+    (loop for i below r do (loop for j below c do
+      (setf (aref a i j) (float (neval (nth j (nth i rows)) env) 1d0))))
+    a))
+;; FAST-PATH NUMERICO: las ops de matriz construyen formas (* a b) y llaman simplify,
+;; aun con numeros. Si TODAS las entradas son numeros, se hace aritmetica nativa de
+;; SBCL (sin simplify): ~1000x mas rapido en numerico, misma respuesta simbolica.
+(declaim (inline nums2))
+(defun nums2 (a b) (and (numberp a) (numberp b)))
 ;; producto punto: suma BINARIA anidada (+ (+ (+ 0 p1) p2) p3), porque `simplify` solo
 ;; combina '+' de dos en dos (un (+ a b c) n-ario le haría perder términos).
 (defun mdot (row col)
-  (simplify (reduce (lambda (acc pr) (list '+ acc (list '* (car pr) (cdr pr))))
-                    (mapcar #'cons row col) :initial-value 0)))
+  (if (and (every #'numberp row) (every #'numberp col))
+      (let ((s 0)) (mapc (lambda (a b) (setf s (+ s (* a b)))) row col) s)   ; numerico nativo
+      (simplify (reduce (lambda (acc pr) (list '+ acc (list '* (car pr) (cdr pr))))
+                        (mapcar #'cons row col) :initial-value 0))))
 (defun mmul (a b)
   (let ((ra (to-rows a)) (cb (apply #'mapcar #'list (to-rows b))))
     (from-rows (mapcar (lambda (row) (mapcar (lambda (col) (mdot row col)) cb)) ra))))
 (defun mscale (s x)
-  (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (simplify (list '* s e))) row)) (to-rows x))))
+  (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (if (nums2 s e) (* s e) (simplify (list '* s e)))) row)) (to-rows x))))
 (defun madd (a b)
-  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (simplify (list '+ e f))) r1 r2))
+  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (if (nums2 e f) (+ e f) (simplify (list '+ e f)))) r1 r2))
                      (to-rows a) (to-rows b))))
 (defun msub (a b)
-  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (simplify (list '- e f))) r1 r2))
+  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (if (nums2 e f) (- e f) (simplify (list '- e f)))) r1 r2))
                      (to-rows a) (to-rows b))))
 (defun mrange (a &optional s b)                                   ; (a b) o (a s b)
   (unless b (setf b s s 1))
@@ -771,8 +801,11 @@
   (let* ((rows (to-rows x)) (n (length rows)))
     (cond
       ((= n 1) (caar rows))
-      ((= n 2) (simplify (list '- (list '* (nth 0 (nth 0 rows)) (nth 1 (nth 1 rows)))
-                                    (list '* (nth 1 (nth 0 rows)) (nth 0 (nth 1 rows))))))
+      ((= n 2) (let ((a (nth 0 (nth 0 rows))) (b (nth 1 (nth 0 rows)))
+                     (c (nth 0 (nth 1 rows))) (d (nth 1 (nth 1 rows))))
+                 (if (and (numberp a) (numberp b) (numberp c) (numberp d))
+                     (- (* a d) (* b c))
+                     (simplify (list '- (list '* a d) (list '* b c))))))
       (t (let ((acc 0))
            (loop for j from 0 below n do
              (let ((term (list '* (nth j (car rows)) (mdet (from-rows (mminor rows 0 j))))))

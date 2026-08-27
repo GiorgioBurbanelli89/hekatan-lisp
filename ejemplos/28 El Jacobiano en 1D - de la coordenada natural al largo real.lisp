@@ -10,7 +10,9 @@
 #: Las funciones de forma no se postulan de memoria: se deducen. El elemento tiene dos nodos, es decir dos grados de libertad, de modo que la función más simple que los interpola es una recta: N = {a} + {b}·{xi}, con dos números por determinar, {a} y {b}.
 #: Esa misma recta se escribe como un producto de la base [1, {xi}] por el vector de coeficientes [{a}; {b}]. No es nada nuevo: el producto fila·columna multiplica término a término y suma —uno por {a}, más {xi} por {b}—, que reproduce exactamente la recta {N_i}:
 N_i = [1, xi] * [a; b]
-#: Ese producto se llama producto punto, y se hace por partes: se emparejan los elementos en el mismo orden y se multiplica cada pareja. El primero de la fila (1) con el primero de la columna ({a}); el segundo de la fila ({xi}) con el segundo de la columna ({b}):
+#: Ese producto se llama producto punto. Se hace por partes: se emparejan los elementos en el mismo orden, se multiplica cada pareja y se suman. En el dibujo, cada pareja lleva un color —1 con {a} en azul, {xi} con {b} en coral—:
+#punto
+#: Lo mismo como operaciones del motor. El primero de la fila (1) con el primero de la columna ({a}); el segundo de la fila ({xi}) con el segundo de la columna ({b}):
 p_1 = 1*a
 p_2 = xi*b
 #: La primera pareja da 1 por {a} = {a}; la segunda da {xi} por {b}. Se suman las dos parejas, y esa suma es la recta completa:

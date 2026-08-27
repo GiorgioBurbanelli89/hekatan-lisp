@@ -385,6 +385,81 @@ namespace HekatanLisp
             return Convert.ToBase64String(data.ToArray());
         }
 
+        // Esquema del PRODUCTO PUNTO fila·columna: [1 ξ]·[a;b]. Empareja por posición (1↔a azul,
+        // ξ↔b coral), multiplica cada pareja y suma. Para explicar la notación a quien no sabe álgebra lineal.
+        public static string DotProductPng(bool dark)
+        {
+            const int W = 660, H = 340;
+            var bg  = dark ? new SKColor(0x14,0x16,0x1a) : new SKColor(0xFB,0xF7,0xEC);
+            var fg  = dark ? new SKColor(0xC8,0xCC,0xD0) : new SKColor(0x33,0x33,0x33);
+            var blu = dark ? new SKColor(0x6E,0xA8,0xE8) : new SKColor(0x2B,0x66,0xC4);   // pareja 1  (1, a)
+            var acc = dark ? new SKColor(0xE8,0x82,0x5A) : new SKColor(0xD8,0x5A,0x30);   // pareja 2  (ξ, b)
+            using var surf = SKSurface.Create(new SKImageInfo(W,H));
+            var cv = surf.Canvas; cv.Clear(bg);
+
+            var brk  = new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.8f};
+            var dim  = new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1f};
+            var apen = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=2.4f};
+            var afil = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var cpen = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=2.4f};
+            var cfil = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
+            var tfgL = new SKPaint{Color=fg, IsAntialias=true,TextSize=15,TextAlign=SKTextAlign.Left};
+            var tfgC = new SKPaint{Color=fg, IsAntialias=true,TextSize=24,TextAlign=SKTextAlign.Center};
+            var tblu = new SKPaint{Color=blu,IsAntialias=true,TextSize=24,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tacc = new SKPaint{Color=acc,IsAntialias=true,TextSize=24,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tbluL= new SKPaint{Color=blu,IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var taccL= new SKPaint{Color=acc,IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tsum = new SKPaint{Color=fg, IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+
+            // ---- fila [1  ξ] · columna [a; b] ----
+            Bracket(cv,160,78,122,true,brk);  Bracket(cv,300,78,122,false,brk);
+            cv.DrawText("1",205,108,tblu);  cv.DrawText("ξ",258,108,tacc);
+            cv.DrawText("·",325,108,tfgC);
+            Bracket(cv,352,66,134,true,brk);  Bracket(cv,412,66,134,false,brk);
+            cv.DrawText("a",382,92,tblu);  cv.DrawText("b",382,126,tacc);
+
+            // ---- flechas de emparejamiento ----
+            Arc(cv,205,72,250,38,340,40,368,82,apen,afil);   // 1 → a (azul, por arriba)
+            Arc(cv,258,128,300,166,345,164,368,116,cpen,cfil); // ξ → b (coral, por abajo)
+            cv.DrawText("empareja por posición",470,86,tfgL);
+            cv.DrawText("(1 con a, ξ con b)",470,108,tfgL);
+
+            cv.DrawLine(40,168,620,168,dim);
+
+            // ---- pasos ----
+            cv.DrawText("cada pareja se multiplica:",50,200,tfgL);
+            cv.DrawText("1 × a = a",90,236,tbluL);
+            cv.DrawText("ξ × b = b·ξ",90,272,taccL);
+            cv.DrawText("se suman las dos parejas:",50,306,tfgL);
+            cv.DrawText("a + b·ξ",90,336,tsum);
+
+            using var img=surf.Snapshot();
+            using var data=img.Encode(SKEncodedImageFormat.Png,92);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
+        // corchete vertical [ o ]: línea vertical con dos ganchos (left=true dibuja "[")
+        static void Bracket(SKCanvas cv, float x, float yTop, float yBot, bool left, SKPaint pen)
+        {
+            float t = left ? 8 : -8;
+            cv.DrawLine(x, yTop, x, yBot, pen);
+            cv.DrawLine(x, yTop, x + t, yTop, pen);
+            cv.DrawLine(x, yBot, x + t, yBot, pen);
+        }
+
+        // arco cúbico de (x0,y0) a (x3,y3) con controles (x1,y1),(x2,y2) y punta en el extremo
+        static void Arc(SKCanvas cv, float x0,float y0,float x1,float y1,float x2,float y2,float x3,float y3, SKPaint pen, SKPaint fill)
+        {
+            using(var p=new SKPath()){p.MoveTo(x0,y0);p.CubicTo(x1,y1,x2,y2,x3,y3);cv.DrawPath(p,pen);}
+            float dx=x3-x2, dy=y3-y2, n=(float)Math.Sqrt(dx*dx+dy*dy); dx/=n; dy/=n;
+            float px=-dy, py=dx;   // perpendicular
+            using var h=new SKPath();
+            h.MoveTo(x3,y3);
+            h.LineTo(x3-9*dx+5*px, y3-9*dy+5*py);
+            h.LineTo(x3-9*dx-5*px, y3-9*dy-5*py);
+            h.Close(); cv.DrawPath(h,fill);
+        }
+
         // flecha vertical: línea de y0 a y1, punta en y1 (en el sentido del recorrido)
         static void ArrowV(SKCanvas cv, float x, float y0, float y1, SKPaint pen, SKPaint fill)
         {

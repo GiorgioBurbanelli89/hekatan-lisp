@@ -728,6 +728,9 @@ namespace HekatanLisp
                     // escalar o variable J → |J|
                     return "<span class=\"m-detbar\">|</span>" + arg0 + "<span class=\"m-detbar\">|</span>";
                 }
+                case "inv":   // inversa en notación matemática: J⁻¹ (superíndice −1, arriba-derecha)
+                    return "<span class=\"m-transp-wrap\">" + ToHtml(n.Items.Count > 0 ? n.Items[0] : null, 5) +
+                           "<span class=\"m-transp\">−1</span></span>";
                 default:
                     var args = string.Join("<span class=\"m-op\">, </span>", n.Items.Select(x => ToHtml(x, 0)));
                     return FnNameHtml(name) + Paren(args);

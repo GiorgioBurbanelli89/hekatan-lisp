@@ -604,10 +604,17 @@
 (defun slope-at (f var x0)
   (simplify (eval-consts (subst-var (partial f var) var x0))))
 (defun area-under (f var a b)
-  (let ((p (try-poly f)))
-    (if (eq p :fail) '?
-        (let ((bigf (poly->expr (poly-integ p var))))
-          (simplify (list '- (subst-var bigf var b) (subst-var bigf var a)))))))
+  (cond
+    ;; f NO depende de var (constante respecto a la integración, aunque tenga OTRAS
+    ;; letras: 1/L², E·A…) → ∫ₐᵇ f dvar = f·(b−a). Así el FEM con geometría/material
+    ;; simbólico integra (∫₋₁¹ (1/L²) dξ = 2/L²), donde try-poly fallaba por tratar L
+    ;; como variable del polinomio.
+    ((not (member var (vars-of f)))
+     (simplify (list '* f (- b a))))
+    (t (let ((p (try-poly f)))
+         (if (eq p :fail) '?
+             (let ((bigf (poly->expr (poly-integ p var))))
+               (simplify (list '- (subst-var bigf var b) (subst-var bigf var a)))))))))
 
 ;; $product{f @ i = a : b}  y  $root{f @ x}
 (defun producto-op (f var a b)

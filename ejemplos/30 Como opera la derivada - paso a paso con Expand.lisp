@@ -13,7 +13,7 @@ dc = Diff{L/2 @ xi}
 dl = Diff{(L/2)*xi @ xi}
 
 ## 3 · La derivada total y su tiempo
-#: Sumando las dos, la derivada completa es {dl} (el 0 del término constante no aporta). Esta es la operación entera, cronometrada con tic/toc:
+#: Sumando las dos, la derivada completa es {dl} (el 0 del término constante no aporta). Se ve la cadena entera: se deriva el polinomio ya expandido {f}, y queda su coeficiente. Esta es la operación completa, cronometrada con tic/toc:
 tic
-J = Diff{(1+xi)/2 * L @ xi}
+J = Diff{L*xi/2 + L/2 @ xi}
 toc

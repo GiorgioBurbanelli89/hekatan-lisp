@@ -760,6 +760,25 @@
     (from-rows (loop for i from 0 below n collect
                      (loop for j from 0 below n collect (aref a i (+ n j)))))))
 
+;; determinante SIMBÓLICO por expansión de Laplace en la 1a fila (cofactores).
+;; Funciona con entradas simbólicas (a diferencia de minv, que numericiza). Sumas
+;; BINARIAS anidadas para que `simplify` combine término a término.
+(defun mminor (rows i j)   ; submatriz quitando fila i, columna j (rows = lista de listas)
+  (loop for r from 0 below (length rows) unless (= r i)
+        collect (loop for c from 0 below (length (nth r rows)) unless (= c j)
+                      collect (nth c (nth r rows)))))
+(defun mdet (x)
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (cond
+      ((= n 1) (caar rows))
+      ((= n 2) (simplify (list '- (list '* (nth 0 (nth 0 rows)) (nth 1 (nth 1 rows)))
+                                    (list '* (nth 1 (nth 0 rows)) (nth 0 (nth 1 rows))))))
+      (t (let ((acc 0))
+           (loop for j from 0 below n do
+             (let ((term (list '* (nth j (car rows)) (mdet (from-rows (mminor rows 0 j))))))
+               (setf acc (list (if (evenp j) '+ '-) acc term))))
+           (simplify acc))))))
+
 ;; construye la matriz de un literal [ … ]: si los elementos ya son matrices/filas,
 ;; los apila por filas (vertcat); si son escalares, es una sola fila.
 (defun build-mat (elems)
@@ -783,6 +802,14 @@
     ;; transpose(M): alias de mtransp para que el usuario escriba transpose(B) y
     ;; se transponga de verdad (antes quedaba sin evaluar -> "?"). Funciona simbólico.
     ((eq (car e) 'transpose) (mtransp (meval (second e))))
+    ;; det(M): determinante simbólico (para detJ del Jacobiano, etc.).
+    ((eq (car e) 'det) (mdet (meval (second e))))
+    ;; parciales/derivadas DENTRO de una matriz: si no se evalúan aquí, un
+    ;; J = [∂x/∂ξ …] guarda la forma ∂ sin reducir y det(J) opera sobre símbolos
+    ;; opacos. Evaluándolas, la matriz de un Jacobiano queda con sus valores.
+    ((eq (car e) 'partial)  (partial  (meval (second e)) (meval (third e))))
+    ((eq (car e) 'derive-x) (if (cddr e) (derive-x (meval (second e)) (meval (third e)))
+                                (derive-x (meval (second e)))))
     ((eq (car e) 'mrange)  (apply #'mrange (mapcar #'meval (cdr e))))
     ((eq (car e) 'area-under)          ; ∫ de una MATRIZ (entrada por entrada) o escalar
      (let* ((fa (second e)) (va (third e))

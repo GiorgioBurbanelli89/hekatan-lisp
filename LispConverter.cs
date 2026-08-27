@@ -706,6 +706,16 @@ namespace HekatanLisp
                     return "<span class=\"m-op\" style=\"font-size:1.35em;vertical-align:-0.15em\">∫</span>&hairsp;" +
                            arg0 + "&thinsp;<span class=\"m-op\">d</span>" + v;
                 }
+                case "det":   // determinante en notación matemática: |M| (barras verticales)
+                {
+                    var a = n.Items.Count > 0 ? n.Items[0] : null;
+                    if (a != null && a.Op == "mat")
+                        return GridHtml(a.Items.Select(r => r.Items).ToList(), true);
+                    if (a != null && a.Op == "vec")
+                        return GridHtml(new List<List<N>> { a.Items }, true);
+                    // escalar o variable J → |J|
+                    return "<span class=\"m-detbar\">|</span>" + arg0 + "<span class=\"m-detbar\">|</span>";
+                }
                 default:
                     var args = string.Join("<span class=\"m-op\">, </span>", n.Items.Select(x => ToHtml(x, 0)));
                     return FnNameHtml(name) + Paren(args);
@@ -735,8 +745,12 @@ namespace HekatanLisp
         // GRANDE (>9 col ó >11 filas): índices de fila/columna en los bordes y el centro
         //   COLAPSADO con … ⋮ ⋱ (como el MathCanvas de Hekatan Calc y como NumPy/MATLAB).
         //   Chica: cuadrícula simple, sin índices.
-        static string GridHtml(List<List<N>> rows)
+        static string GridHtml(List<List<N>> rows, bool bars = false)
         {
+            // bars = true → delimitadores de DETERMINANTE (barras verticales |…|) en vez de
+            // corchetes [ ]. Notación matemática de det(M).
+            string BRL = bars ? "m-brk m-detl" : "m-brk m-brl";
+            string BRR = bars ? "m-brk m-detr" : "m-brk m-brr";
             int nrows = rows.Count;
             int ncols = nrows == 0 ? 0 : rows.Max(r => r.Count);
             const int CMAX = 8, RMAX = 10;              // cuántas primeras se muestran antes de colapsar
@@ -758,9 +772,9 @@ namespace HekatanLisp
                         cj++;
                     }
                 }
-                return "<span class=\"m-mat\"><span class=\"m-brk m-brl\"></span>" +
+                return "<span class=\"m-mat\"><span class=\"" + BRL + "\"></span>" +
                        "<span class=\"m-mgrid\" style=\"grid-template-columns:repeat(" + ncols + ",auto)\">" +
-                       sc + "</span><span class=\"m-brk m-brr\"></span></span>";
+                       sc + "</span><span class=\"" + BRR + "\"></span></span>";
             }
             // ---- matriz grande: COLAPSABLE con índices + … ⋮ ⋱ y el MISMO corchete [ ] de siempre ----
             //   (limpia, sin barras ni marcos: como NumPy/MATLAB).
@@ -865,6 +879,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-brk{width:.32em;}
 .m-brl{border:1.4px solid currentColor;border-right:none;}
 .m-brr{border:1.4px solid currentColor;border-left:none;}
+.m-detl{border-left:1.4px solid currentColor;}
+.m-detr{border-right:1.4px solid currentColor;}
+.m-detbar{color:currentColor;margin:0 .08em;}
 .m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
 .m-cell{color:var(--num);white-space:nowrap;}
 /* matriz GRANDE: índices en los bordes + centro colapsado (… ⋮ ⋱), como Hekatan Calc */

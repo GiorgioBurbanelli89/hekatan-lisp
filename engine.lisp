@@ -780,6 +780,9 @@
     ((eq (car e) 'quote) (second e))
     ((eq (car e) 'vector) (build-mat (mapcar #'meval (cdr e))))
     ((eq (car e) 'mtransp) (mtransp (meval (second e))))
+    ;; transpose(M): alias de mtransp para que el usuario escriba transpose(B) y
+    ;; se transponga de verdad (antes quedaba sin evaluar -> "?"). Funciona simbólico.
+    ((eq (car e) 'transpose) (mtransp (meval (second e))))
     ((eq (car e) 'mrange)  (apply #'mrange (mapcar #'meval (cdr e))))
     ((eq (car e) 'area-under)          ; ∫ de una MATRIZ (entrada por entrada) o escalar
      (let* ((fa (second e)) (va (third e))

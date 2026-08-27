@@ -7,13 +7,18 @@
 #bar1d
 
 ## 2 · Deducción de las funciones de forma
-#: Las funciones de forma no se postulan de memoria: se deducen. El elemento tiene dos nodos, es decir dos grados de libertad, de modo que el polinomio interpolante más simple es de primer grado en {xi}. Para la función de forma genérica se propone la forma lineal, con coeficientes {a} y {b} por determinar:
-N_i = a + b*xi
-#: Los coeficientes se fijan con la propiedad de delta de Kronecker: la función de forma de un nodo vale la unidad en ese nodo y se anula en el otro. Evaluar el polinomio en los dos nodos equivale a multiplicar la base [1, {xi}] por el vector de coeficientes; ordenando la base en {xi} = −1 (fila 1) y en {xi} = +1 (fila 2) se obtiene la matriz del sistema:
+#: Las funciones de forma no se postulan de memoria: se deducen. El elemento tiene dos nodos, es decir dos grados de libertad, de modo que el polinomio interpolante más simple es de primer grado en {xi}. Se propone entonces una recta con dos coeficientes {a} y {b} por determinar, que conviene escribir como la base [1, {xi}] multiplicada por el vector de coeficientes:
+N_i = [1, xi] * [a; b]
+#: El producto reproduce la recta {N_i}. Los coeficientes se fijan con la propiedad de delta de Kronecker: la función de forma de un nodo vale la unidad en ese nodo y se anula en el otro. La clave está en cómo se aplica esa condición. Al evaluar la función en un nodo, la base [1, {xi}] toma el valor concreto de {xi} en ese nodo, y la condición se vuelve una ecuación en {a} y {b}.
+#: Nodo 1 ({xi} = −1): la base vale [1, −1], de modo que la función de forma en ese punto es:
+e_1 = [1, -1] * [a; b]
+#: Como debe valer 1 en el nodo 1, se obtiene la primera ecuación: {e_1} = 1. Nodo 2 ({xi} = +1): la base vale [1, +1], y la función en ese punto es:
+e_2 = [1, 1] * [a; b]
+#: Como debe anularse en el nodo 2, la segunda ecuación es {e_2} = 0. Ya hay dos ecuaciones con dos incógnitas: {a} − {b} = 1 y {a} + {b} = 0. Apilando las dos filas —la base evaluada en cada nodo— se forma la matriz del sistema:
 M = [1, -1; 1, 1]
-#: Para la función de forma del nodo 1 el lado derecho es [1; 0] (vale 1 en el nodo 1 y 0 en el nodo 2). Los coeficientes salen invirtiendo la matriz del sistema:
+#: El sistema es entonces M·[{a}; {b}] = [1; 0], donde el lado derecho recoge los valores nodales de {N_1} (1 en el nodo 1, 0 en el nodo 2). Se resuelve invirtiendo la matriz:
 c_1 = inv(M) * [1; 0]
-#: El vector {c_1} contiene los coeficientes {a} y {b} buscados. La función de forma del nodo 1 se reconstruye como la base por su vector de coeficientes:
+#: Los coeficientes buscados son {c_1}: {a} = 1/2 y {b} = −1/2. La función de forma del nodo 1 se reconstruye multiplicando la base por su vector de coeficientes:
 N_1 = [1, xi] * c_1
 #: Repitiendo con el lado derecho [0; 1] se obtiene la del nodo 2. Ambas salen de un solo producto, multiplicando la base por la inversa completa del sistema:
 N = [1, xi] * inv(M)

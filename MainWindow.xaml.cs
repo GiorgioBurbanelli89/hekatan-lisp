@@ -32,7 +32,8 @@ namespace HekatanLisp
         private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
         private string _op = "auto";               // operación: "auto" | "simplify" | "expand" | "deriv"
         private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
-        private string _shot, _ctl, _pdf;
+        private string _shot, _ctl, _pdf, _html;
+        private string _lastHtml;   // último HTML renderizado (para --html: Hekatan School)
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private bool _ranProgram = false;          // el último resultado vino de EJECUTAR un programa (stdout de consola)
@@ -56,7 +57,8 @@ namespace HekatanLisp
             _shot = ValueAfter(args, "--shot");
             _pdf = ValueAfter(args, "--pdf");
             _ctl = ValueAfter(args, "--ctl");
-            if (_pdf != null) _view = "render";   // el PDF sale de la HOJA renderizada
+            _html = ValueAfter(args, "--html");   // vuelca el HTML REAL del render (para Hekatan School)
+            if (_pdf != null || _html != null) _view = "render";
             var v = ValueAfter(args, "--view");
             if (v is "render" or "lisp" or "math") _view = v;
             var o = ValueAfter(args, "--op");
@@ -109,6 +111,10 @@ namespace HekatanLisp
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
             if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
+            if (_html != null) {   // --html: vuelca el HTML renderizado (Hekatan School). En progreso.
+                await Task.Delay(1300);
+                try { System.IO.File.WriteAllText(_html, _lastHtml ?? ""); } catch { }
+                Application.Current.Shutdown(); }
         }
 
         // Ctrl + rueda del ratón → zoom del texto (agranda/achica la fuente del editor/salida)
@@ -212,6 +218,7 @@ namespace HekatanLisp
                         html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>", ph ?? "");
                     if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + "</body>");   // motor de orbit, una vez
                 }
+                _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)
                 Viewer.NavigateToString(html);
                 return;
             }

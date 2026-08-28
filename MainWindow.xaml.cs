@@ -807,7 +807,15 @@ namespace HekatanLisp
                     // si la fórmula tiene TOKENS (Partial, Factor…) muestra TÉRMINO = RESULTADO
                     // (el término entero renderiza a CSS, y al lado su valor simbólico).
                     if (HasOpCall(formOf[i]) && hasR)
-                        display.Add(lbl + " = " + formOf[i] + " = " + r);
+                    {
+                        // Si la operación (∫, Diff…) referencia una variable VECTOR/MATRIZ (B),
+                        // muéstrala con el SÍMBOLO (∫ EI·Bᵀ·B dx), NO con B sustituida por su
+                        // definición (la cadena de d/dx[d/dx[…]]), que llena la integral de
+                        // operadores y la parte en varias líneas. treeOf conserva el símbolo B.
+                        string opF = treeOf[i] != null ? LispConverter.ToLisp(treeOf[i]) : formOf[i];
+                        bool refsVec = opF != formOf[i] && ReferencesVecVar(opF, vecMap);
+                        display.Add(lbl + " = " + (refsVec ? opF : formOf[i]) + " = " + r);
+                    }
                     else if (hasR && r.StartsWith("(vector") && r != formOf[i])
                     {
                         // operación de matriz (A', A*B, A^-1…): muestra la OPERACIÓN con etiquetas
@@ -847,6 +855,19 @@ namespace HekatanLisp
                     merged.Add(display[i]);
             }
             return merged;
+        }
+
+        // ¿La forma LISP referencia el nombre de alguna variable VECTOR/MATRIZ (de vecMap)?
+        // Decide si una operación (∫, Diff) se muestra con el SÍMBOLO del vector (Bᵀ·B) en vez
+        // de con el vector expandido a su definición (la cadena de d/dx[d/dx[…]]).
+        private static bool ReferencesVecVar(string lispExpr, Dictionary<string, LispConverter.N> vecMap)
+        {
+            if (vecMap == null || string.IsNullOrEmpty(lispExpr)) return false;
+            foreach (var k in vecMap.Keys)
+                if (k.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(
+                        lispExpr, @"(?<![A-Za-z0-9_])" + System.Text.RegularExpressions.Regex.Escape(k) + @"(?![A-Za-z0-9_])"))
+                    return true;
+            return false;
         }
 
         /// <summary>¿La forma LISP tiene alguna VARIABLE LIBRE? (un identificador que no sea función/

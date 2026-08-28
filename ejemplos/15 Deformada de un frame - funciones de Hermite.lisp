@@ -67,7 +67,7 @@ d2H4 = Diff{Diff{H4 @ x} @ x}
 #: El vector de deformación B reúne las cuatro curvaturas:
 B = [d2H1, d2H2, d2H3, d2H4]
 #: Y la rigidez es la integral de EI·Bᵀ·B a lo largo del elemento —todo simbólico, con {L} y EI como letras—:
-K = Area{EI * transpose(B)*B @ x = 0:L} @@(K = ∫₀ᴸ EI·Bᵀ·B dx)
+K = Area{EI * transpose(B)*B @ x = 0:L}
 #: Esa es la matriz de rigidez de viga CLÁSICA: 12EI/L³, 6EI/L², 4EI/L, 2EI/L… deducida símbolo a símbolo, desde la ecuación de la viga hasta la rigidez. Es la que ensamblan todos los programas de estructuras.
 
 ## 10 · ¿Desde cuándo se hace así?

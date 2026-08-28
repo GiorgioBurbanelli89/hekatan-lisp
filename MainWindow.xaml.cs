@@ -798,7 +798,7 @@ namespace HekatanLisp
                     var tp = treeOf[i];
                     bool matOp = tp != null && (tp.Op == "trans" ||
                         (tp.Op == "fn" && tp.Items != null && tp.Items.Count == 1 &&
-                         (tp.Atom == "det" || tp.Atom == "inv" || tp.Atom == "transpose")));
+                         (tp.Atom == "det" || tp.Atom == "inv" || tp.Atom == "transpose" || tp.Atom == "trace")));
                     if (matOp && hasR && (tp.A?.IsAtom == true || (tp.Items != null && tp.Items.Count == 1 && tp.Items[0].IsAtom)))
                     {
                         display.Add(lbl + " = " + LispConverter.ToLisp(tp) + " = " + r);

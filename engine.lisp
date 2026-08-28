@@ -1032,6 +1032,26 @@
                          (if (evenp (+ i j)) m (simplify (list '- m))))))))
           (mscale (simplify (list '/ 1 d)) (mtransp (from-rows cof)))))))
 
+;; TRAZA = suma de la diagonal principal (escalar). tr(A) = a11 + a22 + ...
+(defun mtrace (x)
+  (let* ((rows (to-rows x)) (n (length rows)) (acc 0))
+    (loop for i from 0 below n do (setf acc (list '+ acc (nth i (nth i rows)))))
+    (simplify acc)))
+
+;; componentes PLANAS de un vector, sea fila o columna.
+(defun vec-comps (x)
+  (let ((rows (to-rows x)))
+    (if (and rows (> (length rows) 1)) (mapcar #'car rows) (car rows))))
+
+;; PRODUCTO CRUZ de dos vectores 3D -> vector columna perpendicular a ambos.
+(defun mcross (a b)
+  (let* ((ac (vec-comps a)) (bc (vec-comps b))
+         (a1 (nth 0 ac)) (a2 (nth 1 ac)) (a3 (nth 2 ac))
+         (b1 (nth 0 bc)) (b2 (nth 1 bc)) (b3 (nth 2 bc)))
+    (from-rows (list (list (simplify (list '- (list '* a2 b3) (list '* a3 b2))))
+                     (list (simplify (list '- (list '* a3 b1) (list '* a1 b3))))
+                     (list (simplify (list '- (list '* a1 b2) (list '* a2 b1))))))))
+
 ;; construye la matriz de un literal [ … ]: si los elementos ya son matrices/filas,
 ;; los apila por filas (vertcat); si son escalares, es una sola fila.
 (defun build-mat (elems)
@@ -1059,6 +1079,9 @@
     ((eq (car e) 'det) (mdet (meval (second e))))
     ((eq (car e) 'inv) (msinv (meval (second e))))
     ((eq (car e) 'adj) (madjugate (meval (second e))))
+    ;; trace(M): traza (suma de la diagonal). cross(u,v): producto cruz 3D.
+    ((eq (car e) 'trace) (mtrace (meval (second e))))
+    ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
     ((eq (car e) 'ngauss)
      (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
        (ngauss (meval (unq (second e))) (unq (third e)) (unq (fourth e)))))

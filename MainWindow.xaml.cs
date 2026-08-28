@@ -803,6 +803,12 @@ namespace HekatanLisp
                     {
                         display.Add(lbl + " = " + LispConverter.ToLisp(tp) + " = " + r);
                     }
+                    // DESPEJAR: "ecuación → solución" con FLECHA (como los libros; hay >2 pasos, el
+                    // último no es una igualdad sino el resultado del despeje).
+                    else if (tp != null && tp.Atom == "despejar" && hasR)
+                    {
+                        display.Add(lbl + " = " + formOf[i] + " → " + r);
+                    }
                     else
                     // si la fórmula tiene TOKENS (Partial, Factor…) muestra TÉRMINO = RESULTADO
                     // (el término entero renderiza a CSS, y al lado su valor simbólico).

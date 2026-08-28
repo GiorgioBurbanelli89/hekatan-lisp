@@ -1205,15 +1205,23 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 {
                     try
                     {
-                        // "N1 = OPERACIÓN = RESULTADO": varios pasos separados por " = ".
-                        var partes = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"\s=\s");
-                        var trees = new N[partes.Length];
-                        for (int pi = 0; pi < partes.Length; pi++)
-                            trees[pi] = fromLisp ? ParseLisp(partes[pi].Trim()) : ParseMath(partes[pi].Trim());
-                        bool isVec = trees.Length > 0 && trees[0] != null && trees[0].Op == "vec";
+                        // "N1 = A = B → C": pasos separados por " = " (igualdad) o " → " (flecha, como
+                        // los libros cuando hay más de 2 pasos: ecuación → solución). Se conserva cuál va.
+                        var toks = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"(\s=\s|\s→\s)");
+                        var trees = new List<N>();
+                        var seps = new List<string>();   // separador ANTES de cada parte (desde la 2ª)
+                        for (int pi = 0; pi < toks.Length; pi++)
+                        {
+                            if (pi % 2 == 0) trees.Add(fromLisp ? ParseLisp(toks[pi].Trim()) : ParseMath(toks[pi].Trim()));
+                            else seps.Add(toks[pi].Contains("→") ? " → " : " = ");
+                        }
+                        bool isVec = trees.Count > 0 && trees[0] != null && trees[0].Op == "vec";
                         var sb = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value, isVec));
-                        foreach (var rt in trees)
-                            sb.Append("<span class=\"m-op\"> = </span><span class=\"m-expr\">").Append(ToHtml(rt)).Append("</span>");
+                        for (int ti = 0; ti < trees.Count; ti++)
+                        {
+                            string sep = ti == 0 ? " = " : seps[ti - 1];
+                            sb.Append("<span class=\"m-op\">" + sep + "</span><span class=\"m-expr\">").Append(ToHtml(trees[ti])).Append("</span>");
+                        }
                         html = sb.ToString();
                     }
                     catch { html = System.Net.WebUtility.HtmlEncode(line); }

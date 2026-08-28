@@ -111,9 +111,13 @@ namespace HekatanLisp
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
             if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
-            if (_html != null) {   // --html: vuelca el HTML renderizado (Hekatan School). En progreso.
-                await Task.Delay(1300);
-                try { System.IO.File.WriteAllText(_html, _lastHtml ?? ""); } catch { }
+            if (_html != null) {   // --html: vuelca el DOM renderizado (Hekatan School)
+                await Task.Delay(1500);
+                string dom = "";
+                try { var raw = await Viewer.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
+                      dom = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? ""; } catch { }
+                if (string.IsNullOrWhiteSpace(dom)) dom = _lastHtml ?? "";
+                try { System.IO.File.WriteAllText(_html, dom); } catch { }
                 Application.Current.Shutdown(); }
         }
 

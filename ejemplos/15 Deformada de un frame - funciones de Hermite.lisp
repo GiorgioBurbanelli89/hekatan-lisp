@@ -17,34 +17,32 @@ defl = Integral{c1*x^2/2 + c2*x + c3 @ x}
 v(x) = c_1 + c_2*x + c_3*x^2 + c_4*x^3 @@(cúbica: 4 constantes = 4 GDL)
 base = [1 x x^2 x^3] @@(la base cúbica)
 
-## 3 · Nace C: evalúo v y su pendiente v' en los 2 nudos
-#: Con L=1. Las filas salen de evaluar el desplazamiento **v** y la pendiente **v' = dv/dx** en x=0 y x=1:
-#|  v(0)=c₁ → [1 0 0 0]   ·   v'(0)=c₂ → [0 1 0 0]
-#|  v(1)      → [1 1 1 1]   ·   v'(1)      → [0 1 2 3]
-C = [1 0 0 0; 0 1 0 0; 1 1 1 1; 0 1 2 3] @@(C: v y v' en los 2 nudos)
+## 3 · Nace C: evalúo v y su pendiente v′ en los 2 nudos
+#: Todo simbólico, con el largo {L} como letra (no {L}=1). Las filas salen de evaluar el desplazamiento **v** y la pendiente **v′ = dv/dx** en x=0 y x={L}. En x=0 solo sobreviven las constantes; en x={L} aparecen las potencias de {L}:
+#|  v(0)=c₁ → [1 0 0 0]   ·   v′(0)=c₂ → [0 1 0 0]
+#|  v(L) → [1 L L² L³]   ·   v′(L) → [0 1 2L 3L²]
+C = [1, 0, 0, 0; 0, 1, 0, 0; 1, L, L^2, L^3; 0, 1, 2*L, 3*L^2] @@(C: v y v′ en los 2 nudos)
 
-## 4 · La inversa
-Cinv = C^-1 @@(despeja las 4 perillas)
+## 4 · La inversa — la operación simbólica
+#: Para despejar las cuatro constantes hace falta C⁻¹. Su determinante sale {L}⁴, y la inversa es una matriz simbólica con potencias de 1/{L}. Aquí SÍ hay operación simbólica de verdad —el motor invierte una 4×4 con la letra {L} adentro—:
+detC = det(C)
+Cinv = inv(C) @@(despeja las 4 constantes)
 
 ## 5 · Las funciones de forma de Hermite: N = base · C⁻¹
-N = base*Cinv @@(las 4 cúbicas de Hermite)
-#: Da  H₁=1−3x²+2x³ (para v₁),  H₂=x−2x²+x³ (para θ₁),  H₃=3x²−2x³ (para v₂),  H₄=−x²+x³ (para θ₂).
+N = base*Cinv @@(las 4 cúbicas de Hermite, con L)
+#: Da las Hermite escritas con el largo real {L}: H₁ = 1−3(x/L)²+2(x/L)³, H₂ = x−2x²/L+x³/L², H₃ = 3(x/L)²−2(x/L)³, H₄ = −x²/L+x³/L². Con {L}=1 se recuperan las clásicas.
 
-## 6 · VERLAS — las 4 cúbicas de Hermite
-#: H₁ y H₃ mandan sobre los **desplazamientos**; H₂ y H₄ sobre los **giros**. Cada una vale 1 en su GDL y 0 en los otros:
-H1 = 1-3*x^2+2*x^3 @@(peso de v₁)
-H2 = x-2*x^2+x^3 @@(peso de θ₁)
-H3 = 3*x^2-2*x^3 @@(peso de v₂)
-H4 = -x^2+x^3 @@(peso de θ₂)
-#fplot(H1, H2, H3, H4, [0 1])
+## 6 · Las 4 cúbicas de Hermite, una por una
+#: Cada columna de {N} es una función de forma, escrita con el largo real {L}. H₁ y H₃ pesan los **desplazamientos** (v₁, v₂); H₂ y H₄ los **giros** (θ₁, θ₂). Cada una vale 1 en su grado de libertad y 0 en los otros:
+H1 = 1 - 3*x^2/L^2 + 2*x^3/L^3 @@(peso de v₁)
+H2 = x - 2*x^2/L + x^3/L^2 @@(peso de θ₁)
+H3 = 3*x^2/L^2 - 2*x^3/L^3 @@(peso de v₂)
+H4 = -x^2/L + x^3/L^2 @@(peso de θ₂)
 
-## 7 · LA DEFORMADA: así se dibuja la viga curva
-#: El programa resuelve la estructura y obtiene solo los valores en los **extremos** (v₁,θ₁,v₂,θ₂). Para dibujar la **curva** entre nudos, mezcla las Hermite:
+## 7 · La deformada: la viga curva
+#: El programa resuelve la estructura y obtiene solo los valores en los **extremos**: v₁, θ₁, v₂, θ₂. La **curva** entre nudos es la combinación de las cuatro Hermite pesadas por esos valores:
 #|  v(x) = H₁·v₁ + H₂·θ₁ + H₃·v₂ + H₄·θ₂
-#: Ejemplo: extremo izquierdo fijo (v₁=0, θ₁=0), derecho baja 1 y gira 0.5 (v₂=1, θ₂=0.5). La deformada es:
-deformada = 3*x^2-2*x^3 + 0.5*(-x^2+x^3) @@(v(x) con esos valores)
-#fplot(deformada, [0 1])
-#: Esa **curva suave** es exactamente lo que dibuja el programa para la viga deformada (amplificada por un factor, porque las deformaciones reales son diminutas). No son dos rectas entre nudos: es la cúbica de Hermite.
+#: Esa curva suave —la cúbica de Hermite— es exactamente lo que dibuja el programa para la viga deformada. No son dos rectas entre nudos: es la cúbica.
 
 ## 8 · ¿Desde cuándo se hace así?
 #: · Las cúbicas de **Hermite** son matemática de ~1870 (interpolación con valor Y pendiente).

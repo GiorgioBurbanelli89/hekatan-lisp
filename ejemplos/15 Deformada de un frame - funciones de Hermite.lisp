@@ -66,9 +66,13 @@ d2H3 = Diff{Diff{H3 @ x} @ x}
 d2H4 = Diff{Diff{H4 @ x} @ x}
 #: El vector de deformación B reúne las cuatro curvaturas:
 B = [d2H1, d2H2, d2H3, d2H4]
-#: Y la rigidez es la integral de EI·Bᵀ·B a lo largo del elemento —todo simbólico, con {L} y EI como letras—:
+#: La operación K = ∫EI·Bᵀ·B dx tiene tres pasos algebraicos. **Primero**, la transpuesta de B: la columna Bᵀ (las mismas curvaturas, en vertical):
+Bt = transpose(B)
+#: **Segundo**, el producto Bᵀ·B: una matriz 4×4 donde cada término es el producto de dos curvaturas (Hᵢ''·Hⱼ''). Este es el núcleo algebraico de la rigidez:
+P = Bt * B
+#: **Tercero**, se escala por EI y se integra cada término de esa 4×4 de 0 a {L}. Al integrar esos polinomios desaparece la {x} y quedan solo {L} y EI:
 K = Area{EI * transpose(B)*B @ x = 0:L}
-#: Esa es la matriz de rigidez de viga CLÁSICA: 12EI/L³, 6EI/L², 4EI/L, 2EI/L… deducida símbolo a símbolo, desde la ecuación de la viga hasta la rigidez. Es la que ensamblan todos los programas de estructuras.
+#: Esa es la matriz de rigidez de viga CLÁSICA: 12EI/L³, 6EI/L², 4EI/L, 2EI/L… deducida símbolo a símbolo: transponer, multiplicar Bᵀ·B, integrar. Es la que ensamblan todos los programas de estructuras.
 
 ## 10 · ¿Desde cuándo se hace así?
 #: · Las cúbicas de **Hermite** son matemática de ~1870 (interpolación con valor Y pendiente).

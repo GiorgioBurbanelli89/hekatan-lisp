@@ -327,17 +327,23 @@
               p)))
 
 (defun cancel-ratpoly (r)
-  "Cancela el monomio y el factor numerico comunes entre numerador y denominador."
+  "Cancela el monomio y el factor numerico comunes entre numerador y denominador.
+   Ademas, si num y den son el MISMO polinomio -> 1 (la diagonal de A*inv(A)=I);
+   si son opuestos -> -1. (p+ deja el polinomio VACIO cuando todo se cancela.)"
   (let ((num (car r)) (den (cdr r)))
-    (if (null num) (cons nil (p-const 1))
-        (let ((mm (mono-min (append num den))))
-          (when mm (setf num (poly-div-mono num mm) den (poly-div-mono den mm)))
-          (let ((g (gcd-rat (ratcontent num) (ratcontent den))))
-            (when (and (/= g 0) (/= g 1)) (setf num (p-scale num (/ 1 g)) den (p-scale den (/ 1 g)))))
-          ;; si el denominador es una constante negativa, pasa el signo al numerador
-          (let ((dc (p-constant den)))
-            (when (and (numberp dc) (minusp dc)) (setf num (p-scale num -1) den (p-scale den -1))))
-          (cons num den)))))
+    (cond
+      ((null num) (cons nil (p-const 1)))
+      ((null (p+ num (p-scale den -1))) (cons (p-const 1) (p-const 1)))   ; num = den  -> 1
+      ((null (p+ num den))              (cons (p-const -1) (p-const 1)))  ; num = -den -> -1
+      (t
+       (let ((mm (mono-min (append num den))))
+         (when mm (setf num (poly-div-mono num mm) den (poly-div-mono den mm)))
+         (let ((g (gcd-rat (ratcontent num) (ratcontent den))))
+           (when (and (/= g 0) (/= g 1)) (setf num (p-scale num (/ 1 g)) den (p-scale den (/ 1 g)))))
+         ;; si el denominador es una constante negativa, pasa el signo al numerador
+         (let ((dc (p-constant den)))
+           (when (and (numberp dc) (minusp dc)) (setf num (p-scale num -1) den (p-scale den -1))))
+         (cons num den))))))
 
 (defun ratpoly->expr (r)
   "(num . den) -> expresion legible; si el den es constante lo reparte, si no deja num/den."

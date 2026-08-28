@@ -111,14 +111,10 @@ namespace HekatanLisp
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
             if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
-            if (_html != null) {   // --html: vuelca el DOM renderizado (Hekatan School)
-                await Task.Delay(1500);
-                string dom = "";
-                try { var raw = await Viewer.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
-                      dom = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? ""; } catch { }
-                if (string.IsNullOrWhiteSpace(dom)) dom = _lastHtml ?? "";
-                try { System.IO.File.WriteAllText(_html, dom); } catch { }
-                Application.Current.Shutdown(); }
+            if (_html != null) {   // --html: vuelca el DOM renderizado (Hekatan School). Mismo camino que --shot.
+                await Task.Delay(700);
+                await CaptureHtmlAndExit(_html);
+            }
         }
 
         // Ctrl + rueda del ratón → zoom del texto (agranda/achica la fuente del editor/salida)
@@ -1573,6 +1569,20 @@ namespace HekatanLisp
         }
 
         // ---------- captura headless ----------
+        // Igual que CaptureAndExit pero vuelca el HTML del DOM (Hekatan School). Mismo timing.
+        private async Task CaptureHtmlAndExit(string path)
+        {
+            try
+            {
+                await Task.Delay(400);
+                var raw = await Viewer.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
+                var html = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? "";
+                File.WriteAllText(path, html);
+            }
+            catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }
+            finally { Application.Current.Shutdown(); }
+        }
+
         private async Task CaptureAndExit(string path)
         {
             try

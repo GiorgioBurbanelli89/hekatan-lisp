@@ -544,7 +544,7 @@ namespace HekatanLisp
             if (n == null) return "";
             if (n.Op == "solver") return SolverToLisp(n);
             if (n.IsAtom) return SafeName(n.Atom);
-            if (n.Op == "neg") return "(- " + ToLisp(n.A) + ")";
+            if (n.Op == "neg") return "(- 0 " + ToLisp(n.A) + ")";   // menos BINARIO: el motor (deriv/simp) trata (- a b), no el unario (- a) (perdía el signo al derivar)
             if (n.Op == "trans") return "(mtransp " + ToLisp(n.A) + ")";
             if (n.Op == "range") return "(mrange " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
             if (n.Op == "fn") return "(" + n.Atom + " " + string.Join(" ", n.Items.Select(ToLisp)) + ")";
@@ -761,6 +761,12 @@ namespace HekatanLisp
                 }
                 default: // + o -
                 {
+                    // 0 − x  →  −x  (el menos unario se guarda como (- 0 x); no mostrar el 0)
+                    if (n.Op == "-" && n.A != null && n.A.IsAtom && n.A.Atom == "0")
+                    {
+                        var rn = "<span class=\"m-op\">−</span>" + ToHtml(n.B, 2);
+                        return parentPrec > 2 ? Paren(rn) : rn;
+                    }
                     var sym = n.Op == "-" ? "−" : "+";
                     var r = ToHtml(n.A, 1) + " <span class=\"m-op\">" + sym + "</span> " +
                             ToHtml(n.B, n.Op == "-" ? 2 : 1);

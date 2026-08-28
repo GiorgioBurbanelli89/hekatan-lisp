@@ -369,14 +369,15 @@
     res))
 
 (defun derive-x (e &optional v)
-  "Derivada ORDINARIA d/dx. Si se da v, deriva respecto a v; si no, autodetecta la variable."
-  (let* ((var (or v (let ((vs (vars-of e))) (if vs (car vs) 'x)))) (p (try-poly e)))
+  "Derivada ORDINARIA d/dx. Si se da v, deriva respecto a v; si no, autodetecta la variable.
+   Resuelve ops anidadas primero (Diff{Diff{}} = 2a derivada, que el quote dejaba sin evaluar)."
+  (let* ((e (eval-ops-tree e)) (var (or v (let ((vs (vars-of e))) (if vs (car vs) 'x)))) (p (try-poly e)))
     (if (eq p :fail) (simplify (deriv e var)) (poly->expr (poly-deriv p var)))))
 
 (defun partial (e v)
   "Derivada PARCIAL respecto a la variable v (elegida). Para 2D: dN/ds, dN/dt.
    A diferencia de derive-x (que AUTODETECTA una variable), aquí TÚ das la variable."
-  (let ((p (try-poly e)))
+  (let* ((e (eval-ops-tree e)) (p (try-poly e)))
     (if (eq p :fail) (simplify (deriv e v)) (poly->expr (poly-deriv p v)))))
 
 ;;;; --- derivada que MUESTRA SU TRABAJO: la regla de la potencia con su aritmetica ---
@@ -731,6 +732,8 @@
 (defun slope-at (f var x0)
   (simplify (eval-consts (subst-var (partial f var) var x0))))
 (defun area-under (f var a b)
+  ;; resuelve operaciones anidadas (Diff{} dentro de Area{}) que el quote dejo sin evaluar
+  (let ((f (eval-ops-tree f)))
   (cond
     ;; f NO depende de var (constante respecto a la integración, aunque tenga OTRAS
     ;; letras: 1/L², E·A…) → ∫ₐᵇ f dvar = f·(b−a). Así el FEM con geometría/material
@@ -739,9 +742,18 @@
     ((not (member var (vars-of f)))
      (simplify (list '* f (- b a))))
     (t (let ((p (try-poly f)))
-         (if (eq p :fail) '?
+         (if (not (eq p :fail))
              (let ((bigf (poly->expr (poly-integ p var))))
-               (simplify (list '- (subst-var bigf var b) (subst-var bigf var a)))))))))
+               (simplify (list '- (subst-var bigf var b) (subst-var bigf var a))))
+             ;; NO es polinomio: prueba funcion RACIONAL num/den con den SIN la variable de integracion
+             ;; (∫ (poly en x)/L^n dx = (1/L^n) ∫ poly dx). Es lo que aparece en la rigidez de viga.
+             (let ((r (try-ratpoly f)))
+               (if (and (not (eq r :fail))
+                        (not (member var (vars-of (poly->expr (cdr r))))))
+                   (let* ((bigf (poly->expr (poly-integ (car r) var)))
+                          (defint (simplify (list '- (subst-var bigf var b) (subst-var bigf var a)))))
+                     (simplify (list '/ defint (poly->expr (cdr r)))))
+                   '?))))))))
 
 ;; $product{f @ i = a : b}  y  $root{f @ x}
 (defun producto-op (f var a b)

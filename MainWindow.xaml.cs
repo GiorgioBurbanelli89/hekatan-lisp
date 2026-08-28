@@ -111,9 +111,9 @@ namespace HekatanLisp
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
             if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
-            if (_html != null) {   // --html: vuelca el DOM renderizado (Hekatan School). Mismo camino que --shot.
-                await Task.Delay(700);
-                await CaptureHtmlAndExit(_html);
+            if (_html != null) {   // --html: vuelca el HTML REAL del motor (Hekatan School). Sin leer el DOM.
+                await Task.Delay(300);
+                await WriteHtmlAndExit(_html);
             }
         }
 
@@ -1569,15 +1569,15 @@ namespace HekatanLisp
         }
 
         // ---------- captura headless ----------
-        // Igual que CaptureAndExit pero vuelca el HTML del DOM (Hekatan School). Mismo timing.
-        private async Task CaptureHtmlAndExit(string path)
+        // Vuelca el HTML REAL que produjo el motor (_lastHtml: EVALUADO + RenderPage + gráficas),
+        // SIN leer el DOM del WebView (aquello era frágil). Para Hekatan School.
+        private async Task WriteHtmlAndExit(string path)
         {
             try
             {
-                await Task.Delay(400);
-                var raw = await Viewer.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
-                var html = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? "";
-                File.WriteAllText(path, html);
+                ShowResult();                        // fuerza el pipeline: SBCL → RenderPage → gráficas
+                try { await _showTask; } catch { }   // espera a que el cálculo/render termine
+                File.WriteAllText(path, _lastHtml ?? "");
             }
             catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }
             finally { Application.Current.Shutdown(); }

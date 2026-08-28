@@ -939,7 +939,11 @@ namespace HekatanLisp
         const string CSS = @"
 *{box-sizing:border-box;}
 .pagebreak{break-before:page;page-break-before:always;height:0;margin:0;border:0;}
-@media print{ body{background:#fff;} .pagebreak{break-before:page;page-break-before:always;} }
+@media print{ body{background:#fff;} .pagebreak{break-before:page;page-break-before:always;}
+  /* al imprimir la columna es mas angosta que la pantalla: fit() se calculo para pantalla, asi
+     que una ecuacion ancha (K = integral BtB) puede desbordar y overflow-x:auto imprime la barra.
+     En papel NUNCA queremos barra: se oculta (el contenido ya cabe, la barra sobraba). */
+  .ws-eq,.deq-body{overflow-x:hidden !important;overflow-y:hidden !important;} }
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
 .ws-eq{margin:0.4em 0;padding:.4em 0 .25em;

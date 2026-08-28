@@ -58,7 +58,19 @@ H4 = -x^2/L + x^3/L^2 @@(peso de θ₂)
 #|  v(x) = H₁·v₁ + H₂·θ₁ + H₃·v₂ + H₄·θ₂
 #: Esa curva suave —la cúbica de Hermite— es exactamente lo que dibuja el programa para la viga deformada. No son dos rectas entre nudos: es la cúbica.
 
-## 9 · ¿Desde cuándo se hace así?
+## 9 · La matriz de rigidez de la viga K
+#: Con las funciones de forma listas, la rigidez sale de la energía de flexión. La curvatura (la deformación por flexión) es la SEGUNDA derivada de la deflexión, B = d²N/dx². Primero la curvatura de cada Hermite:
+d2H1 = Diff{Diff{H1 @ x} @ x}
+d2H2 = Diff{Diff{H2 @ x} @ x}
+d2H3 = Diff{Diff{H3 @ x} @ x}
+d2H4 = Diff{Diff{H4 @ x} @ x}
+#: El vector de deformación B reúne las cuatro curvaturas:
+B = [d2H1, d2H2, d2H3, d2H4]
+#: Y la rigidez es la integral de EI·Bᵀ·B a lo largo del elemento —todo simbólico, con {L} y EI como letras—:
+K = Area{EI * transpose(B)*B @ x = 0:L} @@(K = ∫₀ᴸ EI·Bᵀ·B dx)
+#: Esa es la matriz de rigidez de viga CLÁSICA: 12EI/L³, 6EI/L², 4EI/L, 2EI/L… deducida símbolo a símbolo, desde la ecuación de la viga hasta la rigidez. Es la que ensamblan todos los programas de estructuras.
+
+## 10 · ¿Desde cuándo se hace así?
 #: · Las cúbicas de **Hermite** son matemática de ~1870 (interpolación con valor Y pendiente).
 #: · La **matriz de rigidez de la viga** (con estas funciones) se formaliza en el **análisis matricial de estructuras de los años 1950**, y el método de rigidez directa hacia **1959**.
 #: · **Dibujar la deformada** con estas funciones en el computador es estándar desde los **programas de los años 1970** (el linaje SAP, Berkeley), del que descienden los programas de hoy.

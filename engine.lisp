@@ -714,8 +714,11 @@
 (defun neg-lead-p (e)
   (cond ((numberp e) (< e 0)) ((and (consp e) (eq (car e) '*) (eql (second e) -1)) t) (t nil)))
 (defun despejar (lhs rhs var)
-  "Despeja var de la ecuacion lhs = rhs. Lineal -> simbolico; cuadratica -> las 2 raices."
-  (let ((p (try-poly (list '- lhs rhs))))
+  "Despeja var de la ecuacion lhs = rhs. Lineal -> simbolico; cuadratica -> las 2 raices.
+   Resuelve primero ops de MATRIZ en los lados (det, …) para que
+   Despejar{det(K-lam*M)=0 @ lam} de los autovalores (det -> polinomio caracteristico)."
+  (let* ((lhs (meval lhs)) (rhs (meval rhs))
+         (p (try-poly (list '- lhs rhs))))
     (if (eq p :fail) '?
         (let ((deg (poly-deg-in p var)))
           (cond
@@ -1082,6 +1085,12 @@
     ;; trace(M): traza (suma de la diagonal). cross(u,v): producto cruz 3D.
     ((eq (car e) 'trace) (mtrace (meval (second e))))
     ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
+    ;; despejar dentro de una expr con matrices (autovalores: Despejar{det(K-λM)=0 @ λ}).
+    ;; La forma llega enrutada a meval por las matrices; se resuelve la ecuacion (despejar
+    ;; ya evalua det en sus lados). Desenvuelve los args citados.
+    ((eq (car e) 'despejar)
+     (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
+       (despejar (unq (second e)) (unq (third e)) (unq (fourth e)))))
     ((eq (car e) 'ngauss)
      (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
        (ngauss (meval (unq (second e))) (unq (third e)) (unq (fourth e)))))

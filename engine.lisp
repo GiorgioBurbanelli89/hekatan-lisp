@@ -1108,7 +1108,15 @@
     ((eq (car e) 'expt)
      (let ((base (meval (second e))) (p (meval (third e))))
        (if (and (matp base) (eql p -1)) (minv base) (simplify (list 'expt base p)))))
-    (t (simplify (cons (car e) (mapcar #'meval (cdr e)))))))
+    ;; funcion escalar (sqrt, sin, …) sobre una expr matricial que da 1x1 (p.ej. sqrt(uᵀu)):
+    ;; colapsa el 1x1 a su escalar y REDUCE con clean (psqrt: sqrt de cuadrado perfecto -> entero).
+    ;; sqrt([25]) -> sqrt(25) -> 5.
+    (t (clean (simplify (cons (car e) (mapcar (lambda (x) (scalarize (meval x))) (cdr e))))))))
+(defun scalarize (v)
+  "Vector 1x1 -> su escalar (recursivo: #(25) -> 25, #(#(25)) -> 25). Otro tamaño se deja igual."
+  (if (and (vectorp v) (= (length v) 1))
+      (scalarize (aref v 0))
+      v))
 (defun m2 (mf sf a b) (if (or (matp a) (matp b)) (funcall mf a b) (simplify (list (if (eq sf #'+) '+ '-) a b))))
 (defun mtimes (a b)
   (cond ((and (matp a) (matp b)) (mmul a b))

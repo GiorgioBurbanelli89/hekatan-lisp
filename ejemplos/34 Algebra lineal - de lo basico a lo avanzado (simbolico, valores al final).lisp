@@ -21,7 +21,8 @@ un = [3; 4]
 vn = [1; 2]
 puntoN = transpose(un) * vn
 n2N = transpose(un) * un
-#: Punto = {puntoN}, largo² = {n2N}. La norma es su raíz: |u| = √25 = **5** (el 3-4-5 de Pitágoras).
+normaN = sqrt(transpose(un) * un)
+#: Punto = {puntoN}, largo² = {n2N}, y la norma |u| = {normaN} (el 3-4-5 de Pitágoras).
 
 ## 3 · Matriz: el determinante (simbólico → número)
 #: Una matriz 2×2 genérica:

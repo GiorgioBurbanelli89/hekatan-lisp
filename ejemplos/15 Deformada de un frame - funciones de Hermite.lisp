@@ -23,10 +23,13 @@ base = [1 x x^2 x^3] @@(la base cúbica)
 #|  v(L) → [1 L L² L³]   ·   v′(L) → [0 1 2L 3L²]
 C = [1, 0, 0, 0; 0, 1, 0, 0; 1, L, L^2, L^3; 0, 1, 2*L, 3*L^2] @@(C: v y v′ en los 2 nudos)
 
-## 4 · La inversa — la operación simbólica
-#: Para despejar las cuatro constantes hace falta C⁻¹. Su determinante sale {L}⁴, y la inversa es una matriz simbólica con potencias de 1/{L}. Aquí SÍ hay operación simbólica de verdad —el motor invierte una 4×4 con la letra {L} adentro—:
+## 4 · La inversa — la operación paso a paso
+#: Para despejar las cuatro constantes hace falta C⁻¹. El motor la calcula por la fórmula clásica: **C⁻¹ = adj(C) / det(C)**. Primero el determinante (por expansión de cofactores):
 detC = det(C)
-Cinv = inv(C) @@(despeja las 4 constantes)
+#: Sale {L}⁴. Luego la matriz **adjunta** —la transpuesta de la matriz de cofactores; cada cofactor es el determinante (con signo) de una submatriz 3×3—:
+adjC = adj(C)
+#: Y la inversa es la adjunta dividida por el determinante. Al dividir por {L}⁴ aparecen las potencias de 1/{L}:
+Cinv = adj(C) * (1/det(C)) @@(C⁻¹ = adj(C)/det(C))
 
 ## 5 · Las funciones de forma de Hermite: N = base · C⁻¹
 N = base*Cinv @@(las 4 cúbicas de Hermite, con L)

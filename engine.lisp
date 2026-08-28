@@ -994,6 +994,16 @@
 ;; INVERSA SIMBÓLICA por adjunta/determinante: inv(A) = (1/det A)·adj(A), con
 ;; adj = transpuesta de la matriz de cofactores C_ij = (-1)^(i+j)·minor(i,j).
 ;; A diferencia de minv (numérica), funciona con entradas simbólicas (Jᵀ, J⁻¹ del FEM).
+(defun madjugate (x)
+  "Matriz ADJUNTA = transpuesta de la matriz de cofactores. Sirve para C^-1 = adj(C)/det(C)."
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (if (= n 1) (from-rows (list (list 1)))
+        (let ((cof (loop for i from 0 below n collect
+                     (loop for j from 0 below n collect
+                       (let ((m (mdet (from-rows (mminor rows i j)))))
+                         (if (evenp (+ i j)) m (simplify (list '- m))))))))
+          (mtransp (from-rows cof))))))
+
 (defun msinv (x)
   (let* ((rows (to-rows x)) (n (length rows)) (d (mdet x)))
     (if (= n 1)
@@ -1030,6 +1040,7 @@
     ;; det(M): determinante simbólico (para detJ del Jacobiano, etc.).
     ((eq (car e) 'det) (mdet (meval (second e))))
     ((eq (car e) 'inv) (msinv (meval (second e))))
+    ((eq (car e) 'adj) (madjugate (meval (second e))))
     ((eq (car e) 'ngauss)
      (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
        (ngauss (meval (unq (second e))) (unq (third e)) (unq (fourth e)))))

@@ -1039,7 +1039,7 @@ namespace HekatanLisp
         // ¿la forma LISP contiene alguna llamada de operación (Partial, Factor, ∫, …)?
         private static readonly string[] OpCalls = {
             "(partial","(derive-x","(factor","(expand*","(integ-var","(integ-x","(area-under","(slope-at",
-            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite" };
+            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite","(despejar" };
         private static bool HasOpCall(string f) => f != null && System.Array.Exists(OpCalls, s => f.Contains(s));
         // dos formas LISP son "la misma" salvo comillas de quote y espacios (un operador que NO cerró
         // devuelve su propia notación: no debe mostrarse como "entrada = <lo mismo>").

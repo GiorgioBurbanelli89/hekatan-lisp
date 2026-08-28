@@ -837,7 +837,7 @@
 ;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
 (defparameter *op-calls*
   '(partial derive-x deriv-steps factor expand* integ-var integ-x area-under slope-at
-    suma producto-op root-op find-op sup-op inf-op repeat-op limite))
+    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar))
 (defun evops (e)
   (cond
     ((atom e) e)

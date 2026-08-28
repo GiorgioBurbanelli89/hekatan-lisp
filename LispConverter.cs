@@ -47,6 +47,7 @@ namespace HekatanLisp
             { "partial", "partial" }, { "derivate", "derive-x" }, { "diff", "derive-x" },
             { "pasos", "deriv-steps" }, { "diffpasos", "deriv-steps" },   // derivada MOSTRANDO el trabajo (regla de la potencia)
             { "simplify", "factor" }, { "factor", "factor" }, { "expand", "expand*" },
+            { "despejar", "despejar" }, { "solve", "despejar" },   // Despejar{ lhs = rhs @ x } → resuelve la ecuación
         };
 
         public static N ParseMath(string s)
@@ -114,6 +115,19 @@ namespace HekatanLisp
                 if (isName && SolverOps.ContainsKey(solverKey) && Peek() == "{")
                 {
                     Eat();  // {
+                    // DESPEJAR: la sintaxis es  Despejar{ lhs = rhs @ x }  — el '=' es la ecuación
+                    // (no límites). Items = [lhs, rhs, var]. Si no hay '=', se resuelve lhs = 0.
+                    if (solverKey == "despejar")
+                    {
+                        var lhsD = Expr();
+                        var itemsD = new List<N> { lhsD };
+                        if (Peek() == "=") { Eat(); itemsD.Add(Expr()); } else itemsD.Add(N.Leaf("0"));
+                        N varD = null;
+                        if (Peek() == "@") { Eat(); varD = N.Leaf(Peek()); Eat(); }
+                        itemsD.Add(varD ?? N.Leaf("x"));
+                        if (Peek() == "}") Eat();
+                        return new N { Op = "solver", Atom = "despejar", Items = itemsD };
+                    }
                     var f = Expr();
                     var items = new List<N> { f };
                     if (Peek() == "@")
@@ -193,6 +207,7 @@ namespace HekatanLisp
             { "find-op", "find" }, { "sup-op", "sup" }, { "inf-op", "inf" }, { "repeat-op", "repeat" },
             { "partial", "partial" }, { "derive-x", "derivate" }, { "integ-var", "integral" },
             { "factor", "factor" }, { "expand*", "expand" }, { "limite", "lim" },
+            { "despejar", "despejar" },   // (despejar lhs rhs var) → se renderiza como  lhs = rhs
         };
 
         static N ReadLisp(List<string> toks, ref int i)
@@ -250,6 +265,9 @@ namespace HekatanLisp
         }
         static string SolverToLisp(N n)   // → llamada al motor (f y var CITADOS)
         {
+            // Despejar{ lhs = rhs @ x } → (despejar 'lhs 'rhs 'x). Items = [lhs, rhs, var].
+            if (n.Atom == "despejar" && n.Items != null && n.Items.Count >= 3)
+                return $"(despejar '{ToLisp(n.Items[0])} '{ToLisp(n.Items[1])} '{ToLisp(n.Items[2])})";
             var (f, v, a, b) = SolverParts(n, x => ToLisp(x));
             return n.Atom switch
             {
@@ -309,6 +327,9 @@ namespace HekatanLisp
         }
         static string SolverToHtml(N n)   // → render IGUAL a Hekatan Lab/Calcpad (dvr/nary: límites apilados)
         {
+            // Despejar{ lhs = rhs @ x } → se muestra la ECUACIÓN  lhs = rhs  (y el display agrega "= solución").
+            if (n.Atom == "despejar" && n.Items != null && n.Items.Count >= 2)
+                return ToHtml(n.Items[0]) + " <span class=\"m-op\">=</span> " + ToHtml(n.Items[1]);
             var (f, v, a, b) = SolverParts(n, x => ToHtml(x));
             // n-ario apilado como Calcpad: <dvr><small>sup</small><nary>Σ</nary><small>sub</small></dvr> expr
             string Nary(string sym, string sub, string sup, string expr) =>

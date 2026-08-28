@@ -81,7 +81,21 @@ P = Bt * B
 K = Area{EI * transpose(B)*B @ x = 0:L}
 #: Esa es la matriz de rigidez de viga CLÁSICA: 12EI/L³, 6EI/L², 4EI/L, 2EI/L… deducida símbolo a símbolo: transponer, multiplicar Bᵀ·B, integrar. Es la que ensamblan todos los programas de estructuras.
 
-## 10 · ¿Desde cuándo se hace así?
+## 10 · El ciclo completo: de K a la deformada DIBUJADA
+#: Ojo con no confundir dos cosas. **K no es el dibujo**: es la herramienta para RESOLVER. El programa arma K, resuelve **K·d = F** (fuerzas = rigidez × desplazamientos) y obtiene los valores de los nudos: d = (v₁, θ₁, v₂, θ₂). Recién con esos valores, las **mismas Hermite** dibujan la curva:
+#|  v(x) = H₁·v₁ + H₂·θ₁ + H₃·v₂ + H₄·θ₂
+#: Ejemplo: un extremo fijo (v₁=0, θ₁=0) y el otro que sube una unidad sin girar (v₂=1, θ₂=0). Metemos esos valores:
+v1 = 0
+th1 = 0
+v2 = 1
+th2 = 0
+#: La deformada es la combinación de las Hermite con esos valores —solo sobrevive H₃—:
+defo = H1*v1 + H2*th1 + H3*v2 + H4*th2
+#: Y ESA es la curva que se dibuja en pantalla (con {L}=1): la viga doblada. No dos rectas: la cúbica.
+#fplot(3*x^2 - 2*x^3, [0 1])
+#: El ciclo entero, cerrado: ecuación de la viga → cúbica → funciones de Hermite → curvaturas → **K** → resolver K·d=F → nudos → **deformada dibujada**. Las mismas cuatro funciones sirven para armar la rigidez (derivadas dos veces) y para dibujar la curva (usadas directas).
+
+## 11 · ¿Desde cuándo se hace así?
 #: · Las cúbicas de **Hermite** son matemática de ~1870 (interpolación con valor Y pendiente).
 #: · La **matriz de rigidez de la viga** (con estas funciones) se formaliza en el **análisis matricial de estructuras de los años 1950**, y el método de rigidez directa hacia **1959**.
 #: · **Dibujar la deformada** con estas funciones en el computador es estándar desde los **programas de los años 1970** (el linaje SAP, Berkeley), del que descienden los programas de hoy.

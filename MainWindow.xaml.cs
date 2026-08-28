@@ -827,7 +827,13 @@ namespace HekatanLisp
                     }
                     else if (_op == "auto" && hasR &&
                              System.Text.RegularExpressions.Regex.IsMatch(r, @"^-?\d+(\.\d+)?$|^-?\d+/\d+$"))
-                        display.Add(lbl + " = " + formOf[i] + " = " + r);   // giro = M·l/(2·EI) = 3/5 (número o racional exacto)
+                    {
+                        // giro = M·l/(2·EI) = 3/5. Si la operación referencia un vector/matriz
+                        // (p.ej. √(uᵀ·u)), muéstrala con el SÍMBOLO, no con el vector expandido bajo la raíz.
+                        string opF = treeOf[i] != null ? LispConverter.ToLisp(treeOf[i]) : formOf[i];
+                        bool refsVec = opF != formOf[i] && ReferencesVecVar(opF, vecMap);
+                        display.Add(lbl + " = " + (refsVec ? opF : formOf[i]) + " = " + r);
+                    }
                     else
                     {
                         string rhs = (_op == "auto" || !hasR) ? formOf[i] : r;

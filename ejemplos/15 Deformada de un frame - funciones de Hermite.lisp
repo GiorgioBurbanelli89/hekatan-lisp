@@ -2,15 +2,22 @@
 #: Un **frame** (viga-columna) no usa la recta del 1D simple. Para la **flexión** usa polinomios **cúbicos de Hermite**. Y esas mismas cúbicas son las que dibujan la **curva** de la viga deformada que ves en pantalla. El motor las deduce.
 
 ## 1 · ¿Por qué una cúbica? La impone la ecuación de la viga
-#: No se elige la cúbica por capricho: la da la física. Una viga en flexión obedece la ecuación de Euler-Bernoulli, EI·v⁗ = w (la carga). ENTRE dos nudos no hay carga (w = 0), así que v⁗ = 0. Esa ecuación se resuelve integrando cuatro veces, y cada integral añade una constante. Primera integral —el cortante:
+#: Una viga que se carga se **dobla**. Y no se dobla en línea recta: toma una **curva suave**. ¿Qué curva, exactamente? Siempre la misma: una **cúbica** (un polinomio de grado 3). Aquí ves de dónde sale, paso a paso y con dibujos. Piensa en esta viga —empotrada a la izquierda, con una carga en la punta—:
+#beam(fixed-free, P@1)
+#: La ley de una viga en flexión es **EI·v⁗ = w** (w = la carga que lleva encima). Entre dos nudos, si la carga está aplicada EN los nudos, en el medio **no hay carga → v⁗ = 0**. Resolver esa ecuación es **integrar cuatro veces**. Y aquí está la clave: **cada integral sube el grado en uno**. Míralo, con la forma que va tomando la curva:
+#: **Primera** integral: de cero sale una **constante** (el cortante V, igual en todo el tramo). Su gráfica es una línea plana:
 V = Integral{0 @ x}
-#: Segunda —el momento (salvo EI):
+#fplot(1, [0 1])
+#: **Segunda**: esa constante se integra en una **recta** (el momento M, que sube en línea):
 M = Integral{c1 @ x}
-#: Tercera —el giro (la pendiente v′):
+#fplot(x, [0 1])
+#: **Tercera**: la recta se integra en una **parábola** (el giro, o sea la pendiente de la viga):
 pend = Integral{c1*x + c2 @ x}
-#: Cuarta —la deflexión:
+#fplot(x^2, [0 1])
+#: **Cuarta**: la parábola se integra en una **cúbica** (la deflexión: la curva que de verdad toma la viga al doblarse):
 defl = Integral{c1*x^2/2 + c2*x + c3 @ x}
-#: La deflexión {defl} es un polinomio de GRADO 3 —una cúbica con cuatro constantes—. Ese es el punto: la cúbica no aproxima nada, es la forma EXACTA de una viga descargada entre nudos. Por eso el FEM de viga reproduce la deformada real, no la parte en rectas.
+#fplot(x^3, [0 1])
+#: El camino completo es **constante → recta → parábola → cúbica**. Partiste de cero y, en cuatro integrales, llegaste a un polinomio de grado 3 con cuatro constantes. Esa cúbica **no aproxima nada**: es la forma EXACTA de una viga sin carga entre nudos. Por eso el programa dibuja la deformada **real**, no dos rectas quebradas.
 
 ## 2 · Los grados de libertad de la flexión (2 nudos → 4)
 #: Y esas cuatro constantes encajan justo con los grados de libertad del elemento. En cada extremo la viga tiene DOS cosas: el desplazamiento **v** y el giro **θ** (la pendiente). Dos nudos → **4 datos**: v₁, θ₁, v₂, θ₂. Por eso el polinomio necesita **4 términos** —la cúbica, con la misma estructura que salió de integrar la ecuación:
@@ -43,7 +50,7 @@ adjC = adj(C)
 Cinv = adj(C) * (1/det(C)) @@(C⁻¹ = adj(C)/det(C))
 
 ## 6 · Las funciones de forma de Hermite: N = base · C⁻¹
-N = base*Cinv @@(las 4 cúbicas de Hermite, con L)
+N = base*Cinv
 #: Da las Hermite escritas con el largo real {L}: H₁ = 1−3(x/L)²+2(x/L)³, H₂ = x−2x²/L+x³/L², H₃ = 3(x/L)²−2(x/L)³, H₄ = −x²/L+x³/L². Con {L}=1 se recuperan las clásicas.
 
 ## 7 · Las 4 cúbicas de Hermite, una por una

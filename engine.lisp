@@ -997,6 +997,20 @@
     (cond ((null n) 0)
           ((floatp n) (rational n))
           (t n))))
+;; ¿toda la matriz reduce a NUMERO de verdad? `mnum` devuelve 0 cuando no puede,
+;; asi que preguntarselo a el no sirve: una entrada simbolica se colaba como 0 y
+;; la eliminacion de Gauss daba un pivote nulo -> `minv` devolvia la matriz SIN
+;; INVERTIR, en silencio. Con letras ([a,b;b,a]^-1) salia la propia matriz y la
+;; comprobacion A·A^-1 daba [a^2+b^2, 2ab; ...] en vez de la identidad.
+(defun mat-numeric-p (x)
+  (every (lambda (fila)
+           (every (lambda (c)
+                    (let ((v (ignore-errors (eval-consts (simplify c)))))
+                      (or (numberp v) (numberp (num-eval v)) (numberp (num-eval c)))))
+                  fila))
+         (to-rows x)))
+
+
 (defun minv (x)
   (let* ((rows (to-rows x)) (n (length rows))
          (a (make-array (list n (* 2 n)) :initial-element 0)))
@@ -1065,6 +1079,30 @@
                          (if (evenp (+ i j)) m (simplify (list '- m))))))))
           (mscale (simplify (list '/ 1 d)) (mtransp (from-rows cof)))))))
 
+;; La inversa se ENRUTA segun lo que haya DENTRO: si todo son numeros, Gauss
+;; exacto (fracciones limpias); si hay letras, adjunta/determinante. Asi
+;; [a,b;b,a]^-1 sale en algebra y A·A^-1 da la identidad de verdad.
+(defun minv-auto (x)
+  (if (mat-numeric-p x) (minv x) (msinv x)))
+
+;; ---- los PASOS de la inversa, sueltos, para poder ENSENARLA ----
+;; La inversa no es un boton: es det -> menores -> cofactores -> adjunta -> dividir.
+;; Cada paso se expone al usuario para escribirlo en la hoja y verlo en algebra.
+
+;; menor(A; i; j) = la submatriz que queda al TACHAR la fila i y la columna j (1-based).
+(defun mminor-mat (x i j)
+  (from-rows (mminor (to-rows x) (1- i) (1- j))))
+
+;; cof(A) = matriz de COFACTORES: C_ij = (-1)^(i+j) · det(menor_ij).
+;; La adjunta es su transpuesta; por eso adj y cof se parecen pero NO son iguales.
+(defun mcofactors (x)
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (from-rows
+      (loop for i from 0 below n collect
+        (loop for j from 0 below n collect
+          (let ((m (mdet (from-rows (mminor rows i j)))))
+            (if (evenp (+ i j)) m (simplify (list '- m)))))))))
+
 ;; TRAZA = suma de la diagonal principal (escalar). tr(A) = a11 + a22 + ...
 (defun mtrace (x)
   (let* ((rows (to-rows x)) (n (length rows)) (acc 0))
@@ -1112,6 +1150,11 @@
     ((eq (car e) 'det) (mdet (meval (second e))))
     ((eq (car e) 'inv) (msinv (meval (second e))))
     ((eq (car e) 'adj) (madjugate (meval (second e))))
+    ;; cof(M) y menor(M; i; j): los PASOS de la inversa, para ensenarla en algebra.
+    ((eq (car e) 'cof) (mcofactors (meval (second e))))
+    ((member (car e) '(menor minor)) (mminor-mat (meval (second e))
+                                               (mnum (meval (third e)))
+                                               (mnum (meval (fourth e)))))
     ;; trace(M): traza (suma de la diagonal). cross(u,v): producto cruz 3D.
     ((eq (car e) 'trace) (mtrace (meval (second e))))
     ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
@@ -1146,7 +1189,7 @@
     ((eq (car e) '*) (mtimes (meval (second e)) (meval (third e))))
     ((eq (car e) 'expt)
      (let ((base (meval (second e))) (p (meval (third e))))
-       (if (and (matp base) (eql p -1)) (minv base) (simplify (list 'expt base p)))))
+       (if (and (matp base) (eql p -1)) (minv-auto base) (simplify (list 'expt base p)))))
     ;; funcion escalar (sqrt, sin, …) sobre una expr matricial que da 1x1 (p.ej. sqrt(uᵀu)):
     ;; colapsa el 1x1 a su escalar y REDUCE con clean (psqrt: sqrt de cuadrado perfecto -> entero).
     ;; sqrt([25]) -> sqrt(25) -> 5.

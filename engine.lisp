@@ -966,7 +966,37 @@
 
 ;; INVERSA por Gauss-Jordan. Convierte cada entrada a número (eval-consts) y resuelve
 ;; con aritmética EXACTA de SBCL (racionales). Matriz singular -> se deja igual.
-(defun mnum (e) (let ((v (ignore-errors (eval-consts (simplify e))))) (if (numberp v) v 0)))
+
+;; Reduce una expresion a un numero EXACTO si solo tiene numeros y las cuatro
+;; operaciones. Devuelve NIL si no puede. Hace falta porque `eval-consts` NO
+;; evalua aritmetica: una entrada como 5/2 llegaba a `mnum` como la lista
+;; (/ 5 2), `numberp` daba NIL y se convertia en 0 -> el pivote salia cero y
+;; `minv` devolvia la matriz SIN INVERTIR, en silencio. Solo funcionaba con
+;; matrices de enteros.
+(defun num-eval (e)
+  (cond
+    ((numberp e) e)
+    ((atom e) nil)
+    (t (let ((op (car e)) (as (mapcar #'num-eval (cdr e))))
+         (when (and as (every #'identity as))
+           (case op
+             (+ (reduce #'+ as))
+             (- (if (cdr as) (reduce #'- as) (- (car as))))
+             (* (reduce #'* as))
+             (neg (- (car as)))
+             (/ (if (and (cdr as) (notany #'zerop (cdr as))) (reduce #'/ as) nil))
+             ((expt ^) (if (and (= (length as) 2) (integerp (second as)))
+                           (ignore-errors (expt (first as) (second as))) nil))
+             (t nil)))))))
+
+;; Los decimales se pasan a racional para que la eliminacion de Gauss de `minv`
+;; siga siendo EXACTA (0.15 -> 3/20) y la inversa salga en fracciones limpias.
+(defun mnum (e)
+  (let* ((v (ignore-errors (eval-consts (simplify e))))
+         (n (or (and (numberp v) v) (num-eval v) (num-eval e))))
+    (cond ((null n) 0)
+          ((floatp n) (rational n))
+          (t n))))
 (defun minv (x)
   (let* ((rows (to-rows x)) (n (length rows))
          (a (make-array (list n (* 2 n)) :initial-element 0)))

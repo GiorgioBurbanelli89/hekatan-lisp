@@ -125,6 +125,135 @@ namespace HekatanLisp
             return new SKColor((byte)(r * 255), (byte)(g * 255), (byte)(b * 255));
         }
 
+
+        // Colormap de CSI — el MISMO de ETABS, SAFE y SAP2000. Copiado de la replica ya
+        // comprobada contra la leyenda real de ETABS (hekatan-struct, getColorMap.ts):
+        // t=0 el MAXIMO (magenta) y t=1 el minimo (azul oscuro), pasando por rojo,
+        // naranja, amarillo, verde y cian. 14 paradas.
+        static readonly (double t, byte r, byte g, byte b)[] CSI_PAL = {
+            (0.000, 255,   0, 255), (0.077, 255,   0, 180), (0.154, 255,   0,   0),
+            (0.231, 255,  80,   0), (0.308, 255, 140,   0), (0.385, 255, 190,   0),
+            (0.462, 255, 255,   0), (0.538, 180, 255,   0), (0.615,   0, 255,   0),
+            (0.692,   0, 255, 180), (0.769,   0, 255, 255), (0.846,   0, 180, 255),
+            (0.923,   0,   0, 255), (1.000,   0,   0, 180),
+        };
+
+        // t = 0 minimo … 1 maximo (se invierte dentro para casar con la leyenda de CSI)
+        static SKColor Csi(double t)
+        {
+            t = 1.0 - Math.Max(0, Math.Min(1, t));
+            for (int i = 0; i < CSI_PAL.Length - 1; i++)
+            {
+                var (t0, r0, g0, b0) = CSI_PAL[i];
+                var (t1, r1, g1, b1) = CSI_PAL[i + 1];
+                if (t <= t1)
+                {
+                    double u = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
+                    return new SKColor((byte)(r0 + (r1 - r0) * u),
+                                       (byte)(g0 + (g1 - g0) * u),
+                                       (byte)(b0 + (b1 - b0) * u));
+                }
+            }
+            var last = CSI_PAL[CSI_PAL.Length - 1];
+            return new SKColor(last.r, last.g, last.b);
+        }
+
+        // Cuantiza a bandas, como los contours de ETABS: nlev = 0 -> gradiente continuo.
+        static SKColor Banda(double t, int nlev, bool csi)
+        {
+            if (nlev > 0)
+            {
+                t = Math.Max(0, Math.Min(0.999999, t));
+                t = (Math.Floor(t * nlev) + 0.5) / nlev;
+            }
+            return csi ? Csi(t) : JetR(t);
+        }
+
+
+        // ---- MALLADO: la rejilla de elementos con sus nudos ----------------------
+        // Dibuja nx x ny elementos sobre [xa,xb]x[ya,yb], numerando los nudos cuando
+        // caben. Es lo que hace falta para ENSEÑAR una malla de elementos finitos
+        // antes de pintar cualquier campo encima.
+        public static string MeshPng(int nx, int ny, double xa, double xb,
+                                     double ya, double yb, bool dark, bool numerar = true)
+        {
+            const int W = 560, H = 430;
+            var inv = CultureInfo.InvariantCulture;
+            float pL = 52, pR = 30, pT = 40, pB = 44;   // pT deja sitio al titulo
+            float pw = W - pL - pR, ph = H - pT - pB;
+            SKColor bg = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
+            SKColor fg = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
+            SKColor lin = dark ? new SKColor(0x6E, 0x86, 0xA8) : new SKColor(0x7A, 0x8A, 0xA0);
+            SKColor nod = new SKColor(0xC0, 0x39, 0x2B);
+            using var surf = SKSurface.Create(new SKImageInfo(W, H));
+            var cv = surf.Canvas;
+            cv.Clear(bg);
+            float X(double u) => pL + (float)((u - xa) / (xb - xa)) * pw;
+            float Y(double v) => pT + ph - (float)((v - ya) / (yb - ya)) * ph;
+
+            var gl = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke,
+                                   Color = lin, StrokeWidth = 1.2f };
+            for (int i = 0; i <= nx; i++)
+            {
+                double u = xa + (xb - xa) * i / nx;
+                cv.DrawLine(X(u), Y(ya), X(u), Y(yb), gl);
+            }
+            for (int j = 0; j <= ny; j++)
+            {
+                double v = ya + (yb - ya) * j / ny;
+                cv.DrawLine(X(xa), Y(v), X(xb), Y(v), gl);
+            }
+            // el contorno, mas grueso
+            var bo = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke,
+                                   Color = fg, StrokeWidth = 2.4f };
+            cv.DrawRect(X(xa), Y(yb), X(xb) - X(xa), Y(ya) - Y(yb), bo);
+
+            var dot = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = nod };
+            var txt = new SKPaint { IsAntialias = true, Color = fg, TextSize = 10,
+                                    TextAlign = SKTextAlign.Center };
+            int nJ = (nx + 1) * (ny + 1);
+            bool num = numerar && nJ <= 80;
+            int id = 0;
+            for (int j = 0; j <= ny; j++)
+                for (int i = 0; i <= nx; i++)
+                {
+                    id++;
+                    float fx = X(xa + (xb - xa) * i / nx), fy = Y(ya + (yb - ya) * j / ny);
+                    cv.DrawCircle(fx, fy, 3.2f, dot);
+                    if (num) cv.DrawText(id.ToString(inv), fx + 9, fy - 6, txt);
+                }
+            // numero de elemento en el centro de cada celda
+            if (nx * ny <= 60)
+            {
+                var et = new SKPaint { IsAntialias = true, Color = lin, TextSize = 10,
+                                       TextAlign = SKTextAlign.Center };
+                int e = 0;
+                for (int j = 0; j < ny; j++)
+                    for (int i = 0; i < nx; i++)
+                    {
+                        e++;
+                        float fx = X(xa + (xb - xa) * (i + 0.5) / nx);
+                        float fy = Y(ya + (yb - ya) * (j + 0.5) / ny);
+                        cv.DrawText(e.ToString(inv), fx, fy + 4, et);
+                    }
+            }
+            var ax = new SKPaint { IsAntialias = true, Color = fg, TextSize = 11 };
+            string N(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", inv);
+            for (int k = 0; k <= 4; k++)
+            {
+                float fx = pL + pw * k / 4; double v0 = xa + (xb - xa) * k / 4;
+                ax.TextAlign = SKTextAlign.Center; cv.DrawText(N(v0), fx, pT + ph + 17, ax);
+                float fy = pT + ph - ph * k / 4; double w0 = ya + (yb - ya) * k / 4;
+                ax.TextAlign = SKTextAlign.Right; cv.DrawText(N(w0), pL - 7, fy + 4, ax);
+            }
+            ax.TextAlign = SKTextAlign.Center; ax.TextSize = 12;
+            cv.DrawText($"{nx} x {ny} = {nx * ny} elementos   ·   {nJ} nudos",
+                        W / 2f, 14, ax);
+            using var img = surf.Snapshot();
+            using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+            return Convert.ToBase64String(data.ToArray());
+        }
+
         // Devuelve el PNG (base64) de la superficie z=f(x,y) sobre [xa,xb]×[ya,yb].
         public static string SurfacePng(LispConverter.N f, string vx, string vy,
                                         double xa, double xb, double ya, double yb, bool dark)
@@ -195,8 +324,17 @@ namespace HekatanLisp
         // Estático (2D no gira), por eso va con SkiaSharp y no con canvas.
         public static string MapPng(LispConverter.N f, string vx, string vy,
                                     double xa, double xb, double ya, double yb, bool dark)
+            => MapPng(f, vx, vy, xa, xb, ya, yb, dark, false, 0);
+
+        // csi = colormap de ETABS/CSI · nlev = bandas de contorno (0 = gradiente)
+        public static string MapPng(LispConverter.N f, string vx, string vy,
+                                    double xa, double xb, double ya, double yb, bool dark,
+                                    bool csi, int nlev)
         {
-            const int nn = 90, W = 560, H = 430;
+            // con bandas hace falta MAS resolucion: si no, el borde de cada banda sale
+            // escalonado (en ETABS/Lab el relleno es por pixel).
+            int nn = nlev > 0 ? 240 : 90;
+            const int W = 560, H = 430;
             var (Z, zmin, zmax) = Sample(f, vx, vy, xa, xb, ya, yb, nn);
             var inv = CultureInfo.InvariantCulture;
             float pL = 50, pR = 84, pT = 16, pB = 42;
@@ -214,7 +352,7 @@ namespace HekatanLisp
                 for (int j = 0; j < nn; j++)
                 {
                     double zc = (Z[i, j] + Z[i + 1, j] + Z[i, j + 1] + Z[i + 1, j + 1]) / 4;
-                    cell.Color = JetR((zc - zmin) / (zmax - zmin));
+                    cell.Color = Banda((zc - zmin) / (zmax - zmin), nlev, csi);
                     cv.DrawRect(pL + i * cw, pT + (nn - 1 - j) * chh, cw + 1, chh + 1, cell);
                 }
             var axis = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, Color = fg, StrokeWidth = 1 };
@@ -236,7 +374,7 @@ namespace HekatanLisp
             var bar = new SKPaint { Style = SKPaintStyle.Fill };
             for (int k = 0; k < (int)cbH; k++)
             {
-                bar.Color = JetR(1.0 - k / cbH);           // arriba = máximo
+                bar.Color = Banda(1.0 - k / cbH, nlev, csi);   // arriba = máximo
                 cv.DrawRect(cbx, cbTop + k, cbw, 1.2f, bar);
             }
             cv.DrawRect(cbx, cbTop, cbw, cbH, axis);

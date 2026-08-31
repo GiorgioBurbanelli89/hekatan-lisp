@@ -621,6 +621,15 @@ namespace HekatanLisp
         static string Paren(string s) =>
             "<span class=\"m-paren\"><span class=\"m-pl\"></span>" + s + "<span class=\"m-pr\"></span></span>";
 
+        /// <summary>Un índice (1, 2, i, j) como texto plano, para ponerlo de subíndice en M_ij.</summary>
+        static string PlainIdx(N n)
+        {
+            if (n == null) return "";
+            var s = n.Atom ?? "";
+            if (s.Length == 0) s = System.Text.RegularExpressions.Regex.Replace(ToHtml(n, 0), "<[^>]+>", "");
+            return System.Net.WebUtility.HtmlEncode(s.Trim());
+        }
+
         // nombre con SUBÍNDICE: "N1" -> N con 1 abajo · "sigma_x" -> sigma con x abajo.
         // Convención ingenieril: dígitos finales (o lo que sigue a "_") es subíndice.
         // nombres de letras griegas → su símbolo (como Hekatan Lab): theta→θ, gamma→γ, sigma→σ…
@@ -874,6 +883,29 @@ namespace HekatanLisp
                 case "inv":   // inversa en notación matemática: J⁻¹ (superíndice −1, arriba-derecha)
                     return "<span class=\"m-transp-wrap\">" + ToHtml(n.Items.Count > 0 ? n.Items[0] : null, 5) +
                            "<span class=\"m-transp\">−1</span></span>";
+                // --- operadores de matriz en la notación de los LIBROS, no en la del teclado ---
+                // "menor(A,1,1)" y "trace(A)" se leían como código fuente, no como matemática.
+                case "trace":   // la traza es tr(A)
+                    return "<span class=\"m-fn\">tr</span>" + Paren(arg0);
+                case "menor":
+                case "minor":   // el menor de la posición i,j es M_ij — y la matriz, entre paréntesis
+                    if (n.Items.Count >= 3)
+                        return "<span class=\"m-fn\">M</span><sub class=\"m-sub\">" +
+                               PlainIdx(n.Items[1]) + PlainIdx(n.Items[2]) + "</sub>" + Paren(arg0);
+                    goto default;
+                case "cofactor":  // y el cofactor, C_ij (menor CON su signo)
+                    if (n.Items.Count >= 3)
+                        return "<span class=\"m-fn\">C</span><sub class=\"m-sub\">" +
+                               PlainIdx(n.Items[1]) + PlainIdx(n.Items[2]) + "</sub>" + Paren(arg0);
+                    goto default;
+                case "cross":   // producto cruz: u × v, con el aspa de siempre
+                    if (n.Items.Count >= 2)
+                        return ToHtml(n.Items[0], 5) + "<span class=\"m-op\"> × </span>" + ToHtml(n.Items[1], 5);
+                    goto default;
+                case "abs":     // valor absoluto / módulo: |x|
+                    return "<span class=\"m-detbar\">|</span>" + arg0 + "<span class=\"m-detbar\">|</span>";
+                case "norm":    // norma: ‖v‖
+                    return "<span class=\"m-detbar\">‖</span>" + arg0 + "<span class=\"m-detbar\">‖</span>";
                 default:
                     var args = string.Join("<span class=\"m-op\">, </span>", n.Items.Select(x => ToHtml(x, 0)));
                     return FnNameHtml(name) + Paren(args);

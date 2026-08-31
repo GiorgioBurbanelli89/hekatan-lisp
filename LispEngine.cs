@@ -222,9 +222,22 @@ namespace HekatanLisp
             {
                 EnsureServer();
                 if (_server == null || _server.HasExited) return null;
-                _sin.Write(code);
-                _sin.Write("\n(hlisp-done)\n");   // marcador: fin del bloque de entrada
-                _sin.Flush();
+                // La ESCRITURA va en su propia tarea. Antes se mandaba el script entero a
+                // stdin y SOLO DESPUES se leia stdout: con una hoja larga, SBCL empieza a
+                // contestar a mitad de la entrega, llena su buffer de salida y se para;
+                // entonces deja de leer stdin, y la app se para escribiendo. Los dos
+                // esperando al otro = cuelgue eterno (ni siquiera saltaba el timeout, que
+                // solo cubria la lectura). Escribiendo y leyendo A LA VEZ no puede pasar.
+                var writeTask = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        _sin.Write(code);
+                        _sin.Write("\n(hlisp-done)\n");   // marcador: fin del bloque de entrada
+                        _sin.Flush();
+                    }
+                    catch { }
+                });
                 // lee stdout hasta \x1e (fin de respuesta), con timeout
                 var readTask = System.Threading.Tasks.Task.Run(() =>
                 {
@@ -237,7 +250,8 @@ namespace HekatanLisp
                     }
                     return buf.ToString();
                 });
-                if (!readTask.Wait(30000)) { KillServer(); throw new Exception("timeout server"); }
+                if (!readTask.Wait(60000)) { KillServer(); throw new Exception("timeout server"); }
+                writeTask.Wait(2000);
                 return readTask.Result.TrimEnd('\n', '\r');
             }
         }

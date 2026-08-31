@@ -326,6 +326,169 @@
                   (cons (remove-if (lambda (x) (zerop (cdr x))) res) (cdr tm))))
               p)))
 
+;;;; ---- MCD de POLINOMIOS multivariables: para cancelar la fraccion de verdad ----
+;;;; `cancel-ratpoly` solo quitaba el monomio y el factor NUMERICO comunes. Por eso la
+;;;; inversa por LU, la pseudo-inversa o la QR salian con el determinante elevado al
+;;;; cuadrado arriba y abajo: correcto, pero ilegible. Con el MCD (Euclides con
+;;;; pseudo-division sobre la variable principal) la fraccion queda en minima expresion.
+;;;; Se cancela SOLO si el MCD divide EXACTO a los dos, asi que nunca puede falsear.
+
+;; PRESUPUESTO. El MCD es exacto pero puede dispararse (los coeficientes de la
+;; pseudo-division crecen solos). Un motor que NO cancela es feo; uno que se CUELGA
+;; es inservible. Asi que cada intento lleva un presupuesto de pasos: si se agota,
+;; se abandona y la fraccion se queda como estaba. Nunca puede colgar.
+(defvar *gcd-saldo* 0)
+(defun gcd-gasta (&optional (n 1))
+  "Saldo 0 = nadie abrio presupuesto (llamada suelta): no se frena nada."
+  (when (> *gcd-saldo* 0)
+    (decf *gcd-saldo* n)
+    (when (<= *gcd-saldo* 0) (throw 'gcd-caro :caro))))
+
+(defun poly-zerop (p) (null p))
+
+(defun poly-vars (p)
+  (let ((vs nil))
+    (dolist (tm p) (dolist (pr (car tm)) (pushnew (car pr) vs)))
+    vs))
+
+(defun poly-deg (p v)
+  (let ((d 0))
+    (dolist (tm p) (let ((c (assoc v (car tm)))) (when c (setf d (max d (cdr c))))))
+    d))
+
+(defun poly-coef-v (p v k)
+  "Coeficiente de v^k: un polinomio en las DEMAS variables."
+  (let ((res nil))
+    (dolist (tm p)
+      (when (= (or (cdr (assoc v (car tm))) 0) k)
+        (setf res (p+ res (list (cons (remove v (copy-alist (car tm)) :key #'car)
+                                      (cdr tm)))))))
+    res))
+
+(defun poly-mul-v^k (p v k) (p* p (list (cons (if (zerop k) nil (list (cons v k))) 1))))
+
+(defun mono-div (m1 m2)
+  "m1/m2 si m2 divide a m1; :no si no lo divide."
+  (let ((res (copy-alist m1)))
+    (dolist (pr m2)
+      (let ((cell (assoc (car pr) res)))
+        (if (and cell (>= (cdr cell) (cdr pr)))
+            (decf (cdr cell) (cdr pr))
+            (return-from mono-div :no))))
+    (remove-if (lambda (pr) (zerop (cdr pr))) res)))
+
+(defun mono-mayor-p (m1 m2)
+  "Orden GRLEX: primero el grado total y, a igual grado, lexicografico sobre las
+   variables por nombre. Tiene que ser un orden MULTIPLICATIVO —comparar el TEXTO del
+   monomio no lo es— o el lider del divisor no divide al del dividendo y una division
+   que SI es exacta se declara imposible: eso dejaba las fracciones sin cancelar."
+  (let ((d1 (mono-degree m1)) (d2 (mono-degree m2)))
+    (cond ((> d1 d2) t) ((< d1 d2) nil)
+          (t (let ((vs (sort (remove-duplicates (append (mapcar #'car m1) (mapcar #'car m2)))
+                             #'string< :key #'string)))
+               (dolist (v vs nil)
+                 (let ((e1 (or (cdr (assoc v m1)) 0))
+                       (e2 (or (cdr (assoc v m2)) 0)))
+                   (cond ((> e1 e2) (return t))
+                         ((< e1 e2) (return nil))))))))))
+
+(defun poly-lead (p)
+  (let ((mejor (car p)))
+    (dolist (tm (cdr p)) (when (mono-mayor-p (car tm) (car mejor)) (setf mejor tm)))
+    mejor))
+
+(defun poly-exact-div (p q)
+  "p/q cuando la division es EXACTA; NIL si sobra resto (o si q es cero)."
+  (if (or (poly-zerop p) (poly-zerop q)) nil
+      (let ((r p) (out nil) (lq (poly-lead q)) (n 0))
+        (loop while (and r (< n 300)) do
+          (incf n) (gcd-gasta)
+          (let* ((lr (poly-lead r))
+                 (md (mono-div (car lr) (car lq))))
+            (when (eq md :no) (return-from poly-exact-div nil))
+            (let ((tq (list (cons md (/ (cdr lr) (cdr lq))))))
+              (setf out (p+ out tq))
+              (setf r (p+ r (p-scale (p* tq q) -1))))))
+        (if (poly-zerop r) out nil))))
+
+(defun poly-primitiva (p)
+  "Quita el factor NUMERICO comun de los coeficientes."
+  (if (poly-zerop p) p
+      (let ((c (ratcontent p)))
+        (if (or (zerop c) (= c 1)) p (p-scale p (/ 1 c))))))
+
+(defun poly-prem (a b v)
+  "Pseudo-resto de a entre b respecto a v (Euclides sin fracciones)."
+  (let* ((db (poly-deg b v)) (lb (poly-coef-v b v db)) (r a))
+    (loop for guarda from 0 below 200
+          while (and (not (poly-zerop r)) (>= (poly-deg r v) db)) do
+      (gcd-gasta (max 1 (floor (length r) 4)))
+      (when (and (> *gcd-saldo* 0) (> (length r) 200)) (throw 'gcd-caro :caro))
+      (let* ((dr (poly-deg r v)) (lr (poly-coef-v r v dr)))
+        (setf r (poly-primitiva
+                 (p+ (p* lb r)
+                     (p-scale (p* (poly-mul-v^k lr v (- dr db)) b) -1))))))
+    r))
+
+;; El MCD tiene que ser PRIMITIVO: si no se quita el contenido (el factor comun de
+;; los coeficientes vistos en v) el algoritmo devuelve el MCD multiplicado por basura
+;; —salia q^2·(p^2-q^2) en vez de (p^2-q^2)— y entonces ya no divide exacto y no se
+;; cancela nada. El contenido se calcula con el mismo MCD, pero con UNA VARIABLE MENOS,
+;; asi que la recursion siempre termina.
+(defun poly-content-v (p v)
+  "MCD de los coeficientes de p visto como polinomio en v."
+  (if (> (length p) 60) (p-const 1)
+      (let ((g nil))
+        (loop for k from 0 to (poly-deg p v) do
+          (let ((c (poly-coef-v p v k)))
+            (unless (poly-zerop c) (setf g (if g (poly-gcd g c) c)))))
+        (or g (p-const 1)))))
+
+(defun poly-pp-v (p v)
+  "Parte primitiva de p respecto a v: p dividido por su contenido."
+  (if (poly-zerop p) p
+      (let ((c (poly-content-v p v)))
+        (if (numberp (p-constant c))
+            (poly-primitiva p)
+            (poly-primitiva (or (poly-exact-div p c) p))))))
+
+(defun poly-gcd (a b)
+  "MCD de dos polinomios, salvo constante (Euclides con pseudo-division, PRS primitivo)."
+  (gcd-gasta)
+  (cond ((poly-zerop a) (poly-primitiva b))
+        ((poly-zerop b) (poly-primitiva a))
+        ((poly-exact-div b a) (poly-primitiva a))
+        ((poly-exact-div a b) (poly-primitiva b))
+        (t (let ((v (car (intersection (poly-vars a) (poly-vars b)))))
+             (if (null v) (p-const 1)
+                 (let* ((ca (poly-content-v a v))
+                        (cb (poly-content-v b v))
+                        (cg (if (or (numberp (p-constant ca)) (numberp (p-constant cb)))
+                                (p-const 1) (poly-gcd ca cb)))
+                        (x (poly-pp-v a v))
+                        (y (poly-pp-v b v)))
+                   (when (< (poly-deg x v) (poly-deg y v)) (rotatef x y))
+                   (loop for guarda from 0 below 40
+                         while (not (poly-zerop y)) do
+                           (let ((r (poly-prem x y v)))
+                             (setf x y y (poly-pp-v r v))))
+                   (p* cg x)))))))
+
+(defun cancel-gcd (num den)
+  "Divide numerador y denominador por su MCD, comprobando que sale EXACTO."
+  (if (or (poly-zerop num) (poly-zerop den)
+          (numberp (p-constant den))                 ; denominador constante: nada que hacer
+          (> (length num) 80) (> (length den) 80))   ; demasiado grande: no merece la pena
+      (cons num den)
+      (let* ((*gcd-saldo* 6000)
+             (g (catch 'gcd-caro (ignore-errors (poly-gcd num den)))))
+        (if (or (null g) (eq g :caro) (poly-zerop g) (numberp (p-constant g)))
+            (cons num den)
+            (let* ((r (catch 'gcd-caro
+                        (let ((n2 (poly-exact-div num g)) (d2 (poly-exact-div den g)))
+                          (if (and n2 d2) (cons n2 d2) :caro)))))
+              (if (eq r :caro) (cons num den) r))))))
+
 (defun cancel-ratpoly (r)
   "Cancela el monomio y el factor numerico comunes entre numerador y denominador.
    Ademas, si num y den son el MISMO polinomio -> 1 (la diagonal de A*inv(A)=I);
@@ -340,6 +503,9 @@
          (when mm (setf num (poly-div-mono num mm) den (poly-div-mono den mm)))
          (let ((g (gcd-rat (ratcontent num) (ratcontent den))))
            (when (and (/= g 0) (/= g 1)) (setf num (p-scale num (/ 1 g)) den (p-scale den (/ 1 g)))))
+         ;; y el factor POLINOMICO comun (el determinante que salia al cuadrado)
+         (let ((g (cancel-gcd num den)))
+           (setf num (car g) den (cdr g)))
          ;; si el denominador es una constante negativa, pasa el signo al numerador
          (let ((dc (p-constant den)))
            (when (and (numberp dc) (minusp dc)) (setf num (p-scale num -1) den (p-scale den -1))))
@@ -352,12 +518,122 @@
           ((numberp dc) (poly->expr (p-scale num (/ 1 dc))))
           (t (list '/ (poly->expr num) (poly->expr den))))))
 
+;;;; ===== ATOMOS OPACOS: sin, cos, sqrt… DENTRO del motor de polinomios =====
+;;;; El motor de polinomios solo entiende + - * / y potencia entera. Cualquier otra
+;;;; llamada (sin, cos, sqrt, log) le hacia tirar la toalla, y `simplify` devolvia la
+;;;; expresion casi cruda: cos(t)*sin(t) - sin(t)*cos(t) se quedaba escrito tal cual, y
+;;;; sqrt(p)*sqrt(p) no era p. Eso bloqueaba TRES formas de invertir una matriz
+;;;; —ortogonal (A^-1 = A^T), Cholesky y QR—, que viven todas de raices y senos.
+;;;; Aqui esas llamadas se sustituyen por una LETRA nueva, el polinomio las combina
+;;;; como a cualquier otra, y al final dos reglas las devuelven a su significado:
+;;;;   · (sqrt a)^k          -> a^(k/2) · (sqrt a)^(k mod 2)     [sqrt(p)*sqrt(p) = p]
+;;;;   · sin(u)^2*M + cos(u)^2*M -> M                            [Pitagoras]
+
+(defvar *opq* nil "alist (letra-nueva . forma original) del simplify opaco en curso.")
+
+(defun opq-arith-p (op) (member op '(+ - * / expt)))
+
+(defun opq-sub (e)
+  "Sustituye cada llamada NO aritmetica por una letra nueva; recuerda la equivalencia."
+  (cond ((atom e) e)
+        ((opq-arith-p (car e)) (cons (car e) (mapcar #'opq-sub (cdr e))))
+        (t (let ((hit (rassoc e *opq* :test #'equal)))
+             (if hit (car hit)
+                 (let ((g (make-symbol (format nil "OPQ~3,'0d" (length *opq*)))))
+                   (push (cons g e) *opq*)
+                   g))))))
+
+(defun opq-back (e)
+  "Devuelve cada letra opaca a su forma original."
+  (cond ((symbolp e) (let ((hit (assoc e *opq*))) (if hit (cdr hit) e)))
+        ((consp e) (cons (car e) (mapcar #'opq-back (cdr e))))
+        (t e)))
+
+(defun opq-form (v) (and (symbolp v) (cdr (assoc v *opq*))))
+(defun opq-letra-de (forma) (car (rassoc forma *opq* :test #'equal)))
+;; el radicando puede ser una FRACCION (Cholesky: sqrt(p - q^2/p)), asi que el
+;; plegado trabaja con racionales (num . den), no con polinomios sueltos.
+(defun opq-ratpoly (e) (try-ratpoly (opq-sub e)))
+(defun rp* (a b) (cons (p* (car a) (car b)) (p* (cdr a) (cdr b))))
+(defun rp+ (a b) (cons (p+ (p* (car a) (cdr b)) (p* (car b) (cdr a))) (p* (cdr a) (cdr b))))
+
+(defun mono-sort (m)
+  (sort (remove-if (lambda (pr) (zerop (cdr pr))) (copy-alist m))
+        #'string< :key (lambda (pr) (string (car pr)))))
+
+(defun poly-sqrt-fold (p)
+  "(sqrt a)^k dentro de un monomio -> a^(k/2) multiplicando fuera, (sqrt a)^(k mod 2)
+   dentro. Devuelve un RACIONAL (num . den) porque el radicando puede ser fraccion."
+  (let ((out (cons nil (p-const 1))))
+    (dolist (tm p)
+      (let ((m nil) (extra (cons (p-const 1) (p-const 1))))
+        (dolist (pr (car tm))
+          (let ((f (opq-form (car pr))))
+            (if (and (consp f) (eq (car f) 'sqrt) (>= (cdr pr) 2))
+                (let* ((k (cdr pr)) (mitad (floor k 2)) (resto (mod k 2))
+                       (ar (opq-ratpoly (second f))))
+                  (if (eq ar :fail)
+                      (push pr m)                    ; radicando raro: se deja como esta
+                      (progn
+                        (when (> resto 0) (push (cons (car pr) resto) m))
+                        (dotimes (i mitad) (setf extra (rp* extra ar))))))
+                (push pr m))))
+        (setf out (rp+ out (rp* (cons (list (cons (mono-sort m) (cdr tm))) (p-const 1))
+                                extra)))))
+    out))
+
+(defun mono-baja (m v k)
+  "El monomio m con la potencia de v rebajada en k."
+  (mono-sort (mapcar (lambda (pr) (if (eq (car pr) v) (cons v (- (cdr pr) k)) pr)) m)))
+
+(defun poly-pyth (p)
+  "sin(u)^2*M + cos(u)^2*M -> M (mismo coeficiente). Repite hasta que no cambie nada."
+  (let ((sigue t))
+    (loop while sigue do
+      (setf sigue nil)
+      (block barrido
+        (dolist (tm p)
+          (let ((m (car tm)) (c (cdr tm)))
+            (dolist (pr m)
+              (let ((f (opq-form (car pr))))
+                (when (and (consp f) (member (car f) '(sin cos)) (>= (cdr pr) 2))
+                  (let ((otro (opq-letra-de (list (if (eq (car f) 'sin) 'cos 'sin) (second f)))))
+                    (when otro
+                      (let* ((resto (mono-baja m (car pr) 2))
+                             (m2 (mono-mul resto (list (cons otro 2))))
+                             (par (assoc m2 p :test #'equal)))
+                        (when (and par (= (cdr par) c))
+                          (setf p (p+ p (list (cons m (- c)) (cons m2 (- c)) (cons resto c))))
+                          (setf sigue t)
+                          (return-from barrido))))))))))))
+    p))
+
+(defun opq-reglas (r)
+  "Las dos reglas sobre un racional: (n1/n2)/(d1/d2) = (n1*d2)/(n2*d1)."
+  (let ((n (poly-sqrt-fold (car r)))
+        (d (poly-sqrt-fold (cdr r))))
+    (cons (poly-pyth (p* (car n) (cdr d)))
+          (poly-pyth (p* (cdr n) (car d))))))
+
+(defun simplify-opaco (e)
+  "Ultimo intento: trata sin/cos/sqrt como letras, simplifica, y aplica sus dos reglas."
+  (let ((*opq* nil))
+    (let* ((es (opq-sub e))
+           (p (try-poly es)))
+      (if (not (eq p :fail))
+          (opq-back (ratpoly->expr (cancel-ratpoly (opq-reglas (cons p (p-const 1))))))
+          (let ((r (try-ratpoly es)))
+            (if (eq r :fail)
+                (collect-in (simp* e))
+                (opq-back (ratpoly->expr (cancel-ratpoly (opq-reglas r))))))))))
+
 (defun simplify (e)
-  "Simplifica EXACTO: polinomio; si no, funcion RACIONAL (num/den con cancelacion); si no, motor viejo."
+  "Simplifica EXACTO: polinomio; si no, funcion RACIONAL (num/den con cancelacion);
+   si no, el mismo motor tratando sin/cos/sqrt como letras; si no, motor viejo."
   (let ((p (try-poly e)))
     (if (not (eq p :fail)) (poly->expr p)
         (let ((r (try-ratpoly e)))
-          (if (eq r :fail) (collect-in (simp* e)) (ratpoly->expr (cancel-ratpoly r)))))))
+          (if (eq r :fail) (simplify-opaco e) (ratpoly->expr (cancel-ratpoly r)))))))
 
 (defun expand* (e) "Expande y simplifica (mismo motor de polinomios)." (simplify e))
 
@@ -1204,6 +1480,13 @@
                                                (mnum (meval (fourth e)))))
     ;; trace(M): traza (suma de la diagonal). cross(u,v): producto cruz 3D.
     ((eq (car e) 'trace) (mtrace (meval (second e))))
+    ;; Expand{…} / Simplify{…} / Factor{…} sobre MATRICES: antes caian al ramal
+    ;; generico y devolvian la forma SIN evaluar (el producto quedaba escrito). El
+    ;; algebra de matrices ya simplifica cada entrada al operar, asi que basta con
+    ;; evaluar dentro; si lo de dentro resulta escalar, se simplifica como escalar.
+    ((member (car e) '(expand* factor simplify simplif clean))
+     (let ((v (scalarize (meval (second e)))))
+       (if (matp v) v (simplify v))))
     ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
     ;; despejar dentro de una expr con matrices (autovalores: Despejar{det(K-λM)=0 @ λ}).
     ;; La forma llega enrutada a meval por las matrices; se resuelve la ecuacion (despejar

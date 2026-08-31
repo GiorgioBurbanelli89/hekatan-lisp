@@ -675,12 +675,18 @@ namespace HekatanLisp
             // colocaciones: pegado al NOMBRE (Phiprime_1a -> Φ′₁ₐ, la de Lab) y pegado al
             // SUBINDICE (Phi_1prime -> Φ′₁). Mas especificos primero: tprime, pprime, prime.
             bool primaEnBase = false;
-            foreach (var (tk, nprime) in new[] { ("tprime", 3), ("pprime", 2), ("prime", 1) })
+            // en BUCLE: `w''''` llega como wprimeprimeprime + ' y hay que deshacer TODOS
+            // los tokens seguidos, no solo el ultimo (antes salia "wprimeprime′").
+            for (bool sigue = true; sigue; )
             {
-                if (baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
-                { baseN = baseN.Substring(0, baseN.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; primaEnBase = true; break; }
-                if (sub.Length > tk.Length && sub.EndsWith(tk, StringComparison.Ordinal))
-                { sub = sub.Substring(0, sub.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; primaEnBase = true; break; }
+                sigue = false;
+                foreach (var (tk, nprime) in new[] { ("tprime", 3), ("pprime", 2), ("prime", 1) })
+                {
+                    if (baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
+                    { baseN = baseN.Substring(0, baseN.Length - tk.Length); primes = string.Concat(Enumerable.Repeat("&prime;", nprime)) + primes; primaEnBase = true; sigue = true; break; }
+                    if (sub.Length > tk.Length && sub.EndsWith(tk, StringComparison.Ordinal))
+                    { sub = sub.Substring(0, sub.Length - tk.Length); primes = string.Concat(Enumerable.Repeat("&prime;", nprime)) + primes; primaEnBase = true; sigue = true; break; }
+                }
             }
             // vecArrow: la variable ES un vector/matriz → flecha automática sobre el nombre (v → v⃗).
             var deco = vecArrow ? Over("&#8594;", DecorateBase(baseN)) : DecorateBase(baseN);   // theta→θ, Fvec→F⃗…

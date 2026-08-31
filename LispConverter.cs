@@ -670,16 +670,22 @@ namespace HekatanLisp
             // El apóstrofo no sobrevive al viaje por LISP (allí ' es quote), así que llega
             // convertido en el token `prime` — como en Hekatan Lab. Aquí se deshace: el token
             // puede venir pegado al SUBÍNDICE (Phi_1prime) o al nombre (Phiprime).
+            // En TEXTO PLANO la prima se escribe con TOKEN, como en Hekatan Lab, porque el
+            // apostrofo no sobrevive al viaje por LISP (alli ' es quote). Se admiten las dos
+            // colocaciones: pegado al NOMBRE (Phiprime_1a -> Φ′₁ₐ, la de Lab) y pegado al
+            // SUBINDICE (Phi_1prime -> Φ′₁). Mas especificos primero: tprime, pprime, prime.
+            bool primaEnBase = false;
             foreach (var (tk, nprime) in new[] { ("tprime", 3), ("pprime", 2), ("prime", 1) })
             {
+                if (baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
+                { baseN = baseN.Substring(0, baseN.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; primaEnBase = true; break; }
                 if (sub.Length > tk.Length && sub.EndsWith(tk, StringComparison.Ordinal))
-                { sub = sub.Substring(0, sub.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; break; }
-                if (sub.Length == 0 && baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
-                { baseN = baseN.Substring(0, baseN.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; break; }
+                { sub = sub.Substring(0, sub.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; primaEnBase = true; break; }
             }
             // vecArrow: la variable ES un vector/matriz → flecha automática sobre el nombre (v → v⃗).
             var deco = vecArrow ? Over("&#8594;", DecorateBase(baseN)) : DecorateBase(baseN);   // theta→θ, Fvec→F⃗…
             var h = "<span class=\"m-var\">" + deco + "</span>";
+            if (primaEnBase && primes.Length > 0) { h += "<sup class=\"m-sup\">" + primes + "</sup>"; primes = ""; }
             if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
             if (primes.Length > 0) h += "<sup class=\"m-sup\">" + primes + "</sup>";
             return h;

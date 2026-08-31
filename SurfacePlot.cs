@@ -386,5 +386,112 @@ namespace HekatanLisp
             using var data = img.Encode(SKEncodedImageFormat.Png, 92);
             return Convert.ToBase64String(data.ToArray());
         }
+
+        // ================= SOLIDOS 3D (hexaedros), orbitables =================
+        // Hekatan Lab tiene `solidmesh`; aqui va el equivalente. Se malla un prisma
+        // de a x b x h en nx*ny*nz hexaedros, se pueden QUITAR unos cuantos (corte)
+        // y se dibujan solo las caras EXTERIORES: las que no comparte con otro
+        // hexaedro presente. Por eso el corte se ve RELLENO y no hueco.
+        public static string SolidCanvas(double a, double b, double h,
+                                         int nx, int ny, int nz, int corte, int id)
+        {
+            nx = Math.Max(1, Math.Min(nx, 24));
+            ny = Math.Max(1, Math.Min(ny, 24));
+            nz = Math.Max(1, Math.Min(nz, 24));
+            bool Vivo(int i, int j, int k)
+            {
+                if (corte == 1) return !(i >= nx / 2 && j >= ny / 2);          // cuarto quitado
+                if (corte == 2) return j < (ny + 1) / 2;                        // media pieza
+                if (corte == 3) return !(i >= nx / 2 && j >= ny / 2 && k >= nz / 2);
+                return true;
+            }
+            double dx = a / nx, dy = b / ny, dz = h / nz;
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder();
+            sb.Append('[');
+            bool primero = true;
+            // las 6 caras de un hexaedro: indices del vertice (di,dj,dk) en orden de giro
+            int[][][] CARAS = new int[][][] {
+                new[]{ new[]{0,0,0}, new[]{0,1,0}, new[]{0,1,1}, new[]{0,0,1} },   // -x
+                new[]{ new[]{1,0,0}, new[]{1,0,1}, new[]{1,1,1}, new[]{1,1,0} },   // +x
+                new[]{ new[]{0,0,0}, new[]{0,0,1}, new[]{1,0,1}, new[]{1,0,0} },   // -y
+                new[]{ new[]{0,1,0}, new[]{1,1,0}, new[]{1,1,1}, new[]{0,1,1} },   // +y
+                new[]{ new[]{0,0,0}, new[]{1,0,0}, new[]{1,1,0}, new[]{0,1,0} },   // -z
+                new[]{ new[]{0,0,1}, new[]{0,1,1}, new[]{1,1,1}, new[]{1,0,1} },   // +z
+            };
+            int[][] VEC = new int[][] { new[]{-1,0,0}, new[]{1,0,0}, new[]{0,-1,0},
+                                        new[]{0,1,0}, new[]{0,0,-1}, new[]{0,0,1} };
+            for (int i = 0; i < nx; i++)
+                for (int j = 0; j < ny; j++)
+                    for (int k = 0; k < nz; k++)
+                    {
+                        if (!Vivo(i, j, k)) continue;
+                        for (int c = 0; c < 6; c++)
+                        {
+                            int vi = i + VEC[c][0], vj = j + VEC[c][1], vk = k + VEC[c][2];
+                            bool dentro = vi >= 0 && vi < nx && vj >= 0 && vj < ny && vk >= 0 && vk < nz;
+                            if (dentro && Vivo(vi, vj, vk)) continue;      // cara interior: no se dibuja
+                            if (!primero) sb.Append(',');
+                            primero = false;
+                            for (int v = 0; v < 4; v++)
+                            {
+                                var d = CARAS[c][v];
+                                double X = (i + d[0]) * dx, Y = (j + d[1]) * dy, Z = (k + d[2]) * dz;
+                                sb.Append(Math.Round(X, 4).ToString("0.####", inv)).Append(',');
+                                sb.Append(Math.Round(Y, 4).ToString("0.####", inv)).Append(',');
+                                sb.Append(Math.Round(Z, 4).ToString("0.####", inv)).Append(',');
+                            }
+                            double t = nz > 0 ? (k + 0.5) / nz : 0.5;      // color por ALTURA
+                            sb.Append(Math.Round(t, 4).ToString("0.####", inv));
+                        }
+                    }
+            sb.Append(']');
+            return "<canvas class=\"hk-sol\" width=\"560\" height=\"430\" style=\"max-width:100%;touch-action:none;cursor:grab\""
+                 + " data-id=\"" + id + "\""
+                 + " data-a=\"" + a.ToString("0.####", inv) + "\""
+                 + " data-b=\"" + b.ToString("0.####", inv) + "\""
+                 + " data-h=\"" + h.ToString("0.####", inv) + "\""
+                 + " data-f='" + sb + "'></canvas>";
+        }
+
+        // Orbit de los SOLIDOS: mismo pintor que la superficie, pero sobre caras
+        // sueltas (13 numeros por cara: 4 vertices xyz + el valor de color).
+        public const string SolidScript = @"<script>
+(function(){
+ var CSI=[[255,0,255],[255,0,0],[255,140,0],[255,255,0],[0,255,0],[0,255,255],[0,0,255],[0,0,180]];
+ function csi(t){t=1-Math.max(0,Math.min(1,t));var u=t*(CSI.length-1),k=Math.min(CSI.length-2,Math.floor(u)),f=u-k;
+   var A=CSI[k],B=CSI[k+1];
+   return 'rgb('+((A[0]+(B[0]-A[0])*f)|0)+','+((A[1]+(B[1]-A[1])*f)|0)+','+((A[2]+(B[2]-A[2])*f)|0)+')';}
+ function setup(cv){
+   var F=JSON.parse(cv.dataset.f),a=+cv.dataset.a,b=+cv.dataset.b,h=+cv.dataset.h;
+   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=-0.75,el=0.42;
+   var m=Math.max(a,Math.max(b,h))||1;
+   function proj(X,Y,Z){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+     var x=X/m-a/m/2,y=Y/m-b/m/2,z=Z/m-h/m/2;
+     var rx=-x*sa+y*ca,up=-se*ca*x-se*sa*y+ce*z;
+     return [W*0.5+rx*W*0.60,H*0.52-up*H*0.58];}
+   function dep(X,Y,Z){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+     var x=X/m-a/m/2,y=Y/m-b/m/2,z=Z/m-h/m/2;return ce*ca*x+ce*sa*y+se*z;}
+   function draw(){ctx.clearRect(0,0,W,H);var n=F.length/13,ord=[];
+     for(var q=0;q<n;q++){var o=q*13,d=0;
+       for(var v=0;v<4;v++)d+=dep(F[o+v*3],F[o+v*3+1],F[o+v*3+2]);
+       ord.push([d/4,q]);}
+     ord.sort(function(p,r){return p[0]-r[0];});
+     for(var s=0;s<ord.length;s++){var o=ord[s][1]*13;
+       ctx.beginPath();
+       for(var v=0;v<4;v++){var P=proj(F[o+v*3],F[o+v*3+1],F[o+v*3+2]);
+         if(v===0)ctx.moveTo(P[0],P[1]);else ctx.lineTo(P[0],P[1]);}
+       ctx.closePath();ctx.fillStyle=csi(F[o+12]);ctx.fill();
+       ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=0.8;ctx.stroke();}}
+   var drag=false,px=0,py=0;
+   cv.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;py=e.clientY;cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+   cv.addEventListener('pointermove',function(e){if(!drag)return;az-=(e.clientX-px)*0.01;el+=(e.clientY-py)*0.01;
+     el=Math.max(-1.4,Math.min(1.4,el));px=e.clientX;py=e.clientY;draw();});
+   cv.addEventListener('pointerup',function(e){drag=false;cv.style.cursor='grab';});
+   draw();}
+ function todos(){var l=document.querySelectorAll('canvas.hk-sol');for(var i=0;i<l.length;i++)if(!l[i].__hk){l[i].__hk=1;setup(l[i]);}}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',todos);else todos();
+})();
+</script>";
     }
 }

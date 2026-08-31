@@ -96,6 +96,11 @@ namespace HekatanLisp
             Output.PreviewMouseWheel += OnCtrlZoom;
             PoblarEjemplos();                                // menú Ejemplos ← carpeta ejemplos/
             // --in <archivo>: carga ese .lisp en el editor (útil con --shot para capturar un contenido dado)
+            // --dark / --oscuro: saca el render en TEMA OSCURO (hace falta para los
+            // videos de fondo oscuro; sin esto solo se podia cambiar desde la ventana).
+            if (System.Array.Exists(args, x => string.Equals(x, "--dark", StringComparison.OrdinalIgnoreCase)
+                                            || string.Equals(x, "--oscuro", StringComparison.OrdinalIgnoreCase)))
+            { _dark = true; LispConverter.Dark = true; }
             var inFile = ValueAfter(args, "--in");
             if (inFile != null) { try { if (File.Exists(inFile)) { var it = File.ReadAllText(inFile); if (string.Equals(Path.GetExtension(inFile), ".m", StringComparison.OrdinalIgnoreCase)) it = LispConverter.MatlabToHlisp(it); Editor.Text = it; SetCurrentFile(inFile); } } catch { } }
             if (string.IsNullOrWhiteSpace(Editor.Text))
@@ -586,16 +591,21 @@ namespace HekatanLisp
         {
             if (string.IsNullOrWhiteSpace(lispForm)) return "";
             if (lispForm.StartsWith("⚠") || lispForm.StartsWith("…")) return lispForm;
-            // "A = B = C" → convierte cada tramo a matemática y une con " = " (todo en UNA línea)
-            var partes = System.Text.RegularExpressions.Regex.Split(lispForm, @"\s=\s");
+            // "A = B = C" → convierte cada tramo a matemática y une con " = " (todo en UNA línea).
+            // También parte por ≈ (lo pone `dec`: 1/3 ≈ 0.33) y conserva el signo que había:
+            // sin esto, el tramo "1/3 ≈ 0.33" se intentaba parsear ENTERO como una expresión
+            // LISP, fallaba, y se perdía todo lo que venía detrás del ≈.
+            var trozos = System.Text.RegularExpressions.Regex.Split(lispForm, @"(\s=\s|\s≈\s)");
             var outp = new List<string>();
-            foreach (var p in partes)
+            foreach (var p in trozos)
             {
                 var t = p.Trim();
+                if (t == "=" || t == "≈") { outp.Add(t); continue; }        // el signo, tal cual
+                if (t.Length == 0) continue;
                 if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^[A-Za-z]\w*$")) { outp.Add(t); continue; }  // NAME
                 try { outp.Add(LispConverter.ToLab(LispConverter.ParseLisp(t), 0)); } catch { outp.Add(t); }
             }
-            return string.Join(" = ", outp);
+            return string.Join(" ", outp);
         }
 
         /// <summary>El RESULTADO como FORMAS LISP. Autodetecta programa (ejecuta) vs expresiones
@@ -863,6 +873,18 @@ namespace HekatanLisp
                     else if (tp != null && tp.Atom == "despejar" && hasR)
                     {
                         display.Add(lbl + " = " + formOf[i] + " → " + r);
+                    }
+                    // dec(x) / dec(x, n): la palabra `dec` es fontaneria, no matematica, y no
+                    // debe aparecer. Se muestra el ARGUMENTO y el valor unido con ≈, que es el
+                    // signo correcto para un redondeo:   1/3 ≈ 0.33
+                    else if (formOf[i] != null && formOf[i].StartsWith("(dec ") && hasR)
+                    {
+                        // se coge el PRIMER argumento (el segundo son las cifras) y se une
+                        // con ≈ al valor. El nodo puede no llegar en treeOf, asi que se mira
+                        // la forma LISP directamente.
+                        var ar = LispConverter.TopLevelArgs(formOf[i]);
+                        string arg = ar.Count > 0 ? ar[0] : formOf[i];
+                        display.Add(lbl + " = " + arg + " ≈ " + r);
                     }
                     else
                     // si la fórmula tiene TOKENS (Partial, Factor…) muestra TÉRMINO = RESULTADO

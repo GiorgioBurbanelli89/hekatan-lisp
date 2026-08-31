@@ -614,6 +614,7 @@ namespace HekatanLisp
             {"nu","ν"},{"xi","ξ"},{"omicron","ο"},{"rho","ρ"},{"sigma","σ"},{"tau","τ"},
             {"upsilon","υ"},{"phi","φ"},{"chi","χ"},{"psi","ψ"},{"omega","ω"},
             {"eps","ε"},{"varepsilon","ε"},{"varphi","φ"},  // alias cortos frecuentes
+            {"pi","π"},   // solo el RENDER: el motor la sigue tratando como su constante
 
             {"Alpha","Α"},{"Beta","Β"},{"Gamma","Γ"},{"Delta","Δ"},{"Theta","Θ"},{"Lambda","Λ"},
             {"Xi","Ξ"},{"Sigma","Σ"},{"Phi","Φ"},{"Psi","Ψ"},{"Omega","Ω"},
@@ -977,8 +978,12 @@ namespace HekatanLisp
 
         // ---------- pagina HTML completa (worksheet) — tema claro/oscuro como Hekatan Lab ----------
         public static bool Dark = true;
-        const string ROOT_DARK  = ":root{--bg:#14161a;--fg:#e8e8e8;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;--sep:#463f5c;}";
-        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#2a2418;--mut:#6E664F;--var:#0066dd;--num:#0a3d91;--nary:#9b30d0;--sep:#c9b8dd;}";
+                // El separador daba 1.83 sobre el fondo oscuro: no se veia. Subido a 5.1.
+        const string ROOT_DARK  = ":root{--bg:#000000;--fg:#f0efec;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;--sep:#8f7fb0;}";
+                // Contraste MEDIDO (WCAG) sobre el crema del video, con la marca de agua
+        // encima: el separador estaba en 1.6 (invisible) y las variables e integrales
+        // se quedaban justas en 4.8. Subidos a 7 o mas; el texto, a 16.8.
+        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#171310;--mut:#544d3a;--var:#0b4fa8;--num:#08306b;--nary:#7a1fa8;--sep:#9c86b8;}";
         const string CSS = @"
 *{box-sizing:border-box;}
 .pagebreak{break-before:page;page-break-before:always;height:0;margin:0;border:0;}
@@ -1229,13 +1234,17 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     {
                         // "N1 = A = B → C": pasos separados por " = " (igualdad) o " → " (flecha, como
                         // los libros cuando hay más de 2 pasos: ecuación → solución). Se conserva cuál va.
-                        var toks = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"(\s=\s|\s→\s)");
+                        // separadores de paso: '=' (igualdad), '→' (despeje) y '≈' (lo pone `dec`,
+                        // para un valor redondeado: 1/3 ≈ 0.33). Sin el ≈ aquí, "X ≈ Y" se parseaba
+                        // ENTERO como una expresión, fallaba, y el valor no llegaba a dibujarse.
+                        var toks = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"(\s=\s|\s→\s|\s≈\s)");
                         var trees = new List<N>();
                         var seps = new List<string>();   // separador ANTES de cada parte (desde la 2ª)
                         for (int pi = 0; pi < toks.Length; pi++)
                         {
                             if (pi % 2 == 0) trees.Add(fromLisp ? ParseLisp(toks[pi].Trim()) : ParseMath(toks[pi].Trim()));
-                            else seps.Add(toks[pi].Contains("→") ? " → " : " = ");
+                            else seps.Add(toks[pi].Contains("→") ? " → "
+                                        : toks[pi].Contains("≈") ? " ≈ " : " = ");
                         }
                         bool isVec = trees.Count > 0 && trees[0] != null && trees[0].Op == "vec";
                         var sb = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value, isVec));

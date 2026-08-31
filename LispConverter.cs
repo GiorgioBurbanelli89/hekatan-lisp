@@ -667,6 +667,16 @@ namespace HekatanLisp
             }
             // subíndice SOLO si el nombre empieza por letra (no en "-1", que es un número)
             if (sub.Length > 0 && !(baseN.Length > 0 && char.IsLetter(baseN[0]))) { baseN = name; sub = ""; }
+            // El apóstrofo no sobrevive al viaje por LISP (allí ' es quote), así que llega
+            // convertido en el token `prime` — como en Hekatan Lab. Aquí se deshace: el token
+            // puede venir pegado al SUBÍNDICE (Phi_1prime) o al nombre (Phiprime).
+            foreach (var (tk, nprime) in new[] { ("tprime", 3), ("pprime", 2), ("prime", 1) })
+            {
+                if (sub.Length > tk.Length && sub.EndsWith(tk, StringComparison.Ordinal))
+                { sub = sub.Substring(0, sub.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; break; }
+                if (sub.Length == 0 && baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
+                { baseN = baseN.Substring(0, baseN.Length - tk.Length); for (int q = 0; q < nprime; q++) primes += "&prime;"; break; }
+            }
             // vecArrow: la variable ES un vector/matriz → flecha automática sobre el nombre (v → v⃗).
             var deco = vecArrow ? Over("&#8594;", DecorateBase(baseN)) : DecorateBase(baseN);   // theta→θ, Fvec→F⃗…
             var h = "<span class=\"m-var\">" + deco + "</span>";

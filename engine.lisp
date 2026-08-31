@@ -507,10 +507,49 @@
   (let ((s (infix e))
         (myp (if (and (consp e) (member (car e) '(+ - * / expt))) (op-prec (car e)) 5)))
     (if (< myp outer) (concatenate 'string "(" s ")") s)))
+;; ---- DECIMALES ----
+;; El motor guarda TODO exacto (fracciones) para no perder cifras. Pero un
+;; resultado de ingenieria se lee en decimal: 304.26, no 118967/391.
+;;
+;; No sirve guardar un racional con denominador 10^n: Common Lisp REDUCE los
+;; racionales solo (30426/100 -> 15213/50), asi que la potencia de 10 se pierde.
+;; Por eso `dec` devuelve un nodo (decv "304.26") con el texto ya formateado,
+;; que `infix` escribe tal cual.
+(defun fmt-dec-str (x n)
+  "Valor exacto -> texto decimal con n cifras, redondeando."
+  (let* ((m (expt 10 n)) (k (round (* (rational x) m)))
+         (neg (< k 0)) (a (abs k)) (ent (floor a m)) (fr (- a (* ent m))))
+    (if (= n 0)
+        (format nil "~:[~;-~]~a" neg ent)
+        (format nil "~:[~;-~]~a.~v,'0d" neg ent n fr))))
+
+(defun poda-ceros (s)
+  "\"0.3300\" -> \"0.33\" ; \"5.0000\" -> \"5\". Solo cuando el usuario no fijo las cifras."
+  (if (find #\. s)
+      (let ((r (string-right-trim "0" s)))
+        (if (char= (char r (1- (length r))) #\.) (subseq r 0 (1- (length r))) r))
+      s))
+
+(defun to-dec (v n podar)
+  "dec(x) y dec(x, n). Funciona tambien sobre MATRICES, termino a termino."
+  (cond
+    ((matp v) (from-rows (mapcar (lambda (f) (mapcar (lambda (c) (to-dec c n podar)) f))
+                                 (to-rows v))))
+    (t (let ((x (cond ((numberp v) v)
+                      (t (let ((w (ignore-errors (eval-consts (simplify v)))))
+                           (if (numberp w) w (num-eval (or w v))))))))
+         (if (null x) v
+             (let ((txt (fmt-dec-str x n)))
+               ;; simbolo con el texto por nombre: asi funciona igual dentro de una
+               ;; MATRIZ (que se imprime elemento a elemento) que suelto.
+               (intern (if podar (poda-ceros txt) txt))))))))
+
 (defun infix (e)
   "Convierte una expresion LISP a texto matematico infijo (estilo MATLAB)."
   (cond
     ((integerp e) (format nil "~a" e))
+    ;; (decv "0.33") = un decimal ya formateado por `dec`; se escribe tal cual.
+    ((and (consp e) (eq (car e) 'decv)) (second e))
     ((rationalp e) (format nil "~a/~a" (numerator e) (denominator e)))
     ((numberp e) (format nil "~a" e))
     ((symbolp e) (string-downcase (symbol-name e)))
@@ -840,7 +879,11 @@
 ;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
 (defparameter *op-calls*
   '(partial derive-x deriv-steps factor expand* integ-var integ-x area-under slope-at
-    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar))
+    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar dec))
+
+;; dec como FUNCION, para que `evops` la aplique en el camino ESCALAR (el de
+;; matrices entra por `meval`). Sin n: 6 cifras y se podan los ceros de cola.
+(defun dec (x &optional n) (to-dec x (or n 6) (null n)))
 (defun evops (e)
   (cond
     ((atom e) e)
@@ -1152,6 +1195,10 @@
     ((eq (car e) 'adj) (madjugate (meval (second e))))
     ;; cof(M) y menor(M; i; j): los PASOS de la inversa, para ensenarla en algebra.
     ((eq (car e) 'cof) (mcofactors (meval (second e))))
+    ;; dec(x) / dec(x, n): resultado en DECIMAL en vez de fraccion exacta.
+    ((eq (car e) 'dec)
+     (let ((n (if (third e) (let ((k (mnum (meval (third e))))) (if (integerp k) k 4)) 6)))
+       (to-dec (meval (second e)) n (null (third e)))))
     ((member (car e) '(menor minor)) (mminor-mat (meval (second e))
                                                (mnum (meval (third e)))
                                                (mnum (meval (fourth e)))))

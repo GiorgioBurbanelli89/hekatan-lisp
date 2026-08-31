@@ -1,20 +1,42 @@
-# La INVERSA en álgebra — los pasos, no el botón
-## 1 · La matriz, con letras
+# La INVERSA de una matriz, en álgebra
+#: No es un botón. Es una cadena de pasos, y cada uno se puede escribir con letras.
+
+## El escalar
+#: Con un solo número la ecuación se despeja dividiendo.
+esc_1 = Despejar{a·x = b @ x}
+
+## La matriz, con letras
 A_m = [a, b; b, c]
-## 2 · El determinante
+
+## El determinante
 detA = det(A_m)
-## 3 · Los MENORES: tachar fila y columna
+
+## Los menores: tachar la fila y la columna
 men11 = menor(A_m, 1, 1)
 men12 = menor(A_m, 1, 2)
-## 4 · Los COFACTORES: el menor con su signo
+men21 = menor(A_m, 2, 1)
+men22 = menor(A_m, 2, 2)
+
+## Los cofactores: cada menor con su signo
 cofA = cof(A_m)
-## 5 · La ADJUNTA: la de cofactores, transpuesta
+
+## La adjunta: la de cofactores, transpuesta
 adjA = adj(A_m)
-## 6 · Y la INVERSA: la adjunta partida por el determinante
+
+## Y la inversa: la adjunta partida por el determinante
 invA = A_m^-1
-## 7 · La comprobación
+
+## La comprobación
 chkA = A_m·A_m^-1
-## 8 · Con la forma de una rigidez de dos grados
+
+## Ahora con forma de RIGIDEZ: dos grados y un muelle de apoyo
 K_s = [k, -k; -k, k + p]
 detK = det(K_s)
 invK = K_s^-1
+
+## Y sin el apoyo, el muelle vale cero
+K_0 = [k, -k; -k, k]
+det0 = det(K_0)
+
+## El desplazamiento, despejado en álgebra
+u_s = K_s^-1·[F; 0]

@@ -48,6 +48,7 @@ namespace HekatanLisp
             { "pasos", "deriv-steps" }, { "diffpasos", "deriv-steps" },   // derivada MOSTRANDO el trabajo (regla de la potencia)
             { "simplify", "factor" }, { "factor", "factor" }, { "expand", "expand*" },
             { "despejar", "despejar" }, { "solve", "despejar" },   // Despejar{ lhs = rhs @ x } → resuelve la ecuación
+            { "inverse", "inv" }, { "inversa", "inv" },            // Inverse{K} → se dibuja K⁻¹
         };
 
         public static N ParseMath(string s)
@@ -128,6 +129,15 @@ namespace HekatanLisp
                         if (Peek() == "}") Eat();
                         return new N { Op = "solver", Atom = "despejar", Items = itemsD };
                     }
+                    // INVERSE: no lleva '@' ni límites. Se convierte en POTENCIA -1, que ya se
+                    // dibuja como K⁻¹ y que el motor sabe invertir. Antes, al no interceptarlo
+                    // aquí, la palabra "Inverse" acababa escrita en el render.
+                    if (solverKey == "inverse" || solverKey == "inversa")
+                    {
+                        var fInv = Expr();
+                        if (Peek() == "}") Eat();
+                        return N.Make("^", fInv, N.Leaf("-1"));
+                    }
                     var f = Expr();
                     var items = new List<N> { f };
                     if (Peek() == "@")
@@ -160,6 +170,13 @@ namespace HekatanLisp
                     // "transpose"; y ToLisp lo emite como (mtransp X), que el motor computa.
                     if (fname0.Equals("transpose", System.StringComparison.OrdinalIgnoreCase) && args.Count == 1)
                         return new N { Op = "trans", A = args[0] };
+                    // Inverse{X} / Inversa{X} / inv(X) → POTENCIA -1: se dibuja X⁻¹, como en los
+                    // libros, y el motor la invierte. Antes salía la palabra "Inverse" escrita.
+                    if (args.Count == 1 &&
+                        (fname0.Equals("inverse", System.StringComparison.OrdinalIgnoreCase) ||
+                         fname0.Equals("inversa", System.StringComparison.OrdinalIgnoreCase) ||
+                         fname0.Equals("inv", System.StringComparison.OrdinalIgnoreCase)))
+                        return N.Make("^", args[0], N.Leaf("-1"));
                     return new N { Op = "fn", Atom = fname0, Items = args };
                 }
                 return N.Leaf(fname0);

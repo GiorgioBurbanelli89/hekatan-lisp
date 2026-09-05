@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -73,8 +73,18 @@ namespace HekatanLisp
                         psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";
                         psi.EnvironmentVariables["LC_ALL"] = "en_US.UTF-8";
                         using var p = Process.Start(psi);
-                        p.StandardOutput.ReadToEnd(); p.StandardError.ReadToEnd();
-                        p.WaitForExit(20000);
+                        // Las dos salidas EN PARALELO. Leer stdout hasta el final y
+                        // DESPUES stderr es un interbloqueo de manual: `save-lisp-and-die`
+                        // escribe mucho por stderr ("writing N bytes from the ... space"),
+                        // llena su buffer y SBCL se queda bloqueado escribiendo mientras
+                        // nosotros seguimos bloqueados leyendo stdout. `ReadToEnd()` no
+                        // tiene tiempo limite, asi que el WaitForExit de abajo no llegaba
+                        // NUNCA: la ventana se quedaba sin ejecutar y el modo --html no
+                        // devolvia jamas. Solo pasaba la PRIMERA vez, la del horneado.
+                        var tOut = p.StandardOutput.ReadToEndAsync();
+                        var tErr = p.StandardError.ReadToEndAsync();
+                        if (!p.WaitForExit(60000)) { try { p.Kill(true); } catch { } }
+                        try { System.Threading.Tasks.Task.WaitAll(new System.Threading.Tasks.Task[] { tOut, tErr }, 5000); } catch { }
                     }
                     if (File.Exists(core)) _engineCore = core;
                 }
@@ -319,9 +329,15 @@ namespace HekatanLisp
                 psi.EnvironmentVariables["LANG"] = "en_US.UTF-8";
                 psi.EnvironmentVariables["LC_ALL"] = "en_US.UTF-8";
                 using var p = Process.Start(psi);
-                var o = p.StandardOutput.ReadToEnd();
-                var e = p.StandardError.ReadToEnd();
-                p.WaitForExit(30000);
+                // en paralelo, por lo mismo que en EngineCore(): con las dos en serie,
+                // un script que escriba mucho por stderr bloquea a los dos procesos
+                var tOut = p.StandardOutput.ReadToEndAsync();
+                var tErr = p.StandardError.ReadToEndAsync();
+                if (!p.WaitForExit(30000)) { try { p.Kill(true); } catch { } }
+                var o = ""; var e = "";
+                try { System.Threading.Tasks.Task.WaitAll(new System.Threading.Tasks.Task[] { tOut, tErr }, 5000); } catch { }
+                if (tOut.IsCompletedSuccessfully) o = tOut.Result;
+                if (tErr.IsCompletedSuccessfully) e = tErr.Result;
                 return string.IsNullOrWhiteSpace(e) ? o : o + e;
             }
             catch (Exception ex) { return "; error motor SBCL: " + ex.Message; }

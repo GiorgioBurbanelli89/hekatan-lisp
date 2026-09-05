@@ -64,7 +64,7 @@ F_tx = A·B·q·Integral{Integral{xi·A·(1 - xi·(2 - xi))·(1 - eta^2·(3 - 2�
 
 ## 12 · Se ensambla, se sujeta y se resuelve
 KZ = K·Z = F
-Z_s = Kinv·F
+Z_s = K^-1·F
 
 ## 13 · AHORA los números
 a_m = 6 @@(largo, m)

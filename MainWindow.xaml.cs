@@ -219,8 +219,12 @@ namespace HekatanLisp
                     html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true);
                     // Gráficas INTERCALADAS: cada una en su posición del documento (marcador → HTML), en orden.
                     var plots = BuildPlotsOrdered(text, forms, _dark, out bool anySurf);
+                    // La gráfica va DENTRO de su hk-plotslot: antes el hueco se reemplazaba entero, la
+                    // regla de impresión (alto ≤ 300 px, no partir) no la encontraba y en el PDF la gráfica
+                    // ocupaba casi una hoja → saltaba a la siguiente y dejaba media página en blanco.
                     foreach (var ph in plots)
-                        html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>", ph ?? "");
+                        html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>",
+                            ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
                     if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + "</body>");   // motor de orbit, una vez
                 }
                 _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)

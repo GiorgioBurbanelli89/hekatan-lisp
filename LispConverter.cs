@@ -1060,7 +1060,10 @@ namespace HekatanLisp
   /* al imprimir la columna es mas angosta que la pantalla: fit() se calculo para pantalla, asi
      que una ecuacion ancha (K = integral BtB) puede desbordar y overflow-x:auto imprime la barra.
      En papel NUNCA queremos barra: se oculta (el contenido ya cabe, la barra sobraba). */
-  .ws-eq,.deq-body{overflow-x:hidden !important;overflow-y:hidden !important;} }
+  .ws-eq,.deq-body{overflow-x:hidden !important;overflow-y:hidden !important;}
+  /* el título y la frase que PRESENTA una fórmula no se quedan solos al pie de la hoja */
+  .ws-h1,.ws-h2,.ws-h3,.ws-fmt:has(+ .ws-eq),.ws-fmt:has(+ .ws-deq),.ws-fmt:has(+ .hk-plotslot){break-after:avoid;page-break-after:avoid;}
+  .ws-eq,.ws-deq{break-inside:avoid;page-break-inside:avoid;} }
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
 .ws-eq{margin:0.4em 0;padding:.4em 0 .25em;
@@ -1069,7 +1072,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   overflow-x:auto;overflow-y:hidden;max-width:100%;}   /* padding = aire para glifos altos (∫ Σ) que overflow-y:hidden recortaría; overflow-x:auto = scroll para matrices anchas */
 /* gráficas: alto acotado para que NO ocupen una hoja entera en el PDF, y no partirlas entre páginas */
 .hk-plotslot{break-inside:avoid;page-break-inside:avoid;}
-.hk-plotslot img,.hk-plotslot svg{max-height:300px;width:auto;max-width:100%;height:auto;}
+@media print{ .hk-plotslot img,.hk-plotslot svg{max-height:300px;width:auto;max-width:100%;height:auto;} }
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 /* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
@@ -1500,17 +1503,26 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         static string PrettyLabel(string s)
         {
             if (string.IsNullOrEmpty(s)) return s ?? "";
-            const string sup = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+            const string sup = "⁰¹²³⁴⁵⁶⁷⁸⁹", sub = "₀₁₂₃₄₅₆₇₈₉";
+            // griegas por su nombre (palabra entera): el eje salía «xi» y no «ξ»
+            s = Regex.Replace(s, @"\b(xi|eta|zeta|theta|phi|psi|alpha|beta|gamma|delta|epsilon|sigma|tau|omega|lambda|mu|nu|rho)\b",
+                m => m.Value switch
+                {
+                    "xi" => "ξ", "eta" => "η", "zeta" => "ζ", "theta" => "θ", "phi" => "φ", "psi" => "ψ",
+                    "alpha" => "α", "beta" => "β", "gamma" => "γ", "delta" => "δ", "epsilon" => "ε",
+                    "sigma" => "σ", "tau" => "τ", "omega" => "ω", "lambda" => "λ", "mu" => "μ", "nu" => "ν", _ => "ρ"
+                });
             var o = new StringBuilder();
             for (int i = 0; i < s.Length; i++)
             {
                 char c = s[i];
                 if (c == '*') o.Append('·');
                 else if (c == '-') o.Append('−');
-                else if (c == '^')
+                else if (c == '^' || (c == '_' && i + 1 < s.Length && char.IsDigit(s[i + 1])))
                 {
+                    string tabla = c == '^' ? sup : sub;   // N_1 → N₁ (la leyenda salía «N_1»)
                     i++;
-                    while (i < s.Length && char.IsDigit(s[i])) { o.Append(sup[s[i] - '0']); i++; }
+                    while (i < s.Length && char.IsDigit(s[i])) { o.Append(tabla[s[i] - '0']); i++; }
                     i--;
                 }
                 else o.Append(c);
@@ -1574,7 +1586,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             sb.Append("<rect x=\"").Append(pL).Append("\" y=\"").Append(pT).Append("\" width=\"").Append(W - pL - pR)
               .Append("\" height=\"").Append(H - pT - pB).Append("\" fill=\"none\" stroke=\"var(--mut)\" stroke-width=\"1.2\"/>");
             // etiqueta eje X
-            sb.Append("<text x=\"").Append((pL + W - pR) / 2).Append("\" y=\"").Append(H - 6).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\" text-anchor=\"middle\">").Append(System.Net.WebUtility.HtmlEncode(var)).Append("</text>");
+            sb.Append("<text x=\"").Append((pL + W - pR) / 2).Append("\" y=\"").Append(H - 6).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\" text-anchor=\"middle\">").Append(System.Net.WebUtility.HtmlEncode(PrettyLabel(var))).Append("</text>");
             // curvas
             for (int s = 0; s < series.Count; s++)
             {

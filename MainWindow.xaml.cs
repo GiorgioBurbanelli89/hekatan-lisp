@@ -395,13 +395,18 @@ namespace HekatanLisp
             var todas = (forms ?? new List<string>()).SelectMany(f => (f ?? "").Replace("\r", "").Split('\n'));
             foreach (var raw in todas)
             {
-                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");
+                // `N_1(xi) = …` también es una definición: el motor la devuelve como
+                // `(N_1 xi) = …` (la llamada en LISP). El nombre es N_1; sin esto
+                // #fplot no la encontraba y dibujaba la recta y = ξ.
+                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(),
+                    @"^(?:\(([A-Za-z][\w']*)\s[^()]*\)|([A-Za-z][\w']*)(?:\s*\([^()=]*\))?)\s*=\s*(?![=])(.+)$");
                 if (!m.Success) continue;
-                var partes = System.Text.RegularExpressions.Regex.Split(m.Groups[2].Value, @"\s=\s");
+                var nom = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+                var partes = System.Text.RegularExpressions.Regex.Split(m.Groups[3].Value, @"\s=\s");
                 try
                 {
                     var tree = LispConverter.ParseLisp(partes[partes.Length - 1].Trim());
-                    if (!byName.ContainsKey(m.Groups[1].Value)) { byName[m.Groups[1].Value] = tree; fns.Add((m.Groups[1].Value, tree)); }
+                    if (!byName.ContainsKey(nom)) { byName[nom] = tree; fns.Add((nom, tree)); }
                 }
                 catch { }
             }
@@ -572,6 +577,9 @@ namespace HekatanLisp
         private static void AddFn(List<(string, LispConverter.N)> sel, Dictionary<string, LispConverter.N> byName, string spec)
         {
             if (byName.TryGetValue(spec, out var t)) { sel.Add((spec, t)); return; }
+            // #fplot(N_1(xi), …): el nombre sin su (xi)
+            var fm = System.Text.RegularExpressions.Regex.Match(spec, @"^([A-Za-z][\w']*)\s*\([^()]*\)$");
+            if (fm.Success && byName.TryGetValue(fm.Groups[1].Value, out var tf)) { sel.Add((fm.Groups[1].Value, tf)); return; }
             try { var t2 = LispConverter.ParseMath(spec); if (t2 != null) sel.Add((spec, t2)); } catch { }
         }
 

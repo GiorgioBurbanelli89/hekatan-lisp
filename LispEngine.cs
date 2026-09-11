@@ -163,16 +163,16 @@ namespace HekatanLisp
                 if (hasMat)  // álgebra de matrices simbólica/numérica
                     sb.Append("(format t \"~a~%\" (or (ignore-errors (mprint (meval '").Append(ex).Append("))) '").Append(ex).Append("))\n");
                 else if (hasOp)   // tokens (Partial, Factor, …) puros o mezclados con aritmética → resultado simbólico
-                    sb.Append("(format t \"~a~%\" (or (ignore-errors (evops '").Append(ex).Append(")) '").Append(ex).Append("))\n");
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (show (evops '").Append(ex).Append("))) '").Append(ex).Append("))\n");
                 else if (fn == null)   // auto: valor si evalúa a número; si no, la forma tal cual
-                    sb.Append("(format t \"~a~%\" (or (ignore-errors (let ((v ").Append(ex)
-                      .Append(")) (if (numberp v) v nil))) '").Append(ex).Append("))\n");
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (let ((v (eval (dbl-args '").Append(ex)
+                      .Append(")))) (if (numberp v) (show v) nil))) '").Append(ex).Append("))\n");
                 else if (twoArg)  // partial / integ-var con la variable elegida
-                    sb.Append("(format t \"~a~%\" (or (ignore-errors (").Append(fn).Append(" '")
-                      .Append(ex).Append(" '").Append(var.Trim()).Append(")) '").Append(ex).Append("))\n");
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (show (").Append(fn).Append(" '")
+                      .Append(ex).Append(" '").Append(var.Trim()).Append("))) '").Append(ex).Append("))\n");
                 else
-                    sb.Append("(format t \"~a~%\" (or (ignore-errors (").Append(fn).Append(" '")
-                      .Append(ex).Append(")) '").Append(ex).Append("))\n");
+                    sb.Append("(format t \"~a~%\" (or (ignore-errors (show (").Append(fn).Append(" '")
+                      .Append(ex).Append("))) '").Append(ex).Append("))\n");
             }
             var res = new List<string>();
             foreach (var l in Run(sb.ToString()).Replace("\r", "").Split('\n'))

@@ -1,6 +1,10 @@
 ;;;; engine.lisp — motor simbolico de Hekatan LISP. Corre en SBCL.
 ;;;; deriv: deriva.  simplif: limpia.  dsimp: deriva y simplifica hasta el fondo.
 
+;; Un literal 0.09 se lee como DOUBLE (15-16 cifras). Por defecto SBCL lo lee SINGLE (7 cifras):
+;; 2500000*0.09/3 daba 75000.01 en vez de 75000.
+(setf *read-default-float-format* 'double-float)
+
 (defun deriv (e x)
   "Derivada de la formula E (arbol LISP) respecto a la variable X."
   (cond
@@ -1538,16 +1542,49 @@
 
 ;; imprime el resultado como forma (vector …) para que el parser de C# lo lea y renderice.
 ;; imprime un float sin el sufijo d0/e0 de SBCL y sin ceros de cola (1.3333, 12.0->12)
+;; Redondea a 10 CIFRAS SIGNIFICATIVAS (quita el ruido del float: 75000.00000000001 -> 75000,
+;; 395.43750000000003 -> 395.4375) y quita ceros de cola.
 (defun fmt-float (x)
-  (let* ((s (format nil "~f" x)))
-    (when (find #\. s)
-      (setf s (string-right-trim "0" s))
-      (when (char= (char s (1- (length s))) #\.) (setf s (concatenate 'string s "0"))))
-    s))
+  (let ((d (float x 1d0)))
+    (if (or (zerop d) (sb-ext:float-infinity-p d) (sb-ext:float-nan-p d))
+        (if (zerop d) "0" (format nil "~a" d))
+        (let* ((e (floor (log (abs d) 10d0)))
+               (m (expt 10 (- 9 e)))                          ; 10 cifras: 10^(9-e)
+               (r (float (/ (round (* (rational d) m)) m) 1d0))
+               (s (let ((*read-default-float-format* 'double-float)) (princ-to-string r)))
+               (ep (position #\e s)))
+          (let ((mant (if ep (subseq s 0 ep) s)) (ex (if ep (subseq s ep) "")))
+            (when (find #\. mant)
+              (setf mant (string-right-trim "0" mant))
+              (when (char= (char mant (1- (length mant))) #\.)
+                (setf mant (subseq mant 0 (1- (length mant))))))
+            (concatenate 'string mant ex))))))
 (defun mprint (x)
   (cond ((vectorp x) (format nil "(vector ~{~a~^ ~})" (map 'list #'mprint x)))
         ((floatp x) (fmt-float x))
         (t (format nil "~a" x))))
+;; CL: (sqrt 2), (sin 1), (expt 2 1/2) de un RACIONAL devuelven SINGLE (7 cifras) aunque
+;; *read-default-float-format* sea double. dbl-args pasa esos argumentos a double antes de evaluar.
+(defun dbl (x) (if (rationalp x) (float x 1d0) x))
+(defun dexpt (a b)
+  (if (and (rationalp a) (rationalp b) (not (integerp b))) (expt (float a 1d0) b) (expt a b)))
+(defun dbl-args (f)
+  (cond ((atom f) f)
+        ((eq (car f) 'quote) f)
+        ((member (car f) '(sqrt sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log))
+         (cons (car f) (mapcar (lambda (a) (list 'dbl (dbl-args a))) (cdr f))))
+        ((and (eq (car f) 'expt) (= (length f) 3))
+         (list 'dexpt (dbl-args (second f)) (dbl-args (third f))))
+        (t (cons (car f) (mapcar #'dbl-args (cdr f))))))
+;; resultado para mostrar: floats -> texto redondeado (fmt-float), tambien DENTRO de formas
+;; simbolicas ((* 0.30000000000000004 x) -> (* 0.3 x)). ~a escribe el texto sin comillas.
+(defun show (x)
+  (cond ((floatp x) (fmt-float x))
+        ((and (complexp x) (floatp (realpart x)))
+         (format nil "#c(~a ~a)" (fmt-float (realpart x)) (fmt-float (imagpart x))))
+        ((vectorp x) (if (stringp x) x (mprint x)))
+        ((consp x) (cons (show (car x)) (show (cdr x))))
+        (t x)))
 
 ;; ---- SERVIDOR PERSISTENTE: un proceso SBCL vivo que evalua formas de stdin y responde ----
 ;; Elimina el arranque (~80 ms) por evaluacion. El WPF manda las formas (que hacen format t) y
@@ -1555,6 +1592,7 @@
 (defun hlisp-server ()
   (setf *print-case* :downcase)
   (setf *print-right-margin* 100000)
+  (setf *read-default-float-format* 'double-float)   ; 0.09 = double (ver arriba)
   (loop
     (let ((form (handler-case (read *standard-input* nil :hlisp-eof)
                   (error () :hlisp-skip))))

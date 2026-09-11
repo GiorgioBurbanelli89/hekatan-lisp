@@ -618,6 +618,19 @@ namespace HekatanLisp
         // ---------- render: arbol -> HTML matematico (estilo Hekatan Lab) ----------
         // paréntesis que CRECEN con el contenido (arcos CSS, como los corchetes de matriz):
         // así "( fracción )²" queda con los paréntesis del alto de la fracción, no pequeños.
+        /// <summary>¿Este trozo empieza por un signo menos? Sirve para no escribir
+        /// nunca dos signos seguidos: «1 − −1» se compone «1 − (−1)».</summary>
+        static bool EsNegativo(N n)
+        {
+            if (n == null) return false;
+            if (n.Op == "neg") return true;
+            // el menos unario viaja como (- 0 x)
+            if (n.Op == "-" && n.A != null && n.A.IsAtom && n.A.Atom == "0") return true;
+            if (n.IsAtom && n.Atom != null && n.Atom.Length > 1 && n.Atom[0] == '-'
+                && char.IsDigit(n.Atom[1])) return true;
+            return false;
+        }
+
         static string Paren(string s) =>
             "<span class=\"m-paren\"><span class=\"m-pl\"></span>" + s + "<span class=\"m-pr\"></span></span>";
 
@@ -826,7 +839,10 @@ namespace HekatanLisp
                     // −1·x  o  x·−1  →  −x  (evita el feo "-1·b" en la adjunta del inverso 2×2)
                     if (IsMinusOne(n.A)) { var rn = "<span class=\"m-op\">−</span>" + ToHtml(n.B, 2); return parentPrec > 2 ? Paren(rn) : rn; }
                     if (IsMinusOne(n.B)) { var rn = "<span class=\"m-op\">−</span>" + ToHtml(n.A, 2); return parentPrec > 2 ? Paren(rn) : rn; }
-                    var r = ToHtml(n.A, 2) + "<span class=\"m-op\">·</span>" + ToHtml(n.B, 2);
+                    // tampoco en un producto: «−0.5·−1» se compone «−0.5·(−1)».
+                    var derM = ToHtml(n.B, 2);
+                    if (EsNegativo(n.B)) derM = Paren(derM);
+                    var r = ToHtml(n.A, 2) + "<span class=\"m-op\">·</span>" + derM;
                     return parentPrec > 2 ? Paren(r) : r;
                 }
                 default: // + o -
@@ -838,8 +854,12 @@ namespace HekatanLisp
                         return parentPrec > 2 ? Paren(rn) : rn;
                     }
                     var sym = n.Op == "-" ? "−" : "+";
-                    var r = ToHtml(n.A, 1) + " <span class=\"m-op\">" + sym + "</span> " +
-                            ToHtml(n.B, n.Op == "-" ? 2 : 1);
+                    // DOS SIGNOS SEGUIDOS NO SE ESCRIBEN. «1 − −1» no es notación
+                    // matemática: el operando negativo va entre paréntesis,
+                    // «1 − (−1)». Salía al evaluar una función de forma en ξ = −1.
+                    var der = ToHtml(n.B, n.Op == "-" ? 2 : 1);
+                    if (EsNegativo(n.B)) der = Paren(der);
+                    var r = ToHtml(n.A, 1) + " <span class=\"m-op\">" + sym + "</span> " + der;
                     return parentPrec > 1 ? Paren(r) : r;
                 }
             }

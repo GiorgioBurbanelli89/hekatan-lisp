@@ -57,6 +57,14 @@ r5 = T·D_c
 Pi = 7
 r6 = 2·Pi
 
+## 5b · Cabeceras que empiezan por T o D (antes desaparecian)
+Tz = t_z = 12·E·I_z/(L^3·(1 + phi_z)) @@(línea 218)
+Tx = 3
+Tab = a + b
+T_2 = a + 1
+Dz = d_z = 4·E·I_z/L
+Theta_z = 2·E
+
 ## 6 · Choques mayuscula/minuscula
 c1 = m + M
 c2 = l·L

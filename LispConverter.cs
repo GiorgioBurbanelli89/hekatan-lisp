@@ -1417,7 +1417,10 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 // GRÁFICA en su posición: un hueco que MainWindow rellena con el HTML de la gráfica.
                 if (raw == PlotSlot) return "<div class=\"hk-plotslot\"></div>";
                 // marcador de TEXTO con formato (viene de una directiva ; procesada en ComputeResult)
-                if (raw.StartsWith(TxtMark))
+                // ORDINAL: TxtMark es "\x01T" y StartsWith(string) compara con la CULTURA, que IGNORA el
+                // \x01 → toda fórmula cuya cabecera empezaba por T (Tz = …, T_1 = …) se tomaba por
+                // texto y DESAPARECÍA de la hoja.
+                if (raw.StartsWith(TxtMark, StringComparison.Ordinal))
                 {
                     var pz = raw.Split(TxtSep);   // ["","T",kind,align,html…]
                     string kind = pz.Length > 2 ? pz[2] : "p";

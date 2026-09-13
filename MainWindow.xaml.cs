@@ -385,18 +385,18 @@ namespace HekatanLisp
                     AddFn(sel, byName, a);
                 }
             }
-                    for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
-            }
-            if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
-            if (sel.Count == 0) return "";
-            string var = forcedVar ?? LispConverter.FreeVar(sel[0].Item2);
-            return LispConverter.PlotSvg(var, lo, hi, sel) ?? "";
             else   // forma simple: ;grafica s -1 1 [N1 N2 …]
             {
                 var toks = rest.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
                 int k = 0;
                 if (toks.Length > 0 && !double.TryParse(toks[0], System.Globalization.NumberStyles.Any, inv, out _)) { forcedVar = toks[0]; k = 1; }
                 if (toks.Length >= k + 2 && double.TryParse(toks[k], System.Globalization.NumberStyles.Any, inv, out lo) && double.TryParse(toks[k + 1], System.Globalization.NumberStyles.Any, inv, out hi))
+                    for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
+            }
+            if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
+            if (sel.Count == 0) return "";
+            string var = forcedVar ?? LispConverter.FreeVar(sel[0].Item2);
+            return LispConverter.PlotSvg(var, lo, hi, sel) ?? "";
         }
 
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
@@ -716,13 +716,13 @@ namespace HekatanLisp
             var notationOf = new string[lines.Length];        // línea de NOTACIÓN pura (f(x)=…, y=f(x)=…): se dibuja, no se calcula
             var funcMap = new Dictionary<string, (List<string> ps, LispConverter.N body)>();  // f(x)=x²+1 → aplicar f(3)
             var deqTag = new string[lines.Length];             // etiqueta @@(…) que va a la DERECHA (estilo libro)
+            var aliasOf = new List<string>[lines.Length];      // Fx = F_1 = Expand{…}: los nombres del medio (F_1)
             // ETIQUETA de ecuación: @@(texto) al FINAL de una línea de MATEMÁTICA → número a la derecha.
             // La VARIABLE queda a la IZQUIERDA (como Calcpad/Hekatan Lab). Compat: acepta el viejo #deq.
             // Las líneas de TEXTO (#: ## #> ; %) y las gráficas no llevan etiqueta.
             for (int i = 0; i < lines.Length; i++)
             {
                 if (isTic[i] || isToc[i]) continue;   // tic/toc: no son expresiones
-            var aliasOf = new List<string>[lines.Length];      // Fx = F_1 = Expand{…}: los nombres del medio (F_1)
                 var s = lines[i].TrimStart();
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
@@ -764,18 +764,18 @@ namespace HekatanLisp
                     treeOf[i] = TreeOfLine(ali.Value.expr);
                     continue;
                 }
-            }
-            // mapa etiqueta → su árbol (para sustituir  Partial{v@x}  con la definición de v)
-            var labelMap = new Dictionary<string, LispConverter.N>();
-            for (int i = 0; i < lines.Length; i++)
-                if (labels[i] != null && treeOf[i] != null && !labelMap.ContainsKey(labels[i]))
-                    labelMap[labels[i]] = treeOf[i];
                 var nt = NotationLine(lines[i]);
                 if (nt != null) { notationOf[i] = nt; continue; }
                 var lm = System.Text.RegularExpressions.Regex.Match(lines[i].Trim(),
                             @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");   // NAME = expr  (no ==)
                 if (lm.Success) { labels[i] = lm.Groups[1].Value; exprText = lm.Groups[2].Value; }
                 treeOf[i] = TreeOfLine(exprText);
+            }
+            // mapa etiqueta → su árbol (para sustituir  Partial{v@x}  con la definición de v)
+            var labelMap = new Dictionary<string, LispConverter.N>();
+            for (int i = 0; i < lines.Length; i++)
+                if (labels[i] != null && treeOf[i] != null && !labelMap.ContainsKey(labels[i]))
+                    labelMap[labels[i]] = treeOf[i];
             // vecMap = etiquetas cuyo valor es un VECTOR o MATRIZ → así v(i)/A(i,j) es ÍNDICE (no función).
             // Es lo que diferencia f(x) de v(i): el NOMBRE está definido como función o como vector.
             var vecMap = new Dictionary<string, LispConverter.N>();
@@ -798,14 +798,14 @@ namespace HekatanLisp
                 }
                 catch { formOf[i] = null; }
                 if (formOf[i] != null) { forms.Add(formOf[i]); idx.Add(i); }
+                if (labels[i] != null && !prevLabels.ContainsKey(labels[i])) prevLabels[labels[i]] = treeOf[i];
+                if (aliasOf[i] != null) foreach (var a in aliasOf[i]) if (!prevLabels.ContainsKey(a)) prevLabels[a] = treeOf[i];
             }
             bool hasVar = !string.IsNullOrWhiteSpace(dvar);   // dvar = variable de la parcial (∂/∂), o null = auto
             var results = LispEngine.EvalOp(forms, _op, dvar);
             var resOf = new string[lines.Length];
             for (int k = 0; k < idx.Count; k++) resOf[idx[k]] = k < results.Count ? results[k].Trim() : "";
             // Integral INDEFINIDA ( Integral{f @ x} sin límites ) → añade la constante  + C  (rigor matemático).
-                if (labels[i] != null && !prevLabels.ContainsKey(labels[i])) prevLabels[labels[i]] = treeOf[i];
-                if (aliasOf[i] != null) foreach (var a in aliasOf[i]) if (!prevLabels.ContainsKey(a)) prevLabels[a] = treeOf[i];
             for (int k = 0; k < idx.Count; k++)
             {
                 int i = idx[k]; var t = treeOf[i];
@@ -965,6 +965,10 @@ namespace HekatanLisp
                     display.Add(hasR ? formOf[i] + " = " + r : formOf[i]);
                 }
             }
+            // alias del medio:  Fx = <F_1 = > expresión = resultado
+            for (int i = 0; i < lines.Length && i < display.Count; i++)
+                if (aliasOf[i] != null && aliasOf[i].Count > 0 && labels[i] != null && display[i].StartsWith(labels[i] + " = "))
+                    display[i] = labels[i] + " = " + string.Join(" = ", aliasOf[i]) + display[i].Substring(labels[i].Length);
             // #deq: pega la ETIQUETA (a la derecha) al final de la línea de display correspondiente.
             for (int i = 0; i < lines.Length && i < display.Count; i++)
                 if (deqTag[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal))
@@ -974,10 +978,6 @@ namespace HekatanLisp
             var merged = new List<string>();
             for (int i = 0; i < display.Count; i++)
             {
-            // alias del medio:  Fx = <F_1 = > expresión = resultado
-            for (int i = 0; i < lines.Length && i < display.Count; i++)
-                if (aliasOf[i] != null && aliasOf[i].Count > 0 && labels[i] != null && display[i].StartsWith(labels[i] + " = "))
-                    display[i] = labels[i] + " = " + string.Join(" = ", aliasOf[i]) + display[i].Substring(labels[i].Length);
                 bool cont = i < contLine.Count && contLine[i];
                 if (cont && merged.Count > 0 && Mergeable(display[i]) && Mergeable(merged[merged.Count - 1]))
                     merged[merged.Count - 1] += LispConverter.SbsSep + display[i];
@@ -1036,6 +1036,7 @@ namespace HekatanLisp
                                             Dictionary<string, (List<string> ps, LispConverter.N body)> funcMap = null,
                                             Dictionary<string, LispConverter.N> vecMap = null)
         {
+            name = LispConverter.MangleExpr(name);   // la prosa usa los nombres tal cual; la hoja, los preparados
             // 1) ¿es una ETIQUETA definida en la hoja? → su resultado (ya calculado en el lote)
             for (int j = 0; j < labels.Length; j++)
                 if (labels[j] == name)
@@ -1045,7 +1046,6 @@ namespace HekatanLisp
                     try { return LispConverter.ToHtml(LispConverter.ParseLisp(r)); } catch { return null; }
                 }
             // 2) expresión suelta: aplica funciones (f(3)→3²+1) y, si trae un TOKEN (Factor, Partial,
-            name = LispConverter.MangleExpr(name);   // la prosa usa los nombres tal cual; la hoja, los preparados
             //    Simplify…), COMPÚTALA con el motor y renderiza el resultado; si no, tal cual.
             try
             {
@@ -1178,15 +1178,6 @@ namespace HekatanLisp
             return malo;
         }
 
-        /// una cadena  y = f(x) = cuerpo). Guarda nombre → (parámetros, árbol del cuerpo) para luego
-        /// APLICAR  f(3), f(a), f(G(x))  por sustitución (β-reducción, el método de la época LISP).</summary>
-        private static void CollectFuncDefs(string raw, Dictionary<string, (List<string> ps, LispConverter.N body)> map)
-        {
-            var line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith("(")) return;
-            var eqs = TopLevelEquals(line);   // no partir por el '=' interno de un token solver
-            if (eqs.Count == 0) return;
-            var segs = new List<string>(); int prev = 0;
         private static string LispFormOfLine(string line)
         {
             line = line.Trim();
@@ -1196,6 +1187,15 @@ namespace HekatanLisp
         }
 
         /// <summary>Registra las definiciones de función de una línea:  f(x) = cuerpo  (también dentro de
+        /// una cadena  y = f(x) = cuerpo). Guarda nombre → (parámetros, árbol del cuerpo) para luego
+        /// APLICAR  f(3), f(a), f(G(x))  por sustitución (β-reducción, el método de la época LISP).</summary>
+        private static void CollectFuncDefs(string raw, Dictionary<string, (List<string> ps, LispConverter.N body)> map)
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("(")) return;
+            var eqs = TopLevelEquals(line);   // no partir por el '=' interno de un token solver
+            if (eqs.Count == 0) return;
+            var segs = new List<string>(); int prev = 0;
             foreach (var pe in eqs) { segs.Add(line.Substring(prev, pe - prev)); prev = pe + 1; }
             segs.Add(line.Substring(prev));
             if (segs.Count < 2) return;
@@ -1284,6 +1284,9 @@ namespace HekatanLisp
         {
             if (t.TrimStart().StartsWith(";")) return true;
             // (a) una palabra clave LISP tras '(' → seguro es LISP
+            // La palabra va tras un '(' que NO está pegado a un nombre, y le sigue un espacio y un
+            // argumento (no un operador): así «sqrt(lambda^2 + mu^2)» o «(lambda + mu)/2» son
+            // MATEMÁTICA. Antes esa línea convertía la hoja ENTERA en un programa LISP («⚠ = 2»).
             if (System.Text.RegularExpressions.Regex.IsMatch(t,
                 @"(?<![A-Za-z0-9_.])\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\s+(?=[^\s\-+*/^=)·,])"))
                 return true;
@@ -1293,9 +1296,6 @@ namespace HekatanLisp
             return System.Text.RegularExpressions.Regex.IsMatch(t, @"(?<![A-Za-z0-9_.])\(\s*[-+*/=<>]\s");
         }
 
-            // La palabra va tras un '(' que NO está pegado a un nombre, y le sigue un espacio y un
-            // argumento (no un operador): así «sqrt(lambda^2 + mu^2)» o «(lambda + mu)/2» son
-            // MATEMÁTICA. Antes esa línea convertía la hoja ENTERA en un programa LISP («⚠ = 2»).
         private static bool IsLispProgram(string t)
             => System.Text.RegularExpressions.Regex.IsMatch(t,
                 @"(?<![A-Za-z0-9_.])\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\s+(?=[^\s\-+*/^=)·,])");

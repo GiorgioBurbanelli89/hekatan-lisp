@@ -57,6 +57,7 @@ namespace HekatanLisp
             //   menos/'/' unicode → ASCII.  Sin esto "12·10^6" se leía como 12 (se perdía el operador).
             s = s.Replace('·', '*').Replace('∙', '*').Replace('⋅', '*').Replace('×', '*')
                  .Replace('−', '-').Replace('∕', '/').Replace('⁄', '/');
+            s = GreekToAscii(s);   // λ, σ_x, Δ tecleadas en Unicode: el tokenizer solo conoce A-Z
             var toks = new List<string>();
             foreach (Match m in Tok.Matches(s)) toks.Add(m.Value);
             if (toks.Count == 0) return null;
@@ -632,7 +633,13 @@ namespace HekatanLisp
         }
 
         static string Paren(string s) =>
-            "<span class=\"m-paren\"><span class=\"m-pl\"></span>" + s + "<span class=\"m-pr\"></span></span>";
+            "<span class=\"m-paren\"><span class=\"m-pl\"></span>" + FlexSafe(s) + "<span class=\"m-pr\"></span></span>";
+
+        /// <summary>Dentro de un inline-flex (paréntesis, transpuesta) cada hijo es una CAJA: el
+        /// &lt;sub&gt; de u₁ dejaba de bajar y salía «u1» (y en Tₑᵀ la e quedaba arriba). Con un span
+        /// que lo envuelva, el subíndice vuelve a vivir en su línea de texto.</summary>
+        static string FlexSafe(string s) =>
+            s != null && s.Contains("<sub") ? "<span class=\"m-pin\">" + s + "</span>" : s;
 
         /// <summary>Un índice (1, 2, i, j) como texto plano, para ponerlo de subíndice en M_ij.</summary>
         static string PlainIdx(N n)
@@ -657,7 +664,135 @@ namespace HekatanLisp
 
             {"Alpha","Α"},{"Beta","Β"},{"Gamma","Γ"},{"Delta","Δ"},{"Theta","Θ"},{"Lambda","Λ"},
             {"Xi","Ξ"},{"Sigma","Σ"},{"Phi","Φ"},{"Psi","Ψ"},{"Omega","Ω"},
+            // las que faltaban: «Pi» salía escrito con letras, y el resto de mayúsculas
+            {"Pi","Π"},{"Epsilon","Ε"},{"Zeta","Ζ"},{"Eta","Η"},{"Iota","Ι"},{"Kappa","Κ"},
+            {"Mu","Μ"},{"Nu","Ν"},{"Omicron","Ο"},{"Rho","Ρ"},{"Tau","Τ"},{"Upsilon","Υ"},{"Chi","Χ"},
         };
+
+        // ---------- griegas escritas en Unicode (λ, σ_x, Δ) ----------
+        // El tokenizer y los regex de la hoja solo conocen [A-Za-z]: una λ tecleada DESAPARECÍA
+        // («u = λ + σ_x» salía «u = +»). Se traduce cada letra a su nombre (λ → lambda) ANTES de
+        // todo, y el render la vuelve a dibujar como λ.
+        static readonly Dictionary<char, string> GreekUni = new Dictionary<char, string>
+        {
+            {'α',"alpha"},{'β',"beta"},{'γ',"gamma"},{'δ',"delta"},{'ε',"epsilon"},{'ϵ',"epsilon"},
+            {'ζ',"zeta"},{'η',"eta"},{'θ',"theta"},{'ϑ',"theta"},{'ι',"iota"},{'κ',"kappa"},
+            {'λ',"lambda"},{'μ',"mu"},{'ν',"nu"},{'ξ',"xi"},{'ο',"omicron"},{'π',"pi"},{'ρ',"rho"},
+            {'σ',"sigma"},{'ς',"sigma"},{'τ',"tau"},{'υ',"upsilon"},{'φ',"phi"},{'ϕ',"phi"},
+            {'χ',"chi"},{'ψ',"psi"},{'ω',"omega"},
+            {'Α',"Alpha"},{'Β',"Beta"},{'Γ',"Gamma"},{'Δ',"Delta"},{'Ε',"Epsilon"},{'Ζ',"Zeta"},
+            {'Η',"Eta"},{'Θ',"Theta"},{'Ι',"Iota"},{'Κ',"Kappa"},{'Λ',"Lambda"},{'Μ',"Mu"},
+            {'Ν',"Nu"},{'Ξ',"Xi"},{'Ο',"Omicron"},{'Π',"Pi"},{'Ρ',"Rho"},{'Σ',"Sigma"},{'Τ',"Tau"},
+            {'Υ',"Upsilon"},{'Φ',"Phi"},{'Χ',"Chi"},{'Ψ',"Psi"},{'Ω',"Omega"},
+        };
+        static bool HasGreekUni(string s) { foreach (char c in s ?? "") if (GreekUni.ContainsKey(c)) return true; return false; }
+        public static string GreekToAscii(string s)
+        {
+            if (!HasGreekUni(s)) return s;
+            var sb = new StringBuilder();
+            foreach (char c in s) { if (GreekUni.TryGetValue(c, out var nm)) sb.Append(nm); else sb.Append(c); }
+            return sb.ToString();
+        }
+
+        // ---------- nombres que CHOCAN al pasar por LISP ----------
+        // El lector de LISP no distingue mayúsculas: m y M, l y L, g_x y G_x, lambda_1 y Lambda_1
+        // son EL MISMO símbolo, y CaseMap (minúscula → como se escribió) solo recuerda uno, así que
+        // «m + M» salía «M + M» (y el motor lo sumaba como 2·M). Tampoco sirven como variables
+        // T (verdadero en LISP) ni Pi (la constante π). Esos nombres se RENOMBRAN antes de ir al
+        // motor a una forma única en minúscula (m + "hkq" + n) y CaseMap la devuelve a su letra.
+        public const string MangleTag = "hkq";
+        static readonly Dictionary<string, string> _mangle = new Dictionary<string, string>(StringComparer.Ordinal);
+        static readonly Regex RxIdent = new Regex(@"(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_])");
+        static readonly Regex RxIdentUni = new Regex(@"(?<![\p{L}0-9_])[\p{L}_][\p{L}0-9_]*(?![\p{L}0-9_])");
+        // palabras de la notación que NUNCA se renombran (operadores y funciones conocidas)
+        static readonly HashSet<string> NoMangle = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "transpose","inv","inverse","inversa","det","trace","sqrt","sin","cos","tan","exp","log","ln","abs",
+            "sinh","cosh","tanh","asin","acos","atan","norm","cross","dot","menor","minor","cofactor","adj","cof",
+            "dec","max","min","mod","floor","ceil","round","sign","tic","toc",
+        };
+        static readonly HashSet<string> LispReserved = new HashSet<string> { "t", "nil", "pi" };
+
+        /// <summary>Prepara los NOMBRES de la hoja: griegas Unicode → nombre ASCII, y renombra
+        /// los identificadores que chocarían en LISP. Llena CaseMap para volver a dibujarlos
+        /// como se escribieron. Solo toca líneas de matemática y los argumentos de #fplot/#surf/#map
+        /// (la prosa #:, los comentarios ; y la etiqueta @@ quedan igual).</summary>
+        public static string PrepareNames(string text)
+        {
+            CaseMap.Clear(); _mangle.Clear();
+            var lines = (text ?? "").Replace("\r", "").Split('\n');
+            var uniOrig = new Dictionary<string, string>(StringComparer.Ordinal);   // ascii → como se tecleó (Δu)
+            var groups = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            var cuerpo = new string[lines.Length]; var cola = new string[lines.Length];
+            for (int k = 0; k < lines.Length; k++)
+            {
+                var ln = lines[k]; var t = ln.TrimStart();
+                bool plotDir = Regex.IsMatch(t, @"^#\s*(fplot|plot|ezplot|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b", RegexOptions.IgnoreCase);
+                if (t.Length == 0 || ((t[0] == '#' || t[0] == ';' || t[0] == '%') && !plotDir)) continue;
+                int at = ln.IndexOf("@@", StringComparison.Ordinal);
+                string body = at >= 0 ? ln.Substring(0, at) : ln, tail = at >= 0 ? ln.Substring(at) : "";
+                if (HasGreekUni(body))
+                    body = RxIdentUni.Replace(body, m =>
+                    {
+                        if (!HasGreekUni(m.Value)) return m.Value;
+                        var a = GreekToAscii(m.Value);
+                        if (!uniOrig.ContainsKey(a)) uniOrig[a] = m.Value;
+                        return a;
+                    });
+                int skip = plotDir ? body.IndexOf(Regex.Match(t, @"^#\s*\w+").Value.TrimStart('#').Trim(), StringComparison.Ordinal) : -1;
+                foreach (Match m in RxIdent.Matches(body))
+                {
+                    if (plotDir && m.Index <= skip) continue;       // la palabra fplot/surf no es un nombre
+                    var id = m.Value;
+                    if (NoMangle.Contains(id) || SolverOps.ContainsKey(id.ToLowerInvariant())) continue;
+                    var lo = id.ToLowerInvariant();
+                    if (!groups.TryGetValue(lo, out var g)) groups[lo] = g = new List<string>();
+                    if (!g.Contains(id)) g.Add(id);
+                }
+                cuerpo[k] = body; cola[k] = tail;
+            }
+            int n = 0;
+            foreach (var kv in groups)
+            {
+                var lo = kv.Key; var sp = kv.Value;
+                bool choque = sp.Count > 1;
+                foreach (var id in sp)
+                {
+                    bool renombra = (choque && id != lo && (sp.Contains(lo) || id != sp[0]))
+                                    || (LispReserved.Contains(lo) && id != lo);
+                    if (renombra)
+                    {
+                        var nuevo = lo + MangleTag + (++n);
+                        _mangle[id] = nuevo;
+                        CaseMap[nuevo] = uniOrig.TryGetValue(id, out var u0) ? u0 : id;
+                    }
+                    else if (uniOrig.TryGetValue(id, out var u1)) { CaseMap[lo] = u1; CaseMap[id] = u1; }   // Δu: la etiqueta llega sin bajar a minúscula
+                    else if (id != lo) CaseMap[lo] = id;
+                }
+            }
+            for (int k = 0; k < lines.Length; k++)
+            {
+                if (cuerpo[k] == null) continue;
+                var body = _mangle.Count == 0 ? cuerpo[k] : RxIdent.Replace(cuerpo[k], m => _mangle.TryGetValue(m.Value, out var r) ? r : m.Value);
+                lines[k] = body + cola[k];
+            }
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>Un trozo suelto (un {nombre} de la prosa) con los MISMOS nombres que la hoja preparada.</summary>
+        public static string MangleExpr(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            s = GreekToAscii(s);
+            return _mangle.Count == 0 ? s : RxIdent.Replace(s, m => _mangle.TryGetValue(m.Value, out var r) ? r : m.Value);
+        }
+
+        /// <summary>El nombre como lo escribió el usuario (deshace el renombrado y la minúscula del motor).</summary>
+        public static string OriginalName(string s)
+        {
+            if (string.IsNullOrEmpty(s) || CaseMap.Count == 0) return s;
+            return CaseMap.TryGetValue(s, out var o) ? o : s;
+        }
         // (πi lo maneja el motor como constante; no lo meto aquí para no chocar con 'pi' numérico)
         static string GreekSym(string s) => Greek.TryGetValue(s, out var g) ? g : System.Net.WebUtility.HtmlEncode(s);
 
@@ -802,7 +937,7 @@ namespace HekatanLisp
                 return parentPrec > 3 ? Paren(r) : r;
             }
             if (n.Op == "trans")   // transpuesta: Aᵀ
-                return "<span class=\"m-transp-wrap\">" + ToHtml(n.A, 5) + "<span class=\"m-transp\">T</span></span>";
+                return "<span class=\"m-transp-wrap\">" + FlexSafe(ToHtml(n.A, 5)) + "<span class=\"m-transp\">T</span></span>";
             if (n.Op == "range")   // rango a:b  ó  a:s:b
                 return string.Join("<span class=\"m-op\">:</span>", n.Items.Select(x => ToHtml(x, 2)));
             if (n.Op == "fn") return FnHtml(n);
@@ -901,7 +1036,7 @@ namespace HekatanLisp
                     return "<span class=\"m-detbar\">|</span>" + arg0 + "<span class=\"m-detbar\">|</span>";
                 }
                 case "inv":   // inversa en notación matemática: J⁻¹ (superíndice −1, arriba-derecha)
-                    return "<span class=\"m-transp-wrap\">" + ToHtml(n.Items.Count > 0 ? n.Items[0] : null, 5) +
+                    return "<span class=\"m-transp-wrap\">" + FlexSafe(ToHtml(n.Items.Count > 0 ? n.Items[0] : null, 5)) +
                            "<span class=\"m-transp\">−1</span></span>";
                 // --- operadores de matriz en la notación de los LIBROS, no en la del teclado ---
                 // "menor(A,1,1)" y "trace(A)" se leían como código fuente, no como matemática.
@@ -936,6 +1071,7 @@ namespace HekatanLisp
         // pero en estilo función m-fn). Así N_1(x) renderiza N₁(x), no "N_1(x)".
         static string FnNameHtml(string name)
         {
+            name = OriginalName(name);   // f/F renombrados por choque, y su case original
             string baseN, sub;
             int us = name.IndexOf('_');
             if (us > 0 && us < name.Length - 1) { baseN = name.Substring(0, us); sub = name.Substring(us + 1); }
@@ -1504,6 +1640,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         {
             if (string.IsNullOrEmpty(s)) return s ?? "";
             const string sup = "⁰¹²³⁴⁵⁶⁷⁸⁹", sub = "₀₁₂₃₄₅₆₇₈₉";
+            // nombres renombrados por choque (fhkq1) → como se escribieron (F)
+            if (CaseMap.Count > 0)
+                s = RxIdent.Replace(s, m => m.Value.Contains(MangleTag) && CaseMap.TryGetValue(m.Value.ToLowerInvariant(), out var o) ? o : m.Value);
             // griegas por su nombre (palabra entera): el eje salía «xi» y no «ξ»
             s = Regex.Replace(s, @"\b(xi|eta|zeta|theta|phi|psi|alpha|beta|gamma|delta|epsilon|sigma|tau|omega|lambda|mu|nu|rho)\b",
                 m => m.Value switch

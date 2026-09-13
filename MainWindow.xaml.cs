@@ -34,6 +34,7 @@ namespace HekatanLisp
         private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
         private string _shot, _ctl, _pdf, _html;
         private string _lastHtml;   // último HTML renderizado (para --html: Hekatan School)
+        private string _srcPrepared;   // la hoja con los nombres preparados (griegas, choques de case): la usan las gráficas
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private bool _ranProgram = false;          // el último resultado vino de EJECUTAR un programa (stdout de consola)
@@ -218,7 +219,7 @@ namespace HekatanLisp
                 {
                     html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true);
                     // Gráficas INTERCALADAS: cada una en su posición del documento (marcador → HTML), en orden.
-                    var plots = BuildPlotsOrdered(text, forms, _dark, out bool anySurf);
+                    var plots = BuildPlotsOrdered(_srcPrepared ?? text, forms, _dark, out bool anySurf);
                     // La gráfica va DENTRO de su hk-plotslot: antes el hueco se reemplazaba entero, la
                     // regla de impresión (alto ≤ 300 px, no partir) no la encontraba y en el PDF la gráfica
                     // ocupaba casi una hoja → saltaba a la siguiente y dejaba media página en blanco.
@@ -374,6 +375,22 @@ namespace HekatanLisp
                 int k = 0;
                 if (toks.Length > 0 && !double.TryParse(toks[0], System.Globalization.NumberStyles.Any, inv, out _)) { forcedVar = toks[0]; k = 1; }
                 if (toks.Length >= k + 2 && double.TryParse(toks[k], System.Globalization.NumberStyles.Any, inv, out lo) && double.TryParse(toks[k + 1], System.Globalization.NumberStyles.Any, inv, out hi))
+            else if (rest.Contains("=") && rest.Contains(":"))   // #fplot f(x), g(x), x = 0 : 2
+            {
+                foreach (var a0 in SplitTop(rest))
+                {
+                    var a = a0.Trim(); if (a.Length == 0) continue;
+                    var vr = System.Text.RegularExpressions.Regex.Match(a, @"^([A-Za-z]\w*)\s*=\s*(-?[\d.]+)\s*:\s*(-?[\d.]+)$");
+                    if (vr.Success)
+                    {
+                        forcedVar = vr.Groups[1].Value;
+                        double.TryParse(vr.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out lo);
+                        double.TryParse(vr.Groups[3].Value, System.Globalization.NumberStyles.Any, inv, out hi);
+                        continue;
+                    }
+                    AddFn(sel, byName, a);
+                }
+            }
                     for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
             }
             if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
@@ -631,20 +648,10 @@ namespace HekatanLisp
             // (L, EI, N1…) para restaurar el case en el render (el motor los devuelve en minúscula).
             // SOLO líneas de matemática (no texto '#'/';'/'%' ni la etiqueta @@), para no cazar
             // palabras de la prosa como «Y», «El», «La».
-            LispConverter.CaseMap.Clear();
-            foreach (var raw in text.Replace("\r", "").Split('\n'))
-            {
-                var ln = raw.TrimStart();
-                if (ln.Length == 0 || ln[0] == '#' || ln[0] == ';' || ln[0] == '%') continue;
-                int at = ln.IndexOf("@@", StringComparison.Ordinal); if (at >= 0) ln = ln.Substring(0, at);
-                foreach (System.Text.RegularExpressions.Match idm in
-                         System.Text.RegularExpressions.Regex.Matches(ln, @"[A-Za-z_][A-Za-z0-9_]*"))
-                {
-                    string id = idm.Value; bool hasUp = false;
-                    foreach (char c in id) if (c >= 'A' && c <= 'Z') { hasUp = true; break; }
-                    if (hasUp) LispConverter.CaseMap[id.ToLowerInvariant()] = id;
-                }
-            }
+            // Además: griegas Unicode (λ) → nombre, y los nombres que chocarían en LISP (m/M, T, Pi)
+            // renombrados a una forma única. Ver LispConverter.PrepareNames.
+            text = LispConverter.PrepareNames(text);
+            _srcPrepared = text;
 
             // Programas: LISP (defun/loop/let) o matemática imperativa (for/while) → EJECUTAR.
             if (LooksLikeLisp(text) && IsLispProgram(text))
@@ -715,6 +722,7 @@ namespace HekatanLisp
             for (int i = 0; i < lines.Length; i++)
             {
                 if (isTic[i] || isToc[i]) continue;   // tic/toc: no son expresiones
+            var aliasOf = new List<string>[lines.Length];      // Fx = F_1 = Expand{…}: los nombres del medio (F_1)
                 var s = lines[i].TrimStart();
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
@@ -751,6 +759,17 @@ namespace HekatanLisp
                             @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");   // NAME = expr  (no ==)
                 if (lm.Success) { labels[i] = lm.Groups[1].Value; exprText = lm.Groups[2].Value; }
                 treeOf[i] = TreeOfLine(exprText);
+                // NOMBRES ENCADENADOS con algo que CALCULAR:  Fx = F_1 = Expand{…}  ·  A = a = 2·3.
+                // Antes iba entera a notación (se dibujaba sin pasar por el motor: no expandía).
+                // Ahora el primero es la etiqueta, los del medio alias, y el último se calcula.
+                var ali = AliasChain(lines[i]);
+                if (ali != null)
+                {
+                    labels[i] = ali.Value.names[0];
+                    aliasOf[i] = ali.Value.names.Skip(1).ToList();
+                    treeOf[i] = TreeOfLine(ali.Value.expr);
+                    continue;
+                }
             }
             // mapa etiqueta → su árbol (para sustituir  Partial{v@x}  con la definición de v)
             var labelMap = new Dictionary<string, LispConverter.N>();
@@ -763,7 +782,10 @@ namespace HekatanLisp
             foreach (var kv in labelMap)
                 if (kv.Value != null && (kv.Value.Op == "vec" || kv.Value.Op == "mat"))
                     vecMap[kv.Key] = kv.Value;
-            // PASO 2: sustituir etiquetas y pasar a LISP
+            // PASO 2: sustituir etiquetas y pasar a LISP.
+            // Solo las etiquetas definidas ANTES (como en papel y en Calcpad): antes se usaba el mapa
+            // de TODA la hoja y «g1 = alpha + …» salía «3² + …» por un «alpha = lambda^2» de más abajo.
+            var prevLabels = new Dictionary<string, LispConverter.N>();
             for (int i = 0; i < lines.Length; i++)
             {
                 if (treeOf[i] == null) continue;
@@ -771,7 +793,7 @@ namespace HekatanLisp
                 {
                     var app = (funcMap.Count > 0 || vecMap.Count > 0)
                               ? LispConverter.SubstFuncs(treeOf[i], funcMap, vecMap) : treeOf[i];  // f(3)→3²+1, v(2)→componente
-                    var sub = LispConverter.SubstLabels(app, labelMap, labels[i], new HashSet<string>());
+                    var sub = LispConverter.SubstLabels(app, prevLabels, labels[i], new HashSet<string>());
                     formOf[i] = LispConverter.ToLisp(sub);
                 }
                 catch { formOf[i] = null; }
@@ -782,6 +804,8 @@ namespace HekatanLisp
             var resOf = new string[lines.Length];
             for (int k = 0; k < idx.Count; k++) resOf[idx[k]] = k < results.Count ? results[k].Trim() : "";
             // Integral INDEFINIDA ( Integral{f @ x} sin límites ) → añade la constante  + C  (rigor matemático).
+                if (labels[i] != null && !prevLabels.ContainsKey(labels[i])) prevLabels[labels[i]] = treeOf[i];
+                if (aliasOf[i] != null) foreach (var a in aliasOf[i]) if (!prevLabels.ContainsKey(a)) prevLabels[a] = treeOf[i];
             for (int k = 0; k < idx.Count; k++)
             {
                 int i = idx[k]; var t = treeOf[i];
@@ -853,7 +877,8 @@ namespace HekatanLisp
                 }
                 // hasR = hay RESULTADO distinto de la entrada. Comparo NORMALIZANDO (sin comillas ni
                 // espacios): si el operador no cerró (devuelve la misma notación), no muestro "= <lo mismo>".
-                bool hasR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && !SameForm(r, formOf[i]);
+                bool hasR = r.Length > 0 && !r.Equals("nil", StringComparison.OrdinalIgnoreCase) && !SameForm(r, formOf[i])
+                            && !ResultadoSinSentido(formOf[i], treeOf[i]);
 
                 if (_op == "deriv" || _op == "integ")
                 {   // d/dv(N1) = …   ó   ∫ N1 dv = …  TODO EN UNA LÍNEA (notación = resultado)
@@ -949,6 +974,10 @@ namespace HekatanLisp
             var merged = new List<string>();
             for (int i = 0; i < display.Count; i++)
             {
+            // alias del medio:  Fx = <F_1 = > expresión = resultado
+            for (int i = 0; i < lines.Length && i < display.Count; i++)
+                if (aliasOf[i] != null && aliasOf[i].Count > 0 && labels[i] != null && display[i].StartsWith(labels[i] + " = "))
+                    display[i] = labels[i] + " = " + string.Join(" = ", aliasOf[i]) + display[i].Substring(labels[i].Length);
                 bool cont = i < contLine.Count && contLine[i];
                 if (cont && merged.Count > 0 && Mergeable(display[i]) && Mergeable(merged[merged.Count - 1]))
                     merged[merged.Count - 1] += LispConverter.SbsSep + display[i];
@@ -1016,6 +1045,7 @@ namespace HekatanLisp
                     try { return LispConverter.ToHtml(LispConverter.ParseLisp(r)); } catch { return null; }
                 }
             // 2) expresión suelta: aplica funciones (f(3)→3²+1) y, si trae un TOKEN (Factor, Partial,
+            name = LispConverter.MangleExpr(name);   // la prosa usa los nombres tal cual; la hoja, los preparados
             //    Simplify…), COMPÚTALA con el motor y renderiza el resultado; si no, tal cual.
             try
             {
@@ -1069,7 +1099,11 @@ namespace HekatanLisp
             // antes del PRIMER '=' ¿hay una llamada de función  id(  ?  (definición f(x)= …)
             string lhs0 = line.Substring(0, eqs[0]);
             bool funcDef = System.Text.RegularExpressions.Regex.IsMatch(lhs0, @"[A-Za-z_]\w*\s*\(");
-            if (eqs.Count < 2 && !funcDef) return null;                  // un solo '=' sin función = cálculo normal
+            // un solo '=' con un NOMBRE a la izquierda = cálculo normal (N1 = (1-s)/2).
+            // Con una EXPRESIÓN a la izquierda (K·u = F) es una ECUACIÓN: se dibuja tal cual.
+            // Antes se calculaba solo el lado izquierdo y salía «K·u = K·u».
+            bool lhsNombre = System.Text.RegularExpressions.Regex.IsMatch(lhs0.Trim(), @"^[A-Za-z][\w']*$");
+            if (eqs.Count < 2 && !funcDef && lhsNombre) return null;
             // partir en segmentos por cada '=' de nivel 0
             var segs = new List<string>(); int prev = 0;
             foreach (var pe in eqs) { segs.Add(line.Substring(prev, pe - prev)); prev = pe + 1; }
@@ -1095,6 +1129,64 @@ namespace HekatanLisp
         }
 
         /// <summary>Registra las definiciones de función de una línea:  f(x) = cuerpo  (también dentro de
+        /// <summary>Fx = F_1 = Expand{…}: nombres encadenados y al final algo que el motor CALCULA
+        /// (un operador, o una cuenta sin variables). Devuelve los nombres y la expresión; null si no.
+        /// Una cadena solo simbólica (Ul = u_l = G·u_g) sigue siendo notación.</summary>
+        private static (List<string> names, string expr)? AliasChain(string raw)
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("(")) return null;
+            var eqs = TopLevelEquals(line);
+            if (eqs.Count < 2) return null;
+            var segs = new List<string>(); int prev = 0;
+            foreach (var pe in eqs) { segs.Add(line.Substring(prev, pe - prev).Trim()); prev = pe + 1; }
+            var expr = line.Substring(prev).Trim();
+            if (expr.Length == 0) return null;
+            foreach (var s in segs)
+                if (!System.Text.RegularExpressions.Regex.IsMatch(s, @"^[A-Za-z][\w']*$")) return null;
+            var f = LispFormOfLine(expr);
+            if (f == null || !(HasOpCall(f) || !HasFreeVar(f))) return null;
+            return (segs, expr);
+        }
+
+        /// <summary>Resultados del motor que NO son matemática válida y no se deben escribir:
+        ///  · transpuesta de un SÍMBOLO (Tₑᵀ, L·D·Lᵀ): el motor trata la letra como un escalar y
+        ///    daba «Tₑᵀ = Tₑ», «L·D·Lᵀ = D·L²» (las matrices no conmutan).
+        ///  · Σ/∏ de símbolos que dependen del índice (σᵢ·λᵢ, i = 1…n): los tomaba como constantes.</summary>
+        private static bool ResultadoSinSentido(string form, LispConverter.N tree)
+        {
+            if (form != null && System.Text.RegularExpressions.Regex.IsMatch(form, @"\(mtransp [^()\s]+\)")) return true;
+            bool malo = false;
+            void Rec(LispConverter.N n)
+            {
+                if (n == null || malo) return;
+                if (n.Op == "solver" && (n.Atom == "sum" || n.Atom == "product") && n.Items != null && n.Items.Count > 1
+                    && n.Items[1] != null && n.Items[1].IsAtom)
+                {
+                    string v = n.Items[1].Atom;
+                    void Ind(LispConverter.N x)
+                    {
+                        if (x == null || malo) return;
+                        if (x.IsAtom && x.Atom != null)
+                        {
+                            int us = x.Atom.IndexOf('_');
+                            if (us > 0)
+                            {
+                                var sub = x.Atom.Substring(us + 1);
+                                if (sub == v || (v.Length == 1 && sub.Length <= 3 && sub.Contains(v))) malo = true;
+                            }
+                            return;
+                        }
+                        Ind(x.A); Ind(x.B); if (x.Items != null) foreach (var y in x.Items) Ind(y);
+                    }
+                    Ind(n.Items[0]);
+                }
+                Rec(n.A); Rec(n.B); if (n.Items != null) foreach (var y in n.Items) Rec(y);
+            }
+            Rec(tree);
+            return malo;
+        }
+
         /// una cadena  y = f(x) = cuerpo). Guarda nombre → (parámetros, árbol del cuerpo) para luego
         /// APLICAR  f(3), f(a), f(G(x))  por sustitución (β-reducción, el método de la época LISP).</summary>
         private static void CollectFuncDefs(string raw, Dictionary<string, (List<string> ps, LispConverter.N body)> map)
@@ -1193,7 +1285,7 @@ namespace HekatanLisp
             if (t.TrimStart().StartsWith(";")) return true;
             // (a) una palabra clave LISP tras '(' → seguro es LISP
             if (System.Text.RegularExpressions.Regex.IsMatch(t,
-                @"\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\b"))
+                @"(?<![A-Za-z0-9_.])\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|format|print|progn|cond|when|unless|lambda|dolist|dotimes|expt|list|vector|deriv|dsimp|simplif|and|or|not)\s+(?=[^\s\-+*/^=)·,])"))
                 return true;
             // (b) forma prefija de operador  (- 1 2) : el '(' NO va pegado a un identificador
             //     (si no, N1(-1) sería "resta LISP") y el operador lleva ESPACIO detrás (LISP: "(- 1",
@@ -1201,9 +1293,12 @@ namespace HekatanLisp
             return System.Text.RegularExpressions.Regex.IsMatch(t, @"(?<![A-Za-z0-9_.])\(\s*[-+*/=<>]\s");
         }
 
+            // La palabra va tras un '(' que NO está pegado a un nombre, y le sigue un espacio y un
+            // argumento (no un operador): así «sqrt(lambda^2 + mu^2)» o «(lambda + mu)/2» son
+            // MATEMÁTICA. Antes esa línea convertía la hoja ENTERA en un programa LISP («⚠ = 2»).
         private static bool IsLispProgram(string t)
             => System.Text.RegularExpressions.Regex.IsMatch(t,
-                @"\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\b");
+                @"(?<![A-Za-z0-9_.])\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\s+(?=[^\s\-+*/^=)·,])");
 
         private static string RunLispClean(string code)
         {

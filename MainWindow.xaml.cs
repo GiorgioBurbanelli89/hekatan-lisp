@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,7 +32,7 @@ namespace HekatanLisp
         private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
         private string _op = "auto";               // operación: "auto" | "simplify" | "expand" | "deriv"
         private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
-        private string _shot, _ctl, _pdf, _html;
+        private string _shot, _ctl, _pdf, _html, _latex;
         private string _lastHtml;   // último HTML renderizado (para --html: Hekatan School)
         private string _srcPrepared;   // la hoja con los nombres preparados (griegas, choques de case): la usan las gráficas
         private bool _webReady;
@@ -59,7 +59,10 @@ namespace HekatanLisp
             _pdf = ValueAfter(args, "--pdf");
             _ctl = ValueAfter(args, "--ctl");
             _html = ValueAfter(args, "--html");   // vuelca el HTML REAL del render (para Hekatan School)
-            if (_pdf != null || _html != null) _view = "render";
+            // --latex: las MISMAS expresiones, en LaTeX. Manim necesita las letras como
+            // vectores para transformar una formula en la siguiente; un PNG solo se funde.
+            _latex = ValueAfter(args, "--latex");
+            if (_pdf != null || _html != null || _latex != null) _view = "render";
             var v = ValueAfter(args, "--view");
             if (v is "render" or "lisp" or "math") _view = v;
             var o = ValueAfter(args, "--op");
@@ -102,7 +105,18 @@ namespace HekatanLisp
             if (System.Array.Exists(args, x => string.Equals(x, "--dark", StringComparison.OrdinalIgnoreCase)
                                             || string.Equals(x, "--oscuro", StringComparison.OrdinalIgnoreCase)))
             { _dark = true; LispConverter.Dark = true; }
+            // El fichero puede venir con `--in ruta` o SUELTO (`HekatanLisp.exe hoja.lisp`,
+            // que es lo que pasa al abrirlo con doble clic o al arrastrarlo encima).
             var inFile = ValueAfter(args, "--in");
+            if (inFile == null)
+                for (int i = 1; i < args.Length; i++)
+                {
+                    var a_ = args[i];
+                    if (a_.StartsWith("-")) { if (ValueAfter(args, a_) != null) i++; continue; }
+                    var ex_ = Path.GetExtension(a_).ToLowerInvariant();
+                    if ((ex_ == ".lisp" || ex_ == ".hlisp" || ex_ == ".m" || ex_ == ".txt") && File.Exists(a_))
+                    { inFile = a_; break; }
+                }
             if (inFile != null) { try { if (File.Exists(inFile)) { var it = File.ReadAllText(inFile); if (string.Equals(Path.GetExtension(inFile), ".m", StringComparison.OrdinalIgnoreCase)) it = LispConverter.MatlabToHlisp(it); Editor.Text = it; SetCurrentFile(inFile); } } catch { } }
             if (string.IsNullOrWhiteSpace(Editor.Text))
             {
@@ -114,9 +128,21 @@ namespace HekatanLisp
             }
             ApplyTheme(_dark);   // sincroniza UI + render (LispConverter.Dark) al arrancar; llama SetView/SetOp
 
+            // Abrir una hoja YA LA CORRE, sin tocar el ▶ (Jorge, 16-sep-2026: «pongo un
+            // script y no ejecuta»). Hekatan Lab y Hekatan Py ya lo hacían al abrir un
+            // fichero por línea de órdenes; aquí solo se cargaba el texto en el editor y
+            // se quedaba esperando. Se respeta el interruptor AutoRun.
+            // También en --shot/--pdf/--html: son los modos con los que se COMPRUEBA que
+            // la hoja sale bien, y sin calcular salía la página en blanco.
+            if (inFile != null && _autoRun)
+                ShowResult();
+
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
             if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
+            if (_latex != null) {  // --latex: las expresiones en LaTeX (Hekatan School / Manim)
+                await WriteLatexAndExit(_latex);
+            }
             if (_html != null) {   // --html: vuelca el HTML REAL del motor (Hekatan School). Sin leer el DOM.
                 await Task.Delay(300);
                 await WriteHtmlAndExit(_html);
@@ -864,6 +890,9 @@ namespace HekatanLisp
                 string lbl = labels[i];
                 string v = hasVar ? dvar : FirstVar(formOf[i]);
                 var r = resOf[i] ?? "";
+                // --latex: la MISMA expresion que se va a dibujar, tambien en LaTeX.
+                // Solo se apunta; no cambia nada de lo que ya hacia el render.
+                LispLatex.Apunta(lbl, formOf[i], r);
                 // Pasos{f @ x}: la derivada MOSTRANDO su trabajo. El motor devuelve (steps s0 s1 s2 s3),
                 // una cadena de igualdades que se dibuja como  lbl = d/dx[f] = Σd/dx[tᵢ] = c·n·xⁿ⁻¹ = resultado.
                 if (r.StartsWith("(steps"))
@@ -1748,6 +1777,19 @@ namespace HekatanLisp
         // ---------- captura headless ----------
         // Vuelca el HTML REAL que produjo el motor (_lastHtml: EVALUADO + RenderPage + gráficas),
         // SIN leer el DOM del WebView (aquello era frágil). Para Hekatan School.
+        /// <summary>Corre la hoja y vuelca sus expresiones en LaTeX (una por linea).</summary>
+        private async Task WriteLatexAndExit(string path)
+        {
+            try
+            {
+                ShowResult();                        // el mismo pipeline de siempre
+                try { await _showTask; } catch { }   // esperar a que el motor termine
+                LispLatex.Vuelca(path);              // y volcar lo que se fue apuntando
+            }
+            catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }
+            finally { Application.Current.Shutdown(); }
+        }
+
         private async Task WriteHtmlAndExit(string path)
         {
             try

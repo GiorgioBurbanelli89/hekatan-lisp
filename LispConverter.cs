@@ -1130,11 +1130,47 @@ namespace HekatanLisp
             var rws = new List<int>();
             if (rowBig) { for (int i = 0; i < RMAX; i++) rws.Add(i); rws.Add(-1); rws.Add(nrows - 1); }
             else        { for (int i = 0; i < nrows; i++) rws.Add(i); }
-            return IndexedGrid(rows, cols, rws, ncols, nrows);
+            return IndexedGrid(rows, cols, rws, ncols, nrows,
+                               colBig ? CMAX : ncols, rowBig ? RMAX : nrows);
+        }
+
+        // Carga util para ARRASTRAR la matriz: el HTML de TODAS las celdas, en JSON.
+        // Sin esto el JS solo veria lo ya truncado y arrastrar no mostraria nada nuevo.
+        // Tope de seguridad: matrices enormes no se serializan (se quedan solo truncadas).
+        const int HK_MAX_CELDAS = 4000;
+        static string CeldasJson(List<List<N>> rows, int ncols, int nrows)
+        {
+            if ((long)ncols * nrows > HK_MAX_CELDAS) return null;
+            var sb = new StringBuilder("[");
+            for (int r = 0; r < nrows; r++)
+            {
+                if (r > 0) sb.Append(',');
+                sb.Append('[');
+                for (int c = 0; c < ncols; c++)
+                {
+                    if (c > 0) sb.Append(',');
+                    string h = c < rows[r].Count ? ToHtml(rows[r][c], 0) : "";
+                    sb.Append('"');
+                    foreach (char ch in h)
+                    {
+                        if (ch == '"') sb.Append("\\\"");
+                        else if (ch == '\\') sb.Append("\\\\");
+                        else if (ch == '<') sb.Append("\\u003c");
+                        else if (ch == '>') sb.Append("\\u003e");
+                        else if (ch == '&') sb.Append("\\u0026");
+                        else if (ch < ' ') sb.Append("\\u").Append(((int)ch).ToString("x4"));
+                        else sb.Append(ch);
+                    }
+                    sb.Append('"');
+                }
+                sb.Append(']');
+            }
+            return sb.Append(']').ToString();
         }
 
         // dibuja UNA cuadrícula con índices en los bordes; cols/rws son los índices a mostrar (-1 = hueco … ⋮ ⋱)
-        static string IndexedGrid(List<List<N>> rows, List<int> cols, List<int> rws, int ncols, int nrows)
+        static string IndexedGrid(List<List<N>> rows, List<int> cols, List<int> rws, int ncols, int nrows,
+                                  int visC = -1, int visR = -1)
         {
             bool showCol = ncols > 1, showRow = nrows > 1;
             // separador vertical entre columnas de DATOS si la matriz es simbólica (como Hekatan Lab).
@@ -1150,7 +1186,18 @@ namespace HekatanLisp
             // bloque baja hasta la MITAD del corchete (sobre los datos) SIN mover los índices hacia
             // arriba (un translate los sacaría del área y .ws-eq los recortaría).
             string shift = showCol ? " style=\"padding-bottom:1.15em\"" : "";
-            sb.Append("<span class=\"m-matx\"").Append(shift).Append(">");
+            // Datos para ARRASTRAR (hkMat en MAT_JS): totales, cuantas se ven ahora y todas las celdas.
+            string arrastre = "";
+            if (visC > 0 && visR > 0)
+            {
+                string celdas = CeldasJson(rows, ncols, nrows);
+                if (celdas != null)
+                    arrastre = " data-hk-r=\"" + nrows + "\" data-hk-c=\"" + ncols + "\""
+                             + " data-vis-rows=\"" + visR + "\" data-vis-cols=\"" + visC + "\""
+                             + " data-hk-sep=\"" + (symSep ? 1 : 0) + "\""
+                             + " data-hk-cells='" + celdas + "'";
+            }
+            sb.Append("<span class=\"m-matx\"").Append(arrastre).Append(shift).Append(">");
             if (showCol && showRow)
                 sb.Append("<span class=\"m-mh\" style=\"grid-row:1;grid-column:1\"></span>");
             if (showCol)
@@ -1177,6 +1224,7 @@ namespace HekatanLisp
                     sb.Append("<span class=\"m-mc\" style=\"grid-row:").Append(dataRow0 + ri)
                       .Append(";grid-column:").Append(dataCol0 + ci).Append(bl).Append("\">").Append(txt).Append("</span>");
                 }
+            if (arrastre.Length > 0) sb.Append("<span class=\"mat-grip\" title=\"Arrastrar para ver mas o menos celdas\"></span>");
             sb.Append("</span>");
             return sb.ToString();
         }
@@ -1250,7 +1298,12 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
 .m-cell{color:var(--num);white-space:nowrap;}
 /* matriz GRANDE: índices en los bordes + centro colapsado (… ⋮ ⋱), como Hekatan Calc */
-.m-matx{display:inline-grid;vertical-align:middle;margin:0 .25em;row-gap:.05em;column-gap:0;align-items:center;justify-items:center;}
+.m-matx{display:inline-grid;position:relative;vertical-align:middle;margin:0 .25em;row-gap:.05em;column-gap:0;align-items:center;justify-items:center;}
+/* manija para ARRASTRAR la matriz y ver mas/menos celdas (igual que Hekatan Calc web) */
+.mat-grip{position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;cursor:nwse-resize;opacity:.4;transition:opacity .15s;z-index:3;}
+.mat-grip::before{content:'';position:absolute;right:2px;bottom:2px;width:11px;height:11px;border-right:2.5px solid #4a90d9;border-bottom:2.5px solid #4a90d9;}
+.m-matx:hover>.mat-grip,.mat-resizing>.mat-grip{opacity:1;}
+.mat-resizing{outline:1.5px dashed #4a90d9 !important;outline-offset:3px;}
 .m-mh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .45em .1em;}
 .m-mrh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .35em 0 0;justify-self:end;}
 .m-mc{color:var(--num);padding:.12em .45em;text-align:center;white-space:nowrap;}
@@ -1387,7 +1440,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
-                   "</style></head><body>" + body + MAT_JS + "</body></html>";
+                   "</style></head><body>" + body + MAT_JS + HK_MAT_JS + "</body></html>";
         }
 
         // Varias asignaciones de la MISMA línea (a=2; b=3) → una sola fila .ws-eq con las celdas lado a lado,
@@ -1513,6 +1566,77 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             "eq.dataset.fit='1';}catch(e){}});}" +
             "window.addEventListener('load',function(){setTimeout(fit,40);setTimeout(fit,250);});" +
             "if(document.readyState!=='loading')setTimeout(fit,40);})();</script>";
+
+        // ARRASTRAR matrices/vectores grandes: la manija de abajo-derecha cambia cuantas filas y
+        // columnas se ven. El HTML ya trae TODAS las celdas en data-hk-cells (ver CeldasJson), asi
+        // que aqui solo se vuelve a dibujar la rejilla con el MISMO algoritmo de IndexedGrid.
+        // Portado de hekatan-web/hekatan-ui/src/mathcanvas/main.ts (_buildTruncatedMatrixHTML).
+        const string HK_MAT_JS = @"<script>(function(){
+var arr=null;
+function lista(total,vis){var a=[],i;
+  if(vis>=total-1){for(i=0;i<total;i++)a.push(i);return a;}
+  for(i=0;i<vis;i++)a.push(i); a.push(-1); a.push(total-1); return a;}
+function pinta(el){
+  var cells=el.__hkCells, nrows=+el.dataset.hkR, ncols=+el.dataset.hkC;
+  var visR=+el.dataset.visRows, visC=+el.dataset.visCols, sep=el.dataset.hkSep==='1';
+  var cols=lista(ncols,visC), rws=lista(nrows,visR);
+  var showCol=ncols>1, showRow=nrows>1;
+  var brkCol=showRow?2:1, dataCol0=brkCol+1, brkRCol=dataCol0+cols.length, dataRow0=showCol?2:1;
+  var h='',ci,ri;
+  if(showCol&&showRow) h+='<span class=""m-mh"" style=""grid-row:1;grid-column:1""></span>';
+  if(showCol) for(ci=0;ci<cols.length;ci++)
+    h+='<span class=""m-mh"" style=""grid-row:1;grid-column:'+(dataCol0+ci)+'"">'+(cols[ci]<0?'⋯':cols[ci])+'</span>';
+  if(showRow) for(ri=0;ri<rws.length;ri++)
+    h+='<span class=""m-mrh"" style=""grid-row:'+(dataRow0+ri)+';grid-column:1"">'+(rws[ri]<0?'⋮':rws[ri])+'</span>';
+  h+='<span class=""m-brk m-brl"" style=""grid-row:'+dataRow0+' / span '+rws.length+';grid-column:'+brkCol+'""></span>';
+  h+='<span class=""m-brk m-brr"" style=""grid-row:'+dataRow0+' / span '+rws.length+';grid-column:'+brkRCol+'""></span>';
+  for(ri=0;ri<rws.length;ri++)for(ci=0;ci<cols.length;ci++){
+    var r=rws[ri],c=cols[ci];
+    var txt=(r<0&&c<0)?'<span class=""m-ell"">⋱</span>':c<0?'<span class=""m-ell"">⋯</span>':
+            r<0?'<span class=""m-ell"">⋮</span>':((cells[r]&&cells[r][c]!==undefined)?cells[r][c]:'');
+    var bl=(sep&&ci>0)?';border-left:1px solid var(--sep)':'';
+    h+='<span class=""m-mc"" style=""grid-row:'+(dataRow0+ri)+';grid-column:'+(dataCol0+ci)+bl+'"">'+txt+'</span>';}
+  h+='<span class=""mat-grip"" title=""Arrastrar para ver mas o menos celdas""></span>';
+  el.innerHTML=h; manija(el);}
+/* El auto-fit encoge TODO el bloque con transform:scale, y con el la manija: en una matriz
+   ancha quedaba de 8 px pegada al borde y no habia como agarrarla. Aqui se le aplica la
+   escala inversa para que siempre mida lo mismo en pantalla. */
+function manija(el){
+  var g=el.querySelector('.mat-grip'); if(!g)return;
+  var eq=el.closest('.ws-eq,.deq-body'); var inner=eq?eq.querySelector(':scope>.ws-fit'):null;
+  var s=1; if(inner&&inner.style.transform){var m=/scale\(([\d.]+)\)/.exec(inner.style.transform); if(m)s=parseFloat(m[1])||1;}
+  g.style.transformOrigin='bottom right';
+  g.style.transform=(s&&s!==1)?'scale('+(1/s)+')':'';}
+function manijas(){document.querySelectorAll('.m-matx[data-hk-cells]').forEach(manija);}
+window.addEventListener('load',function(){setTimeout(manijas,120);setTimeout(manijas,420);});
+if(document.readyState!=='loading')setTimeout(manijas,120);
+function celdas(el){ if(!el.__hkCells){ try{el.__hkCells=JSON.parse(el.dataset.hkCells);}catch(e){return null;} } return el.__hkCells; }
+document.addEventListener('mousedown',function(e){
+  var g=e.target.closest?e.target.closest('.mat-grip'):null; if(!g)return;
+  var el=g.closest('.m-matx'); if(!el||!el.dataset.hkCells)return;
+  if(!celdas(el))return;
+  e.preventDefault(); e.stopPropagation();
+  var cel=el.querySelector('.m-mc'), rc=cel?cel.getBoundingClientRect():null;
+  arr={el:el,x:e.clientX,y:e.clientY,r0:+el.dataset.visRows,c0:+el.dataset.visCols,
+       w:(rc&&rc.width)||26,h:(rc&&rc.height)||20};
+  el.classList.add('mat-resizing');},true);
+document.addEventListener('mousemove',function(e){
+  if(!arr)return; e.preventDefault();
+  var el=arr.el, nrows=+el.dataset.hkR, ncols=+el.dataset.hkC;
+  var nr=Math.max(1,Math.min(nrows,arr.r0+Math.round((e.clientY-arr.y)/arr.h)));
+  var nc=Math.max(1,Math.min(ncols,arr.c0+Math.round((e.clientX-arr.x)/arr.w)));
+  if(nr===+el.dataset.visRows&&nc===+el.dataset.visCols)return;
+  el.dataset.visRows=nr; el.dataset.visCols=nc; pinta(el);},true);
+document.addEventListener('mouseup',function(){
+  if(!arr)return; arr.el.classList.remove('mat-resizing');
+  // al crecer la matriz hay que rehacer el auto-fit del bloque, si no se sale de la pagina
+  var eq=arr.el.closest('.ws-eq,.deq-body');
+  if(eq){var inner=eq.querySelector(':scope>.ws-fit');
+    if(inner){inner.style.transform='';eq.style.height='';
+      var w=eq.clientWidth,cw=inner.scrollWidth;
+      if(cw>w+2){var s=w/cw;inner.style.transform='scale('+s+')';eq.style.height=(inner.offsetHeight*s)+'px';eq.style.overflowX='hidden';}}}
+  arr=null;},true);
+})();</script>";
 
         // ---------- página de AYUDA (se muestra a la derecha cuando no hay script, como Hekatan Lab) ----------
         public static string HelpPage()
@@ -1797,7 +1921,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS + LEARN_CSS +
-                   "</style></head><body>" + body + MAT_JS + "</body></html>";
+                   "</style></head><body>" + body + MAT_JS + HK_MAT_JS + "</body></html>";
         }
 
         const string LEARN_CSS =

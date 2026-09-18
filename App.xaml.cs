@@ -18,7 +18,8 @@ namespace HekatanLisp
                 string.Equals(a, "--ctl", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--pdf", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(a, "--html", StringComparison.OrdinalIgnoreCase));
+                string.Equals(a, "--html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--latex", StringComparison.OrdinalIgnoreCase));
             if (!headless)
             {
                 _mutex = new System.Threading.Mutex(true, "HekatanLisp_SingleInstance_v1", out bool creada);

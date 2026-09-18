@@ -75,8 +75,13 @@ namespace HekatanLisp
                     sb.Append(Math.Round(Z[i, j], 4).ToString("0.####", inv));
                 }
             sb.Append(']');
+            // 17-sep-2026, Jorge: «con gráfica color map y cursor hover». Los rangos reales van al
+            // canvas para que el hover pueda decir la x y la y del punto, no solo el índice.
             return "<canvas class=\"hk-surf\" width=\"560\" height=\"420\" style=\"max-width:100%;touch-action:none;cursor:grab\""
                  + " data-id=\"" + id + "\" data-nn=\"" + nn + "\""
+                 + " data-xa=\"" + xa.ToString("0.######", inv) + "\" data-xb=\"" + xb.ToString("0.######", inv) + "\""
+                 + " data-ya=\"" + ya.ToString("0.######", inv) + "\" data-yb=\"" + yb.ToString("0.######", inv) + "\""
+                 + " data-vx=\"" + System.Net.WebUtility.HtmlEncode(vx) + "\" data-vy=\"" + System.Net.WebUtility.HtmlEncode(vy) + "\""
                  + " data-zmin=\"" + zmin.ToString("0.####", inv) + "\" data-zmax=\"" + zmax.ToString("0.####", inv) + "\""
                  + " data-z='" + sb + "'></canvas>";
         }
@@ -105,10 +110,35 @@ namespace HekatanLisp
        ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.lineTo(p3[0],p3[1]);ctx.closePath();
        ctx.fillStyle=jetr((zc-zmin)/rng);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.stroke();}}
    draw();cv.style.cursor='grab';
+   // ---- HOVER: el nudo mas cercano al cursor, con su x, y, z (17-sep-2026, Jorge) ----
+   var xa=+cv.dataset.xa,xb=+cv.dataset.xb,ya=+cv.dataset.ya,yb=+cv.dataset.yb;
+   var vx=cv.dataset.vx||'x',vy=cv.dataset.vy||'y';
+   var tip=document.createElement('div');
+   tip.style.cssText='position:fixed;z-index:9999;display:none;pointer-events:none;background:#fffffff2;'+
+     'border:1px solid #888;border-radius:4px;padding:3px 6px;font:12px/1.35 Consolas,monospace;color:#111;'+
+     'box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:pre';
+   document.body.appendChild(tip);
+   function num(v){var a=Math.abs(v);return (a>=1e5||(a>0&&a<1e-3))?v.toExponential(3):v.toFixed(4);}
+   function cerca(e){                     // nudo (i,j) cuya proyeccion queda mas cerca del cursor
+     var r=cv.getBoundingClientRect(),mx=(e.clientX-r.left)*W/r.width,my=(e.clientY-r.top)*H/r.height;
+     var mej=null,d2m=1e18;
+     for(var i=0;i<=nn;i++)for(var j=0;j<=nn;j++){
+       var p=proj(i,j,Z(i,j)),dx=p[0]-mx,dy=p[1]-my,d2=dx*dx+dy*dy;
+       if(d2<d2m){d2m=d2;mej=[i,j,d2];}}
+     return (mej&&mej[2]<400)?mej:null;    // 20 px de tolerancia
+   }
+   function mostrar(e){
+     var m=cerca(e);
+     if(!m){tip.style.display='none';return;}
+     var i=m[0],j=m[1];
+     tip.textContent=vx+' = '+num(xa+(xb-xa)*i/nn)+'\n'+vy+' = '+num(ya+(yb-ya)*j/nn)+'\nz = '+num(Z(i,j));
+     tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+   }
+   cv.addEventListener('pointerleave',function(){tip.style.display='none';});
    var drag=false,px=0,py=0;
-   cv.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;py=e.clientY;cv.style.cursor='grabbing';cv.setPointerCapture(e.pointerId);});
+   cv.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;py=e.clientY;cv.style.cursor='grabbing';tip.style.display='none';cv.setPointerCapture(e.pointerId);});
    cv.addEventListener('pointerup',function(e){drag=false;cv.style.cursor='grab';});
-   cv.addEventListener('pointermove',function(e){if(!drag)return;az-=(e.clientX-px)*0.01;el+=(e.clientY-py)*0.01;
+   cv.addEventListener('pointermove',function(e){if(!drag){mostrar(e);return;}az-=(e.clientX-px)*0.01;el+=(e.clientY-py)*0.01;
      el=Math.max(0.05,Math.min(1.5,el));px=e.clientX;py=e.clientY;draw();});
  }
  function init(){var cs=document.querySelectorAll('canvas.hk-surf');for(var i=0;i<cs.length;i++)setup(cs[i]);}
@@ -325,6 +355,67 @@ namespace HekatanLisp
         public static string MapPng(LispConverter.N f, string vx, string vy,
                                     double xa, double xb, double ya, double yb, bool dark)
             => MapPng(f, vx, vy, xa, xb, ya, yb, dark, false, 0);
+
+        // 17-sep-2026, Jorge: «en el hover cursor». El mapa es un PNG (rapido y con ejes), asi que el
+        // valor no se puede sacar del pixel: se envia APARTE una rejilla de z y se interpola al vuelo.
+        // Los margenes del PNG (pL, pR, pT, pB de MapPng) van tambien, para saber donde empieza la placa.
+        public static string MapHover(LispConverter.N f, string vx, string vy,
+                                      double xa, double xb, double ya, double yb, string img)
+        {
+            const int nh = 64;
+            var (Z, _, _) = Sample(f, vx, vy, xa, xb, ya, yb, nh);
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder("[");
+            for (int j = 0; j <= nh; j++)
+                for (int i = 0; i <= nh; i++)
+                {
+                    if (i + j > 0) sb.Append(',');
+                    sb.Append(Math.Round(Z[i, j], 5).ToString("0.#####", inv));
+                }
+            sb.Append(']');
+            return "<span class=\"hk-map\" style=\"display:inline-block;position:relative\""
+                 + " data-nn=\"" + nh + "\" data-w=\"560\" data-h=\"430\""
+                 + " data-pl=\"50\" data-pr=\"84\" data-pt=\"16\" data-pb=\"42\""
+                 + " data-xa=\"" + xa.ToString("0.######", inv) + "\" data-xb=\"" + xb.ToString("0.######", inv) + "\""
+                 + " data-ya=\"" + ya.ToString("0.######", inv) + "\" data-yb=\"" + yb.ToString("0.######", inv) + "\""
+                 + " data-vx=\"" + System.Net.WebUtility.HtmlEncode(vx) + "\" data-vy=\"" + System.Net.WebUtility.HtmlEncode(vy) + "\""
+                 + " data-z='" + sb + "'>" + img + "</span>";
+        }
+
+        // Script del hover de los MAPAS (se emite una vez, como el del orbit).
+        public const string MapScript = @"<script>
+(function(){
+ function setup(sp){
+   var nn=+sp.dataset.nn, z=JSON.parse(sp.dataset.z), im=sp.querySelector('img');
+   var W=+sp.dataset.w,H=+sp.dataset.h,pL=+sp.dataset.pl,pR=+sp.dataset.pr,pT=+sp.dataset.pt,pB=+sp.dataset.pb;
+   var xa=+sp.dataset.xa,xb=+sp.dataset.xb,ya=+sp.dataset.ya,yb=+sp.dataset.yb;
+   var vx=sp.dataset.vx||'x',vy=sp.dataset.vy||'y';
+   if(!im) return;
+   var tip=document.createElement('div');
+   tip.style.cssText='position:fixed;z-index:9999;display:none;pointer-events:none;background:#fffffff2;'+
+     'border:1px solid #888;border-radius:4px;padding:3px 6px;font:12px/1.35 Consolas,monospace;color:#111;'+
+     'box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:pre';
+   document.body.appendChild(tip);
+   function num(v){var a=Math.abs(v);return (a>=1e5||(a>0&&a<1e-3))?v.toExponential(3):v.toFixed(4);}
+   function Zi(i,j){return z[j*(nn+1)+i];}
+   im.addEventListener('pointermove',function(e){
+     var r=im.getBoundingClientRect();
+     var px=(e.clientX-r.left)*W/r.width, py=(e.clientY-r.top)*H/r.height;   // pixel del PNG original
+     var u=(px-pL)/(W-pL-pR), v=1-(py-pT)/(H-pT-pB);                        // 0..1 dentro de la placa
+     if(u<0||u>1||v<0||v>1){tip.style.display='none';return;}
+     var fi=u*nn, fj=v*nn, i=Math.min(nn-1,Math.floor(fi)), j=Math.min(nn-1,Math.floor(fj));
+     var a=fi-i,b=fj-j;
+     var zz=Zi(i,j)*(1-a)*(1-b)+Zi(i+1,j)*a*(1-b)+Zi(i,j+1)*(1-a)*b+Zi(i+1,j+1)*a*b;   // bilineal
+     tip.textContent=vx+' = '+num(xa+(xb-xa)*u)+'\n'+vy+' = '+num(ya+(yb-ya)*v)+'\nz = '+num(zz);
+     tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+   });
+   im.addEventListener('pointerleave',function(){tip.style.display='none';});
+   im.style.cursor='crosshair';
+ }
+ function init(){var m=document.querySelectorAll('span.hk-map');for(var i=0;i<m.length;i++)setup(m[i]);}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>";
 
         // csi = colormap de ETABS/CSI · nlev = bandas de contorno (0 = gradiente)
         public static string MapPng(LispConverter.N f, string vx, string vy,

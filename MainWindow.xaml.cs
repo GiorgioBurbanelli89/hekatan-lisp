@@ -30,7 +30,11 @@ namespace HekatanLisp
         private readonly DispatcherTimer _debounce =
             new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
         private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
-        private string _op = "auto";               // operación: "auto" | "simplify" | "expand" | "deriv"
+        // Arranca en SIMPLIFY, no en «tal cual» (Jorge, 16-sep-2026: escribió `x+x`, vio
+        // `x + x` y dio por roto el programa — dos veces). Quien teclea una suma espera el
+        // resultado, como en Mathcad o Symbolab; «tal cual» sigue a un clic, para cuando lo
+        // que quieres es la fórmula escrita bonita SIN que te la reescriban.
+        private string _op = "simplify";           // operación: "auto" | "simplify" | "expand" | "deriv"
         private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
         private string _shot, _ctl, _pdf, _html, _latex;
         private string _lastHtml;   // último HTML renderizado (para --html: Hekatan School)
@@ -67,6 +71,8 @@ namespace HekatanLisp
             if (v is "render" or "lisp" or "math") _view = v;
             var o = ValueAfter(args, "--op");
             if (o is "auto" or "simplify" or "expand" or "deriv" or "integ") _op = o;
+            // el botón dorado tiene que decir la verdad desde el primer segundo
+            try { SetOp(_op); } catch { }
 
             var profile = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
@@ -252,7 +258,7 @@ namespace HekatanLisp
                     foreach (var ph in plots)
                         html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>",
                             ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
-                    if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + "</body>");   // motor de orbit, una vez
+                    if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + "</body>");   // orbit + hover de mapas, una vez
                 }
                 _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)
                 Viewer.NavigateToString(html);
@@ -607,7 +613,12 @@ namespace HekatanLisp
                         {
                             string b64 = SurfacePlot.MapPng(f, vx, vy, xa, xb, ya, yb, dark,
                                                            isCont, isCont ? 12 : 0);
-                            outList.Add(PlotWrap("<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">", "mapa de  " + enc + "  (planta)"));
+                            // 17-sep, Jorge: «en el hover cursor» también en los mapas → el PNG va envuelto
+                            // con la rejilla de valores, y MapScript muestra x, y, z al pasar el ratón.
+                            anySurf = true;   // así se inyectan los scripts (orbit + hover de mapas)
+                            string img = "<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">";
+                            outList.Add(PlotWrap(SurfacePlot.MapHover(f, vx, vy, xa, xb, ya, yb, img),
+                                                 "mapa de  " + enc + "  (planta)"));
                         }
                     }
                     catch { outList.Add(""); }
@@ -1681,6 +1692,8 @@ namespace HekatanLisp
         private void StartCtl()
         {
             Directory.CreateDirectory(_ctl);
+            // aviso de "ya estoy vivo" para el guion de pruebas (igual que Lab y Py)
+            try { File.WriteAllText(Path.Combine(_ctl, "ready.txt"), System.Environment.ProcessId.ToString()); } catch { }
             var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             t.Tick += (s, e) => PollCtl();
             t.Start();
@@ -1709,6 +1722,21 @@ namespace HekatanLisp
                     Editor.Text = doc.RootElement.GetProperty("text").GetString();
                     ShowResult();
                     return "{\"ok\":true}";
+                case "js":       // ejecutar JS en el WebView2 (p.ej. arrastrar la manija de una matriz)
+                    string jr = "null";
+                    try { jr = await Viewer.ExecuteScriptAsync(doc.RootElement.GetProperty("code").GetString()); }
+                    catch { }
+                    return "{\"ok\":true,\"result\":" + (string.IsNullOrEmpty(jr) ? "null" : jr) + "}";
+                case "capture":  // PNG de la ventana SIN cerrar la app (frames de una secuencia)
+                    await Capture(doc.RootElement.GetProperty("path").GetString());
+                    return "{\"ok\":true}";
+                // Escribir SIN forzar el cálculo: es el camino del usuario (TextChanged →
+                // debounce → AutoRun). `settext` llama a ShowResult a mano, así que sirve
+                // para probar el motor pero NUNCA para probar el AutoRun: con él el test
+                // pasa aunque el AutoRun esté muerto.
+                case "escribe":
+                    Editor.Text = doc.RootElement.GetProperty("text").GetString();
+                    return "{\"ok\":true,\"autorun\":" + (_autoRun ? "true" : "false") + "}";
                 case "view":     // formato de la derecha: render|lisp|math
                     SetView(doc.RootElement.GetProperty("name").GetString());
                     return "{\"ok\":true,\"view\":\"" + _view + "\"}";
@@ -1762,6 +1790,24 @@ namespace HekatanLisp
                 case "vermotor": // Menú Motor → Ver funciones (carga engine.lisp)
                     MenuVerMotor(this, null);
                     return "{\"ok\":true}";
+                // Autocompletado medible: que ofreceria el popup para un prefijo. El popup es
+                // otra ventana y no sale en --shot, asi que sin esto no habia forma de
+                // comprobarlo sin mirar la pantalla.
+                case "complete":
+                    {
+                        var pre = doc.RootElement.TryGetProperty("prefix", out var pp) ? (pp.GetString() ?? "") : "";
+                        var m = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Take(
+                            System.Linq.Enumerable.Where(Catalogo(),
+                                sy => sy.StartsWith(pre, StringComparison.OrdinalIgnoreCase)), 12));
+                        return System.Text.Json.JsonSerializer.Serialize(new {
+                            ok = true, prefijo = pre,
+                            total = System.Linq.Enumerable.Count(System.Linq.Enumerable.Where(
+                                Catalogo(), sy => sy.StartsWith(pre, StringComparison.OrdinalIgnoreCase))),
+                            catalogo = Catalogo().Length,
+                            primeros = m,
+                        });
+                    }
+
                 case "state":
                     return System.Text.Json.JsonSerializer.Serialize(new { view = _view, op = _op, lisp = _syntaxLisp, autorun = _autoRun });
                 case "hashl":
@@ -1804,6 +1850,13 @@ namespace HekatanLisp
 
         private async Task CaptureAndExit(string path)
         {
+            await Capture(path);
+            Application.Current.Shutdown();
+        }
+
+        /// <summary>Igual que CaptureAndExit pero SIN cerrar: sirve para tomar varios frames.</summary>
+        private async Task Capture(string path)
+        {
             try
             {
                 if (IsRenderView)
@@ -1826,7 +1879,6 @@ namespace HekatanLisp
                 }
             }
             catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }
-            finally { Application.Current.Shutdown(); }
         }
 
         // Imprime la HOJA renderizada a PDF (WebView2). Respeta los saltos de página (#salto) y los fondos.
@@ -2137,6 +2189,35 @@ namespace HekatanLisp
         };
         private ICSharpCode.AvalonEdit.CodeCompletion.CompletionWindow _completion;
 
+        // ── El catálogo REAL: lo que el motor sabe, no una lista copiada a mano ──────
+        //
+        // Jorge (17-sep-2026), viendo que «de» solo ofrecía cuatro: «¿esa es toda la
+        // lista?». Lo era: 59 símbolos escritos a mano aquí arriba, mientras que
+        // `engine.lisp` —el motor— define 175 funciones. Una lista copiada envejece a la
+        // primera función nueva; esta se lee del propio motor al arrancar, así que lo que
+        // se ofrece es siempre lo que de verdad se puede llamar.
+        private static string[] _catalogo;
+        private static string[] Catalogo()
+        {
+            if (_catalogo is not null) return _catalogo;
+            var nombres = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in LispSymbols) nombres.Add(s);          // los de Common Lisp, a mano
+            try
+            {
+                var ruta = Path.Combine(AppContext.BaseDirectory, "engine.lisp");
+                if (File.Exists(ruta))
+                    foreach (System.Text.RegularExpressions.Match m in
+                             System.Text.RegularExpressions.Regex.Matches(
+                                 File.ReadAllText(ruta),
+                                 @"^\((?:defun|defmacro|defparameter|defconstant|defvar)\s+([^\s\)\(]+)",
+                                 System.Text.RegularExpressions.RegexOptions.Multiline))
+                        nombres.Add(m.Groups[1].Value);
+            }
+            catch { }                                               // sin motor, quedan los de siempre
+            _catalogo = System.Linq.Enumerable.ToArray(nombres);
+            return _catalogo;
+        }
+
         private void OnTextEntered(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
             if (e.Text.Length != 1) return;
@@ -2147,7 +2228,7 @@ namespace HekatanLisp
             string prefix = doc.GetText(start, caret - start);
             if (prefix.Length < 1) return;
             var matches = System.Linq.Enumerable.ToList(
-                System.Linq.Enumerable.Where(LispSymbols, sy => sy.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
+                System.Linq.Enumerable.Where(Catalogo(), sy => sy.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
             if (matches.Count == 0) { return; }
             _completion = new ICSharpCode.AvalonEdit.CodeCompletion.CompletionWindow(Editor.TextArea) { StartOffset = start };
             foreach (var m in matches) _completion.CompletionList.CompletionData.Add(new LispCompletion(m));

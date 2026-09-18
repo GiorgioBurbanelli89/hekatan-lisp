@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using SkiaSharp;
 
@@ -23,8 +23,8 @@ namespace HekatanLisp
             var thin = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f };
             var lpen = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.2f };
             var lfill = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Fill };
-            var tfg = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15 };
-            var tac = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+            var tfg = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 15 };
+            var tac = new SKPaint { Typeface = HkFont.Ui, Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
 
             float bx0 = 80, bx1 = W - 55, by = H * 0.55f;
             var parts = (spec ?? "").Split(',');
@@ -134,7 +134,7 @@ namespace HekatanLisp
             var thin = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f };
             var lpen = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.2f };
             var lfill = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Fill };
-            var tac = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+            var tac = new SKPaint { Typeface = HkFont.Ui, Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
 
             var parts = (spec ?? "").Split(',');
             var sup = (parts.Length > 0 ? parts[0] : "fixed-fixed").Trim().ToLowerInvariant().Split('-');
@@ -150,9 +150,9 @@ namespace HekatanLisp
             Ground(cv, sR, cxR, yBase, thin);
             // COTAS: luz L (abajo) y altura h (derecha), + nudos B, C — para leer la geometría
             var dim = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.1f };
-            var tcen = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15, TextAlign = SKTextAlign.Center };
-            var tlft = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15, TextAlign = SKTextAlign.Left };
-            var tjt = new SKPaint { Color = fg, IsAntialias = true, TextSize = 14, FakeBoldText = true };
+            var tcen = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 15, TextAlign = SKTextAlign.Center };
+            var tlft = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 15, TextAlign = SKTextAlign.Left };
+            var tjt = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 14, FakeBoldText = true };
             float yL = yBase + 40;
             cv.DrawLine(cxL, yBase + 18, cxL, yL, dim);
             cv.DrawLine(cxR, yBase + 18, cxR, yL, dim);
@@ -203,7 +203,7 @@ namespace HekatanLisp
             var thin = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f };
             var dash = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, PathEffect = SKPathEffect.CreateDash(new float[] { 5, 4 }, 0) };
             var def = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 3.5f };
-            var tf = new SKPaint { Color = fg, IsAntialias = true, TextSize = 13 };
+            var tf = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 13 };
 
             float cxL = 120, cxR = W - 120, yTop = 75, yBase = H - 65;
             float hpx = yBase - yTop, Lpx = cxR - cxL;
@@ -275,9 +275,9 @@ namespace HekatanLisp
             var fpen  = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2.6f };
             var ffill = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Fill };
             var dim   = new SKPaint { Color = fg,  IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f };
-            var tfg   = new SKPaint { Color = fg,  IsAntialias = true, TextSize = 15 };
-            var tblu  = new SKPaint { Color = blu, IsAntialias = true, TextSize = 16, FakeBoldText = true };
-            var tacc  = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+            var tfg   = new SKPaint { Typeface = HkFont.Ui, Color = fg,  IsAntialias = true, TextSize = 15 };
+            var tblu  = new SKPaint { Typeface = HkFont.Ui, Color = blu, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+            var tacc  = new SKPaint { Typeface = HkFont.Ui, Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
 
             float x0 = 245, x1 = 400, yT = 120, yB = 205, cy = (yT + yB) / 2;
 
@@ -341,11 +341,11 @@ namespace HekatanLisp
             var nfillA= new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
             var mapPen= new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.8f};
             var mapFill=new SKPaint{Color=fg, IsAntialias=true,Style=SKPaintStyle.Fill};
-            var tfg = new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Center};
-            var tfgL= new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
-            var tblu= new SKPaint{Color=blu,IsAntialias=true,TextSize=16,FakeBoldText=true,TextAlign=SKTextAlign.Center};
-            var tacc= new SKPaint{Color=acc,IsAntialias=true,TextSize=16,FakeBoldText=true,TextAlign=SKTextAlign.Center};
-            var tnum= new SKPaint{Color=fg, IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tfg = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Center};
+            var tfgL= new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
+            var tblu= new SKPaint{Typeface=HkFont.Ui, Color=blu,IsAntialias=true,TextSize=16,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tacc= new SKPaint{Typeface=HkFont.Ui, Color=acc,IsAntialias=true,TextSize=16,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tnum= new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Center};
 
             // NATURAL: segmento ξ de −1 a +1
             float nx0=185, nx1=475, ny=88, nxc=(nx0+nx1)/2;
@@ -403,13 +403,13 @@ namespace HekatanLisp
             var afil = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
             var cpen = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=2.4f};
             var cfil = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
-            var tfgL = new SKPaint{Color=fg, IsAntialias=true,TextSize=15,TextAlign=SKTextAlign.Left};
-            var tfgC = new SKPaint{Color=fg, IsAntialias=true,TextSize=24,TextAlign=SKTextAlign.Center};
-            var tblu = new SKPaint{Color=blu,IsAntialias=true,TextSize=24,FakeBoldText=true,TextAlign=SKTextAlign.Center};
-            var tacc = new SKPaint{Color=acc,IsAntialias=true,TextSize=24,FakeBoldText=true,TextAlign=SKTextAlign.Center};
-            var tbluL= new SKPaint{Color=blu,IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
-            var taccL= new SKPaint{Color=acc,IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
-            var tsum = new SKPaint{Color=fg, IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tfgL = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=15,TextAlign=SKTextAlign.Left};
+            var tfgC = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=24,TextAlign=SKTextAlign.Center};
+            var tblu = new SKPaint{Typeface=HkFont.Ui, Color=blu,IsAntialias=true,TextSize=24,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tacc = new SKPaint{Typeface=HkFont.Ui, Color=acc,IsAntialias=true,TextSize=24,FakeBoldText=true,TextAlign=SKTextAlign.Center};
+            var tbluL= new SKPaint{Typeface=HkFont.Ui, Color=blu,IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var taccL= new SKPaint{Typeface=HkFont.Ui, Color=acc,IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tsum = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=22,FakeBoldText=true,TextAlign=SKTextAlign.Left};
 
             // ---- fila [1  ξ] · columna [a; b] ----
             Bracket(cv,160,78,122,true,brk);  Bracket(cv,300,78,122,false,brk);
@@ -459,12 +459,12 @@ namespace HekatanLisp
             var fblu = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
             var facc = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
             var fgrn = new SKPaint{Color=grn,IsAntialias=true,Style=SKPaintStyle.Fill};
-            var tL   = new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
-            var tC   = new SKPaint{Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Center};
-            var tblu = new SKPaint{Color=blu,IsAntialias=true,TextSize=13,TextAlign=SKTextAlign.Left};
-            var tacc = new SKPaint{Color=acc,IsAntialias=true,TextSize=13,TextAlign=SKTextAlign.Left};
-            var tgrn = new SKPaint{Color=grn,IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Left};
-            var tamb = new SKPaint{Color=amb,IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tL   = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
+            var tC   = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Center};
+            var tblu = new SKPaint{Typeface=HkFont.Ui, Color=blu,IsAntialias=true,TextSize=13,TextAlign=SKTextAlign.Left};
+            var tacc = new SKPaint{Typeface=HkFont.Ui, Color=acc,IsAntialias=true,TextSize=13,TextAlign=SKTextAlign.Left};
+            var tgrn = new SKPaint{Typeface=HkFont.Ui, Color=grn,IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tamb = new SKPaint{Typeface=HkFont.Ui, Color=amb,IsAntialias=true,TextSize=14,FakeBoldText=true,TextAlign=SKTextAlign.Left};
 
             // ejes: ξ horizontal (N=0) y N vertical
             float x_1=100, x0=300, x1=500, yN1=90, yNh=210, yN0=330, xAx=70;
@@ -513,11 +513,11 @@ namespace HekatanLisp
             var dashG= new SKPaint{Color=grn,IsAntialias=true,Style=SKPaintStyle.Stroke,StrokeWidth=1.4f,PathEffect=SKPathEffect.CreateDash(new float[]{5,4},0)};
             var fblu = new SKPaint{Color=blu,IsAntialias=true,Style=SKPaintStyle.Fill};
             var facc = new SKPaint{Color=acc,IsAntialias=true,Style=SKPaintStyle.Fill};
-            var tL   = new SKPaint{Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
-            var tC   = new SKPaint{Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Center};
-            var tR   = new SKPaint{Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Right};
-            var tblu = new SKPaint{Color=blu,IsAntialias=true,TextSize=13,FakeBoldText=true,TextAlign=SKTextAlign.Left};
-            var tacc = new SKPaint{Color=acc,IsAntialias=true,TextSize=13,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tL   = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=14,TextAlign=SKTextAlign.Left};
+            var tC   = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Center};
+            var tR   = new SKPaint{Typeface=HkFont.Ui, Color=fg, IsAntialias=true,TextSize=12,TextAlign=SKTextAlign.Right};
+            var tblu = new SKPaint{Typeface=HkFont.Ui, Color=blu,IsAntialias=true,TextSize=13,FakeBoldText=true,TextAlign=SKTextAlign.Left};
+            var tacc = new SKPaint{Typeface=HkFont.Ui, Color=acc,IsAntialias=true,TextSize=13,FakeBoldText=true,TextAlign=SKTextAlign.Left};
 
             float x_1=100, x0=300, x1=500, yx0=330, yxh=210, yxL=90, xAx=88;
             // ejes
@@ -619,9 +619,9 @@ namespace HekatanLisp
             var vpen = new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.8f };
             var vfill= new SKPaint { Color = blu, IsAntialias = true, Style = SKPaintStyle.Fill };
             var dim  = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f };
-            var tfg  = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15 };
-            var tblu = new SKPaint { Color = blu, IsAntialias = true, TextSize = 17, FakeBoldText = true };
-            var tgr  = new SKPaint { Color = gray, IsAntialias = true, TextSize = 14 };
+            var tfg  = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 15 };
+            var tblu = new SKPaint { Typeface = HkFont.Ui, Color = blu, IsAntialias = true, TextSize = 17, FakeBoldText = true };
+            var tgr  = new SKPaint { Typeface = HkFont.Ui, Color = gray, IsAntialias = true, TextSize = 14 };
 
             float x0 = 70, x1 = W - 60, y0 = 80, amp = 62;
             // eje sin deformar (línea de puntos) + apoyos
@@ -698,10 +698,10 @@ namespace HekatanLisp
             var lfill = new SKPaint { Color = acc, IsAntialias = true, Style = SKPaintStyle.Fill };
             var baseln = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f };
             var guide = new SKPaint { Color = fg, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0) };
-            var tlab = new SKPaint { Color = fg, IsAntialias = true, TextSize = 15, FakeBoldText = true };
-            var tsub = new SKPaint { Color = fg, IsAntialias = true, TextSize = 13 };
-            var tblu = new SKPaint { Color = blu, IsAntialias = true, TextSize = 15, FakeBoldText = true };
-            var tacc = new SKPaint { Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
+            var tlab = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 15, FakeBoldText = true };
+            var tsub = new SKPaint { Typeface = HkFont.Ui, Color = fg, IsAntialias = true, TextSize = 13 };
+            var tblu = new SKPaint { Typeface = HkFont.Ui, Color = blu, IsAntialias = true, TextSize = 15, FakeBoldText = true };
+            var tacc = new SKPaint { Typeface = HkFont.Ui, Color = acc, IsAntialias = true, TextSize = 16, FakeBoldText = true };
 
             // guías verticales (los dos nudos), para ver que todo alinea con la viga
             cv.DrawLine(x0, 45, x0, H - 25, guide);

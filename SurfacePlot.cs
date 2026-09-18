@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using SkiaSharp;
@@ -239,7 +239,7 @@ namespace HekatanLisp
             cv.DrawRect(X(xa), Y(yb), X(xb) - X(xa), Y(ya) - Y(yb), bo);
 
             var dot = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = nod };
-            var txt = new SKPaint { IsAntialias = true, Color = fg, TextSize = 10,
+            var txt = new SKPaint { Typeface = HkFont.Ui, IsAntialias = true, Color = fg, TextSize = 10,
                                     TextAlign = SKTextAlign.Center };
             int nJ = (nx + 1) * (ny + 1);
             bool num = numerar && nJ <= 80;
@@ -255,7 +255,7 @@ namespace HekatanLisp
             // numero de elemento en el centro de cada celda
             if (nx * ny <= 60)
             {
-                var et = new SKPaint { IsAntialias = true, Color = lin, TextSize = 10,
+                var et = new SKPaint { Typeface = HkFont.Ui, IsAntialias = true, Color = lin, TextSize = 10,
                                        TextAlign = SKTextAlign.Center };
                 int e = 0;
                 for (int j = 0; j < ny; j++)
@@ -267,7 +267,7 @@ namespace HekatanLisp
                         cv.DrawText(e.ToString(inv), fx, fy + 4, et);
                     }
             }
-            var ax = new SKPaint { IsAntialias = true, Color = fg, TextSize = 11 };
+            var ax = new SKPaint { Typeface = HkFont.Ui, IsAntialias = true, Color = fg, TextSize = 11 };
             string N(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", inv);
             for (int k = 0; k <= 4; k++)
             {
@@ -448,7 +448,7 @@ namespace HekatanLisp
                 }
             var axis = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, Color = fg, StrokeWidth = 1 };
             cv.DrawRect(pL, pT, pw, ph, axis);
-            var txt = new SKPaint { IsAntialias = true, Color = fg, TextSize = 11 };
+            var txt = new SKPaint { Typeface = HkFont.Ui, IsAntialias = true, Color = fg, TextSize = 11 };
             string N(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", inv);
             // ticks X (abajo) y Y (izquierda), 5 divisiones
             for (int k = 0; k <= 4; k++)

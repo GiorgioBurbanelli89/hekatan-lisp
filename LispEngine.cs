@@ -12,6 +12,7 @@ namespace HekatanLisp
     /// </summary>
     public static class LispEngine
     {
+#if !HEKATAN_WEB
         private static string _sbcl;
         private static string Sbcl => _sbcl ??= Find();
 
@@ -94,6 +95,10 @@ namespace HekatanLisp
         }
 
         private static string Lib => Path.Combine(AppContext.BaseDirectory, "engine.lisp");
+#else
+        // WEB: el motor (engine.lisp) va COMPILADO dentro de hlisp.wasm; no se carga de disco.
+        private static string Lib => "engine.lisp";
+#endif
 
         /// <summary>Deriva y simplifica cada expresion LISP con SBCL, en UNA sola llamada.
         /// Cada linea del resultado corresponde a una expresion (o "?" si fallo).</summary>
@@ -204,6 +209,16 @@ namespace HekatanLisp
             return 0;
         }
 
+#if HEKATAN_WEB
+        // WEB: mismo texto LISP que en escritorio, pero lo evalúa ECL dentro de hlisp.wasm.
+        // Se quitan los (load "…engine.lisp"): el motor ya está horneado en el wasm (como el core de SBCL).
+        private static string Run(string code)
+        {
+            code = System.Text.RegularExpressions.Regex.Replace(
+                code, @"(?im)^\s*\(load\s+""[^""]*engine\.lisp""\)\s*$", "");
+            return WebEngine.Run(code).TrimEnd('\n', '\r');
+        }
+#else
         private static string Run(string code)
         {
             // si el motor está HORNEADO en el core, quita los (load "…engine.lisp") — recargarlo sería lento
@@ -342,5 +357,6 @@ namespace HekatanLisp
             }
             catch (Exception ex) { return "; error motor SBCL: " + ex.Message; }
         }
+#endif
     }
 }

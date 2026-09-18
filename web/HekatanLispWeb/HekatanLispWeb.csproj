@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <!-- Hekatan LISP en el navegador: el MISMO C# del escritorio (enlazado, no copiado)
+       + el motor LISP compilado a WASM con ECL (hlisp.wasm, ver web/build/). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <DefineConstants>$(DefineConstants);HEKATAN_WEB</DefineConstants>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>HekatanLisp</RootNamespace>
+    <!-- SkiaSharp (gráficas) necesita enlazar su librería nativa dentro de dotnet.wasm -->
+    <WasmBuildNative>true</WasmBuildNative>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- API de texto obsoleta de SkiaSharp 3 (el escritorio usa 2.88): funciona igual -->
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\LispConverter.cs" Link="shared\LispConverter.cs" />
+    <Compile Include="..\..\LispEngine.cs" Link="shared\LispEngine.cs" />
+    <Compile Include="..\..\MainWindow.Pipeline.cs" Link="shared\MainWindow.Pipeline.cs" />
+    <Compile Include="..\..\MatlabToLisp.cs" Link="shared\MatlabToLisp.cs" />
+    <Compile Include="..\..\LispPseudoMat.cs" Link="shared\LispPseudoMat.cs" />
+    <Compile Include="..\..\LispLatex.cs" Link="shared\LispLatex.cs" />
+    <Compile Include="..\..\SurfacePlot.cs" Link="shared\SurfacePlot.cs" />
+    <Compile Include="..\..\BeamSchematic.cs" Link="shared\BeamSchematic.cs" />
+    <Compile Include="..\..\HkFont.cs" Link="shared\HkFont.cs" />
+    <!-- fuente de las gráficas en WASM: Open Sans + → ₓ de DejaVu (ver fonts/LEEME.txt) -->
+    <EmbeddedResource Include="fonts\hekatan-plot.ttf" LogicalName="hekatan-plot.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+</Project>

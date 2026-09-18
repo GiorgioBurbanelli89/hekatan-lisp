@@ -1,0 +1,11 @@
+
+(print (dsimp '(expt x 3) 'x))
+(print (dsimp '(* (sin x) (exp (* 2 x))) 'x))
+(print (dsimp '(/ 1 (+ 1 (expt x 2))) 'x))
+(print (evops '(/ (* 2500000 0.09) 3)))
+(print (fmt-float 395.43750000000003d0))
+(print (fmt-float (/ 1d0 3)))
+(print (expt 2 100))
+(print (/ 1 3))
+(car 5)
+(print :sigue)

@@ -1,0 +1,5 @@
+hekatan-plot.ttf = fuente de los TEXTOS de las gráficas (SkiaSharp) en la versión web.
+En WASM Skia no tiene fuentes del sistema; el escritorio usa Segoe UI (no redistribuible).
+  - Open Sans (peso 400, ancho 100)  -> SIL Open Font License 1.1 (OpenSans-OFL.txt)
+  - glifos U+2192 (→) y U+2093 (ₓ) de DejaVu Sans 2.37 -> licencia DejaVu/Bitstream Vera (DejaVu-LICENSE.txt)
+Se arma con fontTools (instancer + subset + merge).

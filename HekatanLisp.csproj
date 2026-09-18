@@ -8,6 +8,13 @@
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
+  <!-- la versión WEB (web/HekatanLispWeb) es otro proyecto: comparte los .cs por enlace -->
+  <ItemGroup>
+    <Compile Remove="web\**" />
+    <None Remove="web\**" />
+    <Content Remove="web\**" />
+    <EmbeddedResource Remove="web\**" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />

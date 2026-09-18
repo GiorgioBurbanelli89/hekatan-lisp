@@ -1,0 +1,6 @@
+(ensure-directories-exist "cmp/")
+(load "../engine.lisp") (load "hlisp_web.lisp")
+(dolist (f (directory "HekatanLispWeb/wwwroot/ejemplos/*.lisp"))
+  (let ((code (with-open-file (s f :external-format :utf-8) (let ((str (make-string (file-length s)))) (subseq str 0 (read-sequence str s))))))
+    (with-open-file (o (format nil "cmp/~a.sbcl" (pathname-name f)) :direction :output :if-exists :supersede :external-format :utf-8)
+      (write-string (hlisp-web-run code) o))))

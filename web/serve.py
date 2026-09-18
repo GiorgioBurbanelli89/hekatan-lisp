@@ -10,7 +10,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         **http.server.SimpleHTTPRequestHandler.extensions_map,
         ".js": "text/javascript", ".wasm": "application/wasm",
         ".json": "application/json", ".lisp": "text/plain; charset=utf-8",
-        ".html": "text/html; charset=utf-8",
+        ".html": "text/html; charset=utf-8", ".css": "text/css",
+        ".dat": "application/octet-stream", ".ttf": "font/ttf", ".png": "image/png",
+        ".br": "application/octet-stream", ".gz": "application/octet-stream",
     }
     def guess_type(self, path):
         return self.extensions_map.get(os.path.splitext(path)[1].lower(), "application/octet-stream")

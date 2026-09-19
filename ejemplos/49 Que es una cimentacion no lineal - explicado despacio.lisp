@@ -8,13 +8,15 @@
 F_resorte = k*delta
 #: NO LINEAL: la regla CAMBIA según lo que pasa. El suelo es un resorte que solo trabaja cuando lo aplastas (δ > 0). Si lo "estiras" (δ < 0, la zapata sube), no hace nada: fuerza cero. Se escribe con la mitad de (δ + |δ|), que vale δ si δ es positivo y 0 si es negativo:
 F_suelo = k*(delta + abs(delta))/2
-#: Las dos juntas, con k = 1. La azul es una recta de punta a punta. La del suelo es recta a la derecha y PLANA a la izquierda: tiene un CODO en δ = 0. Ese codo es la no linealidad.
-#fplot(resorte = x, suelo = (x + abs(x))/2, [-1 1])
+#: Las dos juntas, con k = 1 (gráfica de la izquierda, abajo en la sección 2). La azul es una recta de punta a punta. La del suelo es recta a la derecha y PLANA a la izquierda: tiene un CODO en δ = 0. Ese codo es la no linealidad.
 
 ## 2 · Un solo resorte, animado
 
 #: Se aplasta y se estira poco a poco: la curva se va dibujando de izquierda a derecha. Del lado del tirón (izquierda) el resorte normal responde con fuerza negativa; el suelo se queda en cero porque la zapata simplemente se DESPEGA. A la derecha, empujando, los dos responden igual.
+#fila
+#fplot(resorte = x, suelo = (x + abs(x))/2, [-1 1])
 #anim fplot(resorte = x*(1 + sign(n/10 - x))/2, suelo = (x + abs(x))/2*(1 + sign(n/10 - x))/2, [-1 1]), n = -10:10
+#finfila
 
 ## 3 · La zapata: una fila de resortes
 
@@ -52,9 +54,11 @@ a_n20 = dec(3*(0.75 - 0.5), 2)
 #: Si se calcula como lineal (suelo que tira), la presión máxima sale 76.67 en vez de 81.91 tonf/m²: un 6.4 % MENOS, del lado inseguro. Y la zona "levantada" aparece tirando del suelo, cosa que no pasa.
 dif = dec((76.670/81.914 - 1)*100, 1)
 #: Cinco programas con la misma malla dan lo mismo. En la gráfica, x es el número del programa (1 SAP2000, 2 Hekatan, 3 SAFE, 4 ETABS, 5 OpenSeesPy); la línea «rigida» es la zapata rígida de Das (82.21) y «lineal» el suelo que tira (76.67):
+#: A la derecha, en función de e (otra zapata, 2 × 2 m, P = 60 tonf): la curva es la fórmula de Das; los puntos, el cálculo por elementos finitos. Siguen a la curva también después de e/L = 1/6, donde empieza el levantamiento.
+#fila
 #fplot(rigida = 82.211, lineal = 76.670, SAP2000 = [1 81.914], Hekatan = [2 81.915], SAFE = [3 81.915], ETABS = [4 81.915], OpenSeesPy = [5 81.915], [0.5 5.5])
-#: Y en función de e (otra zapata, 2 × 2 m, P = 60 tonf): la curva es la fórmula de Das; los puntos, el cálculo por elementos finitos. Siguen a la curva también después de e/L = 1/6, donde empieza el levantamiento:
 #fplot(Das = 15*(1 + 6*x)*(1 + sign(1/6 - x))/2 + (20/(1 - 2*x))*(1 - sign(1/6 - x))/2, SAP2000 = [0 15.180; 1/12 22.464; 1/6 30.000; 1/4 40.052; 1/3 60.038], Hekatan = [0 15.180; 1/12 22.464; 1/6 30.000; 1/4 40.055; 1/3 60.072], [0 0.4])
+#finfila
 
 ## En una línea
 

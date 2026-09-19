@@ -32,7 +32,8 @@ sigma_nudo = Expand{((1 - (a - h) - h/2) + (1 - a - h/2))/2}
 #: Sale 1 − {a}: justo la tensión EXACTA en ese nudo. Promediar no es un truco: aquí devuelve el valor exacto.
 
 ## 5 · Convergencia y divergencia
-#: El error del desplazamiento en función del número de elementos:
-#fplot(e_u = 1/(8*n^2), [1 8])
+#: El error del desplazamiento en función del número de elementos. La curva es la fórmula; los puntos son el error MEDIDO en las animaciones de arriba (la mayor distancia entre la parábola y los tramos rectos) con 1, 2, 4 y 8 elementos:
+#fplot(e_u = 1/(8*n^2), medido = [1 0.125; 2 0.03125; 4 0.0078125; 8 0.001953125], [1 8])
+#: Los puntos caen justo sobre la curva: cada vez que se duplica {n}, el error se divide entre 4.
 #: CONVERGE: al refinar, la curva baja hacia cero y los dos programas (o el programa y la solución exacta) se acercan. DIVERGE: al refinar, la diferencia no baja o crece; eso indica que los dos modelos NO son el mismo (otro elemento, otra teoría —Shell-Thin contra Shell-Thick— u otro error).
 #: Y cuando dos programas dan una diferencia cercana a 0 %, con la misma malla y el mismo elemento, significa que hacen el MISMO cálculo.

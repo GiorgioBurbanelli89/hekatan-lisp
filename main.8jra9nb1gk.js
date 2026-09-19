@@ -337,6 +337,7 @@ const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => 
 fetch('ejemplos.json').then(r => r.json()).then(l => {
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
   for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));
+  if (archivo && l.includes(archivo)) $('sel-ejemplos').value = archivo;   // abierto por enlace antes de que llegara la lista
 });
 $('sel-ejemplos').onchange = e => { if (e.target.value) cargarEjemplo(e.target.value); };
 

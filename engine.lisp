@@ -865,7 +865,8 @@
                                  (to-rows v))))
     (t (let ((x (cond ((numberp v) v)
                       (t (let ((w (ignore-errors (eval-consts (simplify v)))))
-                           (if (numberp w) w (num-eval (or w v))))))))
+                           ;; hk-num: ultimo intento con π, √ y decimales ya formateados por otro dec
+                           (if (numberp w) w (or (ignore-errors (num-eval (or w v))) (hk-num v))))))))
          (if (null x) v
              (let ((txt (fmt-dec-str x n)))
                ;; simbolo con el texto por nombre: asi funciona igual dentro de una
@@ -1212,10 +1213,88 @@
 ;; dec como FUNCION, para que `evops` la aplique en el camino ESCALAR (el de
 ;; matrices entra por `meval`). Sin n: 6 cifras y se podan los ceros de cola.
 (defun dec (x &optional n) (to-dec x (or n 6) (null n)))
+
+;;;; ---- ceil / floor / round / max / min NUMERICOS (hojas de diseño: n = ⌈As/Ab⌉) ----
+;;;; Antes quedaban sin evaluar (ceil(24.3/2.01) se dibujaba tal cual). Evaluan si el
+;;;; argumento REDUCE a numero (aunque lleve π o √); si queda una letra libre, la forma
+;;;; se devuelve igual (simbolica). Sobre VECTORES trabajan termino a termino, y max/min
+;;;; de varios vectores (o vector y escalar) dan el maximo/minimo elemento a elemento.
+;;;; round = redondeo "de escuela" (0.5 sube), no el de banquero de Common Lisp.
+(defparameter *num-fns* '(ceil floor round max min))
+(defun ceil (x) (values (ceiling x)))                  ; camino "auto" (eval directo)
+(defun hk-numsym (e)
+  "Simbolos con nombre de numero (los que deja `dec`: |24.34|) -> racional exacto."
+  (cond ((and (symbolp e) e (not (eq e t))
+              ;; solo nombres que EMPIEZAN como numero (24.34, -0.15): rapido en matrices grandes
+              (let ((nm (symbol-name e)))
+                (and (> (length nm) 0)
+                     (or (digit-char-p (char nm 0))
+                         (and (> (length nm) 1) (member (char nm 0) '(#\- #\.)) (digit-char-p (char nm 1)))))))
+         (let ((v (ignore-errors (let ((*read-default-float-format* 'double-float))
+                                   (read-from-string (symbol-name e))))))
+           (if (numberp v) (rational v) e)))
+        ((consp e) (cons (car e) (mapcar #'hk-numsym (cdr e))))
+        (t e)))
+(defun hk-num (x)
+  "Valor numerico (racional si se puede) de X, o NIL si tiene letras libres."
+  (flet ((rat (v) (cond ((rationalp v) v) ((floatp v) (rational v)) (t nil))))
+    (let* ((x (hk-numsym x))
+           (w (ignore-errors (eval-consts (simplify x)))))
+      (or (rat x) (rat w)
+          (rat (ignore-errors (num-eval w))) (rat (ignore-errors (num-eval x)))
+          (rat (ignore-errors (nval (or w x) '%sin-var% 0)))
+          (rat (ignore-errors (nval x '%sin-var% 0)))))))
+(defun hk-arg (a)
+  "Argumento de ceil/floor/…: su NUMERO si reduce (resolviendo antes los ceil/floor
+   anidados; decimales y π incluidos), si no el resultado simbolico de evops."
+  (labels ((inner (e) (cond ((atom e) e)
+                            ((member (car e) *num-fns*) (num-fn (car e) (mapcar #'hk-arg (cdr e))))
+                            (t (cons (car e) (mapcar #'inner (cdr e)))))))
+    (let ((e (inner a)))
+      (or (and (not (matp e)) (hk-num e)) (ignore-errors (evops e)) e))))
+(defun hk-dn (x)
+  "Decimales ya formateados por `dec` (simbolos |2.011|) -> racional, tambien dentro de un
+   vector: asi Ab = dec(π·1.6²/4, 3) se puede usar despues en n = ceil(As/Ab)."
+  (cond ((matp x) (from-rows (mapcar (lambda (f) (mapcar #'hk-numsym f)) (to-rows x))))
+        (t (hk-numsym x))))
+(defun hk-round1 (f x)
+  (let ((v (hk-num x)))
+    (if (null v) (list f x)
+        (ecase f
+          (ceil (ceiling v))
+          (floor (floor v))
+          (round (floor (+ v 1/2)))))))
+(defun hk-elems (v) (if (matp v) (to-rows v) nil))
+(defun num-fn (f args)
+  "Aplica ceil/floor/round/max/min a ARGS ya evaluados (escalares o matrices)."
+  (let ((mats (remove-if-not #'matp args)))
+    (cond
+      ;; vector/matriz: termino a termino (los escalares se repiten en cada posicion)
+      (mats
+       (let ((rows (to-rows (first mats))))
+         (from-rows
+          (loop for i from 0 below (length rows)
+                collect (loop for j from 0 below (length (nth i rows))
+                              collect (num-fn f (mapcar (lambda (a)
+                                                          (if (matp a) (nth j (nth i (to-rows a))) a))
+                                                        args)))))))
+      ((member f '(ceil floor round)) (hk-round1 f (first args)))
+      ;; max/min devuelven el ARGUMENTO ganador tal cual (12.25 sigue siendo 12.25, no la
+      ;; fraccion binaria exacta del double)
+      (t (let ((vs (mapcar #'hk-num args)))
+           (if (every #'identity vs)
+               (let ((best 0))
+                 (loop for k from 1 below (length vs)
+                       when (if (eq f 'max) (> (nth k vs) (nth best vs)) (< (nth k vs) (nth best vs)))
+                         do (setf best k))
+                 (nth best args))
+               (cons f args)))))))
+
 (defun evops (e)
   (cond
     ((atom e) e)
     ((eq (car e) 'quote) (second e))                     ; '(...) → el dato tal cual
+    ((member (car e) *num-fns*) (num-fn (car e) (mapcar #'hk-arg (cdr e))))
     ((member (car e) *op-calls*)                         ; (partial 'f 'x) → su resultado
      (apply (symbol-function (car e))
             (mapcar (lambda (a) (if (and (consp a) (eq (car a) 'quote)) (second a) (evops a)))
@@ -1532,6 +1611,19 @@
                                                (mnum (meval (fourth e)))))
     ;; trace(M): traza (suma de la diagonal). cross(u,v): producto cruz 3D.
     ((eq (car e) 'trace) (mtrace (meval (second e))))
+    ;; ceil/floor/round/max/min: numericos, termino a termino sobre vectores (ver num-fn)
+    ((member (car e) *num-fns*) (num-fn (car e) (mapcar #'meval (cdr e))))
+    ;; matriz / escalar (As/Ab con As vector): antes caia al ramal generico y no se dividia
+    ((and (eq (car e) '/) (= (length e) 3))
+     ;; un 1x1 cuenta como ESCALAR (vᵀ·u en Sherman-Morrison): se escalariza antes de decidir
+     (let ((a (scalarize (hk-dn (meval (second e))))) (b (scalarize (hk-dn (meval (third e))))))
+       (cond ((and (matp a) (not (matp b))) (mscale (simplify (list '/ 1 b)) a))
+             ;; escalar / vector y vector / vector (mismo largo): termino a termino (b/n con n vector)
+             ((and (matp b) (or (not (matp a)) (equal (array-dimensions a) (array-dimensions b)))
+                   (not (vectorp (aref b 0))))
+              (map 'vector (lambda (x y) (simplify (list '/ x y)))
+                   (if (matp a) a (make-array (length b) :initial-element a)) b))
+             (t (clean (simplify (list '/ (scalarize a) (scalarize b))))))))
     ;; Expand{…} / Simplify{…} / Factor{…} sobre MATRICES: antes caian al ramal
     ;; generico y devolvian la forma SIN evaluar (el producto quedaba escrito). El
     ;; algebra de matrices ya simplifica cada entrada al operar, asi que basta con
@@ -1568,7 +1660,7 @@
     ((eq (car e) '-) (if (cddr e) (m2 #'msub #'- (meval (second e)) (meval (third e)))
                          (let ((v (meval (second e))))    ; menos unario: matriz -> escalar -1; escalar -> -x
                            (if (matp v) (mscale -1 v) (simplify (list '- v))))))
-    ((eq (car e) '*) (mtimes (meval (second e)) (meval (third e))))
+    ((eq (car e) '*) (mtimes (hk-dn (meval (second e))) (hk-dn (meval (third e)))))
     ((eq (car e) 'expt)
      (let ((base (meval (second e))) (p (meval (third e))))
        (if (and (matp base) (eql p -1)) (minv-auto base) (simplify (list 'expt base p)))))

@@ -257,7 +257,8 @@ async function compartir() {
   else p.set('h', await comprimir(t));
   if (op !== 'simplify') p.set('op', op);
   if (view !== 'render') p.set('v', view);
-  const url = location.origin + location.pathname + '#' + p.toString();
+  if (document.body.classList.contains('solo')) p.set('solo', '1');   // quien lo abra ve solo el resultado
+  const url =location.origin + location.pathname + '#' + p.toString();
   let copiado = false;
   try { await navigator.clipboard.writeText(url); copiado = true; } catch { }
   aviso(`<b style="color:var(--gold)">🔗 Enlace para compartir</b><br>
@@ -271,6 +272,7 @@ async function abrirDesdeEnlace() {
   const p = new URLSearchParams(location.hash.slice(1));
   if (p.get('op')) op = p.get('op');
   if (p.get('v')) view = p.get('v');
+  if (p.get('solo') === '1') setSolo(true);
   if (p.get('ej')) {
     const f = p.get('ej'), t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
     ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
@@ -303,6 +305,16 @@ document.addEventListener('click', e => {
   else if (b.dataset.ej) { cargarEjemplo(b.dataset.ej); $('sel-ejemplos').value = b.dataset.ej; }
 });
 $('btn-run').onclick = showResult;
+// «Solo resultado»: pantalla completa para la hoja renderizada (Esc o el mismo botón para volver)
+function setSolo(on) {
+  document.body.classList.toggle('solo', on);
+  $('btn-solo').innerHTML = on ? '✎<span class="txt"> Volver al editor</span>' : '⛶<span class="txt"> Solo resultado</span>';
+  $('btn-solo').title = on ? 'Volver al editor (Esc)' : 'Ver solo el resultado, a pantalla completa (Esc para volver)';
+}
+$('btn-solo').onclick = () => setSolo(!document.body.classList.contains('solo'));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.body.classList.contains('solo') && !$('modal').classList.contains('on')) setSolo(false);
+});
 if (leerLocal('hlisp-intro-cerrada') === '1') $('intro').classList.add('oculto');
 $('intro-cerrar').onclick = () => { $('intro').classList.add('oculto'); guardarLocal('hlisp-intro-cerrada', '1'); };
 $('chk-auto').onchange = e => { autoRun = e.target.checked; if (autoRun) showResult(); };

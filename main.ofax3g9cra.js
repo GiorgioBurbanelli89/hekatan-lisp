@@ -207,7 +207,17 @@ function descargar(nombre, texto) {
   a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 function aviso(html) { $('modal-txt').innerHTML = html; $('modal').classList.add('on'); }
-$('modal').onclick = () => $('modal').classList.remove('on');
+$('modal').onclick = e => { if (e.target === $('modal')) $('modal').classList.remove('on'); };   // solo al tocar AFUERA
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('modal').classList.remove('on'); });
+// pegar otro enlace compartido en la misma pestaña → carga esa hoja
+addEventListener('hashchange', async () => {
+  try {
+    if (await abrirDesdeEnlace()) {
+      document.querySelectorAll('.sym[data-op]').forEach(b => b.classList.toggle('on', b.dataset.op === op));
+      setView(view);
+    }
+  } catch { }
+});
 
 const ACCIONES = {
   nuevo: () => { cargarTexto('', null); $('sel-ejemplos').value = ''; ed.focus(); },
@@ -217,8 +227,55 @@ const ACCIONES = {
   copiarLisp: () => navigator.clipboard?.writeText(W.FullLisp(sourceText(), op)),
   pdf: () => { if (view !== 'render') setView('render'); $('render').contentWindow?.print(); },
   verMotor: async () => cargarTexto(await (await fetch('engine.lisp')).text(), 'engine.lisp'),
+  compartir: () => compartir(),
   acerca: () => aviso('<b style="color:var(--gold)">Hekatan LISP</b> — versión web.<br>Motor LISP: ECL compilado a WebAssembly (engine.lisp).<br>Render: el mismo código C# de la app de escritorio.'),
 };
+// ---------- enlace para compartir: la hoja viaja en el #hash (no pasa por ningún servidor) ----------
+//   #ej=<ejemplo>            ejemplo sin cambios (enlace corto)
+//   #h=<texto comprimido>    hoja propia: deflate-raw + base64url
+//   &op=deriv&v=lisp         operación y vista, si no son las de siempre
+async function comprimir(t) {
+  const s = new Blob([t]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  const b = new Uint8Array(await new Response(s).arrayBuffer());
+  let bin = ''; for (const x of b) bin += String.fromCharCode(x);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function descomprimir(c) {
+  const bin = atob(c.replace(/-/g, '+').replace(/_/g, '/'));
+  const b = Uint8Array.from(bin, ch => ch.charCodeAt(0));
+  const s = new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return await new Response(s).text();
+}
+async function compartir() {
+  const t = sourceText();
+  const p = new URLSearchParams();
+  if (archivo && ejemploTexto !== null && t === ejemploTexto) p.set('ej', archivo);
+  else p.set('h', await comprimir(t));
+  if (op !== 'simplify') p.set('op', op);
+  if (view !== 'render') p.set('v', view);
+  const url = location.origin + location.pathname + '#' + p.toString();
+  let copiado = false;
+  try { await navigator.clipboard.writeText(url); copiado = true; } catch { }
+  aviso(`<b style="color:var(--gold)">🔗 Enlace para compartir</b><br>
+    Quien lo abra ve esta hoja, ya calculada${copiado ? ' — <b>copiado</b> al portapapeles' : ''}:<br>
+    <input id="url-compartir" readonly value="${url.replace(/"/g, '&quot;')}"
+      style="width:100%;margin-top:8px;padding:6px;font:12px Consolas,monospace;background:var(--editor);color:var(--text);border:1px solid var(--btn-border)">
+    <div style="margin-top:6px;font-size:11px;color:var(--muted)">${url.length.toLocaleString()} caracteres · la hoja va dentro del enlace</div>`);
+  const i = $('url-compartir'); i.focus(); i.select();
+}
+async function abrirDesdeEnlace() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get('op')) op = p.get('op');
+  if (p.get('v')) view = p.get('v');
+  if (p.get('ej')) {
+    const f = p.get('ej'), t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
+    ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
+    return true;
+  }
+  if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); return true; }
+  return false;
+}
+
 $('file').onchange = async e => { const f = e.target.files[0]; if (f) cargarTexto(await f.text(), f.name); e.target.value = ''; };
 
 const menu = $('menu');
@@ -275,7 +332,8 @@ const GR = [['α', 'alpha'], ['β', 'beta'], ['γ', 'gamma'], ['δ', 'delta'], [
 $('griegas').innerHTML = GR.map(([g, t]) => `<button class="sym gr" data-ins="${t}">${g}</button>`).join('');
 
 // lista de ejemplos: en Archivo → Ejemplos y en la lista de la barra de arriba
-const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => cargarTexto(t, f));
+let ejemploTexto = null;   // texto del ejemplo cargado: si no se tocó, el enlace lo nombra (corto)
+const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); });
 fetch('ejemplos.json').then(r => r.json()).then(l => {
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
   for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));
@@ -287,9 +345,12 @@ const temaGuardado = leerLocal('hlisp-tema');
 dark = temaGuardado === 'dark';
 document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 $('btn-theme').textContent = dark ? '☾' : '☀';
-ponerEditor(leerLocal('hlisp-autosave') || EJ_MATH);
+// si se abrió con un enlace compartido, esa hoja manda; si no, lo último que escribiste (o el ejemplo)
+let desdeEnlace = false;
+try { desdeEnlace = location.hash.length > 1 && await abrirDesdeEnlace(); } catch { desdeEnlace = false; }
+if (!desdeEnlace) ponerEditor(leerLocal('hlisp-autosave') || EJ_MATH);
 if (matchMedia('(max-width: 760px)').matches) $('keypad').classList.add('oculto');   // celular: calculadora a un toque (🖩)
 highlightSyntax();
 document.querySelectorAll('.sym[data-op]').forEach(b => b.classList.toggle('on', b.dataset.op === op));
-setView('render');
+setView(view);
 $('carga').remove();

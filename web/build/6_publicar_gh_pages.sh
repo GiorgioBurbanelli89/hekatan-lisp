@@ -2,8 +2,11 @@
 # Correr desde hekatan-lisp/ en Git Bash:  bash web/build/6_publicar_gh_pages.sh
 set -e
 RAIZ="$PWD"
-cd web/HekatanLispWeb && dotnet publish -c Release > /dev/null && cd "$RAIZ"
+# publicación LIMPIA: la incremental a veces deja los marcadores main#[.{fingerprint}].js sin reemplazar
+# (pasó el 2026-09-18: el sitio pedía «main» y «hlisp» → 404 y la página no cargaba)
+cd web/HekatanLispWeb && rm -rf bin/Release obj/Release && dotnet publish -c Release > /dev/null && cd "$RAIZ"
 PUB="$RAIZ/web/HekatanLispWeb/bin/Release/net10.0/publish/wwwroot"
+if grep -q '{fingerprint}' "$PUB/index.html"; then echo "ERROR: index.html con marcadores sin reemplazar; NO se publica"; exit 1; fi
 T=$(mktemp -d)
 git clone -q --branch gh-pages --single-branch https://github.com/GiorgioBurbanelli89/hekatan-lisp.git "$T"
 cd "$T"

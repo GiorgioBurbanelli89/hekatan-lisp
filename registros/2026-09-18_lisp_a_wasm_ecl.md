@@ -51,6 +51,12 @@ Entorno: WSL Ubuntu (~/lispwasm), emsdk latest, ECL git.
   48 hojas escritorio antes/después: cambian SOLO 00, 06, 07, 08 (las que tenían texto truncado); el resto idéntico.
   Web publicada: «Hola. Deriva x^2: x² = 2·x».
 
+### Parte 4 — publicar sin romper (GitHub Pages)
+- ❌ «Solo resultado» no cambiaba nada en el navegador de Jorge: usaba el **app.css viejo de la caché** (GitHub Pages ~10 min). main.js sí se renovó (lleva huella); el CSS no.
+- ❌ El marcador de huella de .NET NO se aplica a `<link>` (lo deja en app.css) → al publicar: `app.css?v=<sha1 contenido>`.
+- ❌ Publicación INCREMENTAL dejó `main#[.{fingerprint}].js` sin reemplazar → el sitio pedía «main»/«hlisp» (404) y no cargaba. → publicación LIMPIA + chequeo que aborta si queda `{fingerprint}`.
+- ✅ Todo en `web/build/6_publicar_gh_pages.sh` (clon temporal de gh-pages, autocrlf=false, .nojekyll, sin .br/.gz, ?v= del CSS). Verificado en el sitio público.
+
 ## ⏳ Falta
 - Velocidad: motor web ~150 µs/op vs SBCL ~1 µs (ECL -O0 por --spill-pointers + eval en bytecode). Probar -O1/-O2 y medir.
 - «LISP ▶» en la web muestra rutas del escritorio (/sbcl/sbcl.exe): es el mismo C#; el script es para correrlo en SBCL de escritorio.

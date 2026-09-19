@@ -325,12 +325,16 @@ namespace HekatanLisp
             rest = (rest ?? "").Trim();
             double lo = -1, hi = 1; string forcedVar = null;
             var sel = new List<(string, LispConverter.N)>();
+            var dots = new List<(string name, double[] xs, double[] ys)>();
             var paren = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
             if (paren.Success)   // estilo MATLAB: fplot(N1, N2, [-1 1])
             {
                 foreach (var a0 in SplitTop(paren.Groups[1].Value))
                 {
                     var a = a0.Trim(); if (a.Length == 0) continue;
+                    // PUNTOS sueltos:  SAP2000 = [x1 y1; x2 y2]  (datos encima de las curvas)
+                    var dm = System.Text.RegularExpressions.Regex.Match(a, @"^([A-Za-z][\w']*)\s*=\s*\[([^\[\]]*)\]$");
+                    if (dm.Success && TryPuntos(dm.Groups[2].Value, inv, out var pxs, out var pys)) { dots.Add((dm.Groups[1].Value, pxs, pys)); continue; }
                     var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
                     if (rng.Success) { double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out lo); double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out hi); continue; }
                     AddFn(sel, byName, a);
@@ -360,10 +364,34 @@ namespace HekatanLisp
                 if (toks.Length >= k + 2 && double.TryParse(toks[k], System.Globalization.NumberStyles.Any, inv, out lo) && double.TryParse(toks[k + 1], System.Globalization.NumberStyles.Any, inv, out hi))
                     for (int j = k + 2; j < toks.Length; j++) AddFn(sel, byName, toks[j]);
             }
-            if (sel.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
-            if (sel.Count == 0) return "";
-            string var = forcedVar ?? LispConverter.FreeVar(sel[0].Item2);
-            return LispConverter.PlotSvg(var, lo, hi, sel) ?? "";
+            if (sel.Count == 0 && dots.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
+            if (sel.Count == 0 && dots.Count == 0) return "";
+            string var = forcedVar ?? (sel.Count > 0 ? LispConverter.FreeVar(sel[0].Item2) : "x");
+            return LispConverter.PlotSvg(var, lo, hi, sel, dots) ?? "";
+        }
+
+        // "x1 y1; x2 y2" (o con comas) → dos vectores. Admite fracciones a/b. Cada fila = un punto.
+        private static bool TryPuntos(string body, System.Globalization.CultureInfo inv, out double[] xs, out double[] ys)
+        {
+            var lx = new List<double>(); var ly = new List<double>();
+            xs = ys = null;
+            foreach (var fila in body.Split(';'))
+            {
+                var t = fila.Trim(); if (t.Length == 0) continue;
+                var nums = System.Text.RegularExpressions.Regex.Split(t, @"[\s,]+");
+                if (nums.Length != 2) return false;
+                var v = new double[2];
+                for (int k = 0; k < 2; k++)
+                {
+                    var q = nums[k].Split('/');
+                    if (q.Length == 2 && double.TryParse(q[0], System.Globalization.NumberStyles.Any, inv, out var q1)
+                        && double.TryParse(q[1], System.Globalization.NumberStyles.Any, inv, out var q2) && q2 != 0) v[k] = q1 / q2;
+                    else if (!double.TryParse(nums[k], System.Globalization.NumberStyles.Any, inv, out v[k])) return false;
+                }
+                lx.Add(v[0]); ly.Add(v[1]);
+            }
+            if (lx.Count == 0) return false;
+            xs = lx.ToArray(); ys = ly.ToArray(); return true;
         }
 
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por

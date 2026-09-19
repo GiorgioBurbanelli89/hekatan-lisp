@@ -1985,9 +1985,12 @@ document.addEventListener('mouseup',function(){
         }
 
         // ---------- grafica SVG de una o varias funciones f(var) sobre [lo,hi] ----------
-        public static string PlotSvg(string var, double lo, double hi, List<(string name, N tree)> fns)
+        public static string PlotSvg(string var, double lo, double hi, List<(string name, N tree)> fns,
+                                     List<(string name, double[] xs, double[] ys)> dots = null)
         {
-            if (fns == null || fns.Count == 0 || hi <= lo) return "";
+            dots ??= new List<(string name, double[] xs, double[] ys)>();
+            fns ??= new List<(string name, N tree)>();
+            if ((fns.Count == 0 && dots.Count == 0) || hi <= lo) return "";
             const int W = 540, H = 360, pL = 56, pR = 18, pT = 18, pB = 44, NS = 200;
             var C = System.Globalization.CultureInfo.InvariantCulture;
             // muestrear
@@ -2005,6 +2008,10 @@ document.addEventListener('mouseup',function(){
                 }
                 series.Add((name, xs, ys));
             }
+            // PUNTOS sueltos (datos: resultados de SAP2000, ensayos...) también entran en el rango Y
+            foreach (var d in dots)
+                for (int k = 0; k < d.ys.Length; k++)
+                    if (!double.IsNaN(d.ys[k]) && !double.IsInfinity(d.ys[k])) { ymin = Math.Min(ymin, d.ys[k]); ymax = Math.Max(ymax, d.ys[k]); }
             if (double.IsInfinity(ymin) || double.IsInfinity(ymax)) return "";
             if (ymax - ymin < 1e-9) { ymin -= 1; ymax += 1; }
             // límites Y "bonitos" (como MATLAB): redondea a múltiplos del paso
@@ -2055,18 +2062,34 @@ document.addEventListener('mouseup',function(){
                 }
                 sb.Append("<polyline points=\"").Append(pts).Append("\" fill=\"none\" stroke=\"").Append(col).Append("\" stroke-width=\"2\"/>");
             }
+            for (int d = 0; d < dots.Count; d++)
+            {
+                string col = PlotColors[(series.Count + d) % PlotColors.Length];
+                var (_, dxs, dys) = dots[d];
+                for (int k = 0; k < dxs.Length; k++)
+                {
+                    if (double.IsNaN(dys[k]) || dxs[k] < lo || dxs[k] > hi) continue;
+                    sb.Append("<circle cx=\"").Append(Num(SX(dxs[k]))).Append("\" cy=\"").Append(Num(SY(dys[k])))
+                      .Append("\" r=\"4.5\" fill=\"").Append(col).Append("\" stroke=\"var(--bg)\" stroke-width=\"1.2\"><title>(")
+                      .Append(Num(dxs[k])).Append("; ").Append(Num(dys[k])).Append(")</title></circle>");
+                }
+            }
             // leyenda en CAJA, arriba-derecha DENTRO de los ejes. Ancho SEGÚN la etiqueta más larga
             // (antes era fijo 78 y el texto se salía del cuadro) y etiquetas BONITAS (·, superíndices).
             var pretty = series.ConvertAll(se => PrettyLabel(se.name));
+            foreach (var d in dots) pretty.Add(PrettyLabel(d.name));
             int llen = 0; foreach (var p in pretty) llen = Math.Max(llen, p.Length);
-            int lw = 40 + llen * 7, lh = 8 + series.Count * 17;
+            int lw = 40 + llen * 7, lh = 8 + pretty.Count * 17;
             int lx = W - pR - lw - 6; if (lx < pL + 4) lx = pL + 4;
             int lyTop = pT + 8;
             sb.Append("<rect x=\"").Append(lx).Append("\" y=\"").Append(lyTop).Append("\" width=\"").Append(lw).Append("\" height=\"").Append(lh)
               .Append("\" fill=\"var(--bg)\" fill-opacity=\".9\" stroke=\"var(--mut)\" stroke-width=\"1\"/>");
-            for (int s = 0; s < series.Count; s++)
+            for (int s = 0; s < pretty.Count; s++)
             {
                 int ly = lyTop + 14 + s * 17; string col = PlotColors[s % PlotColors.Length];
+                if (s >= series.Count)   // punto: marcador circular
+                    sb.Append("<circle cx=\"").Append(lx + 17).Append("\" cy=\"").Append(ly).Append("\" r=\"4.5\" fill=\"").Append(col).Append("\"/>");
+                else
                 sb.Append("<line x1=\"").Append(lx + 8).Append("\" y1=\"").Append(ly).Append("\" x2=\"").Append(lx + 26).Append("\" y2=\"").Append(ly).Append("\" stroke=\"").Append(col).Append("\" stroke-width=\"2.5\"/>");
                 sb.Append("<text x=\"").Append(lx + 32).Append("\" y=\"").Append(ly + 4).Append("\" fill=\"var(--fg)\" font-size=\"12\" font-style=\"italic\">").Append(System.Net.WebUtility.HtmlEncode(pretty[s])).Append("</text>");
             }

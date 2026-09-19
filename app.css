@@ -54,7 +54,7 @@ body {
 .modos .titulo, .mode, .auto, .lbl { white-space: nowrap; }
 /* pantalla mediana: se esconde el rótulo «resultado como:» para que la barra quepa en una fila */
 @media (max-width: 1280px) and (min-width: 761px) {
-  .lbl-como, .ejemplos .lbl { display: none; }
+  .lbl-como, .ejemplos .lbl, #btn-solo .txt { display: none; }
   .ejemplos select { max-width: 200px; }
   .modos .mode { padding: 6px 8px; }
 }
@@ -74,6 +74,13 @@ body {
 .mode.on { background: var(--view-on); }
 .mode.gold { color: var(--gold); }
 .auto { display: flex; align-items: center; gap: 4px; margin: 0 4px 0 8px; font-size: 12px; cursor: pointer; }
+
+/* «Solo resultado»: la hoja renderizada ocupa todo; se esconden editor, calculadora y operaciones */
+body.solo .ops, body.solo .intro, body.solo .main > .col:first-child, body.solo .split,
+body.solo #btn-keypad { display: none; }
+body.solo .main { grid-template-columns: 1fr; }
+body.solo #btn-solo { background: var(--view-on); }
+@media (max-width: 760px) { body.solo .salida { height: calc(100vh - 150px); } }
 
 /* franja de bienvenida */
 .intro {

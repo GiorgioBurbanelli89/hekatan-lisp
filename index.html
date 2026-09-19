@@ -11,31 +11,31 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
-  <link href="_framework/dotnet.4p90lw01of.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-GCZhzMHeILk4/ypu8xuFT2Asf5jEDY3WGDOx7KTkay8=" />
+  <link href="_framework/dotnet.c81j7xytws.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-BIgySDnS5KeaStkJDrRzLNfjmqrcuPQOOctwp3sjFVA=" />
   <script type="importmap">{
   "imports": {
-    "./_framework/dotnet.js": "./_framework/dotnet.4p90lw01of.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.c81j7xytws.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.ep97gjl5x1.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
     "./hlisp.js": "./hlisp.0vogsvjk28.js",
-    "./main.js": "./main.zglst2dqyo.js"
+    "./main.js": "./main.8rwm2g6p3w.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.4p90lw01of.js": "sha256-GCZhzMHeILk4/ypu8xuFT2Asf5jEDY3WGDOx7KTkay8=",
-    "./_framework/dotnet.js": "sha256-GCZhzMHeILk4/ypu8xuFT2Asf5jEDY3WGDOx7KTkay8=",
+    "./_framework/dotnet.c81j7xytws.js": "sha256-BIgySDnS5KeaStkJDrRzLNfjmqrcuPQOOctwp3sjFVA=",
+    "./_framework/dotnet.js": "sha256-BIgySDnS5KeaStkJDrRzLNfjmqrcuPQOOctwp3sjFVA=",
     "./_framework/dotnet.native.ep97gjl5x1.js": "sha256-Hgd+UiRAqxLF81vsdZwEpb28eOZqJ6ZWb8Wk65Q/JgQ=",
     "./_framework/dotnet.native.js": "sha256-Hgd+UiRAqxLF81vsdZwEpb28eOZqJ6ZWb8Wk65Q/JgQ=",
     "./_framework/dotnet.runtime.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./hlisp.0vogsvjk28.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
     "./hlisp.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
-    "./main.js": "sha256-szDZK0NkJgJ8ZYee7e026t+dbjs6cQPFJz0cIcrJ8VM=",
-    "./main.zglst2dqyo.js": "sha256-szDZK0NkJgJ8ZYee7e026t+dbjs6cQPFJz0cIcrJ8VM="
+    "./main.8rwm2g6p3w.js": "sha256-rI7A+gETlYOeGEH0OYvp//ZHGO2RFnDX4maUJhy15zc=",
+    "./main.js": "sha256-rI7A+gETlYOeGEH0OYvp//ZHGO2RFnDX4maUJhy15zc="
   }
 }</script>
   <script src="hlisp.0vogsvjk28.js"></script>
-  <script type="module" src="main.zglst2dqyo.js"></script>
+  <script type="module" src="main.8rwm2g6p3w.js"></script>
 </head>
 <body>
   <div class="carga" id="carga"><div>Cargando <b>Hekatan LISP</b>… (motor LISP + render)</div></div>
@@ -113,6 +113,7 @@
       <button class="mode" data-view="math" title="El RESULTADO en notación matemática (x^2 + 3*x). Texto plano.">matemática</button>
       <button class="mode" data-view="learn" title="APRENDER: la misma expresión en Matemática · LISP · MATLAB, a la vez">3 formas</button>
       <span class="gap" style="width:14px"></span>
+      <button class="mode" id="btn-solo" title="Ver solo el resultado, a pantalla completa (Esc para volver)">⛶<span class="txt"> Solo resultado</span></button>
       <button class="mode" id="btn-keypad" style="font-size:15px" title="Mostrar / ocultar la calculadora">🖩</button>
       <button class="mode" id="btn-theme" style="font-size:14px" title="Cambiar claro / oscuro">☀</button>
     </div>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hekatan LISP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <link href="_framework/dotnet.bl452nhn5a.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-f3TgVGYoOu4DAf10rZXzUkgcHTVQF3CAW55Q6pr2TPg=" />
+  <script type="importmap">{
+  "imports": {
+    "./_framework/dotnet.js": "./_framework/dotnet.bl452nhn5a.js",
+    "./_framework/dotnet.native.js": "./_framework/dotnet.native.ep97gjl5x1.js",
+    "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
+    "./hlisp.js": "./hlisp.0vogsvjk28.js",
+    "./main.js": "./main.xccpfitznk.js"
+  },
+  "scopes": {},
+  "integrity": {
+    "./_framework/dotnet.bl452nhn5a.js": "sha256-f3TgVGYoOu4DAf10rZXzUkgcHTVQF3CAW55Q6pr2TPg=",
+    "./_framework/dotnet.js": "sha256-f3TgVGYoOu4DAf10rZXzUkgcHTVQF3CAW55Q6pr2TPg=",
+    "./_framework/dotnet.native.ep97gjl5x1.js": "sha256-Hgd+UiRAqxLF81vsdZwEpb28eOZqJ6ZWb8Wk65Q/JgQ=",
+    "./_framework/dotnet.native.js": "sha256-Hgd+UiRAqxLF81vsdZwEpb28eOZqJ6ZWb8Wk65Q/JgQ=",
+    "./_framework/dotnet.runtime.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
+    "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
+    "./hlisp.0vogsvjk28.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
+    "./hlisp.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
+    "./main.js": "sha256-0ZHwrA4v+G0QBuWl4nZb0Hgw4SxulbtRYJ+ctQk2HJo=",
+    "./main.xccpfitznk.js": "sha256-0ZHwrA4v+G0QBuWl4nZb0Hgw4SxulbtRYJ+ctQk2HJo="
+  }
+}</script>
+  <script src="hlisp.0vogsvjk28.js"></script>
+  <script type="module" src="main.xccpfitznk.js"></script>
+</head>
+<body>
+  <div class="carga" id="carga"><div>Cargando <b>Hekatan LISP</b>… (motor LISP + render)</div></div>
+
+  <!-- 0 · menú -->
+  <nav class="menu" id="menu">
+    <div class="mi"><span>Archivo</span>
+      <div class="sub">
+        <button data-a="nuevo">Nuevo</button>
+        <button data-a="abrir">Abrir…</button>
+        <button data-a="guardar">Guardar <kbd>Ctrl+S</kbd></button>
+        <hr>
+        <div class="mi-lbl" style="padding:3px 22px;color:var(--muted)">Ejemplos (practicar)</div>
+        <div class="lista" id="lista-ejemplos"></div>
+        <hr>
+        <button data-a="guardarLisp">Guardar como LISP ejecutable (archivo)…</button>
+        <button data-a="copiarLisp">Copiar como LISP ejecutable (portapapeles)</button>
+        <hr>
+        <button data-a="pdf">Exportar a PDF…  (para imprimir / LinkedIn)</button>
+      </div>
+    </div>
+    <div class="mi"><span>Ver resultado</span>
+      <div class="sub">
+        <button data-view="render">Render CSS</button>
+        <button data-view="lisp">LISP</button>
+        <button data-view="math">MATLAB</button>
+      </div>
+    </div>
+    <div class="mi"><span>Insertar</span>
+      <div class="sub">
+        <button data-ins="(§§)">( )</button>
+        <button data-ins="x^2">potencia  x^n</button>
+        <button data-ins="/">fracción  a/b</button>
+        <hr>
+        <button data-ins="(+ §§)">LISP  (+ …)</button>
+        <button data-ins="(* §§)">LISP  (* …)</button>
+        <button data-ins="(expt x 2)">LISP  (expt x n)</button>
+        <button data-ins="(deriv '§§ 'x)">LISP  (deriv … x)</button>
+        <hr>
+        <button data-ins="sqrt(§§)">sqrt( )</button>
+        <button data-ins="sin(§§)">sin( )</button>
+        <button data-ins="cos(§§)">cos( )</button>
+      </div>
+    </div>
+    <div class="mi"><span>Motor</span>
+      <div class="sub">
+        <button data-a="verMotor">Ver funciones del motor (LISP)</button>
+      </div>
+    </div>
+    <div class="mi"><span>Ayuda</span>
+      <div class="sub">
+        <button data-a="acerca">Acerca de Hekatan LISP</button>
+      </div>
+    </div>
+    <span class="archivo" id="lbl-archivo">(sin guardar)</span>
+  </nav>
+
+  <!-- 1 · botones de modo -->
+  <div class="modos">
+    <span class="titulo">Hekatan LISP</span>
+    <div class="der">
+      <button class="mode gold" id="btn-run" title="Ejecuta ahora (F5). Útil si AutoRun está apagado.">▶ Ejecutar</button>
+      <label class="auto" title="Actualiza el resultado en vivo tras cada cambio (como Hekatan Lab)"><input type="checkbox" id="chk-auto" checked> AutoRun</label>
+      <span class="gap" style="width:12px"></span>
+      <span class="lbl" style="margin-right:8px">resultado como:</span>
+      <button class="mode" data-view="render">Render CSS</button>
+      <button class="mode" data-view="lisp" title="El RESULTADO en forma LISP">LISP</button>
+      <button class="mode" data-view="math" title="El RESULTADO en notación matemática (x^2 + 3*x). Texto plano.">matemática</button>
+      <button class="mode" data-view="learn" title="APRENDER: la misma expresión en Matemática · LISP · MATLAB, a la vez">3 formas</button>
+      <span class="gap" style="width:14px"></span>
+      <button class="mode" id="btn-keypad" style="font-size:15px" title="Mostrar / ocultar la calculadora">🖩</button>
+      <button class="mode" id="btn-theme" style="font-size:14px" title="Cambiar claro / oscuro">☀</button>
+    </div>
+  </div>
+
+  <!-- 2 · operaciones simbólicas -->
+  <div class="ops">
+    <span class="lbl" style="margin:0 4px 0 2px">escribo:</span>
+    <button class="sym" data-syn="math" style="min-width:72px" title="Escribir la entrada en notación matemática (x^2 + 3*x)">matemática</button>
+    <button class="sym" data-syn="lisp" style="min-width:56px" title="Solo la EXPRESIÓN en forma LISP (dato simbólico). NO se ejecuta: para correr usa «LISP ▶».">expr LISP</button>
+    <button class="sym" data-syn="full" style="min-width:56px" title="El script LISP COMPLETO y EJECUTABLE (carga el motor + cita las fórmulas).">LISP ▶</button>
+    <button class="sym" data-syn="lab" style="min-width:56px" title="El código para Hekatan Lab / MATLAB (syms + diff/int + tic/toc)">Hekatan Lab</button>
+    <span class="gap" style="width:16px"></span>
+    <span class="lbl" style="margin-right:4px">operar:</span>
+    <button class="sym" data-op="auto" style="min-width:62px" title="Muestra la expresión tal cual (o su valor si es número)">tal cual</button>
+    <button class="sym" data-op="simplify" style="min-width:82px" title="Simplifica = FACTORIZA: x²+2x+1 → (x+1)² ,  x²-1 → (x-1)(x+1)">simplify</button>
+    <button class="sym" data-op="expand" style="min-width:72px" title="Distribuye (lo contrario de factorizar): (x+1)² → x²+2·x+1">expand</button>
+    <button class="sym" data-op="deriv" style="min-width:52px" title="Derivada: d/dx. Variable en el cuadro de la derecha (parcial).">diff</button>
+    <button class="sym" data-op="integ" style="min-width:52px" title="Integral indefinida: ∫ s² → s³/3">∫ int</button>
+    <button class="sym" data-op="despejar" style="min-width:72px" title="Resuelve una ECUACIÓN para la variable del cuadro (ej: y = m*x+b, var x → x = (y-b)/m).">despejar</button>
+    <span class="gap" style="width:10px"></span>
+    <span class="lbl" style="margin-right:3px">var:</span>
+    <input class="var" id="txt-var" title="Variable de la derivada/integral PARCIAL (ej: s, t). Vacío = autodetecta una.">
+    <span class="gap" style="width:18px"></span>
+    <button class="sym gold" id="btn-full" style="min-width:120px" title="El script LISP COMPLETO y ejecutable: se copia al portapapeles">📋 LISP completo</button>
+  </div>
+
+  <!-- 3-5 · editor + calculadora | resultado -->
+  <div class="main" id="main">
+    <div class="col">
+      <div class="etq" id="lbl-in">escribes: texto plano</div>
+      <div class="editor">
+        <div class="gutter" id="gutter">1</div>
+        <div class="area">
+          <pre id="hl" aria-hidden="true"></pre>
+          <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Editor"></textarea>
+        </div>
+      </div>
+      <div class="keypad" id="keypad">
+        <div class="kp-cab"><span class="lbl">Calculadora</span><button class="sym kp-min" id="kp-min" title="Ocultar la calculadora">−  minimizar</button></div>
+        <div class="griegas" id="griegas"></div>
+        <div class="grupos">
+          <fieldset class="grp" style="--c:3"><legend>Números</legend>
+            <button class="sym key" data-ins="7">7</button><button class="sym key" data-ins="8">8</button><button class="sym key" data-ins="9">9</button>
+            <button class="sym key" data-ins="4">4</button><button class="sym key" data-ins="5">5</button><button class="sym key" data-ins="6">6</button>
+            <button class="sym key" data-ins="1">1</button><button class="sym key" data-ins="2">2</button><button class="sym key" data-ins="3">3</button>
+            <button class="sym key" data-ins="0">0</button><button class="sym key" data-ins=".">.</button><button class="sym key" data-ins="x">x</button>
+          </fieldset>
+          <fieldset class="grp" style="--c:4"><legend>Operadores</legend>
+            <button class="sym key" data-ins="+">+</button><button class="sym key" data-ins="-">−</button>
+            <button class="sym key" data-ins="*">×</button><button class="sym key" data-ins="/">÷</button>
+            <button class="sym key" data-ins="^">xⁿ</button><button class="sym key" data-ins=" = ">=</button>
+            <button class="sym key par" data-ins="(">(</button><button class="sym key par" data-ins=")">)</button>
+          </fieldset>
+          <fieldset class="grp" style="--c:4"><legend>Funciones</legend>
+            <button class="sym key w42" data-ins="(sqrt §§)|sqrt(§§)">√</button>
+            <button class="sym key w42" data-ins="(sin §§)|sin(§§)">sin</button>
+            <button class="sym key w42" data-ins="(cos §§)|cos(§§)">cos</button>
+            <button class="sym key w42" data-ins="(tan §§)|tan(§§)">tan</button>
+            <button class="sym key w42" data-ins="(exp §§)|exp(§§)">eˣ</button>
+            <button class="sym key w42" data-ins="(log §§)|log(§§)">log</button>
+            <button class="sym key w42" data-ins="(abs §§)|abs(§§)">|x|</button>
+            <button class="sym key w42" style="font-size:12px" data-ins="(expt x 2)|x^2">expt</button>
+          </fieldset>
+          <fieldset class="grp" style="--c:1"><legend>Const.</legend>
+            <button class="sym key" style="font-family:'Times New Roman',serif" data-ins="pi">π</button>
+            <button class="sym key" data-ins="(exp 1)|exp(1)">e</button>
+            <button class="sym key" data-ins="9.80665">g</button>
+          </fieldset>
+          <fieldset class="grp" style="--c:2"><legend>LISP</legend>
+            <button class="sym key w48" data-ins="(+ §§)|+">+ suma</button>
+            <button class="sym key w48" data-ins="(* §§)|*">× mult</button>
+            <button class="sym key w48" data-ins="(deriv '§§ 'x)|diff(§§)">deriv</button>
+            <button class="sym key w48" data-ins="'§§">quote</button>
+          </fieldset>
+          <fieldset class="grp" style="--c:3"><legend>Loops · Cond</legend>
+            <button class="sym key w52" title="bucle · LISP loop / MATLAB for" data-ins="(loop for i from 1 to 10&#10;      collect §§)|for i = 1:10&#10;    §§&#10;end">for</button>
+            <button class="sym key w52" title="bucle condicional" data-ins="(loop while §§&#10;      do (progn ))|while §§&#10;    &#10;end">while</button>
+            <button class="sym key w52" title="repetir n veces" data-ins="(dotimes (i 10)&#10;  §§)|for i = 0:9&#10;    §§&#10;end">dotimes</button>
+            <button class="sym key w52" title="condicional simple" data-ins="(if §§&#10;    then&#10;    else)|if §§&#10;    &#10;else&#10;    &#10;end">if</button>
+            <button class="sym key w52" title="varios casos (if/elseif)" data-ins="(cond&#10;  (§§ )&#10;  (t ))|if §§&#10;elseif&#10;else&#10;end">cond</button>
+            <button class="sym key w52" title="definir función" data-ins="(defun f (x)&#10;  §§)|function y = f(x)&#10;    y = §§;&#10;end">defun</button>
+          </fieldset>
+        </div>
+      </div>
+    </div>
+    <div class="split" id="split" title="Arrastra para agrandar el editor o el resultado"></div>
+    <div class="col">
+      <div class="etq" id="lbl-out">resultado — render CSS</div>
+      <div class="salida">
+        <iframe id="render" title="Resultado"></iframe>
+        <pre id="texto" hidden></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal"><div id="modal-txt"></div></div>
+  <input type="file" id="file" accept=".lisp,.txt" hidden>
+</body>
+</html>

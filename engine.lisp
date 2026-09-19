@@ -1,0 +1,1654 @@
+;;;; engine.lisp — motor simbolico de Hekatan LISP. Corre en SBCL.
+;;;; deriv: deriva.  simplif: limpia.  dsimp: deriva y simplifica hasta el fondo.
+
+;; Un literal 0.09 se lee como DOUBLE (15-16 cifras). Por defecto SBCL lo lee SINGLE (7 cifras):
+;; 2500000*0.09/3 daba 75000.01 en vez de 75000.
+(setf *read-default-float-format* 'double-float)
+
+;; INTERSECTION portable: el ORDEN del resultado lo deja libre el estándar, y aquí importa
+;; (se toma el PRIMERO como variable principal → decide el signo de la forma normal).
+;; Fuera de SBCL se usa el MISMO algoritmo de SBCL 2.6.7 (src/code/list.lisp, test EQL):
+;; listas cortas → recorre la MÁS CORTA (empate: la 1ª) y hace push → orden inverso;
+;; si la corta tiene >20 o (≥3 y la larga ≥100) → tabla hash y recorre la LARGA.
+(defun hk-intersection (l1 l2)
+  #+sbcl (intersection l1 l2)
+  #-sbcl
+  (when (and l1 l2)
+    (let* ((n1 (length l1)) (n2 (length l2))
+           (short (if (<= n1 n2) l1 l2)) (long (if (<= n1 n2) l2 l1))
+           (sl (min n1 n2)) (ll (max n1 n2)) (res nil))
+      (if (or (> sl 20) (and (>= sl 3) (>= ll 100)))
+          (let ((h (make-hash-table :test 'eql)))
+            (dolist (e short) (setf (gethash e h) t))
+            (dolist (e long) (when (gethash e h) (push e res))))
+          (dolist (e short) (when (member e long) (push e res))))
+      res)))
+
+;; RATIONALIZE portable: SBCL da la fraccion MAS SIMPLE (0.09 -> 9/100); ECL da la EXACTA
+;; del float (0.09 -> 84442493013196796875/...), y el estandar permite las dos. Fuera de SBCL
+;; se usa el MISMO algoritmo de SBCL 2.6.7 (src/code/target-float.lisp, fraccion continua
+;; dentro del intervalo de redondeo [2m-1, 2m+1]/2^(1-e)), copiado sin cambios de logica.
+(defun hk-rationalize (x)
+  #+sbcl (rationalize x)
+  #-sbcl
+  (if (not (floatp x))
+      (rational x)
+      (multiple-value-bind (frac expo sign) (integer-decode-float x)
+        (let* ((shift (- (float-digits x) (integer-length frac)))
+               (frac (ash frac shift))
+               (expo (- expo shift)))
+          (if (or (zerop frac) (>= expo 0))
+              (if (minusp sign) (- (ash frac expo)) (ash frac expo))
+              (let ((a (/ (- (* 2 frac) 1) (ash 1 (- 1 expo))))
+                    (b (/ (+ (* 2 frac) 1) (ash 1 (- 1 expo))))
+                    (p0 0) (q0 1) (p1 1) (q1 0))
+                (do ((c (ceiling a) (ceiling a)))
+                    ((< c b)
+                     (let ((top (+ (* c p1) p0)) (bot (+ (* c q1) q0)))
+                       (/ (if (minusp sign) (- top) top) bot)))
+                  (let* ((k (- c 1))
+                         (p2 (+ (* k p1) p0))
+                         (q2 (+ (* k q1) q0)))
+                    (psetf a (/ (- b k))
+                           b (/ (- a k)))
+                    (setf p0 p1 q0 q1 p1 p2 q1 q2)))))))))
+
+(defun deriv (e x)
+  "Derivada de la formula E (arbol LISP) respecto a la variable X."
+  (cond
+    ((numberp e) 0)
+    ((symbolp e) (if (eq e x) 1 0))
+    ((eq (car e) '+) (list '+ (deriv (second e) x) (deriv (third e) x)))
+    ((eq (car e) '-) (list '- (deriv (second e) x) (deriv (third e) x)))
+    ((eq (car e) '*)                       ; regla del producto
+     (list '+ (list '* (second e) (deriv (third e) x))
+              (list '* (deriv (second e) x) (third e))))
+    ((eq (car e) '/)                       ; regla del cociente
+     (let ((u (second e)) (v (third e)))
+       (list '/ (list '- (list '* (deriv u x) v) (list '* u (deriv v x)))
+                (list 'expt v 2))))
+    ((eq (car e) 'expt)                    ; regla de la potencia (exponente constante)
+     (let ((u (second e)) (n (third e)))
+       (list '* (list '* n (list 'expt u (- n 1))) (deriv u x))))
+    ((eq (car e) 'sqrt)                    ; (sqrt u)' = u' / (2*sqrt u)
+     (list '/ (deriv (second e) x) (list '* 2 (list 'sqrt (second e)))))
+    ((eq (car e) 'sin)                     ; (sin u)' = cos u * u'
+     (list '* (list 'cos (second e)) (deriv (second e) x)))
+    ((eq (car e) 'cos)                     ; (cos u)' = -sin u * u'
+     (list '* (list '- 0 (list 'sin (second e))) (deriv (second e) x)))
+    ((eq (car e) 'exp)                     ; (e^u)' = e^u * u'
+     (list '* (list 'exp (second e)) (deriv (second e) x)))
+    ((eq (car e) 'log)                     ; (ln u)' = u'/u
+     (list '/ (deriv (second e) x) (second e)))
+    (t (error "no se derivar: ~a" e))))
+
+(defun simplif (e)
+  "Una pasada de reglas obvias: 0+x=x, 1*x=x, 0*x=0, numeros se operan.
+   Los operadores aritmeticos son BINARIOS; cualquier otra forma (sqrt, sin,
+   vector con N args...) se recorre respetando TODOS sus argumentos."
+  (if (atom e) e
+      (let ((op (car e)))
+        (if (not (and (member op '(+ - * / expt)) (= (length e) 3)))
+            (cons op (mapcar #'simplif (cdr e)))   ; n-ario: no pierde argumentos
+        (let ((a (simplif (second e)))
+              (b (simplif (third e))))
+        (cond
+          ((eq op '+) (cond ((eql a 0) b) ((eql b 0) a)
+                            ((and (numberp a) (numberp b)) (+ a b))
+                            (t (list '+ a b))))
+          ((eq op '-) (cond ((eql b 0) a)
+                            ((and (numberp a) (numberp b)) (- a b))
+                            (t (list '- a b))))
+          ((eq op '*) (cond ((or (eql a 0) (eql b 0)) 0)
+                            ((eql a 1) b) ((eql b 1) a)
+                            ((and (numberp a) (numberp b)) (* a b))
+                            ((equal a b) (list 'expt a 2))   ; x*x -> x^2
+                            (t (list '* a b))))
+          ((eq op '/) (cond ((eql a 0) 0) ((eql b 1) a)
+                            ((and (numberp a) (numberp b)) (/ a b))  ; 6/4 -> 3/2 (racional)
+                            (t (list '/ a b))))
+          ((eq op 'expt) (cond ((eql b 1) a) ((eql b 0) 1)
+                               ((and (numberp a) (numberp b)) (expt a b))  ; 2^2 -> 4
+                               (t (list 'expt a b))))
+          (t (list op a b))))))))
+
+(defun simp* (e)
+  "Aplica simplif hasta que ya no cambie (punto fijo)."
+  (let ((s (simplif e))) (if (equal s e) s (simp* s))))
+
+(defun dsimp (e x) (simp* (deriv e x)))
+
+;;;; --- combinar terminos semejantes: x^2 + x^2 -> 2*x^2, 3*x + 2*x -> 5*x ---
+
+(defun sum-terms (e)
+  "Lista de sumandos de una suma anidada (+ (+ a b) c) -> (a b c)."
+  (if (and (consp e) (eq (car e) '+))
+      (append (sum-terms (second e)) (sum-terms (third e)))
+      (list e)))
+
+(defun coeff-base (term)
+  "(coef . base): separa el factor numerico de un producto  n*base."
+  (cond ((numberp term) (cons term 1))
+        ((and (consp term) (eq (car term) '*) (numberp (second term)))
+         (cons (second term) (third term)))
+        (t (cons 1 term))))
+
+(defun collect-sum (terms)
+  "Suma combinando semejantes. Agrupa por 'base' y suma coeficientes."
+  (let ((groups '()))
+    (dolist (tm terms)
+      (let* ((cb (coeff-base tm)) (c (car cb)) (b (cdr cb))
+             (g (assoc b groups :test #'equal)))
+        (if g (setf (cdr g) (+ (cdr g) c))
+            (setf groups (append groups (list (cons b c)))))))
+    (let ((out '()))
+      (dolist (g groups)
+        (let ((b (car g)) (c (cdr g)))
+          (unless (eql c 0)
+            (setf out (append out
+              (list (cond ((equal b 1) c)          ; base 1 -> solo el numero
+                          ((eql c 1) b)            ; coef 1 -> solo la base
+                          (t (list '* c b)))))))))
+      (cond ((null out) 0)
+            ((null (cdr out)) (car out))
+            (t (reduce (lambda (a b) (list '+ a b)) out))))))
+
+(defun collect-in (e)
+  "Aplica collect-sum a cada suma del arbol (recursivo)."
+  (if (atom e) e
+      (if (eq (car e) '+)
+          (collect-sum (mapcar #'collect-in (sum-terms e)))
+          (cons (car e) (mapcar #'collect-in (cdr e))))))
+
+(defun simplify (e)
+  "Simplifica de verdad: reglas obvias (simp*) + combina terminos semejantes."
+  (collect-in (simp* e)))
+
+;;;; --- expandir: distribuye productos y potencias  (x+1)^2 -> x^2 + 2*x + 1 ---
+
+(defun expand-mul (a b)
+  "Multiplica a*b distribuyendo si alguno es suma/resta."
+  (cond
+    ((and (consp a) (member (car a) '(+ -)))
+     (list (car a) (expand-mul (second a) b) (expand-mul (third a) b)))
+    ((and (consp b) (member (car b) '(+ -)))
+     (list (car b) (expand-mul a (second b)) (expand-mul a (third b))))
+    (t (list '* a b))))
+
+(defun expand (e)
+  "Expande productos sobre sumas y potencias enteras (polinomios)."
+  (if (atom e) e
+      (let ((op (car e)) (a (expand (second e))) (b (expand (third e))))
+        (cond
+          ((eq op '*) (expand-mul a b))
+          ((eq op 'expt)
+           (cond ((eql b 1) a)
+                 ((and (integerp b) (> b 1)) (expand (list '* a (list 'expt a (1- b)))))
+                 (t (list 'expt a b))))
+          (t (list op a b))))))
+
+;;;; ==========================================================================
+;;;; MOTOR DE POLINOMIOS con coeficientes RACIONALES (exacto).
+;;;; Un polinomio = alist (monomio . coef).  Monomio = alist ordenado
+;;;; ((var . potencia) ...), constante = NIL.  Coef = racional de Lisp (1/2, -3).
+;;;; Esto da simplify/expand/deriv EXACTOS para funciones de forma y la matriz D.
+;;;; ==========================================================================
+
+(defun vars-of (e)
+  "Variables (simbolos) libres en la formula, sin repetir."
+  (cond ((numberp e) nil)
+        ((symbolp e) (list e))
+        ((consp e) (remove-duplicates (mapcan #'vars-of (cdr e))))
+        (t nil)))
+
+(defun mono-mul (m1 m2)
+  "Producto de monomios: suma potencias de la misma variable; ordena por nombre."
+  (let ((res (copy-alist m1)))
+    (dolist (pr m2)
+      (let ((cell (assoc (car pr) res)))
+        (if cell (incf (cdr cell) (cdr pr))
+            (setf res (append res (list (cons (car pr) (cdr pr))))))))
+    (sort (remove-if (lambda (pr) (zerop (cdr pr))) res)
+          #'string< :key (lambda (pr) (string (car pr))))))
+
+(defun mono-degree (m) (reduce #'+ (mapcar #'cdr m) :initial-value 0))
+
+(defun p+ (p q)
+  "Suma de polinomios (combina monomios iguales, tira los de coef 0)."
+  (let ((res (copy-alist p)))
+    (dolist (term q)
+      (let ((cell (assoc (car term) res :test #'equal)))
+        (if cell (incf (cdr cell) (cdr term))
+            (setf res (append res (list (cons (car term) (cdr term))))))))
+    (remove-if (lambda (term) (zerop (cdr term))) res)))
+
+(defun p-scale (p c)
+  (if (zerop c) nil (mapcar (lambda (term) (cons (car term) (* (cdr term) c))) p)))
+
+(defun p* (p q)
+  (let ((res nil))
+    (dolist (a p)
+      (dolist (b q)
+        (setf res (p+ res (list (cons (mono-mul (car a) (car b))
+                                      (* (cdr a) (cdr b))))))))
+    res))
+
+(defun p-const (c) (if (zerop c) nil (list (cons nil c))))
+(defun p-var (v) (list (cons (list (cons v 1)) 1)))
+
+(defun p-constant (p)
+  "Valor si el polinomio es constante; :nc si no lo es."
+  (cond ((null p) 0)
+        ((and (null (cdr p)) (null (caar p))) (cdar p))
+        (t :nc)))
+
+(defun expr->poly (e)
+  "Formula LISP -> polinomio racional.  Lanza 'notpoly con :fail si no es polinomio
+   (p.ej. division por algo NO constante, potencia no entera, funcion desconocida)."
+  (cond
+    ((integerp e) (p-const e))
+    ((rationalp e) (p-const e))
+    ((floatp e) (p-const (hk-rationalize e)))          ; 0.2 -> 1/5 (exacto)
+    ((symbolp e) (p-var e))
+    ((consp e)
+     (let ((op (car e)))
+       (cond
+         ((eq op '+) (p+ (expr->poly (second e)) (expr->poly (third e))))
+         ((eq op '-) (if (cddr e)
+                         (p+ (expr->poly (second e)) (p-scale (expr->poly (third e)) -1))
+                         (p-scale (expr->poly (second e)) -1)))   ; menos unario
+         ((eq op '*) (p* (expr->poly (second e)) (expr->poly (third e))))
+         ((eq op '/) (let* ((d (expr->poly (third e))) (dc (p-constant d)))
+                       (if (or (eq dc :nc) (zerop dc))
+                           (throw 'notpoly :fail)      ; denominador no constante -> no polinomio
+                           (p-scale (expr->poly (second e)) (/ 1 dc)))))
+         ((eq op 'expt) (let ((n (third e)))
+                          (if (and (integerp n) (>= n 0))
+                              (let ((r (p-const 1)))
+                                (dotimes (i n) (setf r (p* r (expr->poly (second e)))))
+                                r)
+                              (throw 'notpoly :fail))))
+         (t (throw 'notpoly :fail)))))
+    (t (throw 'notpoly :fail))))
+
+(defun try-poly (e) (catch 'notpoly (expr->poly e)))
+
+(defun mono->expr (m)
+  (if (null m) 1
+      (reduce (lambda (a b) (list '* a b))
+              (mapcar (lambda (pr) (if (= (cdr pr) 1) (car pr)
+                                       (list 'expt (car pr) (cdr pr))))
+                      m))))
+
+(defun coeff->expr (c) (if (integerp c) c (list '/ (numerator c) (denominator c))))
+
+(defun neg-expr (e)
+  "Niega una expresion ya construida, de forma legible (sin romperse con simbolos)."
+  (cond ((numberp e) (- e))
+        ((and (consp e) (eq (car e) '/) (numberp (second e))) (list '/ (- (second e)) (third e)))
+        (t (list '* -1 e))))
+
+(defun term->expr (m c)
+  "Monomio m con coef POSITIVO c (racional) -> expresion legible:
+   1->mono, entero->n*mono, p/q -> (p*mono)/q  (asi 1/2*nu se ve como nu/2)."
+  (cond ((null m) (coeff->expr c))
+        ((= c 1) (mono->expr m))
+        ((integerp c) (list '* c (mono->expr m)))
+        (t (let ((num (numerator c)) (den (denominator c)))
+             (list '/ (if (= num 1) (mono->expr m) (list '* num (mono->expr m))) den)))))
+
+(defun poly->expr (p)
+  "Polinomio -> formula LISP legible. Positivos primero (grado desc), luego los
+   negativos como restas -> queda '1 - s^2', 's - 1/2', 'nu/2', etc."
+  (if (null p) 0
+      (let* ((bydeg (sort (copy-alist p) #'> :key (lambda (tm) (mono-degree (car tm)))))
+             (pos (remove-if     (lambda (tm) (minusp (cdr tm))) bydeg))
+             (neg (remove-if-not (lambda (tm) (minusp (cdr tm))) bydeg))
+             (terms (append pos neg))
+             (acc nil))
+        (dolist (tm terms)
+          (let* ((m (car tm)) (c (cdr tm)) (isneg (minusp c))
+                 (e (term->expr m (abs c))))
+            (setf acc
+                  (cond ((null acc) (if isneg (neg-expr e) e))
+                        (isneg (list '- acc e))
+                        (t     (list '+ acc e))))))
+        acc)))
+
+;;;; --- FUNCIONES RACIONALES (num/den polinomios) con cancelacion: para 1/L, L/L^2, dN/dx, EA/L ---
+(defun to-ratpoly (e)
+  "Expresion -> (num-poly . den-poly). Lanza 'notrat si no es racional (sin, sqrt, ...)."
+  (cond
+    ((numberp e) (cons (p-const e) (p-const 1)))
+    ((symbolp e) (cons (p-var e) (p-const 1)))
+    ((consp e)
+     (let ((op (car e)))
+       (cond
+         ((eq op '+) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                       (cons (p+ (p* (car a) (cdr b)) (p* (car b) (cdr a))) (p* (cdr a) (cdr b)))))
+         ((eq op '-) (if (cddr e)
+                         (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                           (cons (p+ (p* (car a) (cdr b)) (p-scale (p* (car b) (cdr a)) -1)) (p* (cdr a) (cdr b))))
+                         (let ((a (to-ratpoly (second e)))) (cons (p-scale (car a) -1) (cdr a)))))
+         ((eq op '*) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                       (cons (p* (car a) (car b)) (p* (cdr a) (cdr b)))))
+         ((eq op '/) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
+                       (cons (p* (car a) (cdr b)) (p* (cdr a) (car b)))))
+         ((eq op 'expt) (let ((n (third e)))
+                          (if (and (integerp n) (>= n 0))
+                              (let ((a (to-ratpoly (second e))) (rn (cons (p-const 1) (p-const 1))))
+                                (dotimes (i n) (setf rn (cons (p* (car rn) (car a)) (p* (cdr rn) (cdr a))))) rn)
+                              (throw 'notrat :fail))))
+         (t (throw 'notrat :fail)))))
+    (t (throw 'notrat :fail))))
+(defun try-ratpoly (e) (catch 'notrat (to-ratpoly e)))
+
+(defun gcd-rat (a b)
+  "MCD de dos racionales: gcd(numeradores)/lcm(denominadores)."
+  (if (or (zerop a) (zerop b)) (+ (abs a) (abs b))
+      (/ (gcd (numerator a) (numerator b)) (lcm (denominator a) (denominator b)))))
+
+(defun ratcontent (p)
+  "Contenido racional de un polinomio: gcd(|numeradores|)/lcm(denominadores) de sus coefs."
+  (if (null p) 1
+      (let ((gn 0) (ld 1))
+        (dolist (tm p) (setf gn (gcd gn (abs (numerator (cdr tm)))) ld (lcm ld (denominator (cdr tm)))))
+        (if (zerop gn) 1 (/ gn ld)))))
+
+(defun mono-min (terms)
+  "Monomio con la potencia MINIMA de cada variable entre TODOS los terminos (factor comun)."
+  (if (null terms) nil
+      (let ((m (copy-alist (caar terms))))
+        (dolist (tm (cdr terms))
+          (let ((tmm (car tm)) (new nil))
+            (dolist (pr m)
+              (let ((cell (assoc (car pr) tmm)))
+                (when cell (push (cons (car pr) (min (cdr pr) (cdr cell))) new))))
+            (setf m new)))
+        (remove-if (lambda (pr) (zerop (cdr pr))) m))))
+
+(defun poly-div-mono (p m)
+  "Divide cada termino de p por el monomio m (que divide a todos)."
+  (if (null m) p
+      (mapcar (lambda (tm)
+                (let ((res (copy-alist (car tm))))
+                  (dolist (pr m)
+                    (let ((cell (assoc (car pr) res)))
+                      (when cell (decf (cdr cell) (cdr pr)))))
+                  (cons (remove-if (lambda (x) (zerop (cdr x))) res) (cdr tm))))
+              p)))
+
+;;;; ---- MCD de POLINOMIOS multivariables: para cancelar la fraccion de verdad ----
+;;;; `cancel-ratpoly` solo quitaba el monomio y el factor NUMERICO comunes. Por eso la
+;;;; inversa por LU, la pseudo-inversa o la QR salian con el determinante elevado al
+;;;; cuadrado arriba y abajo: correcto, pero ilegible. Con el MCD (Euclides con
+;;;; pseudo-division sobre la variable principal) la fraccion queda en minima expresion.
+;;;; Se cancela SOLO si el MCD divide EXACTO a los dos, asi que nunca puede falsear.
+
+;; PRESUPUESTO. El MCD es exacto pero puede dispararse (los coeficientes de la
+;; pseudo-division crecen solos). Un motor que NO cancela es feo; uno que se CUELGA
+;; es inservible. Asi que cada intento lleva un presupuesto de pasos: si se agota,
+;; se abandona y la fraccion se queda como estaba. Nunca puede colgar.
+(defvar *gcd-saldo* 0)
+(defun gcd-gasta (&optional (n 1))
+  "Saldo 0 = nadie abrio presupuesto (llamada suelta): no se frena nada."
+  (when (> *gcd-saldo* 0)
+    (decf *gcd-saldo* n)
+    (when (<= *gcd-saldo* 0) (throw 'gcd-caro :caro))))
+
+(defun poly-zerop (p) (null p))
+
+(defun poly-vars (p)
+  (let ((vs nil))
+    (dolist (tm p) (dolist (pr (car tm)) (pushnew (car pr) vs)))
+    vs))
+
+(defun poly-deg (p v)
+  (let ((d 0))
+    (dolist (tm p) (let ((c (assoc v (car tm)))) (when c (setf d (max d (cdr c))))))
+    d))
+
+(defun poly-coef-v (p v k)
+  "Coeficiente de v^k: un polinomio en las DEMAS variables."
+  (let ((res nil))
+    (dolist (tm p)
+      (when (= (or (cdr (assoc v (car tm))) 0) k)
+        (setf res (p+ res (list (cons (remove v (copy-alist (car tm)) :key #'car)
+                                      (cdr tm)))))))
+    res))
+
+(defun poly-mul-v^k (p v k) (p* p (list (cons (if (zerop k) nil (list (cons v k))) 1))))
+
+(defun mono-div (m1 m2)
+  "m1/m2 si m2 divide a m1; :no si no lo divide."
+  (let ((res (copy-alist m1)))
+    (dolist (pr m2)
+      (let ((cell (assoc (car pr) res)))
+        (if (and cell (>= (cdr cell) (cdr pr)))
+            (decf (cdr cell) (cdr pr))
+            (return-from mono-div :no))))
+    (remove-if (lambda (pr) (zerop (cdr pr))) res)))
+
+(defun mono-mayor-p (m1 m2)
+  "Orden GRLEX: primero el grado total y, a igual grado, lexicografico sobre las
+   variables por nombre. Tiene que ser un orden MULTIPLICATIVO —comparar el TEXTO del
+   monomio no lo es— o el lider del divisor no divide al del dividendo y una division
+   que SI es exacta se declara imposible: eso dejaba las fracciones sin cancelar."
+  (let ((d1 (mono-degree m1)) (d2 (mono-degree m2)))
+    (cond ((> d1 d2) t) ((< d1 d2) nil)
+          (t (let ((vs (sort (remove-duplicates (append (mapcar #'car m1) (mapcar #'car m2)))
+                             #'string< :key #'string)))
+               (dolist (v vs nil)
+                 (let ((e1 (or (cdr (assoc v m1)) 0))
+                       (e2 (or (cdr (assoc v m2)) 0)))
+                   (cond ((> e1 e2) (return t))
+                         ((< e1 e2) (return nil))))))))))
+
+(defun poly-lead (p)
+  (let ((mejor (car p)))
+    (dolist (tm (cdr p)) (when (mono-mayor-p (car tm) (car mejor)) (setf mejor tm)))
+    mejor))
+
+(defun poly-exact-div (p q)
+  "p/q cuando la division es EXACTA; NIL si sobra resto (o si q es cero)."
+  (if (or (poly-zerop p) (poly-zerop q)) nil
+      (let ((r p) (out nil) (lq (poly-lead q)) (n 0))
+        (loop while (and r (< n 300)) do
+          (incf n) (gcd-gasta)
+          (let* ((lr (poly-lead r))
+                 (md (mono-div (car lr) (car lq))))
+            (when (eq md :no) (return-from poly-exact-div nil))
+            (let ((tq (list (cons md (/ (cdr lr) (cdr lq))))))
+              (setf out (p+ out tq))
+              (setf r (p+ r (p-scale (p* tq q) -1))))))
+        (if (poly-zerop r) out nil))))
+
+(defun poly-primitiva (p)
+  "Quita el factor NUMERICO comun de los coeficientes."
+  (if (poly-zerop p) p
+      (let ((c (ratcontent p)))
+        (if (or (zerop c) (= c 1)) p (p-scale p (/ 1 c))))))
+
+(defun poly-prem (a b v)
+  "Pseudo-resto de a entre b respecto a v (Euclides sin fracciones)."
+  (let* ((db (poly-deg b v)) (lb (poly-coef-v b v db)) (r a))
+    (loop for guarda from 0 below 200
+          while (and (not (poly-zerop r)) (>= (poly-deg r v) db)) do
+      (gcd-gasta (max 1 (floor (length r) 4)))
+      (when (and (> *gcd-saldo* 0) (> (length r) 200)) (throw 'gcd-caro :caro))
+      (let* ((dr (poly-deg r v)) (lr (poly-coef-v r v dr)))
+        (setf r (poly-primitiva
+                 (p+ (p* lb r)
+                     (p-scale (p* (poly-mul-v^k lr v (- dr db)) b) -1))))))
+    r))
+
+;; El MCD tiene que ser PRIMITIVO: si no se quita el contenido (el factor comun de
+;; los coeficientes vistos en v) el algoritmo devuelve el MCD multiplicado por basura
+;; —salia q^2·(p^2-q^2) en vez de (p^2-q^2)— y entonces ya no divide exacto y no se
+;; cancela nada. El contenido se calcula con el mismo MCD, pero con UNA VARIABLE MENOS,
+;; asi que la recursion siempre termina.
+(defun poly-content-v (p v)
+  "MCD de los coeficientes de p visto como polinomio en v."
+  (if (> (length p) 60) (p-const 1)
+      (let ((g nil))
+        (loop for k from 0 to (poly-deg p v) do
+          (let ((c (poly-coef-v p v k)))
+            (unless (poly-zerop c) (setf g (if g (poly-gcd g c) c)))))
+        (or g (p-const 1)))))
+
+(defun poly-pp-v (p v)
+  "Parte primitiva de p respecto a v: p dividido por su contenido."
+  (if (poly-zerop p) p
+      (let ((c (poly-content-v p v)))
+        (if (numberp (p-constant c))
+            (poly-primitiva p)
+            (poly-primitiva (or (poly-exact-div p c) p))))))
+
+(defun poly-gcd (a b)
+  "MCD de dos polinomios, salvo constante (Euclides con pseudo-division, PRS primitivo)."
+  (gcd-gasta)
+  (cond ((poly-zerop a) (poly-primitiva b))
+        ((poly-zerop b) (poly-primitiva a))
+        ((poly-exact-div b a) (poly-primitiva a))
+        ((poly-exact-div a b) (poly-primitiva b))
+        (t (let ((v (car (hk-intersection (poly-vars a) (poly-vars b)))))
+             (if (null v) (p-const 1)
+                 (let* ((ca (poly-content-v a v))
+                        (cb (poly-content-v b v))
+                        (cg (if (or (numberp (p-constant ca)) (numberp (p-constant cb)))
+                                (p-const 1) (poly-gcd ca cb)))
+                        (x (poly-pp-v a v))
+                        (y (poly-pp-v b v)))
+                   (when (< (poly-deg x v) (poly-deg y v)) (rotatef x y))
+                   (loop for guarda from 0 below 40
+                         while (not (poly-zerop y)) do
+                           (let ((r (poly-prem x y v)))
+                             (setf x y y (poly-pp-v r v))))
+                   (p* cg x)))))))
+
+(defun cancel-gcd (num den)
+  "Divide numerador y denominador por su MCD, comprobando que sale EXACTO."
+  (if (or (poly-zerop num) (poly-zerop den)
+          (numberp (p-constant den))                 ; denominador constante: nada que hacer
+          (> (length num) 80) (> (length den) 80))   ; demasiado grande: no merece la pena
+      (cons num den)
+      (let* ((*gcd-saldo* 6000)
+             (g (catch 'gcd-caro (ignore-errors (poly-gcd num den)))))
+        (if (or (null g) (eq g :caro) (poly-zerop g) (numberp (p-constant g)))
+            (cons num den)
+            (let* ((r (catch 'gcd-caro
+                        (let ((n2 (poly-exact-div num g)) (d2 (poly-exact-div den g)))
+                          (if (and n2 d2) (cons n2 d2) :caro)))))
+              (if (eq r :caro) (cons num den) r))))))
+
+(defun cancel-ratpoly (r)
+  "Cancela el monomio y el factor numerico comunes entre numerador y denominador.
+   Ademas, si num y den son el MISMO polinomio -> 1 (la diagonal de A*inv(A)=I);
+   si son opuestos -> -1. (p+ deja el polinomio VACIO cuando todo se cancela.)"
+  (let ((num (car r)) (den (cdr r)))
+    (cond
+      ((null num) (cons nil (p-const 1)))
+      ((null (p+ num (p-scale den -1))) (cons (p-const 1) (p-const 1)))   ; num = den  -> 1
+      ((null (p+ num den))              (cons (p-const -1) (p-const 1)))  ; num = -den -> -1
+      (t
+       (let ((mm (mono-min (append num den))))
+         (when mm (setf num (poly-div-mono num mm) den (poly-div-mono den mm)))
+         (let ((g (gcd-rat (ratcontent num) (ratcontent den))))
+           (when (and (/= g 0) (/= g 1)) (setf num (p-scale num (/ 1 g)) den (p-scale den (/ 1 g)))))
+         ;; y el factor POLINOMICO comun (el determinante que salia al cuadrado)
+         (let ((g (cancel-gcd num den)))
+           (setf num (car g) den (cdr g)))
+         ;; si el denominador es una constante negativa, pasa el signo al numerador
+         (let ((dc (p-constant den)))
+           (when (and (numberp dc) (minusp dc)) (setf num (p-scale num -1) den (p-scale den -1))))
+         (cons num den))))))
+
+(defun ratpoly->expr (r)
+  "(num . den) -> expresion legible; si el den es constante lo reparte, si no deja num/den."
+  (let* ((num (car r)) (den (cdr r)) (dc (p-constant den)))
+    (cond ((and (numberp dc) (= dc 1)) (poly->expr num))
+          ((numberp dc) (poly->expr (p-scale num (/ 1 dc))))
+          (t (list '/ (poly->expr num) (poly->expr den))))))
+
+;;;; ===== ATOMOS OPACOS: sin, cos, sqrt… DENTRO del motor de polinomios =====
+;;;; El motor de polinomios solo entiende + - * / y potencia entera. Cualquier otra
+;;;; llamada (sin, cos, sqrt, log) le hacia tirar la toalla, y `simplify` devolvia la
+;;;; expresion casi cruda: cos(t)*sin(t) - sin(t)*cos(t) se quedaba escrito tal cual, y
+;;;; sqrt(p)*sqrt(p) no era p. Eso bloqueaba TRES formas de invertir una matriz
+;;;; —ortogonal (A^-1 = A^T), Cholesky y QR—, que viven todas de raices y senos.
+;;;; Aqui esas llamadas se sustituyen por una LETRA nueva, el polinomio las combina
+;;;; como a cualquier otra, y al final dos reglas las devuelven a su significado:
+;;;;   · (sqrt a)^k          -> a^(k/2) · (sqrt a)^(k mod 2)     [sqrt(p)*sqrt(p) = p]
+;;;;   · sin(u)^2*M + cos(u)^2*M -> M                            [Pitagoras]
+
+(defvar *opq* nil "alist (letra-nueva . forma original) del simplify opaco en curso.")
+
+(defun opq-arith-p (op) (member op '(+ - * / expt)))
+
+(defun opq-sub (e)
+  "Sustituye cada llamada NO aritmetica por una letra nueva; recuerda la equivalencia."
+  (cond ((atom e) e)
+        ((opq-arith-p (car e)) (cons (car e) (mapcar #'opq-sub (cdr e))))
+        (t (let ((hit (rassoc e *opq* :test #'equal)))
+             (if hit (car hit)
+                 (let ((g (make-symbol (format nil "OPQ~3,'0d" (length *opq*)))))
+                   (push (cons g e) *opq*)
+                   g))))))
+
+(defun opq-back (e)
+  "Devuelve cada letra opaca a su forma original."
+  (cond ((symbolp e) (let ((hit (assoc e *opq*))) (if hit (cdr hit) e)))
+        ((consp e) (cons (car e) (mapcar #'opq-back (cdr e))))
+        (t e)))
+
+(defun opq-form (v) (and (symbolp v) (cdr (assoc v *opq*))))
+(defun opq-letra-de (forma) (car (rassoc forma *opq* :test #'equal)))
+;; el radicando puede ser una FRACCION (Cholesky: sqrt(p - q^2/p)), asi que el
+;; plegado trabaja con racionales (num . den), no con polinomios sueltos.
+(defun opq-ratpoly (e) (try-ratpoly (opq-sub e)))
+(defun rp* (a b) (cons (p* (car a) (car b)) (p* (cdr a) (cdr b))))
+(defun rp+ (a b) (cons (p+ (p* (car a) (cdr b)) (p* (car b) (cdr a))) (p* (cdr a) (cdr b))))
+
+(defun mono-sort (m)
+  (sort (remove-if (lambda (pr) (zerop (cdr pr))) (copy-alist m))
+        #'string< :key (lambda (pr) (string (car pr)))))
+
+(defun poly-sqrt-fold (p)
+  "(sqrt a)^k dentro de un monomio -> a^(k/2) multiplicando fuera, (sqrt a)^(k mod 2)
+   dentro. Devuelve un RACIONAL (num . den) porque el radicando puede ser fraccion."
+  (let ((out (cons nil (p-const 1))))
+    (dolist (tm p)
+      (let ((m nil) (extra (cons (p-const 1) (p-const 1))))
+        (dolist (pr (car tm))
+          (let ((f (opq-form (car pr))))
+            (if (and (consp f) (eq (car f) 'sqrt) (>= (cdr pr) 2))
+                (let* ((k (cdr pr)) (mitad (floor k 2)) (resto (mod k 2))
+                       (ar (opq-ratpoly (second f))))
+                  (if (eq ar :fail)
+                      (push pr m)                    ; radicando raro: se deja como esta
+                      (progn
+                        (when (> resto 0) (push (cons (car pr) resto) m))
+                        (dotimes (i mitad) (setf extra (rp* extra ar))))))
+                (push pr m))))
+        (setf out (rp+ out (rp* (cons (list (cons (mono-sort m) (cdr tm))) (p-const 1))
+                                extra)))))
+    out))
+
+(defun mono-baja (m v k)
+  "El monomio m con la potencia de v rebajada en k."
+  (mono-sort (mapcar (lambda (pr) (if (eq (car pr) v) (cons v (- (cdr pr) k)) pr)) m)))
+
+(defun poly-pyth (p)
+  "sin(u)^2*M + cos(u)^2*M -> M (mismo coeficiente). Repite hasta que no cambie nada."
+  (let ((sigue t))
+    (loop while sigue do
+      (setf sigue nil)
+      (block barrido
+        (dolist (tm p)
+          (let ((m (car tm)) (c (cdr tm)))
+            (dolist (pr m)
+              (let ((f (opq-form (car pr))))
+                (when (and (consp f) (member (car f) '(sin cos)) (>= (cdr pr) 2))
+                  (let ((otro (opq-letra-de (list (if (eq (car f) 'sin) 'cos 'sin) (second f)))))
+                    (when otro
+                      (let* ((resto (mono-baja m (car pr) 2))
+                             (m2 (mono-mul resto (list (cons otro 2))))
+                             (par (assoc m2 p :test #'equal)))
+                        (when (and par (= (cdr par) c))
+                          (setf p (p+ p (list (cons m (- c)) (cons m2 (- c)) (cons resto c))))
+                          (setf sigue t)
+                          (return-from barrido))))))))))))
+    p))
+
+(defun opq-reglas (r)
+  "Las dos reglas sobre un racional: (n1/n2)/(d1/d2) = (n1*d2)/(n2*d1)."
+  (let ((n (poly-sqrt-fold (car r)))
+        (d (poly-sqrt-fold (cdr r))))
+    (cons (poly-pyth (p* (car n) (cdr d)))
+          (poly-pyth (p* (cdr n) (car d))))))
+
+(defun simplify-opaco (e)
+  "Ultimo intento: trata sin/cos/sqrt como letras, simplifica, y aplica sus dos reglas."
+  (let ((*opq* nil))
+    (let* ((es (opq-sub e))
+           (p (try-poly es)))
+      (if (not (eq p :fail))
+          (opq-back (ratpoly->expr (cancel-ratpoly (opq-reglas (cons p (p-const 1))))))
+          (let ((r (try-ratpoly es)))
+            (if (eq r :fail)
+                (collect-in (simp* e))
+                (opq-back (ratpoly->expr (cancel-ratpoly (opq-reglas r))))))))))
+
+(defun simplify (e)
+  "Simplifica EXACTO: polinomio; si no, funcion RACIONAL (num/den con cancelacion);
+   si no, el mismo motor tratando sin/cos/sqrt como letras; si no, motor viejo."
+  (let ((p (try-poly e)))
+    (if (not (eq p :fail)) (poly->expr p)
+        (let ((r (try-ratpoly e)))
+          (if (eq r :fail) (simplify-opaco e) (ratpoly->expr (cancel-ratpoly r)))))))
+
+(defun expand* (e) "Expande y simplifica (mismo motor de polinomios)." (simplify e))
+
+(defun poly-deriv (p v)
+  "Derivada del polinomio p respecto a v."
+  (let ((res nil))
+    (dolist (tm p)
+      (let* ((m (car tm)) (c (cdr tm)) (cell (assoc v m)))
+        (when cell
+          (let* ((k (cdr cell))
+                 (rest (remove v (copy-alist m) :key #'car))
+                 (m2 (if (> k 1) (cons (cons v (1- k)) rest) rest))
+                 (m2 (sort m2 #'string< :key (lambda (pr) (string (car pr))))))
+            (setf res (p+ res (list (cons m2 (* c k)))))))))
+    res))
+
+(defun derive-x (e &optional v)
+  "Derivada ORDINARIA d/dx. Si se da v, deriva respecto a v; si no, autodetecta la variable.
+   Resuelve ops anidadas primero (Diff{Diff{}} = 2a derivada, que el quote dejaba sin evaluar)."
+  (let* ((e (eval-ops-tree e)) (var (or v (let ((vs (vars-of e))) (if vs (car vs) 'x)))) (p (try-poly e)))
+    (if (eq p :fail) (simplify (deriv e var)) (poly->expr (poly-deriv p var)))))
+
+(defun partial (e v)
+  "Derivada PARCIAL respecto a la variable v (elegida). Para 2D: dN/ds, dN/dt.
+   A diferencia de derive-x (que AUTODETECTA una variable), aquí TÚ das la variable."
+  (let* ((e (eval-ops-tree e)) (p (try-poly e)))
+    (if (eq p :fail) (simplify (deriv e v)) (poly->expr (poly-deriv p v)))))
+
+;;;; --- derivada que MUESTRA SU TRABAJO: la regla de la potencia con su aritmetica ---
+(defun mono-drop (m v) "El monomio m sin la variable v." (remove v m :key #'car))
+
+(defun drule-term (m c v)
+  "Un termino c*(monomio m) derivado por la REGLA DE LA POTENCIA, SIN reducir:
+   c*v^n  ->  (c*n) * resto * v^(n-1).  Muestra el producto c*n y el exponente n-1.
+   Si v no aparece (n=0), la derivada del termino es 0."
+  (let ((n (or (cdr (assoc v m)) 0)))
+    (if (= n 0) 0
+        (let* ((rest (mono-drop m v))
+               (restx (if rest (mono->expr rest) nil))
+               (powx  (if (> (- n 1) 0) (list 'expt v (- n 1)) nil))
+               (coef  (list '* (coeff->expr c) n))          ; deja  c*n  a la vista
+               (tail  (cond ((and restx powx) (list '* restx powx))
+                            (restx restx) (powx powx) (t nil))))
+          (if tail (list '* coef tail) coef)))))
+
+(defun deriv-steps (e v)
+  "Derivada MOSTRANDO EL TRABAJO. Devuelve (steps s0 s1 s2 s3), una cadena de igualdades:
+   s0 = d/dv[e] (la derivada a resolver), s1 = regla de la suma (d/dv de cada termino),
+   s2 = regla de la potencia con su aritmetica (c*n*v^(n-1)), s3 = resultado reducido.
+   Solo polinomios; si no lo es, cae al resultado normal."
+  (let ((p (try-poly e)))
+    (if (eq p :fail)
+        (list 'steps (list 'derive-x e v) (simplify (deriv e v)))
+        (let* ((bydeg (sort (copy-alist p) #'> :key (lambda (tm) (mono-degree (car tm)))))
+               (s0 (list 'derive-x e v))
+               (term-forms (mapcar (lambda (tm)
+                              (let ((te (if (minusp (cdr tm))
+                                            (neg-expr (term->expr (car tm) (- (cdr tm))))
+                                            (term->expr (car tm) (cdr tm)))))
+                                (list 'derive-x te v)))
+                            bydeg))
+               (s1 (if term-forms (reduce (lambda (a b) (list '+ a b)) term-forms) 0))
+               (rule-terms (mapcar (lambda (tm) (drule-term (car tm) (cdr tm) v)) bydeg))
+               (s2 (if rule-terms (reduce (lambda (a b) (list '+ a b)) rule-terms) 0))
+               (s3 (poly->expr (poly-deriv p v))))
+          (list 'steps s0 s1 s2 s3)))))
+
+(defun poly-integ (p v)
+  "Integral indefinida del polinomio p respecto a v:  c*v^n -> c/(n+1) * v^(n+1)."
+  (let ((res nil))
+    (dolist (tm p)
+      (let* ((m (car tm)) (c (cdr tm)) (cell (assoc v m))
+             (k (if cell (cdr cell) 0))
+             (rest (if cell (remove v (copy-alist m) :key #'car) (copy-alist m)))
+             (m2 (sort (cons (cons v (1+ k)) rest)
+                       #'string< :key (lambda (pr) (string (car pr))))))
+        (setf res (p+ res (list (cons m2 (/ c (1+ k))))))))
+    res))
+
+(defun elem-integ (e v)
+  "Integral ELEMENTAL respecto a v: polinomio, sin, cos, exp, 1/v, sumas/restas y c*f.
+   Devuelve :fail si no sabe integrarlo (p.ej. x*sin(x), que pide por partes)."
+  (let ((p (try-poly e)))
+    (if (not (eq p :fail)) (poly->expr (poly-integ p v))
+        (cond
+          ((atom e) (if (eq e v) (list '/ (list 'expt v 2) 2) (list '* e v)))  ; ∫v dv, ∫c dv
+          ((and (eq (car e) '+) (= (length e) 3))
+           (let ((a (elem-integ (second e) v)) (b (elem-integ (third e) v)))
+             (if (or (eq a :fail) (eq b :fail)) :fail (simplify (list '+ a b)))))
+          ((and (eq (car e) '-) (= (length e) 3))
+           (let ((a (elem-integ (second e) v)) (b (elem-integ (third e) v)))
+             (if (or (eq a :fail) (eq b :fail)) :fail (simplify (list '- a b)))))
+          ((and (eq (car e) '-) (= (length e) 2))                       ; menos unario
+           (let ((a (elem-integ (second e) v))) (if (eq a :fail) :fail (simplify (list '- 0 a)))))
+          ((and (eq (car e) 'sin) (eq (second e) v)) (list '- 0 (list 'cos v)))   ; ∫sin = -cos
+          ((and (eq (car e) 'cos) (eq (second e) v)) (list 'sin v))               ; ∫cos =  sin
+          ((and (eq (car e) 'exp) (eq (second e) v)) (list 'exp v))               ; ∫e^v = e^v
+          ((and (eq (car e) '/) (eql (second e) 1) (eq (third e) v)) (list 'log v)) ; ∫1/v = ln v
+          ((and (eq (car e) '*) (numberp (second e)))                 ; c*f
+           (let ((r (elem-integ (third e) v))) (if (eq r :fail) :fail (simplify (list '* (second e) r)))))
+          ((and (eq (car e) '*) (numberp (third e)))                  ; f*c
+           (let ((r (elem-integ (second e) v))) (if (eq r :fail) :fail (simplify (list '* (third e) r)))))
+          (t :fail)))))
+
+(defun integ-x (e)
+  "Integral indefinida respecto a la variable DETECTADA (elemental; sin +C).
+   Si NO sabe integrarlo devuelve (no-elem e) para que la app no muestre una primitiva falsa."
+  (let* ((vs (vars-of e)) (v (if vs (car vs) 'x)) (r (elem-integ e v)))
+    (if (eq r :fail) (list 'no-elem e) r)))
+
+(defun integ-var (e v)
+  "Integral indefinida respecto a la variable v ELEGIDA (elemental; para 2D)."
+  (let ((r (elem-integ e v))) (if (eq r :fail) (list 'no-elem e) r)))
+
+(defun subst-var (e v val)
+  "Sustituye la variable v por val (numero) en la formula e."
+  (cond ((numberp e) e)
+        ((symbolp e) (if (eq e v) val e))
+        ((consp e) (cons (car e) (mapcar (lambda (x) (subst-var x v val)) (cdr e))))
+        (t e)))
+
+;;;; --- alias con nombres de MATLAB (para quien viene de MATLAB) ---
+;;;; OJO: NO definir 'int': es un simbolo BLOQUEADO en SBCL (paquete SB-ALIEN,
+;;;; tipo C para FFI) -> romperia la carga de engine.lisp. La integral es 'integ'.
+(defun diff (e) "MATLAB: diff(f) -> derivada." (derive-x e))
+(defun integ (e) "Integral indefinida (MATLAB usa 'int', pero 'int' esta bloqueado)." (integ-x e))
+;; simplify y expand ya se llaman igual que en MATLAB.
+
+(defun defint-x (e a b)
+  "Integral DEFINIDA de e entre a y b (regla de Barrow: F(b)-F(a)), variable detectada."
+  (let* ((vs (vars-of e)) (v (if vs (car vs) 'x)) (p (try-poly e)))
+    (if (eq p :fail) e
+        (let* ((f (poly->expr (poly-integ p v)))
+               (fb (simplify (subst-var f v b)))
+               (fa (simplify (subst-var f v a))))
+          (simplify (list '- fb fa))))))
+
+;;;; --- notacion INFIJA (matematica, estilo MATLAB): (+ (* 2 x) 3) -> "2*x + 3" ---
+;;;; Para que el script imprima el resultado como MATEMATICA en vez de lista LISP:
+;;;;   (format t "~a~%" (infix (derive-x '(+ (expt x 2) (* 3 x)))))  ->  2*x + 3
+(defun join (sep lst)
+  (if (null lst) "" (reduce (lambda (a b) (concatenate 'string a sep b)) lst)))
+(defun op-prec (op)
+  (cond ((eq op 'expt) 4) ((member op '(* /)) 2) ((member op '(+ -)) 1) (t 0)))
+(defun infix-par (e outer)
+  "infix, con parentesis si la precedencia del hijo < outer. Funciones = prec alta (sin parentesis)."
+  (let ((s (infix e))
+        (myp (if (and (consp e) (member (car e) '(+ - * / expt))) (op-prec (car e)) 5)))
+    (if (< myp outer) (concatenate 'string "(" s ")") s)))
+;; ---- DECIMALES ----
+;; El motor guarda TODO exacto (fracciones) para no perder cifras. Pero un
+;; resultado de ingenieria se lee en decimal: 304.26, no 118967/391.
+;;
+;; No sirve guardar un racional con denominador 10^n: Common Lisp REDUCE los
+;; racionales solo (30426/100 -> 15213/50), asi que la potencia de 10 se pierde.
+;; Por eso `dec` devuelve un nodo (decv "304.26") con el texto ya formateado,
+;; que `infix` escribe tal cual.
+(defun fmt-dec-str (x n)
+  "Valor exacto -> texto decimal con n cifras, redondeando."
+  (let* ((m (expt 10 n)) (k (round (* (rational x) m)))
+         (neg (< k 0)) (a (abs k)) (ent (floor a m)) (fr (- a (* ent m))))
+    (if (= n 0)
+        (format nil "~:[~;-~]~a" neg ent)
+        (format nil "~:[~;-~]~a.~v,'0d" neg ent n fr))))
+
+(defun poda-ceros (s)
+  "\"0.3300\" -> \"0.33\" ; \"5.0000\" -> \"5\". Solo cuando el usuario no fijo las cifras."
+  (if (find #\. s)
+      (let ((r (string-right-trim "0" s)))
+        (if (char= (char r (1- (length r))) #\.) (subseq r 0 (1- (length r))) r))
+      s))
+
+(defun to-dec (v n podar)
+  "dec(x) y dec(x, n). Funciona tambien sobre MATRICES, termino a termino."
+  (cond
+    ((matp v) (from-rows (mapcar (lambda (f) (mapcar (lambda (c) (to-dec c n podar)) f))
+                                 (to-rows v))))
+    (t (let ((x (cond ((numberp v) v)
+                      (t (let ((w (ignore-errors (eval-consts (simplify v)))))
+                           (if (numberp w) w (num-eval (or w v))))))))
+         (if (null x) v
+             (let ((txt (fmt-dec-str x n)))
+               ;; simbolo con el texto por nombre: asi funciona igual dentro de una
+               ;; MATRIZ (que se imprime elemento a elemento) que suelto.
+               (intern (if podar (poda-ceros txt) txt))))))))
+
+(defun infix (e)
+  "Convierte una expresion LISP a texto matematico infijo (estilo MATLAB)."
+  (cond
+    ((integerp e) (format nil "~a" e))
+    ;; (decv "0.33") = un decimal ya formateado por `dec`; se escribe tal cual.
+    ((and (consp e) (eq (car e) 'decv)) (second e))
+    ((rationalp e) (format nil "~a/~a" (numerator e) (denominator e)))
+    ((numberp e) (format nil "~a" e))
+    ((symbolp e) (string-downcase (symbol-name e)))
+    ((atom e) (format nil "~a" e))
+    ((eq (car e) 'vector) (concatenate 'string "[" (join " " (mapcar #'infix (cdr e))) "]"))
+    ((and (eq (car e) '-) (= (length e) 2)) (concatenate 'string "-" (infix-par (second e) 3)))
+    ((member (car e) '(+ *))
+     (join (if (eq (car e) '+) " + " "*") (mapcar (lambda (a) (infix-par a (op-prec (car e)))) (cdr e))))
+    ((member (car e) '(- /))
+     (let* ((p (op-prec (car e))) (sep (if (eq (car e) '-) " - " "/")) (args (cdr e)))
+       (join sep (cons (infix-par (car args) p) (mapcar (lambda (a) (infix-par a (1+ p))) (cdr args))))))
+    ((eq (car e) 'expt) (concatenate 'string (infix-par (second e) 5) "^" (infix-par (third e) 5)))
+    (t (concatenate 'string (string-downcase (symbol-name (car e))) "(" (join ", " (mapcar #'infix (cdr e))) ")"))))
+
+;;;; ================= LIMITES · SERIES · SUMATORIA · POR DEFINICION =================
+
+;; reglas: evalua funciones en puntos conocidos ( (sin 0)->0, (cos 0)->1, (exp 0)->1 ... )
+(defun eval-consts (e)
+  (if (atom e) e
+      (let* ((f (car e)) (a (and (cdr e) (eval-consts (second e)))))
+        (cond
+          ((and (eq f 'sin) (eql a 0)) 0)
+          ((and (eq f 'cos) (eql a 0)) 1)
+          ((and (eq f 'tan) (eql a 0)) 0)
+          ((and (eq f 'exp) (eql a 0)) 1)
+          ((and (eq f 'log) (eql a 1)) 0)
+          ((and (eq f 'sqrt) (eql a 0)) 0)
+          ((and (eq f 'sqrt) (eql a 1)) 1)
+          (t (cons f (mapcar #'eval-consts (cdr e))))))))
+
+;; DERIVADA POR DEFINICION:  f'(x) = lim_{h->0} (f(x+h)-f(x))/h
+;; Se expande f(x+h)-f(x) como polinomio en h; dividir por h = bajar el grado;
+;; hacer h->0 = quedarse con el coeficiente de h^1. Exacto para polinomios.
+(defun poly-coef-h1 (p)
+  (let ((res nil))
+    (dolist (tm p)
+      (let* ((m (car tm)) (c (cdr tm)) (cell (assoc 'h m)))
+        (when (and cell (= (cdr cell) 1))
+          (setf res (p+ res (list (cons (remove 'h (copy-alist m) :key #'car) c)))))))
+    res))
+(defun deriv-def (e &optional (var 'x))
+  "Derivada POR DEFINICION (limite del cociente). Cae a derive-x si no es polinomio."
+  (let* ((fh (subst-var e var (list '+ var 'h)))
+         (num (try-poly (list '- fh e))))
+    (if (eq num :fail) (derive-x e) (poly->expr (poly-coef-h1 num)))))
+
+;; SUMATORIA finita:  sum_{var=a}^{b} e
+;; FORMULAS CERRADAS de Faulhaber (sum_{i=1}^{n} i^k) para k = 0..3:
+(defun faulhaber (k n)
+  (case k
+    (0 n)
+    (1 (list '/ (list '* n (list '+ n 1)) 2))
+    (2 (list '/ (list '* (list '* n (list '+ n 1)) (list '+ (list '* 2 n) 1)) 6))
+    (3 (list 'expt (list '/ (list '* n (list '+ n 1)) 2) 2))
+    (t nil)))
+(defun suma-poly-1n (e var n)
+  "Sum_{var=1}^{n} e, con e POLINOMIO en var (grado<=3): Faulhaber + linealidad. nil si no aplica."
+  (let ((p (try-poly (expand* e))))
+    (if (eq p :fail) nil
+        (let ((d (poly-deg-in p var)))
+          (if (or (null d) (> d 3)) nil
+              (let ((acc 0))
+                (dotimes (k (1+ d))
+                  (let ((ck (poly-coef-of p var k)) (fk (faulhaber k n)))
+                    (unless (or (equal ck 0) (null fk))
+                      (setf acc (list '+ acc (list '* ck fk))))))
+                (simplify (expand* acc))))))))
+(defun suma (e var a b)
+  "Sumatoria de e con var de a a b. Limites ENTEROS: suma termino a termino. Limite
+   inferior 1 y superior SIMBOLICO con sumando polinomial: FORMULA CERRADA (Faulhaber).
+   Resto de limites simbolicos: NOTACION (dibuja la Σ, no fabrica un resultado falso)."
+  (cond
+    ((and (integerp a) (integerp b))
+     (let ((acc 0)) (loop for i from a to b do (setf acc (simplify (list '+ acc (subst-var e var i))))) acc))
+    ((and (eql a 1) (not (integerp b)))
+     (or (suma-poly-1n e var b) (list 'suma e var a b)))
+    (t (list 'suma e var a b))))
+
+;; SERIE DE TAYLOR alrededor de 0 hasta grado n:  sum f^(k)(0)/k! x^k
+(defun fct (n) (if (<= n 1) 1 (* n (fct (1- n)))))
+(defun taylor (e n &optional (var 'x))
+  "Serie de Taylor de e alrededor de 0, hasta grado n. Usa las derivadas del motor."
+  (let ((term e) (acc 0))
+    (dotimes (k (1+ n))
+      (let ((c (simplify (eval-consts (subst-var term var 0)))))
+        (setf acc (list '+ acc (list '/ (list '* c (list 'expt var k)) (fct k)))))
+      (setf term (eval-consts (simplify (derive-x term)))))
+    (simplify acc)))
+
+;; LIMITE:  sustitucion directa; 0/0 -> L'Hopital; var->infinito -> comparar grados.
+(defun infinityp (a) (and (symbolp a) (member a '(inf infinity infty +inf oo))))
+(defun deg-in (e var)
+  "Grado de e como polinomio en var, o nil si no es polinomio en var."
+  (let ((p (try-poly (expand* e))))
+    (if (eq p :fail) nil (poly-deg-in p var))))
+(defun lead-coef-in (e var)
+  "Coeficiente lider de e (polinomio) en var, o 1 si no aplica."
+  (let ((p (try-poly (expand* e))) (d (deg-in e var)))
+    (if (or (eq p :fail) (null d)) 1 (poly-coef-of p var d))))
+(defun limite-inf (e var)
+  "Limite cuando var->infinito. Racional P/Q: por grados; polinomio: inf; constante: ella."
+  (if (and (consp e) (eq (car e) '/))
+      (let ((dn (deg-in (second e) var)) (dd (deg-in (third e) var)))
+        (if (and dn dd)
+            (cond ((< dn dd) 0)                                    ; abajo domina -> 0
+                  ((> dn dd) 'inf)                                 ; arriba domina -> inf
+                  (t (simplify (list '/ (lead-coef-in (second e) var)   ; grados iguales -> razon de lideres
+                                       (lead-coef-in (third e) var)))))
+            (list 'limite e var 'inf)))
+      (let ((d (deg-in e var)))
+        (cond ((null d) (list 'limite e var 'inf))
+              ((zerop d) (simplify (eval-consts e)))
+              (t 'inf)))))
+(defun limite (e var a)
+  "Limite de e cuando var->a. Sustituye; si 0/0 aplica L'Hopital; var->inf por grados."
+  (cond
+    ((infinityp a) (limite-inf e var))
+    ((and (consp e) (eq (car e) '/))
+     (let ((nu (simplify (eval-consts (subst-var (second e) var a))))
+           (de (simplify (eval-consts (subst-var (third e) var a)))))
+       (if (and (eql nu 0) (eql de 0))
+           (limite (list '/ (partial (second e) var) (partial (third e) var)) var a)
+           (simplify (eval-consts (subst-var e var a))))))
+    (t (simplify (eval-consts (subst-var e var a))))))
+
+;;;; ================= FACTORIZAR (lo contrario de expandir) =================
+;;;; simplify = factorizar/compactar:  x^2+2x+1 -> (x+1)^2 ,  (x+1)^2 se queda (x+1)^2
+;;;; expand = distribuir:  (x+1)^2 -> x^2+2x+1
+(defun poly->coeffs (p v)
+  (let ((deg 0)) (dolist (tm p) (let ((c (assoc v (car tm)))) (setf deg (max deg (if c (cdr c) 0)))))
+    (let ((arr (make-list (1+ deg) :initial-element 0)))
+      (dolist (tm p) (let* ((c (assoc v (car tm))) (k (if c (cdr c) 0)))
+                       (setf (nth k arr) (+ (nth k arr) (cdr tm))))) arr)))
+(defun divisors (n) (setf n (abs n))
+  (if (= n 0) '(1) (let (d) (loop for i from 1 to n do (when (zerop (mod n i)) (push i d))) (nreverse d))))
+(defun peval (coeffs x) (let ((s 0) (p 1)) (dolist (c coeffs) (setf s (+ s (* c p)) p (* p x))) s))
+(defun deflate (coeffs r)   ; Ruffini: coeffs / (x - r) -> cociente (r raiz exacta)
+  (let ((bs nil) (b 0)) (dolist (a (reverse coeffs)) (setf b (+ a (* r b))) (push b bs)) (cdr bs)))
+(defun coeffs->expr (coeffs v)
+  (let ((p nil) (k 0)) (dolist (c coeffs)
+    (unless (zerop c) (setf p (p+ p (p-scale (let ((r (p-const 1))) (dotimes (i k) (setf r (p* r (p-var v)))) r) c)))) (incf k))
+    (poly->expr p)))
+(defun lin-factor (b a v)   ; factor (b*v - a) legible
+  (let ((vx (if (= b 1) v (list '* b v))))
+    (cond ((zerop a) vx) ((> a 0) (list '- vx a)) (t (list '+ vx (- a))))))
+(defun group-powers (parts) ; factores identicos -> (expt f n)
+  (let ((seen nil))
+    (dolist (p parts) (let ((cell (assoc p seen :test #'equal)))
+      (if cell (incf (cdr cell)) (push (cons p 1) seen))))
+    (mapcar (lambda (c) (if (= (cdr c) 1) (car c) (list 'expt (car c) (cdr c)))) (nreverse seen))))
+(defun factor-coeffs (coeffs v)
+  (let* ((L (reduce #'lcm (mapcar #'denominator coeffs) :initial-value 1))
+         (ic (mapcar (lambda (c) (* c L)) coeffs))
+         (g (reduce #'gcd ic :initial-value 0))
+         (ic (if (zerop g) ic (mapcar (lambda (c) (/ c g)) ic)))
+         (cont (/ g L)) (factors nil))
+    (let ((k 0)) (loop while (and (cdr ic) (zerop (car ic))) do (pop ic) (incf k))
+      (when (> k 0) (push (if (= k 1) v (list 'expt v k)) factors)))
+    (loop while (> (length ic) 1) do
+      (let ((c0 (car ic)) (cn (car (last ic))) (found nil))
+        (block search
+          (dolist (p (divisors c0)) (dolist (q (divisors cn))
+            (dolist (r (list (/ p q) (/ (- p) q)))
+              (when (zerop (peval ic r))
+                (push (lin-factor (denominator r) (numerator r) v) factors)
+                (setf ic (mapcar (lambda (cc) (/ cc (denominator r))) (deflate ic r))) (setf found t)
+                (return-from search))))))
+        (unless found (return))))
+    (let* ((resto (unless (equal ic '(1)) (coeffs->expr ic v)))
+           (parts (append (unless (= cont 1) (list (coeff->expr cont)))
+                          (group-powers (reverse factors)) (and resto (list resto)))))
+      (cond ((null parts) 1) ((null (cdr parts)) (car parts))
+            (t (reduce (lambda (x y) (list '* x y)) parts))))))
+(defun factor (e)
+  "Factoriza un polinomio de UNA variable (raices racionales). Si no es polinomio, cae a
+   simplify (que maneja funciones racionales: 1/L, dN/dx, EA/L). Si no, lo reduce.
+   Primero resuelve operaciones anidadas (Diff{} dentro de Simplify{})."
+  (let* ((e (eval-ops-tree e)) (p (try-poly e)))
+    (if (eq p :fail) (simplify e)
+        (let ((vs (vars-of e)))
+          (if (/= (length vs) 1) (poly->expr p) (factor-coeffs (poly->coeffs p (car vs)) (car vs)))))))
+
+;;;; ================= DESPEJAR (resolver una ecuacion para una variable) =================
+(defun psqrt (e)   ; (sqrt n) con n cuadrado perfecto -> raiz entera
+  (if (and (consp e) (eq (car e) 'sqrt) (integerp (second e)) (>= (second e) 0)
+           (let ((r (isqrt (second e)))) (= (* r r) (second e))))
+      (isqrt (second e)) e))
+(defun clean (e)   ; limpia sqrt de cuadrados y reduce por polinomios si puede
+  (let ((e2 (if (atom e) e (psqrt (cons (car e) (mapcar #'clean (cdr e)))))))
+    (let ((p (try-poly e2))) (if (eq p :fail) e2 (poly->expr p)))))
+(defun neg-clean (e)  ; niega legible: -(a-b) -> b-a
+  (cond ((numberp e) (- e))
+        ((and (consp e) (eq (car e) '-) (= (length e) 3)) (list '- (third e) (second e)))
+        (t (list '* -1 e))))
+(defun poly-deg-in (p v) (let ((d 0)) (dolist (tm p) (let ((c (assoc v (car tm)))) (setf d (max d (if c (cdr c) 0))))) d))
+(defun poly-coef-of (p v k)   ; coeficiente de v^k como expresion (en las otras variables)
+  (let ((res nil)) (dolist (tm p)
+    (let* ((m (car tm)) (cell (assoc v m)) (kk (if cell (cdr cell) 0)))
+      (when (= kk k) (setf res (p+ res (list (cons (remove v (copy-alist m) :key #'car) (cdr tm))))))))
+    (poly->expr res)))
+(defun neg-lead-p (e)
+  (cond ((numberp e) (< e 0)) ((and (consp e) (eq (car e) '*) (eql (second e) -1)) t) (t nil)))
+(defun despejar (lhs rhs var)
+  "Despeja var de la ecuacion lhs = rhs. Lineal -> simbolico; cuadratica -> las 2 raices.
+   Resuelve primero ops de MATRIZ en los lados (det, …) para que
+   Despejar{det(K-lam*M)=0 @ lam} de los autovalores (det -> polinomio caracteristico)."
+  (let* ((lhs (meval lhs)) (rhs (meval rhs))
+         (p (try-poly (list '- lhs rhs))))
+    (if (eq p :fail) '?
+        (let ((deg (poly-deg-in p var)))
+          (cond
+            ((= deg 1)
+             (let ((c0 (poly-coef-of p var 0)) (c1 (poly-coef-of p var 1)))
+               (if (neg-lead-p c1) (clean (list '/ c0 (neg-clean c1)))
+                   (clean (list '/ (neg-clean c0) c1)))))
+            ((= deg 2)
+             (let* ((a (poly-coef-of p var 2)) (b (poly-coef-of p var 1)) (c (poly-coef-of p var 0))
+                    (disc (clean (list '- (list 'expt b 2) (list '* 4 (list '* a c))))))
+               (list 'vector
+                     (clean (list '/ (list '+ (neg-clean b) (list 'sqrt disc)) (list '* 2 a)))
+                     (clean (list '/ (list '- (neg-clean b) (list 'sqrt disc)) (list '* 2 a))))))
+            (t '?))))))
+
+;;;; ============ operadores estilo Calcpad (REALES, de Calcpad.Core/Solver.cs) ============
+;;;; $Slope{f(x) @ x = a}   = pendiente = DERIVADA de f respecto a x, evaluada en x=a
+;;;; $Area{f(x) @ x = a : b} = AREA bajo la curva = INTEGRAL definida de a a b
+;;;; (Calcpad lo hace NUMERICO; aqui, al ser simbolico, es EXACTO.)
+(defun slope-at (f var x0)
+  (simplify (eval-consts (subst-var (partial f var) var x0))))
+(defun area-under (f var a b)
+  ;; resuelve operaciones anidadas (Diff{} dentro de Area{}) que el quote dejo sin evaluar
+  (let ((f (eval-ops-tree f)))
+  (cond
+    ;; f NO depende de var (constante respecto a la integración, aunque tenga OTRAS
+    ;; letras: 1/L², E·A…) → ∫ₐᵇ f dvar = f·(b−a). Así el FEM con geometría/material
+    ;; simbólico integra (∫₋₁¹ (1/L²) dξ = 2/L²), donde try-poly fallaba por tratar L
+    ;; como variable del polinomio.
+    ((not (member var (vars-of f)))
+     (simplify (list '* f (- b a))))
+    (t (let ((p (try-poly f)))
+         (if (not (eq p :fail))
+             (let ((bigf (poly->expr (poly-integ p var))))
+               (simplify (list '- (subst-var bigf var b) (subst-var bigf var a))))
+             ;; NO es polinomio: prueba funcion RACIONAL num/den con den SIN la variable de integracion
+             ;; (∫ (poly en x)/L^n dx = (1/L^n) ∫ poly dx). Es lo que aparece en la rigidez de viga.
+             (let ((r (try-ratpoly f)))
+               (if (and (not (eq r :fail))
+                        (not (member var (vars-of (poly->expr (cdr r))))))
+                   (let* ((bigf (poly->expr (poly-integ (car r) var)))
+                          (defint (simplify (list '- (subst-var bigf var b) (subst-var bigf var a)))))
+                     (simplify (list '/ defint (poly->expr (cdr r)))))
+                   '?))))))))
+
+;; $product{f @ i = a : b}  y  $root{f @ x}
+(defun producto-op (f var a b)
+  (if (and (integerp a) (integerp b))
+      (let ((acc 1)) (loop for i from a to b do (setf acc (simplify (list '* acc (subst-var f var i))))) acc)
+      (list 'producto-op f var a b)))   ; limites simbolicos -> NOTACION
+(defun root-op (f var) (despejar f 0 var))
+
+;;;; ---- evaluador NUMERICO del arbol (para $find/$sup/$inf/$repeat) ----
+;;;; Calcpad los calcula NUMERICO (Solver.cs); replicamos su algoritmo tal cual.
+(defun nval (e var x)
+  "Evalua E como numero double, sustituyendo VAR por X."
+  (cond
+    ((numberp e) (float e 1d0))
+    ((eq e var) (float x 1d0))
+    ((eq e 'pi) pi)
+    ((eq e 'e) (exp 1d0))
+    ((symbolp e) (error "variable libre ~a" e))
+    ((consp e)
+     (let ((op (car e)) (as (cdr e)))
+       (flet ((n (a) (nval a var x)))
+         (case op
+           (+ (reduce #'+ (mapcar #'n as) :initial-value 0d0))
+           (* (reduce #'* (mapcar #'n as) :initial-value 1d0))
+           (- (if (cdr as) (- (n (first as)) (reduce #'+ (mapcar #'n (cdr as)))) (- (n (first as)))))
+           (/ (/ (n (first as)) (n (second as))))
+           (expt (expt (n (first as)) (n (second as))))
+           (sqrt (sqrt (n (first as)))) (sin (sin (n (first as)))) (cos (cos (n (first as))))
+           (tan (tan (n (first as)))) (exp (exp (n (first as)))) (log (log (n (first as))))
+           (abs (abs (n (first as))))
+           (t (error "op ~a" op))))))
+    (t (error "?"))))
+
+(defun nclean (x)
+  "Redondea a ~8 decimales y entera si esta cerca de un entero."
+  (if (numberp x)
+      (let ((r (/ (fround (* (float x 1d0) 1d8)) 1d8)))
+        (if (< (abs (- r (fround r))) 1d-9) (round r) r))
+      x))
+
+;; $Find{f @ x = a:b} = x en [a,b] donde f(x)=0 (biseccion; Calcpad usa ModAB)
+(defun find-op (f var a b)
+  (let* ((a (float a 1d0)) (b (float b 1d0))
+         (fa (nval f var a)) (fb (nval f var b)))
+    (if (> (* fa fb) 0d0) '?              ; sin cambio de signo en [a,b]
+        (dotimes (i 200 (nclean (/ (+ a b) 2)))
+          (let* ((m (/ (+ a b) 2)) (fm (nval f var m)))
+            (when (< (abs fm) 1d-13) (return (nclean m)))
+            (if (< (* fa fm) 0d0) (setf b m fb fm) (setf a m fa fm)))))))
+
+;; $Sup / $Inf = extremo de f en [a,b] por seccion aurea (Solver.cs::Extremum), devuelve el VALOR
+(defun extremum-op (f var left right is-min)
+  (let* ((k 0.6180339887498948d0)
+         (x1 (float (min left right) 1d0)) (x2 (float (max left right) 1d0))
+         (left x1) (right x2)
+         (d (- x2 x1)) (x3 (- x2 (* k d))) (x4 (+ x1 (* k d)))
+         (y3 (nval f var x3)) (y4 (nval f var x4)))
+    (loop while (> d (* 1d-11 (+ (abs x3) (abs x4) 1d-30))) do
+      (if (eq is-min (< y3 y4))
+          (setf x2 x4 x4 x3 y4 y3 d (- x2 x1) x3 (- x2 (* k d)) y3 (nval f var x3))
+          (setf x1 x3 x3 x4 y3 y4 d (- x2 x1) x4 (+ x1 (* k d)) y4 (nval f var x4))))
+    (nclean (cond ((= x1 left)  (nval f var left))    ; extremo en el borde izq
+                  ((= x2 right) (nval f var right))   ; extremo en el borde der
+                  (t (nval f var (/ (+ x1 x2) 2)))))))
+(defun sup-op (f var a b) (extremum-op f var a b nil))
+(defun inf-op (f var a b) (extremum-op f var a b t))
+
+;; $Repeat{f @ i = a:b} = itera i=a..b, devuelve el ULTIMO f(i) (Solver.cs::Repeat)
+(defun repeat-op (f var a b)
+  (let ((res '?)) (loop for i from (round a) to (round b) do (setf res (nclean (nval f var i)))) res))
+
+;;;; ---- evaluador SIMBOLICO de expresiones con tokens (Partial, Factor, …) ----
+;;;; Permite mezclar operaciones con aritmética:  (Partial{v@x} - Partial{u@y})/2
+;;;; evops recorre la expresión, EVALUA cada llamada de operación a su resultado
+;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
+(defparameter *op-calls*
+  '(partial derive-x deriv-steps factor expand* integ-var integ-x area-under slope-at
+    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar dec))
+
+;; dec como FUNCION, para que `evops` la aplique en el camino ESCALAR (el de
+;; matrices entra por `meval`). Sin n: 6 cifras y se podan los ceros de cola.
+(defun dec (x &optional n) (to-dec x (or n 6) (null n)))
+(defun evops (e)
+  (cond
+    ((atom e) e)
+    ((eq (car e) 'quote) (second e))                     ; '(...) → el dato tal cual
+    ((member (car e) *op-calls*)                         ; (partial 'f 'x) → su resultado
+     (apply (symbol-function (car e))
+            (mapcar (lambda (a) (if (and (consp a) (eq (car a) 'quote)) (second a) (evops a)))
+                    (cdr e))))
+    ((member (car e) '(+ - * / expt))                    ; aritmética → simplifica lo combinado
+     (simplify (cons (car e) (mapcar #'evops (cdr e)))))
+    (t e)))
+
+(defun eval-ops-tree (e)
+  "Evalua las llamadas de operacion (derive-x, partial, factor, area-under, …) que aparezcan
+   DENTRO de e, dejando el resto igual. Sirve para que Simplify{ … Diff{} … } resuelva las
+   operaciones anidadas antes de simplificar (el quote impedia evaluarlas)."
+  (cond ((atom e) e)
+        ((eq (car e) 'quote) (eval-ops-tree (second e)))
+        ((member (car e) *op-calls*) (evops e))
+        (t (cons (car e) (mapcar #'eval-ops-tree (cdr e))))))
+
+;;;; ================= ÁLGEBRA DE MATRICES (simbólica/numérica) =================
+;;;; Forma externa (del parser): fila = #(a b c) ; matriz = #(#(..) #(..)).
+;;;; Internamente: LISTA DE FILAS (cada fila, lista de entradas). Las entradas pueden
+;;;; ser números o expresiones simbólicas; se compactan con `simplify`.
+(defun to-rows (x)
+  (cond ((not (vectorp x)) (list (list x)))                       ; escalar -> 1x1
+        ((and (plusp (length x)) (vectorp (aref x 0)))            ; ya es matriz
+         (map 'list (lambda (r) (coerce r 'list)) x))
+        (t (list (coerce x 'list)))))                            ; fila -> 1xN
+(defun from-rows (rows)
+  (if (= (length rows) 1)
+      (coerce (first rows) 'vector)                               ; una fila -> #(..)
+      (coerce (mapcar (lambda (r) (coerce r 'vector)) rows) 'vector)))
+(defun matp (x) (vectorp x))                                      ; un valor matriz/vector
+
+(defun mtransp (x) (from-rows (apply #'mapcar #'list (to-rows x))))
+;; EVALUADOR NUMERICO rapido: recorre el arbol de una expresion SIMBOLICA con
+;; aritmetica nativa (sin construir formas ni simplify), dadas las variables en
+;; `env` (alist var->numero). Patron FEM: construir B/detJ simbolicos UNA vez y
+;; luego neval en cada punto de Gauss / elemento -> velocidad de codigo compilado.
+(defun neval (e env)
+  (cond ((numberp e) e)
+        ((symbolp e) (let ((p (assoc e env))) (if p (cdr p) (error "neval: ~a sin valor" e))))
+        ((consp e)
+         (let ((a (mapcar (lambda (x) (neval x env)) (cdr e))))
+           (case (car e)
+             (+ (apply #'+ a)) (- (apply #'- a)) (* (apply #'* a)) (/ (apply #'/ a))
+             (expt (expt (first a) (second a))) (sqrt (sqrt (first a)))
+             (sin (sin (first a))) (cos (cos (first a))) (tan (tan (first a)))
+             (exp (exp (first a))) (log (log (first a))) (abs (abs (first a)))
+             (t (error "neval: op ~a" (car e))))))
+        (t (error "neval: ~a" e))))
+;; nevala matriz simbolica -> matriz de numeros (array 2D double-float)
+(defun nmat (m env)
+  (let* ((rows (to-rows m)) (r (length rows)) (c (length (car rows)))
+         (a (make-array (list r c) :element-type 'double-float)))
+    (loop for i below r do (loop for j below c do
+      (setf (aref a i j) (float (neval (nth j (nth i rows)) env) 1d0))))
+    a))
+
+;; COMPILAR a codigo nativo: una expresion SIMBOLICA se vuelve una funcion de
+;; `vars` compilada por SBCL (una sola vez). Llamarla luego es velocidad de codigo
+;; maquina — el ultimo salto sobre neval (que interpreta el arbol). Las ops del
+;; arbol (+ - * / expt sqrt sin cos ...) ya son funciones de Common Lisp.
+(defun ncompile (expr vars)
+  (compile nil `(lambda ,vars (declare (ignorable ,@vars)) (float (progn ,expr) 1d0))))
+;; compila cada entrada de una matriz -> array 2D de funciones; ncmat-eval las corre.
+(defun ncmat-compile (m vars)
+  (let* ((rows (to-rows m)) (r (length rows)) (c (length (car rows)))
+         (a (make-array (list r c))))
+    (loop for i below r do (loop for j below c do
+      (setf (aref a i j) (ncompile (nth j (nth i rows)) vars))))
+    a))
+(defun ncmat-eval (fns args)
+  (let* ((r (array-dimension fns 0)) (c (array-dimension fns 1))
+         (a (make-array (list r c) :element-type 'double-float)))
+    (loop for i below r do (loop for j below c do
+      (setf (aref a i j) (apply (the function (aref fns i j)) args))))
+    a))
+
+;; NGAUSS: integral de GAUSS 2x2 NUMERICA de una matriz M(v1,v2) sobre [-1,1]^2.
+;; Es el patron FEM: construir M simbolico UNA vez (meval) y evaluar rapido (neval)
+;; en los 4 puntos de Gauss, sumando (pesos = 1). Devuelve matriz de numeros.
+;;   K = NGauss{ transpose(B)*D*B*detJ @ xi , eta }
+(defun ngauss (mexpr v1 v2)
+  (let* ((m (if (vectorp mexpr) mexpr (meval mexpr)))
+         (g 0.5773502691896258d0)
+         (pts (list (list (- g) (- g)) (list g (- g)) (list g g) (list (- g) g)))
+         (rows (to-rows m)) (nr (length rows)) (nc (length (car rows)))
+         (acc (make-array (list nr nc) :element-type 'double-float :initial-element 0d0)))
+    (dolist (p pts)
+      (let ((env (list (cons v1 (first p)) (cons v2 (second p)))))
+        (loop for i below nr do (loop for j below nc do
+          (incf (aref acc i j) (float (neval (nth j (nth i rows)) env) 1d0))))))
+    (from-rows (loop for i below nr collect (loop for j below nc collect (nclean (aref acc i j)))))))
+;; FAST-PATH NUMERICO: las ops de matriz construyen formas (* a b) y llaman simplify,
+;; aun con numeros. Si TODAS las entradas son numeros, se hace aritmetica nativa de
+;; SBCL (sin simplify): ~1000x mas rapido en numerico, misma respuesta simbolica.
+(declaim (inline nums2))
+(defun nums2 (a b) (and (numberp a) (numberp b)))
+;; producto punto: suma BINARIA anidada (+ (+ (+ 0 p1) p2) p3), porque `simplify` solo
+;; combina '+' de dos en dos (un (+ a b c) n-ario le haría perder términos).
+(defun mdot (row col)
+  (if (and (every #'numberp row) (every #'numberp col))
+      (let ((s 0)) (mapc (lambda (a b) (setf s (+ s (* a b)))) row col) s)   ; numerico nativo
+      (simplify (reduce (lambda (acc pr) (list '+ acc (list '* (car pr) (cdr pr))))
+                        (mapcar #'cons row col) :initial-value 0))))
+(defun mmul (a b)
+  (let ((ra (to-rows a)) (cb (apply #'mapcar #'list (to-rows b))))
+    (from-rows (mapcar (lambda (row) (mapcar (lambda (col) (mdot row col)) cb)) ra))))
+(defun mscale (s x)
+  (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (if (nums2 s e) (* s e) (simplify (list '* s e)))) row)) (to-rows x))))
+(defun madd (a b)
+  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (if (nums2 e f) (+ e f) (simplify (list '+ e f)))) r1 r2))
+                     (to-rows a) (to-rows b))))
+(defun msub (a b)
+  (from-rows (mapcar (lambda (r1 r2) (mapcar (lambda (e f) (if (nums2 e f) (- e f) (simplify (list '- e f)))) r1 r2))
+                     (to-rows a) (to-rows b))))
+(defun mrange (a &optional s b)                                   ; (a b) o (a s b)
+  (unless b (setf b s s 1))
+  (coerce (loop for x from a to b by s collect x) 'vector))
+
+;; INVERSA por Gauss-Jordan. Convierte cada entrada a número (eval-consts) y resuelve
+;; con aritmética EXACTA de SBCL (racionales). Matriz singular -> se deja igual.
+
+;; Reduce una expresion a un numero EXACTO si solo tiene numeros y las cuatro
+;; operaciones. Devuelve NIL si no puede. Hace falta porque `eval-consts` NO
+;; evalua aritmetica: una entrada como 5/2 llegaba a `mnum` como la lista
+;; (/ 5 2), `numberp` daba NIL y se convertia en 0 -> el pivote salia cero y
+;; `minv` devolvia la matriz SIN INVERTIR, en silencio. Solo funcionaba con
+;; matrices de enteros.
+(defun num-eval (e)
+  (cond
+    ((numberp e) e)
+    ((atom e) nil)
+    (t (let ((op (car e)) (as (mapcar #'num-eval (cdr e))))
+         (when (and as (every #'identity as))
+           (case op
+             (+ (reduce #'+ as))
+             (- (if (cdr as) (reduce #'- as) (- (car as))))
+             (* (reduce #'* as))
+             (neg (- (car as)))
+             (/ (if (and (cdr as) (notany #'zerop (cdr as))) (reduce #'/ as) nil))
+             ((expt ^) (if (and (= (length as) 2) (integerp (second as)))
+                           (ignore-errors (expt (first as) (second as))) nil))
+             (t nil)))))))
+
+;; Los decimales se pasan a racional para que la eliminacion de Gauss de `minv`
+;; siga siendo EXACTA (0.15 -> 3/20) y la inversa salga en fracciones limpias.
+(defun mnum (e)
+  (let* ((v (ignore-errors (eval-consts (simplify e))))
+         (n (or (and (numberp v) v) (num-eval v) (num-eval e))))
+    (cond ((null n) 0)
+          ((floatp n) (rational n))
+          (t n))))
+;; ¿toda la matriz reduce a NUMERO de verdad? `mnum` devuelve 0 cuando no puede,
+;; asi que preguntarselo a el no sirve: una entrada simbolica se colaba como 0 y
+;; la eliminacion de Gauss daba un pivote nulo -> `minv` devolvia la matriz SIN
+;; INVERTIR, en silencio. Con letras ([a,b;b,a]^-1) salia la propia matriz y la
+;; comprobacion A·A^-1 daba [a^2+b^2, 2ab; ...] en vez de la identidad.
+(defun mat-numeric-p (x)
+  (every (lambda (fila)
+           (every (lambda (c)
+                    (let ((v (ignore-errors (eval-consts (simplify c)))))
+                      (or (numberp v) (numberp (num-eval v)) (numberp (num-eval c)))))
+                  fila))
+         (to-rows x)))
+
+
+(defun minv (x)
+  (let* ((rows (to-rows x)) (n (length rows))
+         (a (make-array (list n (* 2 n)) :initial-element 0)))
+    (loop for i from 0 below n do
+      (loop for j from 0 below n do (setf (aref a i j) (mnum (nth j (nth i rows)))))
+      (setf (aref a i (+ n i)) 1))
+    (loop for c from 0 below n do
+      (when (zerop (aref a c c))
+        (loop for r from (1+ c) below n do
+          (unless (zerop (aref a r c))
+            (loop for k from 0 below (* 2 n) do (rotatef (aref a c k) (aref a r k)))
+            (return))))
+      (let ((piv (aref a c c)))
+        (when (zerop piv) (return-from minv x))                   ; singular
+        (loop for k from 0 below (* 2 n) do (setf (aref a c k) (/ (aref a c k) piv)))
+        (loop for r from 0 below n do
+          (unless (= r c)
+            (let ((f (aref a r c)))
+              (loop for k from 0 below (* 2 n) do
+                (setf (aref a r k) (- (aref a r k) (* f (aref a c k))))))))))
+    (from-rows (loop for i from 0 below n collect
+                     (loop for j from 0 below n collect (aref a i (+ n j)))))))
+
+;; determinante SIMBÓLICO por expansión de Laplace en la 1a fila (cofactores).
+;; Funciona con entradas simbólicas (a diferencia de minv, que numericiza). Sumas
+;; BINARIAS anidadas para que `simplify` combine término a término.
+(defun mminor (rows i j)   ; submatriz quitando fila i, columna j (rows = lista de listas)
+  (loop for r from 0 below (length rows) unless (= r i)
+        collect (loop for c from 0 below (length (nth r rows)) unless (= c j)
+                      collect (nth c (nth r rows)))))
+(defun mdet (x)
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (cond
+      ((= n 1) (caar rows))
+      ((= n 2) (let ((a (nth 0 (nth 0 rows))) (b (nth 1 (nth 0 rows)))
+                     (c (nth 0 (nth 1 rows))) (d (nth 1 (nth 1 rows))))
+                 (if (and (numberp a) (numberp b) (numberp c) (numberp d))
+                     (- (* a d) (* b c))
+                     (simplify (list '- (list '* a d) (list '* b c))))))
+      (t (let ((acc 0))
+           (loop for j from 0 below n do
+             (let ((term (list '* (nth j (car rows)) (mdet (from-rows (mminor rows 0 j))))))
+               (setf acc (list (if (evenp j) '+ '-) acc term))))
+           (simplify acc))))))
+
+;; INVERSA SIMBÓLICA por adjunta/determinante: inv(A) = (1/det A)·adj(A), con
+;; adj = transpuesta de la matriz de cofactores C_ij = (-1)^(i+j)·minor(i,j).
+;; A diferencia de minv (numérica), funciona con entradas simbólicas (Jᵀ, J⁻¹ del FEM).
+(defun madjugate (x)
+  "Matriz ADJUNTA = transpuesta de la matriz de cofactores. Sirve para C^-1 = adj(C)/det(C)."
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (if (= n 1) (from-rows (list (list 1)))
+        (let ((cof (loop for i from 0 below n collect
+                     (loop for j from 0 below n collect
+                       (let ((m (mdet (from-rows (mminor rows i j)))))
+                         (if (evenp (+ i j)) m (simplify (list '- m))))))))
+          (mtransp (from-rows cof))))))
+
+(defun msinv (x)
+  (let* ((rows (to-rows x)) (n (length rows)) (d (mdet x)))
+    (if (= n 1)
+        (from-rows (list (list (simplify (list '/ 1 (caar rows))))))
+        (let ((cof (loop for i from 0 below n collect
+                     (loop for j from 0 below n collect
+                       (let ((m (mdet (from-rows (mminor rows i j)))))
+                         (if (evenp (+ i j)) m (simplify (list '- m))))))))
+          (mscale (simplify (list '/ 1 d)) (mtransp (from-rows cof)))))))
+
+;; La inversa se ENRUTA segun lo que haya DENTRO: si todo son numeros, Gauss
+;; exacto (fracciones limpias); si hay letras, adjunta/determinante. Asi
+;; [a,b;b,a]^-1 sale en algebra y A·A^-1 da la identidad de verdad.
+(defun minv-auto (x)
+  (if (mat-numeric-p x) (minv x) (msinv x)))
+
+;; ---- los PASOS de la inversa, sueltos, para poder ENSENARLA ----
+;; La inversa no es un boton: es det -> menores -> cofactores -> adjunta -> dividir.
+;; Cada paso se expone al usuario para escribirlo en la hoja y verlo en algebra.
+
+;; menor(A; i; j) = la submatriz que queda al TACHAR la fila i y la columna j (1-based).
+(defun mminor-mat (x i j)
+  (from-rows (mminor (to-rows x) (1- i) (1- j))))
+
+;; cof(A) = matriz de COFACTORES: C_ij = (-1)^(i+j) · det(menor_ij).
+;; La adjunta es su transpuesta; por eso adj y cof se parecen pero NO son iguales.
+(defun mcofactors (x)
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (from-rows
+      (loop for i from 0 below n collect
+        (loop for j from 0 below n collect
+          (let ((m (mdet (from-rows (mminor rows i j)))))
+            (if (evenp (+ i j)) m (simplify (list '- m)))))))))
+
+;; TRAZA = suma de la diagonal principal (escalar). tr(A) = a11 + a22 + ...
+(defun mtrace (x)
+  (let* ((rows (to-rows x)) (n (length rows)) (acc 0))
+    (loop for i from 0 below n do (setf acc (list '+ acc (nth i (nth i rows)))))
+    (simplify acc)))
+
+;; componentes PLANAS de un vector, sea fila o columna.
+(defun vec-comps (x)
+  (let ((rows (to-rows x)))
+    (if (and rows (> (length rows) 1)) (mapcar #'car rows) (car rows))))
+
+;; PRODUCTO CRUZ de dos vectores 3D -> vector columna perpendicular a ambos.
+(defun mcross (a b)
+  (let* ((ac (vec-comps a)) (bc (vec-comps b))
+         (a1 (nth 0 ac)) (a2 (nth 1 ac)) (a3 (nth 2 ac))
+         (b1 (nth 0 bc)) (b2 (nth 1 bc)) (b3 (nth 2 bc)))
+    (from-rows (list (list (simplify (list '- (list '* a2 b3) (list '* a3 b2))))
+                     (list (simplify (list '- (list '* a3 b1) (list '* a1 b3))))
+                     (list (simplify (list '- (list '* a1 b2) (list '* a2 b1))))))))
+
+;; construye la matriz de un literal [ … ]: si los elementos ya son matrices/filas,
+;; los apila por filas (vertcat); si son escalares, es una sola fila.
+(defun build-mat (elems)
+  (if (some #'vectorp elems)
+      (from-rows (apply #'append (mapcar #'to-rows elems)))
+      (coerce elems 'vector)))
+
+;; integral DEFINIDA de una matriz respecto a var, de a a b: integra cada entrada
+;; (polinomio en var) con area-under. Sirve para H = ∫∫ QᵀDQ (aplicada dos veces).
+(defun mintegrate (mat var a b)
+  (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (area-under e var a b)) row)) (to-rows mat))))
+
+;; meval: evalúa una expresión que MEZCLA matrices y escalares.
+;;   (vector …) construye ; mtransp/mrange ; + - * expt(-1)=inversa ; escalar·matriz ; ∫ matriz.
+(defun meval (e)
+  (cond
+    ((atom e) e)
+    ((eq (car e) 'quote) (second e))
+    ((eq (car e) 'vector) (build-mat (mapcar #'meval (cdr e))))
+    ((eq (car e) 'mtransp) (mtransp (meval (second e))))
+    ;; transpose(M): alias de mtransp para que el usuario escriba transpose(B) y
+    ;; se transponga de verdad (antes quedaba sin evaluar -> "?"). Funciona simbólico.
+    ((eq (car e) 'transpose) (mtransp (meval (second e))))
+    ;; det(M): determinante simbólico (para detJ del Jacobiano, etc.).
+    ((eq (car e) 'det) (mdet (meval (second e))))
+    ((eq (car e) 'inv) (msinv (meval (second e))))
+    ((eq (car e) 'adj) (madjugate (meval (second e))))
+    ;; cof(M) y menor(M; i; j): los PASOS de la inversa, para ensenarla en algebra.
+    ((eq (car e) 'cof) (mcofactors (meval (second e))))
+    ;; dec(x) / dec(x, n): resultado en DECIMAL en vez de fraccion exacta.
+    ((eq (car e) 'dec)
+     (let ((n (if (third e) (let ((k (mnum (meval (third e))))) (if (integerp k) k 4)) 6)))
+       (to-dec (meval (second e)) n (null (third e)))))
+    ((member (car e) '(menor minor)) (mminor-mat (meval (second e))
+                                               (mnum (meval (third e)))
+                                               (mnum (meval (fourth e)))))
+    ;; trace(M): traza (suma de la diagonal). cross(u,v): producto cruz 3D.
+    ((eq (car e) 'trace) (mtrace (meval (second e))))
+    ;; Expand{…} / Simplify{…} / Factor{…} sobre MATRICES: antes caian al ramal
+    ;; generico y devolvian la forma SIN evaluar (el producto quedaba escrito). El
+    ;; algebra de matrices ya simplifica cada entrada al operar, asi que basta con
+    ;; evaluar dentro; si lo de dentro resulta escalar, se simplifica como escalar.
+    ((member (car e) '(expand* factor simplify simplif clean))
+     (let ((v (scalarize (meval (second e)))))
+       (if (matp v) v (simplify v))))
+    ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
+    ;; despejar dentro de una expr con matrices (autovalores: Despejar{det(K-λM)=0 @ λ}).
+    ;; La forma llega enrutada a meval por las matrices; se resuelve la ecuacion (despejar
+    ;; ya evalua det en sus lados). Desenvuelve los args citados.
+    ((eq (car e) 'despejar)
+     (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
+       (despejar (unq (second e)) (unq (third e)) (unq (fourth e)))))
+    ((eq (car e) 'ngauss)
+     (flet ((unq (x) (if (and (consp x) (eq (car x) 'quote)) (second x) x)))
+       (ngauss (meval (unq (second e))) (unq (third e)) (unq (fourth e)))))
+    ;; parciales/derivadas DENTRO de una matriz: si no se evalúan aquí, un
+    ;; J = [∂x/∂ξ …] guarda la forma ∂ sin reducir y det(J) opera sobre símbolos
+    ;; opacos. Evaluándolas, la matriz de un Jacobiano queda con sus valores.
+    ((eq (car e) 'partial)  (partial  (meval (second e)) (meval (third e))))
+    ((eq (car e) 'derive-x) (if (cddr e) (derive-x (meval (second e)) (meval (third e)))
+                                (derive-x (meval (second e)))))
+    ((eq (car e) 'mrange)  (apply #'mrange (mapcar #'meval (cdr e))))
+    ((eq (car e) 'area-under)          ; ∫ de una MATRIZ (entrada por entrada) o escalar
+     (let* ((fa (second e)) (va (third e))
+            (fform (if (and (consp fa) (eq (car fa) 'quote)) (second fa) fa))   ; desenvuelve '(...)
+            (var   (if (and (consp va) (eq (car va) 'quote)) (second va) va))
+            (m (meval fform)))
+       (if (vectorp m)
+           (mintegrate m var (meval (fourth e)) (meval (fifth e)))
+           (area-under fform var (meval (fourth e)) (meval (fifth e))))))
+    ((eq (car e) '+) (m2 #'madd #'+ (meval (second e)) (meval (third e))))
+    ((eq (car e) '-) (if (cddr e) (m2 #'msub #'- (meval (second e)) (meval (third e)))
+                         (let ((v (meval (second e))))    ; menos unario: matriz -> escalar -1; escalar -> -x
+                           (if (matp v) (mscale -1 v) (simplify (list '- v))))))
+    ((eq (car e) '*) (mtimes (meval (second e)) (meval (third e))))
+    ((eq (car e) 'expt)
+     (let ((base (meval (second e))) (p (meval (third e))))
+       (if (and (matp base) (eql p -1)) (minv-auto base) (simplify (list 'expt base p)))))
+    ;; funcion escalar (sqrt, sin, …) sobre una expr matricial que da 1x1 (p.ej. sqrt(uᵀu)):
+    ;; colapsa el 1x1 a su escalar y REDUCE con clean (psqrt: sqrt de cuadrado perfecto -> entero).
+    ;; sqrt([25]) -> sqrt(25) -> 5.
+    (t (clean (simplify (cons (car e) (mapcar (lambda (x) (scalarize (meval x))) (cdr e))))))))
+(defun scalarize (v)
+  "Vector 1x1 -> su escalar (recursivo: #(25) -> 25, #(#(25)) -> 25). Otro tamaño se deja igual."
+  (if (and (vectorp v) (= (length v) 1))
+      (scalarize (aref v 0))
+      v))
+(defun m2 (mf sf a b) (if (or (matp a) (matp b)) (funcall mf a b) (simplify (list (if (eq sf #'+) '+ '-) a b))))
+(defun mtimes (a b)
+  (cond ((and (matp a) (matp b)) (mmul a b))
+        ((matp a) (mscale b a))
+        ((matp b) (mscale a b))
+        (t (simplify (list '* a b)))))
+
+;; imprime el resultado como forma (vector …) para que el parser de C# lo lea y renderice.
+;; imprime un float sin el sufijo d0/e0 de SBCL y sin ceros de cola (1.3333, 12.0->12)
+;; Redondea a 10 CIFRAS SIGNIFICATIVAS (quita el ruido del float: 75000.00000000001 -> 75000,
+;; 395.43750000000003 -> 395.4375) y quita ceros de cola.
+(defun fmt-float (x)
+  (let ((d (float x 1d0)))
+    (if (or (zerop d) #+sbcl (sb-ext:float-infinity-p d) #-sbcl (ext:float-infinity-p d)
+                      #+sbcl (sb-ext:float-nan-p d) #-sbcl (ext:float-nan-p d))
+        (if (zerop d) "0" (format nil "~a" d))
+        (let* ((e (floor (log (abs d) 10d0)))
+               (m (expt 10 (- 9 e)))                          ; 10 cifras: 10^(9-e)
+               (r (float (/ (round (* (rational d) m)) m) 1d0))
+               (s (let ((*read-default-float-format* 'double-float)) (princ-to-string r)))
+               (ep (position #\e s)))
+          (let ((mant (if ep (subseq s 0 ep) s)) (ex (if ep (subseq s ep) "")))
+            (when (find #\. mant)
+              (setf mant (string-right-trim "0" mant))
+              (when (char= (char mant (1- (length mant))) #\.)
+                (setf mant (subseq mant 0 (1- (length mant))))))
+            (concatenate 'string mant ex))))))
+(defun mprint (x)
+  (cond ((vectorp x) (format nil "(vector ~{~a~^ ~})" (map 'list #'mprint x)))
+        ((floatp x) (fmt-float x))
+        (t (format nil "~a" x))))
+;; CL: (sqrt 2), (sin 1), (expt 2 1/2) de un RACIONAL devuelven SINGLE (7 cifras) aunque
+;; *read-default-float-format* sea double. dbl-args pasa esos argumentos a double antes de evaluar.
+(defun dbl (x) (if (rationalp x) (float x 1d0) x))
+(defun dexpt (a b)
+  (if (and (rationalp a) (rationalp b) (not (integerp b))) (expt (float a 1d0) b) (expt a b)))
+(defun dbl-args (f)
+  (cond ((atom f) f)
+        ((eq (car f) 'quote) f)
+        ((member (car f) '(sqrt sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log))
+         (cons (car f) (mapcar (lambda (a) (list 'dbl (dbl-args a))) (cdr f))))
+        ((and (eq (car f) 'expt) (= (length f) 3))
+         (list 'dexpt (dbl-args (second f)) (dbl-args (third f))))
+        (t (cons (car f) (mapcar #'dbl-args (cdr f))))))
+;; resultado para mostrar: floats -> texto redondeado (fmt-float), tambien DENTRO de formas
+;; simbolicas ((* 0.30000000000000004 x) -> (* 0.3 x)). ~a escribe el texto sin comillas.
+(defun show (x)
+  (cond ((floatp x) (fmt-float x))
+        ((and (complexp x) (floatp (realpart x)))
+         (format nil "#c(~a ~a)" (fmt-float (realpart x)) (fmt-float (imagpart x))))
+        ((vectorp x) (if (stringp x) x (mprint x)))
+        ((consp x) (cons (show (car x)) (show (cdr x))))
+        (t x)))
+
+;; ---- SERVIDOR PERSISTENTE: un proceso SBCL vivo que evalua formas de stdin y responde ----
+;; Elimina el arranque (~80 ms) por evaluacion. El WPF manda las formas (que hacen format t) y
+;; al final (hlisp-done); el server evalua cada una e imprime, y cierra la respuesta con \x1e.
+(defun hlisp-server ()
+  (setf *print-case* :downcase)
+  (setf *print-right-margin* 100000)
+  (setf *read-default-float-format* 'double-float)   ; 0.09 = double (ver arriba)
+  (loop
+    (let ((form (handler-case (read *standard-input* nil :hlisp-eof)
+                  (error () :hlisp-skip))))
+      (cond
+        ((eq form :hlisp-eof) (return))
+        ((eq form :hlisp-skip) (read-line *standard-input* nil :hlisp-eof))   ; resincroniza
+        ((equal form '(hlisp-done))
+         (write-char (code-char 30)) (finish-output))                        ; \x1e = fin de respuesta (SIN newline)
+        (t (handler-case (eval form) (error (e) (format t "; error: ~a~%" e)))
+           (finish-output))))))

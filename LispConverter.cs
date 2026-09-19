@@ -1259,6 +1259,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 @media print{ .hk-plotslot img,.hk-plotslot svg{max-height:300px;width:auto;max-width:100%;height:auto;} }
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
+.ws-prosa{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-style:normal;margin-right:.45em;}
 /* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
 .ws-deq{display:flex;flex-wrap:wrap;align-items:center;gap:.3em 1.2em;overflow:visible;}
 .ws-deq>.deq-body{flex:0 1 auto;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:.4em 0 .25em;}
@@ -1502,6 +1503,21 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                         // para un valor redondeado: 1/3 ≈ 0.33). Sin el ≈ aquí, "X ≈ Y" se parseaba
                         // ENTERO como una expresión, fallaba, y el valor no llegaba a dibujarse.
                         var toks = System.Text.RegularExpressions.Regex.Split(lblM.Groups[2].Value, @"(\s=\s|\s→\s|\s≈\s)");
+                        // Salida de programa con prosa/infija en algún tramo ("h = 1  ->  pendiente = 3"):
+                        // ParseLisp truncaba en silencio ("1 -> pendiente" → 1). Lectura mixta, como abajo.
+                        bool mixta = false;
+                        for (int pi = 0; fromLisp && pi < toks.Length; pi += 2)
+                            if (!EsFormaLispLimpia(toks[pi].Trim())) mixta = true;
+                        if (mixta)
+                        {
+                            var sm = new System.Text.StringBuilder(VarHtml(lblM.Groups[1].Value, false));
+                            for (int pi = 0; pi < toks.Length; pi += 2)
+                            {
+                                string sep = pi == 0 ? " = " : toks[pi - 1].Contains("→") ? " → " : toks[pi - 1].Contains("≈") ? " ≈ " : " = ";
+                                sm.Append("<span class=\"m-op\">" + sep + "</span>").Append(TramoMixtoHtml(toks[pi].Trim()));
+                            }
+                            return "<div class=\"ws-eq\">" + sm + "</div>";
+                        }
                         var trees = new List<N>();
                         var seps = new List<string>();   // separador ANTES de cada parte (desde la 2ª)
                         for (int pi = 0; pi < toks.Length; pi++)
@@ -1528,10 +1544,16 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     try
                     {
                         var partes = System.Text.RegularExpressions.Regex.Split(expr, @"\s=\s");
+                        // Salida de un PROGRAMA que mezcla prosa y matemática infija, p. ej.
+                        // (format t "Hola. Deriva x^2: ~a = ~a" (infix …) (infix …)). ParseLisp/ParseMath
+                        // NO fallan: TRUNCAN en silencio ("Hola. Deriva x^2: x^2" → «Hola.»; "2*x" quedaba
+                        // crudo). Solo si algún tramo no es una forma LISP limpia se usa la lectura mixta.
+                        bool mixta = fromLisp && System.Array.Exists(partes, p => !EsFormaLispLimpia(p.Trim()));
                         var sb = new System.Text.StringBuilder();
                         for (int pi = 0; pi < partes.Length; pi++)
                         {
                             if (pi > 0) sb.Append("<span class=\"m-op\"> = </span>");
+                            if (mixta) { sb.Append(TramoMixtoHtml(partes[pi].Trim())); continue; }
                             var rt = fromLisp ? ParseLisp(partes[pi].Trim()) : ParseMath(partes[pi].Trim());
                             sb.Append("<span class=\"m-expr\">").Append(ToHtml(rt)).Append("</span>");
                         }
@@ -1552,6 +1574,50 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                 catch { html = System.Net.WebUtility.HtmlEncode(line); }
                 return "<div class=\"ws-eq\">" + html + "</div>";
             }
+        }
+
+        // ¿El tramo es UNA forma LISP entera? Lista balanceada que cierra al final, o un átomo
+        // suelto SIN operadores infijos (x, 5, 1/3, -1). "x^2", "2*x" o prosa → no.
+        static bool EsFormaLispLimpia(string s)
+        {
+            if (s.Length == 0) return false;
+            if (s[0] == '(')
+            {
+                int d = 0;
+                for (int i = 0; i < s.Length; i++)
+                {
+                    if (s[i] == '(') d++;
+                    else if (s[i] == ')' && --d == 0) return i == s.Length - 1;
+                }
+                return false;
+            }
+            return !s.Contains(' ') && !System.Text.RegularExpressions.Regex.IsMatch(s, @"[\^*]|\w[+\-]\w");
+        }
+
+        static readonly System.Collections.Generic.HashSet<string> FuncionesMat = new System.Collections.Generic.HashSet<string>(
+            new[] { "sin", "cos", "tan", "exp", "log", "ln", "sqrt", "abs", "pi", "asin", "acos", "atan", "sinh", "cosh", "tanh" });
+
+        // ¿Es matemática infija (lo que imprime `infix`) y no prosa? Prosa = puntuación de frase
+        // (':' o '. ') o una palabra de 3+ letras que no es función conocida («Deriva», «Hola»).
+        static bool EsMatInfija(string s)
+        {
+            if (s.Length == 0 || s.Contains(':') || s.Contains(". ") || s.EndsWith(".")) return false;
+            foreach (System.Text.RegularExpressions.Match w in System.Text.RegularExpressions.Regex.Matches(s, @"[A-Za-zÀ-ÿ]{3,}"))
+                if (!FuncionesMat.Contains(w.Value.ToLowerInvariant())) return false;
+            return true;
+        }
+
+        // Un tramo de una línea mixta: forma LISP → como antes; infija → ParseMath (x² , 2·x);
+        // prosa → TEXTO, y lo que va tras el último ':' vuelve a leerse (suele ser la fórmula).
+        static string TramoMixtoHtml(string s)
+        {
+            if (EsFormaLispLimpia(s)) return "<span class=\"m-expr\">" + ToHtml(ParseLisp(s)) + "</span>";
+            if (EsMatInfija(s)) return "<span class=\"m-expr\">" + ToHtml(ParseMath(s)) + "</span>";
+            int k = s.LastIndexOf(':');
+            if (k >= 0 && k < s.Length - 1)
+                return "<span class=\"ws-prosa\">" + System.Net.WebUtility.HtmlEncode(RestaurarNombres(s.Substring(0, k + 1))) + "</span>"
+                     + TramoMixtoHtml(s.Substring(k + 1).Trim());
+            return "<span class=\"ws-prosa\">" + System.Net.WebUtility.HtmlEncode(RestaurarNombres(s)) + "</span>";
         }
 
         // AUTO-FIT: una ecuación más ancha que la página se ESCALA para caber entera (sin scroll,
@@ -1762,14 +1828,21 @@ document.addEventListener('mouseup',function(){
             return step * mag;
         }
 
+        // Texto libre (prosa de un programa, leyendas): los nombres que el motor recibió renombrados
+        // por choque de mayúsculas (DEFINICION → definicionhkq3) vuelven a como se escribieron.
+        static string RestaurarNombres(string s)
+        {
+            if (string.IsNullOrEmpty(s) || CaseMap.Count == 0) return s;
+            return RxIdent.Replace(s, m => m.Value.Contains(MangleTag) && CaseMap.TryGetValue(m.Value.ToLowerInvariant(), out var o) ? o : m.Value);
+        }
+
         // etiqueta bonita para la leyenda del plot:  3*x^2-2*x^3 → 3·x²−2·x³  (·, superíndices, − real)
         static string PrettyLabel(string s)
         {
             if (string.IsNullOrEmpty(s)) return s ?? "";
             const string sup = "⁰¹²³⁴⁵⁶⁷⁸⁹", sub = "₀₁₂₃₄₅₆₇₈₉";
             // nombres renombrados por choque (fhkq1) → como se escribieron (F)
-            if (CaseMap.Count > 0)
-                s = RxIdent.Replace(s, m => m.Value.Contains(MangleTag) && CaseMap.TryGetValue(m.Value.ToLowerInvariant(), out var o) ? o : m.Value);
+            s = RestaurarNombres(s);
             // griegas por su nombre (palabra entera): el eje salía «xi» y no «ξ»
             s = Regex.Replace(s, @"\b(xi|eta|zeta|theta|phi|psi|alpha|beta|gamma|delta|epsilon|sigma|tau|omega|lambda|mu|nu|rho)\b",
                 m => m.Value switch

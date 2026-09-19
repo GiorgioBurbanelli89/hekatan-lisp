@@ -42,6 +42,15 @@ Entorno: WSL Ubuntu (~/lispwasm), emsdk latest, ECL git.
 - Mi cmp_web.py duplicaba los saltos de línea (write_text en Windows convierte LF a CRLF encima del CRLF que ya trae el C#): artefacto del test, no de la web.
 - Olvidé copiar el hlisp.wasm con el arreglo de raíces a wwwroot: la web corrió un rato con el anterior (sha1 9cbc… vs 85ac…). Verificar sha1 antes de dar por bueno.
 
+### Parte 3 — salida de programas con prosa + fórmula (escritorio Y web, mismo C#)
+- ❌ Hoja 00: `(format t "Hola. Deriva x^2: ~a = ~a" (infix …) (infix …))` se veía «Hola. = 2*x». Igual en el ESCRITORIO.
+  Causa: RenderPage parte por " = " y lee cada tramo con ParseLisp/ParseMath, que NO fallan: TRUNCAN en silencio
+  ("Hola. Deriva x^2: x^2" → «Hola.»; "2*x" queda crudo; "1 -> pendiente" → 1).
+- ✅ LispConverter: `EsFormaLispLimpia` / `EsMatInfija` / `TramoMixtoHtml` (+ `.ws-prosa`, `RestaurarNombres`
+  para DEFINICION→definicionhkq3). Solo entra si algún tramo NO es forma LISP limpia.
+  48 hojas escritorio antes/después: cambian SOLO 00, 06, 07, 08 (las que tenían texto truncado); el resto idéntico.
+  Web publicada: «Hola. Deriva x^2: x² = 2·x».
+
 ## ⏳ Falta
 - Velocidad: motor web ~150 µs/op vs SBCL ~1 µs (ECL -O0 por --spill-pointers + eval en bytecode). Probar -O1/-O2 y medir.
 - «LISP ▶» en la web muestra rutas del escritorio (/sbcl/sbcl.exe): es el mismo C#; el script es para correrlo en SBCL de escritorio.

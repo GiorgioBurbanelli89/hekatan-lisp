@@ -54,7 +54,7 @@ body {
 .modos .titulo, .mode, .auto, .lbl { white-space: nowrap; }
 /* pantalla mediana: se esconde el rótulo «resultado como:» para que la barra quepa en una fila */
 @media (max-width: 1280px) and (min-width: 761px) {
-  .lbl-como, .ejemplos .lbl, #btn-solo .txt { display: none; }
+  .lbl-como, .ejemplos .lbl, #btn-solo .txt, #btn-run .txt { display: none; }
   .ejemplos select { max-width: 200px; }
   .modos .mode { padding: 6px 8px; }
 }

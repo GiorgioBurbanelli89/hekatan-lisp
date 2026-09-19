@@ -397,7 +397,7 @@ namespace HekatanLisp
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
         // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
         private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
+            @"^\s*[;#]+\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
@@ -427,11 +427,21 @@ namespace HekatanLisp
                 catch { }
             }
             int surfId = 0;
+            bool enFila = false; int idxFila = -1;   // #fila … #finfila: gráficas lado a lado
+            void CerrarFila()
+            {
+                if (idxFila >= 0 && idxFila < outList.Count && !string.IsNullOrEmpty(outList[idxFila]))
+                    outList[idxFila] = "<div class=\"hk-lado\">" + outList[idxFila] + "</div>";
+                idxFila = -1;
+            }
             foreach (var lineRaw in (editorText ?? "").Replace("\r", "").Split('\n'))
             {
                 var mm = RxAnyPlot.Match(lineRaw);
                 if (!mm.Success) continue;
+                CerrarFila();
                 string kw = mm.Groups[1].Value.ToLowerInvariant();
+                if (kw is "fila" or "finfila") { enFila = kw == "fila"; outList.Add(""); continue; }
+                if (enFila) idxFila = outList.Count;
                 string rest = mm.Groups[2].Value.Trim();
                 bool isSurf = kw is "surf" or "superficie" or "plot3d" or "mesh";
                 bool isMap = kw is "map" or "mapa" or "heatmap" or "contour" or "contourf";
@@ -596,6 +606,7 @@ namespace HekatanLisp
                     outList.Add(OneFplotHtml(rest, byName, fns, inv));
                 }
             }
+            CerrarFila();
             return outList;
         }
 
@@ -795,7 +806,7 @@ namespace HekatanLisp
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                                   @"^#\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                                System.Text.RegularExpressions.Regex.IsMatch(s, @"^#\s*(?:tabla|table)\s*\(",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -818,7 +829,7 @@ namespace HekatanLisp
                 if (manualTables[i] != null) { textOf[i] = ("table", "left", manualTables[i]); continue; }   // tabla de TEXTO (#|…|)
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                        @"^\s*[;#]+\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var tspec = ParseTablaDirective(lines[i]);
                 if (tspec != null) { isTabla[i] = true; tablaSpecOf[i] = tspec; continue; }

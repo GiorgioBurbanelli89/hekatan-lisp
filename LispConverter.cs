@@ -1270,6 +1270,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   overflow-x:auto;overflow-y:hidden;max-width:100%;}   /* padding = aire para glifos altos (∫ Σ) que overflow-y:hidden recortaría; overflow-x:auto = scroll para matrices anchas */
 /* gráficas: alto acotado para que NO ocupen una hoja entera en el PDF, y no partirlas entre páginas */
 .hk-plotslot{break-inside:avoid;page-break-inside:avoid;}
+.hk-plotslot:has(> .hk-lado){display:inline-block;width:49%;vertical-align:top;}
+.hk-lado svg,.hk-lado img{max-width:100% !important;}
+.hk-lado > div[class^=hkan]{margin-top:0 !important;}
 @media print{ .hk-plotslot img,.hk-plotslot svg{max-height:300px;width:auto;max-width:100%;height:auto;} }
 .ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
@@ -1445,7 +1448,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
                 // #tabla(…)/#table(…): directiva de TABLA (headers)(cols) — no es prosa, se procesa aparte.
                 if (Regex.IsMatch(s0, @"^#+\s*(?:tabla|table)\s*\(", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
@@ -1460,7 +1463,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             }
             // LISP: ';' — esquema previo (compatibilidad)
             var s = s0.Substring(1).Trim();
-            if (Regex.IsMatch(s, @"^(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+            if (Regex.IsMatch(s, @"^(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
             if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
             if (s.StartsWith("|") || s.StartsWith("=")) return ("p", "center", s.Substring(1).Trim());
@@ -2023,7 +2026,7 @@ document.addEventListener('mouseup',function(){
             string Num(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", C);
             var sb = new StringBuilder();
             sb.Append("<div class=\"ws-plot\"><svg viewBox=\"0 0 ").Append(W).Append(' ').Append(H)
-              .Append("\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"'Segoe UI',Arial,sans-serif\" style=\"max-width:100%;height:auto\">");
+              .Append("\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"'Segoe UI',Arial,sans-serif\" style=\"width:100%;max-width:540px;height:auto;display:block;margin:0 auto\">");
             // GRID (líneas tenues en cada tick) — estilo MATLAB
             for (double gx = Math.Ceiling(lo / xstep) * xstep; gx <= hi + xstep * 1e-6; gx += xstep)
                 sb.Append("<line x1=\"").Append(Num(SX(gx))).Append("\" y1=\"").Append(pT).Append("\" x2=\"").Append(Num(SX(gx))).Append("\" y2=\"").Append(H - pB).Append("\" stroke=\"var(--mut)\" stroke-opacity=\".22\" stroke-width=\"1\"/>");

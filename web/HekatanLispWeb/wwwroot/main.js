@@ -210,7 +210,7 @@ function aviso(html) { $('modal-txt').innerHTML = html; $('modal').classList.add
 $('modal').onclick = () => $('modal').classList.remove('on');
 
 const ACCIONES = {
-  nuevo: () => cargarTexto('', null),
+  nuevo: () => { cargarTexto('', null); $('sel-ejemplos').value = ''; ed.focus(); },
   abrir: () => $('file').click(),
   guardar: () => descargar(archivo || 'hoja.lisp', sourceText()),
   guardarLisp: () => descargar((archivo || 'hoja').replace(/\.lisp$/, '') + '_ejecutable.lisp', W.FullLisp(sourceText(), op)),
@@ -239,7 +239,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.ins !== undefined) insertar(b.dataset.ins);
   else if (b.dataset.syn) ({ math: () => setSyntax(false), lisp: () => setSyntax(true), full: synFullLisp, lab: synHekLab })[b.dataset.syn]();
   else if (b.dataset.a) ACCIONES[b.dataset.a]?.();
-  else if (b.dataset.ej) fetch('ejemplos/' + encodeURIComponent(b.dataset.ej)).then(r => r.text()).then(t => cargarTexto(t, b.dataset.ej));
+  else if (b.dataset.ej) { cargarEjemplo(b.dataset.ej); $('sel-ejemplos').value = b.dataset.ej; }
 });
 $('btn-run').onclick = showResult;
 $('chk-auto').onchange = e => { autoRun = e.target.checked; if (autoRun) showResult(); };
@@ -274,10 +274,13 @@ const GR = [['α', 'alpha'], ['β', 'beta'], ['γ', 'gamma'], ['δ', 'delta'], [
   ['μ', 'mu'], ['ν', 'nu'], ['ξ', 'xi'], ['ρ', 'rho'], ['σ', 'sigma'], ['τ', 'tau'], ['φ', 'phi'], ['χ', 'chi'], ['ψ', 'psi'], ['ω', 'omega']];
 $('griegas').innerHTML = GR.map(([g, t]) => `<button class="sym gr" data-ins="${t}">${g}</button>`).join('');
 
-// lista de ejemplos (Archivo → Ejemplos)
+// lista de ejemplos: en Archivo → Ejemplos y en la lista de la barra de arriba
+const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => cargarTexto(t, f));
 fetch('ejemplos.json').then(r => r.json()).then(l => {
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
+  for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));
 });
+$('sel-ejemplos').onchange = e => { if (e.target.value) cargarEjemplo(e.target.value); };
 
 // ---------- 7) arranque (como OnLoaded: autosave o EJ_MATH; ApplyTheme → SetView/SetOp) ----------
 const temaGuardado = leerLocal('hlisp-tema');

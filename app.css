@@ -50,6 +50,16 @@ body {
 /* ---------- fila 1: botones de modo ---------- */
 .modos { display: flex; align-items: center; margin: 4px 0; min-height: 34px; }
 .modos .titulo { color: var(--gold); font-weight: 700; font-size: 15px; margin-left: 14px; }
+.ejemplos { display: flex; align-items: center; gap: 6px; margin-left: 10px; min-width: 0; }
+.modos .titulo, .mode, .auto, .lbl { white-space: nowrap; }
+/* pantalla mediana: se esconde el rótulo «resultado como:» para que la barra quepa en una fila */
+@media (max-width: 1280px) and (min-width: 761px) { .lbl-como { display: none; } }
+.ejemplos select {
+  height: 30px; max-width: 230px; min-width: 0; padding: 0 6px; cursor: pointer;
+  background: var(--btn); color: var(--text); border: 1px solid var(--btn-border); border-radius: 6px;
+  font: 13px Roboto, "Segoe UI", sans-serif;
+}
+.ejemplos select:hover { border-color: var(--red); }
 .modos .der { margin-left: auto; margin-right: 10px; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .lbl { color: var(--muted); font-size: 12px; }
 .mode {
@@ -155,6 +165,8 @@ fieldset.grp legend { padding: 0 2px; }
   .salida { flex: none; height: 75vh; min-height: 360px; }
   .modos { flex-wrap: wrap; }
   .modos .der { margin-left: 8px; justify-content: flex-start; }
+  .ejemplos { margin: 4px 8px 4px 14px; flex: 1 1 100%; }
+  .ejemplos select { max-width: none; flex: 1; }
   .menu .archivo { display: none; }
   .menu .sub { min-width: 0; width: max-content; max-width: calc(100vw - 16px); }
 }

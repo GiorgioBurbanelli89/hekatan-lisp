@@ -14,7 +14,7 @@
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.ep97gjl5x1.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
     "./hlisp.js": "./hlisp.0vogsvjk28.js",
-    "./main.js": "./main.xccpfitznk.js"
+    "./main.js": "./main.ozvjhtqszr.js"
   },
   "scopes": {},
   "integrity": {
@@ -26,12 +26,12 @@
     "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./hlisp.0vogsvjk28.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
     "./hlisp.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
-    "./main.js": "sha256-0ZHwrA4v+G0QBuWl4nZb0Hgw4SxulbtRYJ+ctQk2HJo=",
-    "./main.xccpfitznk.js": "sha256-0ZHwrA4v+G0QBuWl4nZb0Hgw4SxulbtRYJ+ctQk2HJo="
+    "./main.js": "sha256-TPJTkv3PlriI6RNgkScZ55LmELV2WuzVW3dBrmkJ+GA=",
+    "./main.ozvjhtqszr.js": "sha256-TPJTkv3PlriI6RNgkScZ55LmELV2WuzVW3dBrmkJ+GA="
   }
 }</script>
   <script src="hlisp.0vogsvjk28.js"></script>
-  <script type="module" src="main.xccpfitznk.js"></script>
+  <script type="module" src="main.ozvjhtqszr.js"></script>
 </head>
 <body>
   <div class="carga" id="carga"><div>Cargando <b>Hekatan LISP</b>… (motor LISP + render)</div></div>
@@ -92,11 +92,16 @@
   <!-- 1 · botones de modo -->
   <div class="modos">
     <span class="titulo">Hekatan LISP</span>
+    <button class="mode" data-a="nuevo" style="margin-left:14px" title="Hoja nueva en blanco">📄 Nuevo</button>
+    <label class="ejemplos" title="Carga un ejemplo y lo calcula (AutoRun)">
+      <span class="lbl">ejemplos:</span>
+      <select id="sel-ejemplos" aria-label="Ejemplos"><option value="">— elige un ejemplo —</option></select>
+    </label>
     <div class="der">
       <button class="mode gold" id="btn-run" title="Ejecuta ahora (F5). Útil si AutoRun está apagado.">▶ Ejecutar</button>
       <label class="auto" title="Actualiza el resultado en vivo tras cada cambio (como Hekatan Lab)"><input type="checkbox" id="chk-auto" checked> AutoRun</label>
       <span class="gap" style="width:12px"></span>
-      <span class="lbl" style="margin-right:8px">resultado como:</span>
+      <span class="lbl lbl-como" style="margin-right:8px">resultado como:</span>
       <button class="mode" data-view="render">Render CSS</button>
       <button class="mode" data-view="lisp" title="El RESULTADO en forma LISP">LISP</button>
       <button class="mode" data-view="math" title="El RESULTADO en notación matemática (x^2 + 3*x). Texto plano.">matemática</button>

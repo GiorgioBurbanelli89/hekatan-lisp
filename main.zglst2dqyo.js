@@ -228,7 +228,11 @@ const ACCIONES = {
   pdf: () => { if (view !== 'render') setView('render'); $('render').contentWindow?.print(); },
   verMotor: async () => cargarTexto(await (await fetch('engine.lisp')).text(), 'engine.lisp'),
   compartir: () => compartir(),
-  acerca: () => aviso('<b style="color:var(--gold)">Hekatan LISP</b> — versión web.<br>Motor LISP: ECL compilado a WebAssembly (engine.lisp).<br>Render: el mismo código C# de la app de escritorio.'),
+  acerca: () => aviso('<b style="color:var(--gold)">Hekatan LISP</b> — una forma de mostrar operaciones <b>simbólicas y numéricas</b>, paso a paso.<br><br>' +
+    'Sirve para compartir ejemplos: el <b>Jacobiano</b>, las <b>funciones de forma</b>, y las formulaciones que usan ' +
+    '<b>ETABS, SAP2000, SAFE, Hekatan Struct</b> o cualquier programa de cálculo. Escribe la hoja y pulsa <b>🔗 Compartir</b>: ' +
+    'quien abra el enlace la ve igual, ya calculada.<br><br>' +
+    '<span style="font-size:12px;color:var(--muted)">Motor: ECL (Common Lisp) compilado a WebAssembly · Render: el mismo código de la app de escritorio.</span>'),
 };
 // ---------- enlace para compartir: la hoja viaja en el #hash (no pasa por ningún servidor) ----------
 //   #ej=<ejemplo>            ejemplo sin cambios (enlace corto)
@@ -299,6 +303,8 @@ document.addEventListener('click', e => {
   else if (b.dataset.ej) { cargarEjemplo(b.dataset.ej); $('sel-ejemplos').value = b.dataset.ej; }
 });
 $('btn-run').onclick = showResult;
+if (leerLocal('hlisp-intro-cerrada') === '1') $('intro').classList.add('oculto');
+$('intro-cerrar').onclick = () => { $('intro').classList.add('oculto'); guardarLocal('hlisp-intro-cerrada', '1'); };
 $('chk-auto').onchange = e => { autoRun = e.target.checked; if (autoRun) showResult(); };
 $('btn-theme').onclick = () => applyTheme(!dark);
 $('btn-keypad').onclick = $('kp-min').onclick = () => $('keypad').classList.toggle('oculto');

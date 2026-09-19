@@ -75,6 +75,17 @@ body {
 .mode.gold { color: var(--gold); }
 .auto { display: flex; align-items: center; gap: 4px; margin: 0 4px 0 8px; font-size: 12px; cursor: pointer; }
 
+/* franja de bienvenida */
+.intro {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0 8px 6px; padding: 7px 10px;
+  background: var(--editor); border: 1px solid var(--btn-border); border-left: 3px solid var(--gold); border-radius: 6px;
+  font-size: 13px; line-height: 1.45; color: var(--text);
+}
+.intro.oculto { display: none; }
+.intro b { color: var(--gold); font-weight: 600; }
+.intro button { margin-left: auto; flex: none; border: 0; background: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 0 4px; }
+.intro button:hover { color: var(--red); }
+
 /* ---------- fila 2: operaciones ---------- */
 .ops {
   display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px;

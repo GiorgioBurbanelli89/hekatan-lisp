@@ -4,34 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hekatan LISP</title>
+  <meta name="description" content="Hekatan LISP muestra operaciones simbólicas y numéricas paso a paso. Sirve para compartir ejemplos —el Jacobiano, las funciones de forma, las formulaciones que usan ETABS, SAP2000, SAFE, Hekatan Struct o cualquier programa de cálculo— con un enlace.">
+  <meta property="og:title" content="Hekatan LISP — operaciones simbólicas y numéricas">
+  <meta property="og:description" content="Ejemplos compartibles: Jacobiano, funciones de forma y formulaciones de ETABS, SAP2000, SAFE, Hekatan Struct o cualquier programa de cálculo, paso a paso.">
+  <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
-  <link href="_framework/dotnet.gimewdo5yq.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-iGKcIY2lqcPXHabS/fG0STQ6zmu20XLtHuNXRNKEgOs=" />
+  <link href="_framework/dotnet.4p90lw01of.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-GCZhzMHeILk4/ypu8xuFT2Asf5jEDY3WGDOx7KTkay8=" />
   <script type="importmap">{
   "imports": {
-    "./_framework/dotnet.js": "./_framework/dotnet.gimewdo5yq.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.4p90lw01of.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.ep97gjl5x1.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
     "./hlisp.js": "./hlisp.0vogsvjk28.js",
-    "./main.js": "./main.8jra9nb1gk.js"
+    "./main.js": "./main.zglst2dqyo.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.gimewdo5yq.js": "sha256-iGKcIY2lqcPXHabS/fG0STQ6zmu20XLtHuNXRNKEgOs=",
-    "./_framework/dotnet.js": "sha256-iGKcIY2lqcPXHabS/fG0STQ6zmu20XLtHuNXRNKEgOs=",
+    "./_framework/dotnet.4p90lw01of.js": "sha256-GCZhzMHeILk4/ypu8xuFT2Asf5jEDY3WGDOx7KTkay8=",
+    "./_framework/dotnet.js": "sha256-GCZhzMHeILk4/ypu8xuFT2Asf5jEDY3WGDOx7KTkay8=",
     "./_framework/dotnet.native.ep97gjl5x1.js": "sha256-Hgd+UiRAqxLF81vsdZwEpb28eOZqJ6ZWb8Wk65Q/JgQ=",
     "./_framework/dotnet.native.js": "sha256-Hgd+UiRAqxLF81vsdZwEpb28eOZqJ6ZWb8Wk65Q/JgQ=",
     "./_framework/dotnet.runtime.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./hlisp.0vogsvjk28.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
     "./hlisp.js": "sha256-JHaPiYBPrvPIm6gZUJ+ygceImnj2pW9clm95hbszLeQ=",
-    "./main.8jra9nb1gk.js": "sha256-HAEJ1q2RwMeycvqoy5MpeCT44XEonUS8h2dcXTAF0N8=",
-    "./main.js": "sha256-HAEJ1q2RwMeycvqoy5MpeCT44XEonUS8h2dcXTAF0N8="
+    "./main.js": "sha256-szDZK0NkJgJ8ZYee7e026t+dbjs6cQPFJz0cIcrJ8VM=",
+    "./main.zglst2dqyo.js": "sha256-szDZK0NkJgJ8ZYee7e026t+dbjs6cQPFJz0cIcrJ8VM="
   }
 }</script>
   <script src="hlisp.0vogsvjk28.js"></script>
-  <script type="module" src="main.8jra9nb1gk.js"></script>
+  <script type="module" src="main.zglst2dqyo.js"></script>
 </head>
 <body>
   <div class="carga" id="carga"><div>Cargando <b>Hekatan LISP</b>… (motor LISP + render)</div></div>
@@ -112,6 +116,14 @@
       <button class="mode" id="btn-keypad" style="font-size:15px" title="Mostrar / ocultar la calculadora">🖩</button>
       <button class="mode" id="btn-theme" style="font-size:14px" title="Cambiar claro / oscuro">☀</button>
     </div>
+  </div>
+
+  <!-- franja de bienvenida: qué es y para qué sirve (se cierra con ✕ y se recuerda) -->
+  <div class="intro" id="intro">
+    <span><b>Hekatan LISP</b> muestra operaciones <b>simbólicas y numéricas</b>, paso a paso.
+      Sirve para compartir ejemplos —el <b>Jacobiano</b>, las <b>funciones de forma</b>, las formulaciones que usan
+      <b>ETABS, SAP2000, SAFE, Hekatan Struct</b> o cualquier programa de cálculo— con un enlace <b>🔗 Compartir</b>.</span>
+    <button id="intro-cerrar" title="Cerrar">✕</button>
   </div>
 
   <!-- 2 · operaciones simbólicas -->

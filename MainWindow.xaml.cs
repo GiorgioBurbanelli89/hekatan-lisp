@@ -138,7 +138,12 @@ namespace HekatanLisp
 
             if (_ctl != null) StartCtl();
             if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
-            if (_pdf != null) { await Task.Delay(1100); await PrintPdfAndExit(_pdf); }
+            if (_pdf != null)
+            {   // espera el CÁLCULO (hojas largas tardan más de 1 s: salía el PDF de la hoja anterior/vacía)
+                try { if (_showTask != null) await _showTask; } catch { }
+                await Task.Delay(1500);
+                await PrintPdfAndExit(Path.GetFullPath(_pdf));   // WebView2 exige ruta absoluta
+            }
             if (_latex != null) {  // --latex: las expresiones en LaTeX (Hekatan School / Manim)
                 await WriteLatexAndExit(_latex);
             }

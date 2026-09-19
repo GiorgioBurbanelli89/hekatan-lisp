@@ -727,6 +727,13 @@ namespace HekatanLisp
             for (int k = 0; k < lines.Length; k++)
             {
                 var ln = lines[k]; var t = ln.TrimStart();
+                // NOTA: "tabla"/"table" NO entra aqui aposta. Este bloque sustituye griegas Unicode
+                // por su nombre ASCII (φ->"phi") para que el tokenizer las lea — pero en #tabla(...)
+                // los encabezados citados son TEXTO a mostrar (pueden llevar φ, σ, Ø...) y esa sustitucion
+                // los dejaba mangled ("phiV_c" en vez de "φV_c"), sin CaseMap que lo deshaga (no son
+                // variables). Efecto secundario aceptado: una referencia de columna en #tabla(...) que
+                // choque de mayuscula/minuscula con otra igual en el resto de la hoja no se renombra
+                // (ResolveTablaColumn no la encuentra y la muestra literal, no revienta).
                 bool plotDir = Regex.IsMatch(t, @"^#\s*(fplot|plot|ezplot|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b", RegexOptions.IgnoreCase);
                 if (t.Length == 0 || ((t[0] == '#' || t[0] == ';' || t[0] == '%') && !plotDir)) continue;
                 int at = ln.IndexOf("@@", StringComparison.Ordinal);
@@ -1057,6 +1064,10 @@ namespace HekatanLisp
                     if (n.Items.Count >= 2)
                         return ToHtml(n.Items[0], 5) + "<span class=\"m-op\"> × </span>" + ToHtml(n.Items[1], 5);
                     goto default;
+                case "ceil":    // techo ⌈x⌉ (n = ⌈As/Ab⌉, regla de SAFE para el número de varillas)
+                    return "<span class=\"m-detbar\">⌈</span>" + arg0 + "<span class=\"m-detbar\">⌉</span>";
+                case "floor":   // piso ⌊x⌋
+                    return "<span class=\"m-detbar\">⌊</span>" + arg0 + "<span class=\"m-detbar\">⌋</span>";
                 case "abs":     // valor absoluto / módulo: |x|
                     return "<span class=\"m-detbar\">|</span>" + arg0 + "<span class=\"m-detbar\">|</span>";
                 case "norm":    // norma: ‖v‖
@@ -1232,11 +1243,11 @@ namespace HekatanLisp
         // ---------- pagina HTML completa (worksheet) — tema claro/oscuro como Hekatan Lab ----------
         public static bool Dark = true;
                 // El separador daba 1.83 sobre el fondo oscuro: no se veia. Subido a 5.1.
-        const string ROOT_DARK  = ":root{--bg:#000000;--fg:#f0efec;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;--sep:#8f7fb0;}";
+        const string ROOT_DARK  = ":root{--bg:#000000;--fg:#f0efec;--mut:#9aa0a6;--var:#8ab4f8;--num:#9ecbff;--nary:#c080f0;--sep:#8f7fb0;--dib-rojo:#ff6b5e;--dib-azul:#6fa8ff;--dib-verde:#4cc38a;--dib-nar:#ffa94d;--dib-acero:#ff7a6e;}";
                 // Contraste MEDIDO (WCAG) sobre el crema del video, con la marca de agua
         // encima: el separador estaba en 1.6 (invisible) y las variables e integrales
         // se quedaban justas en 4.8. Subidos a 7 o mas; el texto, a 16.8.
-        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#171310;--mut:#544d3a;--var:#0b4fa8;--num:#08306b;--nary:#7a1fa8;--sep:#9c86b8;}";
+        const string ROOT_LIGHT = ":root{--bg:#FBF7EC;--fg:#171310;--mut:#544d3a;--var:#0b4fa8;--num:#08306b;--nary:#7a1fa8;--sep:#9c86b8;--dib-rojo:#c62828;--dib-azul:#1c5fbf;--dib-verde:#2b8a3e;--dib-nar:#d9480f;--dib-acero:#b3141c;}";
         const string CSS = @"
 *{box-sizing:border-box;}
 .pagebreak{break-before:page;page-break-before:always;height:0;margin:0;border:0;}
@@ -1247,7 +1258,10 @@ namespace HekatanLisp
   .ws-eq,.deq-body{overflow-x:hidden !important;overflow-y:hidden !important;}
   /* el título y la frase que PRESENTA una fórmula no se quedan solos al pie de la hoja */
   .ws-h1,.ws-h2,.ws-h3,.ws-fmt:has(+ .ws-eq),.ws-fmt:has(+ .ws-deq),.ws-fmt:has(+ .hk-plotslot){break-after:avoid;page-break-after:avoid;}
-  .ws-eq,.ws-deq{break-inside:avoid;page-break-inside:avoid;} }
+  .ws-eq,.ws-deq{break-inside:avoid;page-break-inside:avoid;}
+  .ws-tbl-wrap{break-inside:avoid;page-break-inside:avoid;overflow-x:visible;}
+  /* en papel una tabla ancha NO debe salir con barra de desplazamiento: las celdas se parten */
+  table.ws-table td,table.ws-table th{white-space:normal;} }
 body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
   font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
 .ws-eq{margin:0.4em 0;padding:.4em 0 .25em;
@@ -1270,6 +1284,33 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .ws-h2{font-weight:600;font-size:12.5pt;margin:.55em 0 .3em;}
 .ws-h3{font-weight:600;font-size:11pt;margin:.45em 0 .25em;color:var(--mut);}
 .al-left{text-align:left;} .al-center{text-align:center;} .al-right{text-align:right;}
+/* TABLAS (texto escrito a mano #|…|…| o resultados calculados #tabla(…)): estilo libro tecnico,
+   sin lineas verticales (booktabs) — regla arriba/abajo del encabezado, filita fina entre datos. */
+.ws-tbl-wrap{margin:.5em 0 .9em;overflow-x:auto;}
+table.ws-table{border-collapse:collapse;font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;
+  font-size:10.3pt;margin:0;}
+table.ws-table caption{caption-side:top;text-align:left;font-weight:600;color:var(--fg);margin-bottom:.3em;}
+table.ws-table thead tr{border-top:1.4px solid var(--fg);}
+table.ws-table th{font-weight:700;color:var(--fg);border-bottom:1.4px solid var(--fg);
+  padding:.3em .85em;white-space:nowrap;text-align:left;}
+table.ws-table td{padding:.26em .85em;border-bottom:.75px solid var(--sep);color:var(--fg);white-space:nowrap;}
+table.ws-table tbody tr:last-child td{border-bottom:1.4px solid var(--fg);}
+table.ws-table th.ws-c-num,table.ws-table td.ws-c-num{text-align:right;font-variant-numeric:tabular-nums;color:var(--num);}
+table.ws-table th.ws-c-txt,table.ws-table td.ws-c-txt{text-align:left;}
+table.ws-table th.ws-c-center,table.ws-table td.ws-c-center{text-align:center;}
+table.ws-table sub{font-size:.72em;} table.ws-table sup{font-size:.72em;}
+/* DIBUJO TÉCNICO (#dibujo … #fin): SVG en mm de papel, colores del tema; no se parte entre páginas */
+.hk-dib{margin:.6em 0 1em;break-inside:avoid;page-break-inside:avoid;}
+.hk-dib-tit{font-family:'Segoe UI',sans-serif;font-size:10pt;color:var(--fg);margin-bottom:.3em;}
+.hk-dib-esc{color:var(--mut);font-size:.92em;}
+.hk-dib-svg{display:block;margin:0 auto;}
+.hk-dib-ley{display:flex;flex-wrap:wrap;gap:.2em 1.3em;font-family:'Segoe UI',sans-serif;font-size:9.5pt;color:var(--fg);margin:.35em 0 .2em;}
+.hk-dib-li{display:inline-flex;align-items:center;gap:.35em;}
+.hk-dib-err{color:var(--dib-rojo);font-family:'Segoe UI',sans-serif;font-size:9.5pt;margin:.3em 0;}
+table.hk-obs td{white-space:normal;vertical-align:top;}
+table.hk-obs td:nth-child(3){min-width:22em;}
+.hk-obs-n{display:inline-block;width:1.7em;height:1.7em;line-height:1.7em;border-radius:50%;color:#fff;text-align:center;font-weight:700;font-size:.88em;}
+.hk-obs-e{font-weight:600;}
 .m-var{font-style:italic;color:var(--var);font-size:105%;} .m-num{color:var(--num);}
 .m-op{color:var(--mut);padding:0 .08em;}
 .m-fn{font-style:normal;font-weight:600;color:var(--fg);padding-right:.05em;}
@@ -1333,6 +1374,67 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         // arma el marcador que RenderPage dibuja como texto formateado
         public static string TxtLine(string kind, string align, string html) =>
             TxtMark + TxtSep + kind + TxtSep + align + TxtSep + html;
+
+        // ---------- TABLAS (texto escrito a mano #|…|…| y resultados calculados #tabla(…)) ----------
+        // Un solo constructor de HTML para las dos: filas y encabezado YA vienen en HTML (negrita,
+        // subindices @{…} ya resueltos) — aqui solo se arma la <table>, estilo libro tecnico (sin
+        // lineas verticales, regla arriba/abajo del encabezado). aligns[c]: "num"|"txt"|"center".
+        public static string BuildTable(string caption, List<string> aligns, List<string> headerHtml, List<List<string>> rowsHtml)
+        {
+            string ClsOf(int c) => "ws-c-" + (c < aligns.Count && aligns[c] != null ? aligns[c] : "txt");
+            var sb = new StringBuilder();
+            sb.Append("<div class=\"ws-tbl-wrap\"><table class=\"ws-table\">");
+            if (!string.IsNullOrEmpty(caption)) sb.Append("<caption>").Append(caption).Append("</caption>");
+            if (headerHtml != null && headerHtml.Count > 0)
+            {
+                sb.Append("<thead><tr>");
+                for (int c = 0; c < headerHtml.Count; c++)
+                    sb.Append("<th class=\"").Append(ClsOf(c)).Append("\">").Append(headerHtml[c]).Append("</th>");
+                sb.Append("</tr></thead>");
+            }
+            sb.Append("<tbody>");
+            // nº de columnas = el encabezado (si hay); una fila corta rellena en blanco, una larga se recorta —
+            // así una fila de datos con menos celdas que el encabezado no desplaza las columnas siguientes.
+            int nCols = headerHtml != null && headerHtml.Count > 0 ? headerHtml.Count
+                      : (rowsHtml != null ? rowsHtml.Select(r => r.Count).DefaultIfEmpty(0).Max() : 0);
+            if (rowsHtml != null)
+                foreach (var row in rowsHtml)
+                {
+                    sb.Append("<tr>");
+                    for (int c = 0; c < nCols; c++)
+                        sb.Append("<td class=\"").Append(ClsOf(c)).Append("\">").Append(c < row.Count ? row[c] : "").Append("</td>");
+                    sb.Append("</tr>");
+                }
+            sb.Append("</tbody></table></div>");
+            return sb.ToString();
+        }
+
+        // numero de un atomo LISP  ("12.5"·"-3"·"3/4")  →  double, o null si es simbolico (no numero).
+        public static double? NumFromAtom(string a)
+        {
+            a = a?.Trim();
+            if (string.IsNullOrEmpty(a)) return null;
+            if (double.TryParse(a, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)) return d;
+            var mm = Regex.Match(a, @"^(-?\d+)\s*/\s*(\d+)$");
+            if (mm.Success
+                && double.TryParse(mm.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var num)
+                && double.TryParse(mm.Groups[2].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var den)
+                && den != 0)
+                return num / den;
+            return null;
+        }
+
+        // celda NUMERICA de una tabla de resultados: "decimales" cifras fijas. Si el atomo NO es
+        // numerico (quedo simbolico: x, EI/L…) se dibuja con el motor de ecuaciones, no como texto
+        // plano — ver feedback_hekatan_lisp_solo_operaciones_no_texto.
+        public static string FormatNumCell(string atomOrExpr, int decimales)
+        {
+            var v = NumFromAtom(atomOrExpr);
+            if (v.HasValue) return v.Value.ToString("F" + Math.Max(0, decimales), System.Globalization.CultureInfo.InvariantCulture);
+            try { var t = ParseLisp(atomOrExpr); return t != null ? ToHtml(t) : System.Net.WebUtility.HtmlEncode(atomOrExpr ?? ""); }
+            catch { return System.Net.WebUtility.HtmlEncode(atomOrExpr ?? ""); }
+        }
+
         public static (string kind, string align, string text)? TextDirective(string raw)
         {
             var s0 = raw.TrimStart();
@@ -1343,7 +1445,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+                // #tabla(…)/#table(…): directiva de TABLA (headers)(cols) — no es prosa, se procesa aparte.
+                if (Regex.IsMatch(s0, @"^#+\s*(?:tabla|table)\s*\(", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
                 {
                     var txt = s0.Substring(2).Trim();
@@ -1356,7 +1460,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
             }
             // LISP: ';' — esquema previo (compatibilidad)
             var s = s0.Substring(1).Trim();
-            if (Regex.IsMatch(s, @"^(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+            if (Regex.IsMatch(s, @"^(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
             if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
             if (s.StartsWith("|") || s.StartsWith("=")) return ("p", "center", s.Substring(1).Trim());
@@ -1375,6 +1479,11 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
         public static string FormatInlineText(string t, Func<string, string> varLookup, Func<string, bool> isVec = null)
         {
             t = System.Net.WebUtility.HtmlEncode(t ?? "");
+            // subindice/superindice EXPLICITOS:  x^{2}  ·  N_{1}  — ANTES que @{expr}/{expr}: si no,
+            // "{2}" (sin @ ni ^/_ real) se confunde con el alias de VALOR de abajo y {2} se sustituye
+            // por el numero 2 renderizado (m-expr), comiendose las llaves antes de llegar aqui.
+            t = Regex.Replace(t, @"\^\{([^{}]+)\}", "<sup>$1</sup>");
+            t = Regex.Replace(t, @"_\{([^{}]+)\}", "<sub>$1</sub>");
             // @{expr} → SOLO el valor
             t = Regex.Replace(t, @"@\{(" + Bal + @")\}", m =>
             {
@@ -1480,6 +1589,9 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
                     string kind = pz.Length > 2 ? pz[2] : "p";
                     string align = pz.Length > 3 ? pz[3] : "left";
                     string htmlC = pz.Length > 4 ? string.Join(TxtSep.ToString(), pz.Skip(4)) : "";
+                    // TABLA (texto a mano #|…|…| o #tabla(…) de resultados): htmlC YA es el <div><table>…
+                    // completo (armado por BuildTable) — se pega tal cual, sin envolver en ws-fmt/al-*.
+                    if (kind == "table") return htmlC;
                     string cls = kind == "h1" ? "ws-h1" : kind == "h2" ? "ws-h2" : kind == "h3" ? "ws-h3" : "";
                     return "<div class=\"ws-fmt " + cls + " al-" + align + "\">" + htmlC + "</div>";
                 }
@@ -1775,7 +1887,10 @@ document.addEventListener('mouseup',function(){
                 return n.Atom switch
                 {
                     "sqrt" => Math.Sqrt(a), "sin" => Math.Sin(a), "cos" => Math.Cos(a), "tan" => Math.Tan(a),
-                    "exp" => Math.Exp(a), "log" => Math.Log(a), "abs" => Math.Abs(a), _ => double.NaN
+                    "exp" => Math.Exp(a), "log" => Math.Log(a), "abs" => Math.Abs(a),
+                    "floor" => Math.Floor(a + 1e-12), "ceil" => Math.Ceiling(a - 1e-12), "round" => Math.Round(a),
+                    "sign" => Math.Sign(a), "sinh" => Math.Sinh(a), "cosh" => Math.Cosh(a), "tanh" => Math.Tanh(a),
+                    _ => double.NaN
                 };
             }
             double l = Eval(n.A, var, x), r = Eval(n.B, var, x);

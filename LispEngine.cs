@@ -147,6 +147,8 @@ namespace HekatanLisp
             "area-under","slope-at","suma","producto-op","root-op","find-op","sup-op","inf-op","repeat-op",
             "partial","derive-x","deriv-steps","integ-var","integ-x","factor","expand*","limite","despejar","dec"
         };
+        // redondeo y extremos NUMERICOS (engine.lisp: num-fn). Van por evops (escalar) o meval (vector).
+        static readonly string[] NumFnNames = { "ceil", "floor", "round", "max", "min" };
         public static List<string> EvalOp(List<string> lispExprs, string op, string var = null)
         {
             // Si hay VARIABLE elegida (∂ respecto a v), usa la PARCIAL / integral con esa v.
@@ -164,7 +166,8 @@ namespace HekatanLisp
                 // ¿MATRIZ? (vector/transpuesta/rango) → evaluar con meval e imprimir como (vector …)
                 bool hasMat = ex.Contains("(vector") || ex.Contains("(mtransp") || ex.Contains("(mrange") || ex.Contains("(ngauss");
                 // ¿la forma tiene ALGÚN token de operación (aunque sea anidado)? → evaluar con evops
-                bool hasOp = System.Array.Exists(OpCallNames, nm => ex.Contains("(" + nm));
+                bool hasOp = System.Array.Exists(OpCallNames, nm => ex.Contains("(" + nm))
+                             || System.Array.Exists(NumFnNames, nm => ex.Contains("(" + nm + " "));   // ceil/floor/round/max/min
                 if (hasMat)  // álgebra de matrices simbólica/numérica
                     sb.Append("(format t \"~a~%\" (or (ignore-errors (mprint (meval '").Append(ex).Append("))) '").Append(ex).Append("))\n");
                 else if (hasOp)   // tokens (Partial, Factor, …) puros o mezclados con aritmética → resultado simbólico

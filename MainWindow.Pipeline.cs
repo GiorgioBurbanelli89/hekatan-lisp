@@ -62,6 +62,194 @@ namespace HekatanLisp
             return res;
         }
 
+        // separa por 'sep' de PRIMER nivel — respeta { } [ ] ( ) Y comillas "…" (para tablas:
+        // encabezados "D, DNE [t]" con coma dentro de comillas, columnas {"A-1","A-2"} literales).
+        private static List<string> SplitTopQ(string s, char sep)
+        {
+            var res = new List<string>(); int depth = 0; bool inQ = false; var cur = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (c == '"') inQ = !inQ;
+                if (!inQ)
+                {
+                    if (c == '{' || c == '[' || c == '(') depth++;
+                    else if (c == '}' || c == ']' || c == ')') depth--;
+                }
+                if (c == sep && depth == 0 && !inQ) { res.Add(cur.ToString()); cur.Clear(); }
+                else cur.Append(c);
+            }
+            res.Add(cur.ToString());
+            return res;
+        }
+
+        // ---------- TABLAS de RESULTADOS calculados:  #tabla("Nudo","Uz [mm]:3")( nudos ; uz ) ----------
+        // headers: lista entre comillas, con ":N" opcional al FINAL = decimales de esa columna (num. 2).
+        // columnas: separadas por ';' — nombre de un VECTOR ya definido en la hoja (D = [12,8,5])·
+        //   vector LITERAL [12,8,5]  ·  o texto literal {"A-1","A-2","B-1"} (columnas no numericas,
+        //   p.ej. "Eje"). No pasa por el motor SBCL (como #beam/#fplot): es un RENDER, no una operacion.
+        private sealed class TablaHeader { public string Text; public int Decimals = 2; }
+        private sealed class TablaSpec { public List<TablaHeader> Headers; public List<string> ColTokens; }
+        private sealed class TablaCol { public bool IsText; public List<string> Text; public List<string> RawNum; }
+
+        private static readonly System.Text.RegularExpressions.Regex RxTabla = new System.Text.RegularExpressions.Regex(
+            @"^\s*#\s*(?:tabla|table)\s*\((?<h>.*)\)\s*\((?<c>.*)\)\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        private static TablaSpec ParseTablaDirective(string line)
+        {
+            var m = RxTabla.Match((line ?? "").Trim());
+            if (!m.Success) return null;
+            var headers = new List<TablaHeader>();
+            foreach (var raw0 in SplitTopQ(m.Groups["h"].Value, ','))
+            {
+                var t = raw0.Trim();
+                if (t.Length == 0) continue;
+                if (t.Length >= 2 && t[0] == '"' && t[t.Length - 1] == '"') t = t.Substring(1, t.Length - 2);
+                var dm = System.Text.RegularExpressions.Regex.Match(t, @"^(.*):(\d{1,2})$");
+                var h = new TablaHeader();
+                if (dm.Success) { h.Text = dm.Groups[1].Value.Trim(); h.Decimals = int.Parse(dm.Groups[2].Value); }
+                else h.Text = t.Trim();
+                headers.Add(h);
+            }
+            var cols = SplitTopQ(m.Groups["c"].Value, ';').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+            if (headers.Count == 0 || cols.Count == 0) return null;
+            return new TablaSpec { Headers = headers, ColTokens = cols };
+        }
+
+        // resuelve UN token de columna: {"a","b"} texto · [1,2,3] vector literal · nombre = variable
+        // YA definida en la hoja (busca la PRIMERA línea etiquetada con ese nombre y su resOf).
+        private static TablaCol ResolveTablaColumn(string tok, string[] labels, string[] resOf)
+        {
+            tok = (tok ?? "").Trim();
+            if (tok.Length >= 2 && tok[0] == '{' && tok[tok.Length - 1] == '}')
+            {
+                var items = SplitTopQ(tok.Substring(1, tok.Length - 2), ',')
+                    .Select(s => { var v = s.Trim(); if (v.Length >= 2 && v[0] == '"' && v[v.Length - 1] == '"') v = v.Substring(1, v.Length - 2); return v; })
+                    .ToList();
+                return new TablaCol { IsText = true, Text = items };
+            }
+            LispConverter.N tree = null;
+            if (tok.StartsWith("["))
+            {
+                try { tree = LispConverter.ParseMath(tok); } catch { }
+            }
+            else
+            {
+                for (int j = 0; j < labels.Length; j++)
+                    if (labels[j] != null && string.Equals(labels[j], tok, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(resOf[j]))
+                    { try { tree = LispConverter.ParseLisp(resOf[j]); } catch { } break; }
+            }
+            if (tree == null)   // no se encontro/parseo: se muestra el token TAL CUAL (visible, no revienta)
+                return new TablaCol { IsText = true, Text = new List<string> { tok } };
+            var items2 = tree.Op == "vec" ? tree.Items : new List<LispConverter.N> { tree };
+            var raws = items2.Select(it => it != null && it.IsAtom ? it.Atom : LispConverter.ToLisp(it)).ToList();
+            return new TablaCol { IsText = false, RawNum = raws };
+        }
+
+        // arma la tabla de resultados completa (columnas resueltas + broadcast de escalares + HTML).
+        private static string BuildTablaResultados(TablaSpec spec, string[] labels, string[] resOf)
+        {
+            if (spec == null) return "";
+            var cols = spec.ColTokens.Select(t => ResolveTablaColumn(t, labels, resOf)).ToList();
+            int nCols = Math.Min(spec.Headers.Count, cols.Count);
+            int nRows = 0;
+            for (int c = 0; c < nCols; c++)
+                nRows = Math.Max(nRows, cols[c].IsText ? cols[c].Text.Count : cols[c].RawNum.Count);
+            // broadcast: una columna de UN solo valor (escalar) se repite en todas las filas
+            for (int c = 0; c < nCols; c++)
+            {
+                var col = cols[c];
+                if (col.IsText && col.Text.Count == 1 && nRows > 1) col.Text = Enumerable.Repeat(col.Text[0], nRows).ToList();
+                if (!col.IsText && col.RawNum != null && col.RawNum.Count == 1 && nRows > 1) col.RawNum = Enumerable.Repeat(col.RawNum[0], nRows).ToList();
+            }
+            var aligns = new List<string>();
+            var headerHtml = new List<string>();
+            for (int c = 0; c < nCols; c++)
+            {
+                aligns.Add(cols[c].IsText ? "txt" : "num");
+                headerHtml.Add(LispConverter.FormatInlineText(spec.Headers[c].Text, _ => null));
+            }
+            var rows = new List<List<string>>();
+            for (int r = 0; r < nRows; r++)
+            {
+                var row = new List<string>();
+                for (int c = 0; c < nCols; c++)
+                {
+                    var col = cols[c];
+                    if (col.IsText)
+                        row.Add(LispConverter.FormatInlineText(r < col.Text.Count ? col.Text[r] : "", _ => null));
+                    else
+                        row.Add(r < col.RawNum.Count ? LispConverter.FormatNumCell(col.RawNum[r], spec.Headers[c].Decimals) : "");
+                }
+                rows.Add(row);
+            }
+            return LispConverter.BuildTable(null, aligns, headerHtml, rows);
+        }
+
+        // ---------- TABLAS de TEXTO escritas a mano en comentarios:  #| A | B |  /  #|---|---:| ----------
+        // Fila de encabezado #|…|…| SEGUIDA de una fila separadora #|---|---:| (markdown): las filas
+        // de abajo, también #|…|…|, son los datos. Alineación por columna, estándar markdown:
+        // ':---' o '---' = izquierda (texto) · '---:' = derecha (número, con el color de m-num) ·
+        // ':---:' = centro. Una línea "#| texto centrado" SUELTA (sin más '|' ni separadora detrás)
+        // sigue siendo la prosa centrada de siempre — no se toca.
+        private static readonly System.Text.RegularExpressions.Regex RxTablaSep = new System.Text.RegularExpressions.Regex(
+            @"^\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$");
+
+        private static void ExtractManualTables(string[] lines, string[] manualTables)
+        {
+            for (int i = 0; i < lines.Length - 1; i++)
+            {
+                var l0 = lines[i].TrimStart();
+                if (!l0.StartsWith("#|")) continue;
+                var rest0 = l0.Substring(2);
+                if (!rest0.Contains('|')) continue;              // "#| texto centrado" suelto: no es tabla
+                var l1 = lines[i + 1].TrimStart();
+                if (!l1.StartsWith("#|")) continue;
+                var rest1 = l1.Substring(2);
+                if (!RxTablaSep.IsMatch(rest1)) continue;         // la 2a fila no es la separadora ---|---
+                var header = rest0.Split('|').Select(c => c.Trim()).ToList();
+                while (header.Count > 0 && header[header.Count - 1].Length == 0) header.RemoveAt(header.Count - 1);
+                var sepCells = rest1.Split('|').Select(c => c.Trim()).ToList();
+                var alignKinds = new List<string>();
+                for (int c = 0; c < header.Count; c++)
+                {
+                    var a = c < sepCells.Count ? sepCells[c] : "-";
+                    bool lft = a.StartsWith(":"); bool rgt = a.EndsWith(":");
+                    alignKinds.Add(lft && rgt ? "center" : rgt ? "num" : "txt");
+                }
+                var rows = new List<List<string>>();
+                int j = i + 2;
+                for (; j < lines.Length; j++)
+                {
+                    var lj = lines[j].TrimStart();
+                    if (!lj.StartsWith("#|")) break;
+                    var restj = lj.Substring(2);
+                    if (!restj.Contains('|')) break;
+                    var celdas = restj.Split('|').Select(c => c.Trim()).ToList();
+                    while (celdas.Count > 0 && celdas[celdas.Count - 1].Length == 0) celdas.RemoveAt(celdas.Count - 1);   // pipe final -> celda vacia de mas
+                    rows.Add(celdas);
+                }
+                // serializa (se re-arma en RebuildManualTable, DESPUES de FormatInlineText por celda):
+                //   aligns\x05aligns... \x04 header\x05header... \x04 fila1\x05fila1... \x04 fila2...
+                var payload = string.Join("\x05", alignKinds) + "\x04" + string.Join("\x05", header) + "\x04"
+                            + string.Join("\x04", rows.Select(r => string.Join("\x05", r)));
+                manualTables[i] = payload;
+                for (int k = i + 1; k < j; k++) lines[k] = "";   // separadora + filas: consumidas, quedan en blanco
+                i = j - 1;                                        // continua DESPUES del bloque
+            }
+        }
+
+        // reconstruye la tabla ya con cada celda pasada por FormatInlineText (negrita/@var/sub-sup).
+        private static string RebuildManualTable(string payloadFormateado)
+        {
+            var parts = payloadFormateado.Split('\x04');
+            if (parts.Length < 2) return payloadFormateado;
+            var aligns = parts[0].Split('\x05').ToList();
+            var header = parts[1].Split('\x05').ToList();
+            var rows = parts.Skip(2).Select(r => r.Split('\x05').ToList()).ToList();
+            return LispConverter.BuildTable(null, aligns, header, rows);
+        }
+
         // Varias asignaciones en UNA línea de matemática, estilo MATLAB:  a = 2; b = 3  →  dos líneas.
         // El ';' separa SOLO a nivel 0 (no dentro de [ ] { } ( ), donde ';' es separador de fila de matriz).
         // No toca líneas de texto (#), LISP/comentario (;) ni MATLAB (%).
@@ -181,7 +369,7 @@ namespace HekatanLisp
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
         // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
         private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
+            @"^\s*[;#]+\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
@@ -232,6 +420,11 @@ namespace HekatanLisp
                 bool isSalto = kw is "salto" or "pagebreak" or "nuevapagina" or "pagina" or "newpage";
                 bool isSolido = kw is "solido" or "solid" or "hexa" or "solidmesh";
                 bool isDiag = kw is "diag" or "vmd";
+                if (kw is "anim" or "animar" or "animacion")
+                {
+                    try { outList.Add(AnimHtml(rest, byName, fns, inv)); } catch { outList.Add(""); }
+                    continue;
+                }
                 if (isDiag)
                 {
                     var pmd = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
@@ -378,9 +571,63 @@ namespace HekatanLisp
             return outList;
         }
 
+        // #anim fplot(u = expr(x,n), [0 1]), n = 1:8   → la MISMA gráfica para cada valor del
+        // parámetro, una tras otra (animación CSS pura: sin JS, funciona igual en la web y en la
+        // app local). Pasar el ratón por encima la PAUSA. Paso opcional: n = 1:2:15.
+        private static int _animId;
+        private static string AnimHtml(string rest, Dictionary<string, LispConverter.N> byName,
+                                       List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv)
+        {
+            var R = System.Text.RegularExpressions.Regex.Match((rest ?? "").Trim(),
+                @"^(.*),\s*([A-Za-z]\w*)\s*=\s*(-?[\d.]+)\s*:\s*(-?[\d.]+)\s*(?::\s*(-?[\d.]+))?\s*$",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (!R.Success) return "";
+            string plot = R.Groups[1].Value.Trim(), par = R.Groups[2].Value;
+            double a = double.Parse(R.Groups[3].Value, inv), b = double.Parse(R.Groups[4].Value, inv), st = 1;
+            if (R.Groups[5].Success) { st = b; b = double.Parse(R.Groups[5].Value, inv); }
+            if (st <= 0 || b < a) return "";
+            // se admite "fplot(...)" o directamente "(...)"
+            plot = System.Text.RegularExpressions.Regex.Replace(plot, @"^(?:fplot|plot|ezplot)\s*(?=\()", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var vals = new List<double>();
+            for (double v = a; v <= b + st * 1e-9 && vals.Count < 60; v += st) vals.Add(v);
+            if (vals.Count == 0) return "";
+            int id = System.Threading.Interlocked.Increment(ref _animId);
+            double dt = 1.2, T = dt * vals.Count;
+            string P(double v) => v.ToString("0.####", inv);
+            double on = 100.0 / vals.Count;
+            var sb = new StringBuilder();
+            sb.Append("<style>@keyframes hkan").Append(id).Append("{0%{opacity:1}")
+              .Append(P(on - 0.01)).Append("%{opacity:1}").Append(P(on)).Append("%{opacity:0}100%{opacity:0}}")
+              .Append(".hkan").Append(id).Append(":hover .hkfr{animation-play-state:paused}</style>");
+            sb.Append("<div class=\"hkan").Append(id).Append("\" style=\"display:grid;margin:1.1em 0\" title=\"ratón encima = pausa\">");
+            for (int i = 0; i < vals.Count; i++)
+            {
+                string sv = P(vals[i]);
+                string sub = System.Text.RegularExpressions.Regex.Replace(plot,
+                    @"(?<![\w.])" + System.Text.RegularExpressions.Regex.Escape(par) + @"(?![\w(])", "(" + sv + ")");
+                sb.Append("<div class=\"hkfr\" style=\"grid-area:1/1;opacity:").Append(i == 0 ? "1" : "0")
+                  .Append(";animation:hkan").Append(id).Append(' ').Append(P(T)).Append("s linear infinite;animation-delay:")
+                  .Append(P(i * dt)).Append("s;text-align:center\">")
+                  .Append(OneFplotHtml(sub, byName, fns, inv))
+                  .Append("<div style=\"color:var(--fg);font-size:1em;margin-top:.2em\"><i>")
+                  .Append(System.Net.WebUtility.HtmlEncode(par)).Append("</i> = ").Append(sv)
+                  .Append("  <span style=\"color:var(--mut);font-size:.85em\">(").Append(i + 1).Append('/').Append(vals.Count)
+                  .Append(")</span></div></div>");
+            }
+            sb.Append("</div>");
+            return sb.ToString();
+        }
+
         // agrega una función: por NOMBRE ya deducido, o expresión MATLAB inline (1-s^2)
         private static void AddFn(List<(string, LispConverter.N)> sel, Dictionary<string, LispConverter.N> byName, string spec)
         {
+            // etiqueta = expresión  →  la leyenda muestra la ETIQUETA (u_EF = …), no la fórmula larga
+            var nm = System.Text.RegularExpressions.Regex.Match(spec, @"^([A-Za-z][\w']*)\s*=\s*(.+)$");
+            if (nm.Success)
+            {
+                try { var tn = LispConverter.ParseMath(nm.Groups[2].Value); if (tn != null) { sel.Add((nm.Groups[1].Value, tn)); return; } } catch { }
+            }
             if (byName.TryGetValue(spec, out var t)) { sel.Add((spec, t)); return; }
             // #fplot(N_1(xi), …): el nombre sin su (xi)
             var fm = System.Text.RegularExpressions.Regex.Match(spec, @"^([A-Za-z][\w']*)\s*\([^()]*\)$");
@@ -477,6 +724,14 @@ namespace HekatanLisp
             // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
             // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
             var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'), out var contLine);
+            // TABLAS de TEXTO escritas a mano (markdown, comentario #|…|):  #| Iteración | Residuo |
+            // seguida de la fila separadora #|---|---:| → tabla; consume las filas y las deja en
+            // blanco (las demás líneas del bloque quedan vacías, como cualquier hueco de la hoja).
+            var manualTables = new string[lines.Length];
+            ExtractManualTables(lines, manualTables);
+            // DIBUJOS técnicos (#dibujo … #fin): el bloque queda en su 1ª línea, el resto en blanco.
+            var dibujos = new LispDibujo.Bloque[lines.Length];
+            LispDibujo.ExtractBlocks(lines, dibujos);
             // tic / toc (cronómetro, estilo Hekatan Lab): 'toc' mide el tiempo de las operaciones desde 'tic'.
             var isTic = new bool[lines.Length];
             var isToc = new bool[lines.Length];
@@ -507,11 +762,14 @@ namespace HekatanLisp
             for (int i = 0; i < lines.Length; i++)
             {
                 if (isTic[i] || isToc[i]) continue;   // tic/toc: no son expresiones
+                if (dibujos[i] != null) continue;     // #dibujo: bloque de dibujo, no es expresión
                 var s = lines[i].TrimStart();
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                                   @"^#\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                                   System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                               System.Text.RegularExpressions.Regex.IsMatch(s, @"^#\s*(?:tabla|table)\s*\(",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (textDir) continue;
                 var m = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(.*?)\s*@@\((.*?)\)\s*$");
@@ -522,14 +780,20 @@ namespace HekatanLisp
                 }
             }
             var isPlot = new bool[lines.Length];   // línea = directiva de gráfica → marca su POSICIÓN en el documento
+            var isTabla = new bool[lines.Length];   // línea = #tabla(…)(…) de RESULTADOS calculados
+            var tablaSpecOf = new TablaSpec[lines.Length];
             // PASO 1: parsear cada línea a árbol + detectar su etiqueta
             for (int i = 0; i < lines.Length; i++)
             {
                 if (isTic[i] || isToc[i]) continue;   // tic/toc: no se parsean como expresión
+                if (dibujos[i] != null) continue;     // #dibujo: se dibuja en el display (necesita los resultados)
+                if (manualTables[i] != null) { textOf[i] = ("table", "left", manualTables[i]); continue; }   // tabla de TEXTO (#|…|)
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                        @"^\s*[;#]+\s*(anim|animar|animacion|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
+                var tspec = ParseTablaDirective(lines[i]);
+                if (tspec != null) { isTabla[i] = true; tablaSpecOf[i] = tspec; continue; }
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }
                 CollectFuncDefs(lines[i], funcMap);   // registra  f(x)=…  para poder aplicar f(3) después
@@ -622,12 +886,27 @@ namespace HekatanLisp
                     continue;
                 }
                 if (isPlot[i]) { display.Add(LispConverter.PlotSlot); continue; }   // gráfica: hueco en su posición
+                if (dibujos[i] != null)   // #dibujo … #fin: SVG técnico con los valores YA calculados de la hoja
+                {
+                    string svg;
+                    try { svg = LispDibujo.Render(dibujos[i], name => NumLookup(name, labels, resOf, formOf, 0)); }
+                    catch (Exception ex) { svg = "<div class=\"hk-dib-err\">⚠ #dibujo: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div>"; }
+                    display.Add(LispConverter.TxtLine("table", "left", svg));
+                    continue;
+                }
+                if (isTabla[i])   // #tabla(headers)(cols): resuelve las columnas YA calculadas (labels/resOf)
+                {
+                    string tblHtml = BuildTablaResultados(tablaSpecOf[i], labels, resOf);
+                    display.Add(LispConverter.TxtLine("table", "left", tblHtml));
+                    continue;
+                }
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {
                     var (kind, align, raw2) = textOf[i].Value;
                     string html = LispConverter.FormatInlineText(raw2,
                         name => LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
                         name => vecMap.TryGetValue(name, out var vt) && vt.Op == "vec");   // @v → flecha solo si v es VECTOR
+                    if (kind == "table") html = RebuildManualTable(html);   // tabla de TEXTO: rearma <table> ya con cada celda formateada
                     display.Add(LispConverter.TxtLine(kind, align, html));
                     continue;
                 }
@@ -705,8 +984,12 @@ namespace HekatanLisp
                     {
                         // se coge el PRIMER argumento (el segundo son las cifras) y se une
                         // con ≈ al valor. El nodo puede no llegar en treeOf, asi que se mira
-                        // la forma LISP directamente.
-                        var ar = LispConverter.TopLevelArgs(formOf[i]);
+                        // la forma LISP directamente. Con ceil/max/… o un dec anidado dentro, la
+                        // sustitución de etiquetas deja un chorizo ilegible: se muestra con SÍMBOLOS.
+                        string decSrc = formOf[i];
+                        if (treeOf[i] != null && (HasNumFn(formOf[i]) || formOf[i].IndexOf("(dec ", 1, StringComparison.Ordinal) > 0))
+                            decSrc = LispConverter.ToLisp(treeOf[i]);
+                        var ar = LispConverter.TopLevelArgs(decSrc);
                         string arg = ar.Count > 0 ? ar[0] : formOf[i];
                         display.Add(lbl + " = " + arg + " ≈ " + r);
                     }
@@ -720,8 +1003,16 @@ namespace HekatanLisp
                         // definición (la cadena de d/dx[d/dx[…]]), que llena la integral de
                         // operadores y la parte en varias líneas. treeOf conserva el símbolo B.
                         string opF = treeOf[i] != null ? LispConverter.ToLisp(treeOf[i]) : formOf[i];
-                        bool refsVec = opF != formOf[i] && ReferencesVecVar(opF, vecMap);
+                        bool refsVec = opF != formOf[i] && (ReferencesVecVar(opF, vecMap) || HasNumFn(formOf[i]));   // ceil/max…: n = ⌈As/Ab⌉, con símbolos
                         display.Add(lbl + " = " + (refsVec ? opF : formOf[i]) + " = " + r);
+                    }
+                    // un NÚMERO escrito por el usuario (q = 13.48, x0 = -0.15) es un DATO: se muestra tal
+                    // cual, no como la fracción exacta del motor (337/25).
+                    else if (System.Text.RegularExpressions.Regex.IsMatch(formOf[i], @"^-?\d+\.\d+$") ||
+                             (treeOf[i] != null && treeOf[i].Op == "neg" && treeOf[i].A != null && treeOf[i].A.IsAtom &&
+                              System.Text.RegularExpressions.Regex.IsMatch(treeOf[i].A.Atom ?? "", @"^\d+\.\d+$")))
+                    {
+                        display.Add(lbl + " = " + (treeOf[i].Op == "neg" ? "-" + treeOf[i].A.Atom : formOf[i]));
                     }
                     else if (hasR && r.StartsWith("(vector") && r != formOf[i])
                     {
@@ -772,6 +1063,30 @@ namespace HekatanLisp
                     merged.Add(display[i]);
             }
             return merged;
+        }
+
+        // VALOR NUMÉRICO de un nombre de la hoja (para #dibujo): el resultado del motor (resOf) o, si
+        // no es numérico, su forma (formOf). Escalar = arreglo de 1; vector/matriz = sus números en fila.
+        // null = no existe o no reduce a número (el dibujo lo avisa en rojo).
+        private static double[] NumLookup(string name, string[] labels, string[] resOf, string[] formOf, int depth)
+        {
+            if (string.IsNullOrEmpty(name) || depth > 8) return null;
+            string mn = LispConverter.MangleExpr(name);
+            int j = Array.FindIndex(labels, l => l != null && l == mn);
+            if (j < 0) j = Array.FindIndex(labels, l => l != null && string.Equals(l, mn, StringComparison.OrdinalIgnoreCase));
+            if (j < 0) return null;
+            foreach (var src in new[] { resOf[j], formOf[j] })
+            {
+                if (string.IsNullOrWhiteSpace(src) || src.Equals("nil", StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    var tree = LispConverter.ParseLisp(src.Trim());
+                    return LispDibujo.Eval(tree, n2 => string.Equals(n2, labels[j], StringComparison.OrdinalIgnoreCase) ? null
+                                                         : NumLookup(n2, labels, resOf, formOf, depth + 1));
+                }
+                catch { }
+            }
+            return null;
         }
 
         // ¿La forma LISP referencia el nombre de alguna variable VECTOR/MATRIZ (de vecMap)?
@@ -1013,7 +1328,10 @@ namespace HekatanLisp
         // ¿la forma LISP contiene alguna llamada de operación (Partial, Factor, ∫, …)?
         private static readonly string[] OpCalls = {
             "(partial","(derive-x","(factor","(expand*","(integ-var","(integ-x","(area-under","(slope-at",
-            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite","(despejar" };
+            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite","(despejar",
+            "(ceil ","(floor ","(round ","(max ","(min " };   // numéricas: se muestra  n = ⌈As/Ab⌉ = 7
+        private static bool HasNumFn(string f) => f != null &&
+            (f.Contains("(ceil ") || f.Contains("(floor ") || f.Contains("(round ") || f.Contains("(max ") || f.Contains("(min "));
         private static bool HasOpCall(string f) => f != null && System.Array.Exists(OpCalls, s => f.Contains(s));
         // dos formas LISP son "la misma" salvo comillas de quote y espacios (un operador que NO cerró
         // devuelve su propia notación: no debe mostrarse como "entrada = <lo mismo>").

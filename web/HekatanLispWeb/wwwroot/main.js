@@ -259,14 +259,21 @@ async function compartir() {
   if (view !== 'render') p.set('v', view);
   if (document.body.classList.contains('solo')) p.set('solo', '1');   // quien lo abra ve solo el resultado
   const url =location.origin + location.pathname + '#' + p.toString();
-  let copiado = false;
-  try { await navigator.clipboard.writeText(url); copiado = true; } catch { }
+  // se copia DIRECTO y basta un aviso corto; la ventana solo si el navegador no deja copiar
+  try { await navigator.clipboard.writeText(url); tostada('✓ Enlace copiado — pégalo en WhatsApp, Telegram…'); return; } catch { }
   aviso(`<b style="color:var(--gold)">🔗 Enlace para compartir</b><br>
-    Quien lo abra ve esta hoja, ya calculada${copiado ? ' — <b>copiado</b> al portapapeles' : ''}:<br>
+    Tu navegador no dejó copiarlo solo: cópialo de aquí (ya está seleccionado):<br>
     <input id="url-compartir" readonly value="${url.replace(/"/g, '&quot;')}"
       style="width:100%;margin-top:8px;padding:6px;font:12px Consolas,monospace;background:var(--editor);color:var(--text);border:1px solid var(--btn-border)">
     <div style="margin-top:6px;font-size:11px;color:var(--muted)">${url.length.toLocaleString()} caracteres · la hoja va dentro del enlace</div>`);
   const i = $('url-compartir'); i.focus(); i.select();
+}
+// aviso corto abajo al centro, se va solo
+function tostada(texto) {
+  let t = $('tostada');
+  if (!t) { t = document.createElement('div'); t.id = 'tostada'; document.body.appendChild(t); }
+  t.textContent = texto; t.classList.add('on');
+  clearTimeout(t._fin); t._fin = setTimeout(() => t.classList.remove('on'), 2200);
 }
 async function abrirDesdeEnlace() {
   const p = new URLSearchParams(location.hash.slice(1));

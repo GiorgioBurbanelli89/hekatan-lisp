@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hekatan LISP</title>
+  <meta name="description" content="Hekatan LISP muestra operaciones simbólicas y numéricas paso a paso. Sirve para compartir ejemplos —el Jacobiano, las funciones de forma, las formulaciones que usan ETABS, SAP2000, SAFE, Hekatan Struct o cualquier programa de cálculo— con un enlace.">
+  <meta property="og:title" content="Hekatan LISP — operaciones simbólicas y numéricas">
+  <meta property="og:description" content="Ejemplos compartibles: Jacobiano, funciones de forma y formulaciones de ETABS, SAP2000, SAFE, Hekatan Struct o cualquier programa de cálculo, paso a paso.">
+  <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
@@ -91,6 +95,14 @@
       <button class="mode" id="btn-keypad" style="font-size:15px" title="Mostrar / ocultar la calculadora">🖩</button>
       <button class="mode" id="btn-theme" style="font-size:14px" title="Cambiar claro / oscuro">☀</button>
     </div>
+  </div>
+
+  <!-- franja de bienvenida: qué es y para qué sirve (se cierra con ✕ y se recuerda) -->
+  <div class="intro" id="intro">
+    <span><b>Hekatan LISP</b> muestra operaciones <b>simbólicas y numéricas</b>, paso a paso.
+      Sirve para compartir ejemplos —el <b>Jacobiano</b>, las <b>funciones de forma</b>, las formulaciones que usan
+      <b>ETABS, SAP2000, SAFE, Hekatan Struct</b> o cualquier programa de cálculo— con un enlace <b>🔗 Compartir</b>.</span>
+    <button id="intro-cerrar" title="Cerrar">✕</button>
   </div>
 
   <!-- 2 · operaciones simbólicas -->

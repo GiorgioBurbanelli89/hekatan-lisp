@@ -274,6 +274,13 @@ V_max_tonf = dec(279.95/9.80665, 3)
 #tabla("Envolvente (ejemplo 3.0 x 2.5 m)","Hekatan:4","SAP2000 Moving Load nativo:4","dif [%]:3")({"Camión: M3 máx [kN·m]","Camión: M3 mín [kN·m]","Camión: Uz mín [mm]","HL-93 + carril: M3 máx [kN·m]","HL-93 + carril: M3 mín [kN·m]","HL-93 + carril: Uz mín [mm]"}; [71.5127, -77.7595, -5.8512, 77.3201, -89.6117, -6.5198]; [71.5128, -77.7599, -5.8512, 77.3194, -89.6053, -6.5198]; [0.000, 0.001, 0.000, 0.001, 0.007, 0.000])
 #: Y el camión paso a paso de SAP (Multi-Step Static, 147 pasos): 134 pasos casan con Hekatan a 5e-10 % en Ux, Uz, Ry, P, V2 y M3, todos los nudos y todas las barras. Los pasos que no casan son de convenio, no de cálculo: SAP no carga un eje que cae justo en x = 0 (el inicio del carril) y Hekatan sí.
 #: La hoja 51 de esta misma web, «Alcantarilla cajón con camión HL-93 - verificación analítica y SAP2000», lleva esa verificación con todas sus leyes: equilibrio, Maxwell-Betti, simetría y cotas a mano que encierran al elemento finito. Esta hoja EXPLICA; aquella VERIFICA.
+#: Y una tercera: la misma alcantarilla hecha con PLACAS en vez de barras. La app deja elegir el elemento (Barras / Placas shell-thick / shell-thin) y la carga móvil corre igual, porque la línea de influencia no pregunta de qué está hecho el modelo. Resultados del registro de la verificación del 19-sep-2026 (caso EJEMPLO 3.0 x 2.5 m, 87 placas Q4, 172 nudos):
+#|  fuente: registros/2026-09-19_alcantarilla_verificacion.md
+#tabla("Comparación con PLACAS (ejemplo 3.0 x 2.5 m)","Desplazamientos [%]:4","Momento [%]:2")({"Hekatan placas vs SAP2000 shell-thick (26 pos., 172 nudos)","Hekatan placas vs Hekatan barras (shell-thick)","Hekatan placas vs Hekatan barras (shell-thin)"}; [0.0000, 0.14, 1.00]; [0.33, 1.09, 0.90])
+#: Los dos primeros números dicen cosas distintas y conviene no confundirlos:
+#: - Contra SAP2000, placa contra placa: 0.0000 % en desplazamientos y 0.33 % en M11. Eso es EL MISMO CÁLCULO; el 0.33 % es un solo momento de nudo junto al muro central (0.26 de 78 kN·m), el resto de nudos coincide.
+#: - Placas contra barras: 0.14 % en Uz y 1.09 % en M3. Eso NO es un error: son dos modelos matemáticos distintos, una placa Q4 de Mindlin con ν = 0.2 contra una viga. Que difieran un 1 % es la señal de que los dos están bien y de que la teoría pesa poco aquí.
+#: - En la envolvente HL-93 + carril: placas -6.5117 mm y 77.72 / -90.34 kN·m, barras -6.5198 mm y 77.32 / -89.61 kN·m. Un +0.5 % y un -0.8 %.
 #: FALTA: el caso GRANDE de esta hoja, el de 9.5 x 6 m del enlace. Los números de las secciones 7 a 13 son del motor de Hekatan y están comprobados por equilibrio (suma de reacciones = suma de cargas a 1e-9 kN en todas las posiciones), pero SAP2000 aún no los ha arbitrado. No se ponen cifras de SAP2000 para este caso porque no existen: fabricarlas sería mentir.
 #: FALTA TAMBIÉN: el ancho de reparto E de AASHTO (sección 3b). Mientras no haya norma en la PC, E = 1 m y avisado en naranja.
 
@@ -285,3 +292,72 @@ V_max_tonf = dec(279.95/9.80665, 3)
 #: - El carril no se dibuja en la animación: se ve el camión, pero en la envolvente el carril está sumado.
 #: - El modelo es una franja de 1 m en el plano XZ, con los grados de libertad de fuera del plano bloqueados y un Ux en el nudo inferior izquierdo para que el cajón no deslice (modeloAlcantarilla.ts:13-16). Las cargas son verticales, así que esa reacción sale 0: es un apoyo de sujeción, no de carga.
 #: - Sin factor de presencia múltiple (sección 3c) y sin reparto de la rueda por el relleno.
+
+## 16 · La pantalla de la app, rótulo a rótulo
+
+#: Esta sección lee la pantalla del ejemplo público como se lee un plano: qué es cada cosa y de dónde sale su número. Todo con el archivo:línea del código que lo dibuja.
+
+#: **(a) Los rótulos rojos de los ejes: 14.79 · 14.79 · 3.57 tonf.**
+#: Cada flecha roja es un eje del camión y su rótulo es la carga que ese eje mete EN EL MODELO, pasada a tonf. En letras:
+rotulo = P_k/9.80665
+#: Y ojo: P_k NO es el número de la norma tal cual. Es el de la norma, con el impacto y dividido por el ancho de reparto (cargaMovil.ts:82-84). O sea, el rótulo lleva dentro los dos factores de la sección 3 (el impacto y el ancho que tengas puestos en los mandos):
+P_k = P_norma*(1 + IM_x/100)/E_x
+#: El rótulo se escribe con dos decimales en animadorCargaMovil.ts:466. Ahora los números, con los valores por defecto del ejemplo (IM = 0 % en alcantarillaCargaMovil.ts:52, y E = 1 m en :53):
+IM_def = 0
+Er_def = 1
+rot_trasero = dec(145*(1 + IM_def/100)/Er_def/9.80665, 2)
+rot_delantero = dec(35*(1 + IM_def/100)/Er_def/9.80665, 2)
+#: 14.79 y 3.57. Salen clavados. Así que la lectura correcta de esa pantalla es: **son los ejes del HL-93 SIN impacto y SIN repartir**, que es lo que trae el ejemplo abierto. No es que el programa no sepa aplicarlos: es que vienen apagados a propósito, para que se vea el efecto de la carga móvil sola.
+#: Si subes el IM al 33 %, ese mismo rótulo cambia delante de tus ojos:
+rot_IM33 = dec(145*(1 + 33/100)/1/9.80665, 2)
+#: Y si pones un ancho de reparto de 3 m, se divide entre 3:
+rot_E3 = dec(145*(1 + 0/100)/3/9.80665, 2)
+#: Esa es la comprobación de que el rótulo no es un adorno: es la carga de verdad que entra al sistema de ecuaciones.
+
+#: **(b) La caja blanca: «franja de cálculo 1 m».**
+#: El modelo NO es la alcantarilla entera: es una REBANADA de 1 m de ancho, un pórtico plano (modeloAlcantarilla.ts:1-2). La caja blanca es exactamente esa rebanada: se dibuja en y = -0.5 y y = +0.5 (animadorCargaMovil.ts:307), un metro justo. La calzada gris de alrededor mide 9 m y es SOLO DIBUJO, para que las ruedas no se vean colgando en el aire antes de entrar (animadorCargaMovil.ts:225 y :390-392).
+#: El porqué de la rebanada es el mismo de siempre en una alcantarilla: es larga y todas sus rebanadas trabajan igual, así que basta calcular una y repetirla. Todo lo que sale de la hoja está en «por metro de alcantarilla».
+#: Y entonces, ¿cuánta carga le toca a esa rebanada? Ahí entra el ancho de reparto E:
+P_franja = P_eje*(1 + IM_x/100)/E_x
+#: Léelo como y = m·x con m = 1/E: cuanto más ancho repartes, menos carga por metro. Con E = 1 m se mete el EJE ENTERO en un solo metro, que es lo más desfavorable que puede pasar: nada se reparte a los lados. Por eso es el lado seguro.
+#: ¿Qué cambiaría si hubiera fuente de AASHTO para la franja equivalente? Que E sería mayor que 1, y como el modelo es LINEAL, TODOS los resultados bajarían en la misma proporción 1/E. Eso sí se puede afirmar, porque es la superposición de la sección 4:
+M_conE = M_con1/E_x
+#: Con el momento negativo del muro central de esta hoja, -346.99 kN·m con E = 1 m, un reparto en 2 m daría:
+M_E2 = dec(-346.99/2, 2)
+#: y en 3 m:
+M_E3 = dec(-346.99/3, 2)
+#: Lo que NO se puede decir es CUÁNTO vale E, porque no hay norma en esta PC (sección 3b). Por eso el aviso naranja de la pantalla y por eso el mando está ahí, para que lo ponga quien tenga la norma delante.
+
+#: **(c) Por qué el camión va en esa dirección, y qué pasa al entrar y al salir.**
+#: El camino son los nudos de la losa superior ORDENADOS por la coordenada X (cargaMovil.ts:110-116), así que el camión avanza en +X. Manda el eje delantero, y los otros dos van detrás (cargaMovil.ts:277):
+x_k = x_F - d_k
+#: El recorrido no es el del tablero: empieza cuando el PRIMER eje pisa y acaba cuando el ÚLTIMO sale (cargaMovil.ts:288-293):
+x_fin = L_tab + L_x
+#: Con los números del ejemplo (tablero 19 m, camión corto 8.6 m):
+x_fin = dec(19 + 8.6, 1)
+#: Y lo que pasa mientras tanto: un eje cuya abscisa cae FUERA del camino no carga nada. El motor no lo tira a la basura, lo apunta aparte, en «fuera», para que se pueda comprobar el equilibrio (cargaMovil.ts:263 y :272). En letras, la carga que de verdad está sobre la estructura en cada posición es:
+P_dentro = P_camion - P_fuera
+#: Por eso el arranque de la animación es tan suave: durante los primeros 4.3 m solo está dentro el eje delantero, el de 3.57 tonf, que es la novena parte del camión. Y por eso el final también baja despacio: los ejes se van saliendo de uno en uno.
+
+#: **(d) El eje que cae entre dos nudos.**
+#: Es el caso general y se resuelve con la regla de la palanca (sección 8): lo que está más cerca se lleva más. El reparto conserva las dos cosas que importan, la fuerza total y su momento respecto de los dos nudos:
+w_i = P_eje*(1 - t)
+w_j = P_eje*t
+suma = w_i + w_j
+#: Y basta porque el modelo es LINEAL: la respuesta a dos cargas es la suma de las respuestas (sección 4). En esta pantalla, además, ni siquiera hace falta: el tablero está mallado cada 0.1 m y el camión avanza cada 0.1 m, así que los ejes caen SIEMPRE en nudo y el contador «repartido» del motor sale 0. La carga móvil es exacta.
+
+#: **(e) Los colores de la deformada.**
+#: El color de cada punto es su desplazamiento TOTAL dividido por el peor desplazamiento de TODO el recorrido (animadorCargaMovil.ts:290 y :480-491). En letras:
+mag = sqrt(u_x^2 + u_z^2)
+color = mag/u_ref
+#: La clave es que u_ref es FIJO: no es el máximo de este fotograma, es el de los 277 fotogramas. Por eso, cuando entra el eje pequeño, la losa se pinta azul aunque sí se esté moviendo: se mueve el 6-24 % de lo que se moverá después. Cuando entra el primer eje de 14.79 tonf salta al 79 % y se pone naranja. Si la escala fuera la de cada cuadro, todo se vería rojo siempre y no se aprendería nada.
+#: Y la deformada está AMPLIFICADA, porque si no no se vería. La regla es: el peor desplazamiento del recorrido se dibuja como el 1.5 % de la diagonal del modelo (animadorCargaMovil.ts:226 y :491):
+esc_def = 0.015*diag/u_max
+#: Los números de esta alcantarilla. La diagonal del cuadro que ocupa el modelo (19 m de largo por 6 m de alto):
+diag = dec((19^2 + 6^2)^0.5, 4)
+#: El peor desplazamiento de todo el recorrido, medido en el motor:
+u_max = 0.0098386
+#: Y el tamaño con el que se dibuja, y el factor:
+dibujado = dec(0.015*diag, 3)
+esc_def = dec(0.015*diag/u_max, 1)
+#: O sea que la deformada va multiplicada por unas 30 veces, y 9.84 mm de flecha real se dibujan como 30 cm. El factor no se esconde: la app lo escribe en pantalla («deformada xN»). Es la misma idea que el «Auto» de SAP2000 para los modos, pero más prudente: con el 3.7 % que usa el modal, esta alcantarilla salía de goma (x75) y los muros se veían doblados como si fueran de plastilina.

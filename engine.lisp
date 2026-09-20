@@ -1795,12 +1795,25 @@
 (defun dim- (a b) (map 'vector #'- (q-dim a) (q-dim b)))
 (defun dim* (a k) (map 'vector (lambda (e) (* e k)) (q-dim a)))
 
+(defparameter *sup-digitos* "⁰¹²³⁴⁵⁶⁷⁸⁹")
+(defun sup (n)
+  "2 → ², -3 → ⁻³ (el exponente se LEE, no se escribe con acento circunflejo)"
+  (if (= n 1) ""
+      (let ((s (format nil "~a" (abs n))))
+        (concatenate 'string
+                     (if (minusp n) "⁻" "")
+                     (map 'string (lambda (c)
+                                    (if (digit-char-p c)
+                                        (char *sup-digitos* (digit-char-p c))
+                                        c))
+                          s)))))
+
 (defun dim-texto (x)
   (let ((s '()))
     (loop for i from 0 below +dim-n+
           for e = (aref (q-dim x) i)
           unless (zerop e)
-            do (push (format nil "~a^~a" (aref *dim-nombres* i) e) s))
+            do (push (format nil "~a~a" (aref *dim-nombres* i) (sup e)) s))
     (if s (format nil "~{~a~^·~}" (nreverse s)) "adimensional")))
 
 ;;; ── Aritmética: la que comprueba dimensiones ──────────────────────────

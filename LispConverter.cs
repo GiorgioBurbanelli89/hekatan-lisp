@@ -1545,6 +1545,9 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         {
             const string SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹";
             u = Regex.Replace(u ?? "", @"\^\(?(-?)(\d)\)?", m => (m.Groups[1].Value == "-" ? "⁻" : "") + SUP[m.Groups[2].Value[0] - '0']);
+            // «m2» y «cm2» (como se escriben en obra) también son m² y cm²: un dígito
+            // pegado detrás de letras es un exponente, no parte del nombre de la unidad.
+            u = Regex.Replace(u, @"(?<=[A-Za-zµμΩ°º])(\d)(?![A-Za-z0-9])", m => SUP[m.Value[0] - '0'].ToString());
             u = u.Replace("*", "·");
             return System.Net.WebUtility.HtmlEncode(u);
         }

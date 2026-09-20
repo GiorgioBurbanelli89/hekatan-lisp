@@ -1,0 +1,287 @@
+# Carga móvil HL-93 en una alcantarilla cajón: líneas de influencia y envolvente
+#: Esta hoja explica, paso a paso, QUÉ hace Hekatan Struct cuando un camión HL-93 cruza la alcantarilla cajón del ejemplo público. Primero en letras, después con los números. Las fórmulas y los números salen del motor de la app, no de la memoria: cada una lleva su archivo:línea.
+#: El ejemplo vivo: https://giorgioburbanelli89.github.io/hekatan-struct-lineal/workspace/?t=alcantarilla-carga-movil
+#: Motor: examples/src/shared/cargaMovil.ts y examples/src/alcantarilla-carga-movil/ (repo hekatan-struct, rama carga-movil-alcantarilla).
+#: Unidades: el motor trabaja en kN y m (cargaMovil.ts:31). Aquí se dan también en tonf, que es lo que se usa en Ecuador. 1 tonf = 9.80665 kN.
+
+## 1 · El camión HL-93: qué es, en letras
+
+#: El HL-93 no es un camión: son cargas que se aplican a la vez, y la combinación se llama HL-93K (cargaMovil.ts:16). Primero el camión de diseño, tres ejes seguidos. El peso total es la suma de los tres:
+P_tot = P_1 + P_2 + P_3
+#: Los ejes no están fijos: el eje delantero manda, y cada eje va una distancia d DETRÁS de él (cargaMovil.ts:37-41, «distancia DETRÁS del eje delantero»). Si el eje delantero está en la abscisa x_F, el eje k está en:
+x_k = x_F - d_k
+#: Las tres distancias del HL-93 (cargaMovil.ts:82-84): el delantero en 0, el segundo a a₁, y el tercero a a₁ más la separación trasera a₂, que NO es fija:
+d_1 = 0
+d_2 = a_1
+d_3 = a_1 + a_2
+#: El largo total del camión es la distancia del primer eje al último (cargaMovil.ts:90, largoVehiculo = máximo de las d):
+L_cam = a_1 + a_2
+#: Y junto al camión va la carga de carril: una carga repartida w_c a todo lo largo, que no se mueve; se pone donde más daño hace.
+
+## 2 · Ahora los números (AASHTO LRFD, en SI)
+
+#: De dónde salen: no hay PDF de AASHTO en esta PC. La fuente comprobada es el CSI Analysis Reference Manual de SAP2000 24, cap. XXVI, pág. 515 y Figura 92 pág. 517 (cargaMovil.ts:16-20 y :72). Ahí el HL-93 está en unidades inglesas: 8 k · 32 k · 32 k, separaciones 14 ft y 14-30 ft, carril 0.640 k/ft. En SI son los redondeos de norma que usa el motor en cargaMovil.ts:67-71:
+P_1 = 35
+P_2 = 145
+P_3 = 145
+a_1 = 4.3
+#: El peso total del camión, en kN y en tonf:
+P_tot = dec(P_1 + P_2 + P_3, 1)
+P_tonf = dec(P_tot/9.80665, 3)
+#: La carga de carril (cargaMovil.ts:71), en kN/m y en tonf/m:
+w_c = 9.3
+w_tonf = dec(w_c/9.80665, 5)
+#: Y la separación trasera a₂ es un RANGO, no un número (cargaMovil.ts:69-70): el camión se estira o se encoge buscando el peor caso.
+a_2min = 4.3
+a_2max = 9.0
+#: Con eso el camión mide entre:
+L_min = a_1 + a_2min
+L_max = a_1 + a_2max
+
+## 3 · Los factores que tocan las cargas
+
+#: (a) IMPACTO IM. La carga de un camión que pasa rodando pega más que la misma carga puesta despacio. La norma lo mete multiplicando los ejes por un factor. En el motor (cargaMovil.ts:77 y :82-84):
+f_IM = 1 + IM/100
+P_din = P_eje*f_IM
+#: El porqué del despeje: si un ensayo te da la carga medida P_med, el IM sale de aquí:
+Despejar{P_med = P_eje*(1 + IM/100) @ IM}
+#: Con el IM del 33 % del HL-93 (CSI Ref. p. 515: «if im = 33 ... multiplied by 1.33»), el eje trasero pasa a valer:
+IM = 33
+f_IM = 1 + IM/100
+P_eje33 = dec(145*f_IM, 2)
+#: Ojo, y esto es importante: el factor solo toca los EJES, no el carril (cargaMovil.ts:57 y :86 — el carril se divide por el ancho, pero no se multiplica por f_IM). En el ejemplo público el IM viene en 0 % por defecto (alcantarillaCargaMovil.ts:52), para que se vea el efecto de la carga móvil sola; se sube con el mando.
+
+#: (b) ANCHO DE REPARTO E. El modelo es un pórtico plano: una FRANJA de 1 m de la alcantarilla (modeloAlcantarilla.ts:1-2). Un eje real se reparte a lo ancho, así que la carga que entra en la franja es:
+P_franja = P_eje/E_r
+#: Y al revés: el ancho que haría falta para que en la franja entre una carga P_obj sale de despejar E:
+Despejar{P_obj = P_eje/E_r @ E_r}
+#: AVISO: aquí la hoja dice lo que NO sabe. El ancho de reparto de AASHTO LRFD para alcantarillas (franja equivalente más la propagación de la rueda por el relleno) NO tiene fuente en esta PC: no hay PDF de AASHTO y los manuales de CSI no lo traen. Por eso el ejemplo abre con E_r = 1 m, o sea el eje ENTERO sobre la franja de 1 m, que es el lado seguro, y lo avisa en pantalla en naranja (alcantarillaCargaMovil.ts:53 y :193-196). No se inventa un número.
+E_r = 1
+
+#: (c) FACTOR DE PRESENCIA MÚLTIPLE. El HL-93 completo lleva un factor m según cuántos carriles se cargan a la vez. El motor de Hekatan Struct NO lo aplica: camionHL93 solo admite separación trasera, IM, ancho y carril sí/no (cargaMovil.ts:53-62). Lo que se calcula es UN carril sobre la franja de 1 m. Si tu norma pide m, se multiplica fuera.
+
+## 4 · La idea que lo hace todo posible: superposición
+
+#: El modelo es LINEAL. Lineal significa lo mismo que y = m·x: si doblas la carga, se dobla la respuesta, y si pones dos cargas, la respuesta es la SUMA de las dos por separado. Eso está dicho con esas palabras en el propio motor (cargaMovil.ts:8-13).
+#: Entonces no hace falta resolver la estructura en cada posición del camión. Basta resolverla UNA vez por cada nudo del tablero con 1 kN hacia abajo. Esa colección de respuestas es la LÍNEA DE INFLUENCIA. Después, el camión en cualquier posición es una suma:
+R = P_1*IL_1 + P_2*IL_2 + P_3*IL_3
+#: R puede ser cualquier cosa: un momento, un cortante, una flecha, la reacción de un muelle. La línea de influencia se calcula una vez y sirve para todas las posiciones. Es lo mismo que hace el Moving Load de SAP2000 (cargaMovil.ts:13).
+#: El ahorro es enorme. Nudos del tablero del ejemplo público (19 m de tablero, un nudo cada 0.1 m):
+n_nudos = 191
+#: Posiciones que se prueban en la envolvente:
+n_pos = 14424
+#: Sin superposición habría que resolver la estructura 14 424 veces. Con líneas de influencia se resuelve 191 veces. El ahorro:
+ahorro = dec(n_pos/n_nudos, 1)
+
+## 5 · El elemento: de dónde sale la rigidez (formulación real del motor)
+
+#: Antes de mover ningún camión hay que saber qué resuelve el programa. Todo el cálculo es UNA ecuación, y es y = m·x con matrices en vez de números: la rigidez por el desplazamiento da la fuerza.
+f = K*u
+#: Con un resorte de toda la vida se ve el porqué. La fuerza es la rigidez por el estiramiento:
+F_r = k_r*u_r
+#: Y si lo que conoces es la fuerza P_dato, despejas el desplazamiento. Más rigidez, menos se mueve:
+Despejar{P_dato = k_r*u_r @ u_r}
+#: Con la estructura entera es lo mismo, solo que K es una matriz grande y en vez de dividir se resuelve el sistema. El motor lo hace con una factorización de Cholesky, LDLT, porque K es simétrica y definida positiva (deform.cpp:224-238).
+
+#: ¿Y de dónde salen los números de K? De las FUNCIONES DE FORMA. Entre dos nudos, sin carga en el medio, la cuarta derivada de la deformada de la viga es cero. Integrar cuatro veces un cero da un polinomio de grado 3 (esto está deducido paso a paso en el ejemplo 15 de esta misma web). La deformada del elemento es, entonces, una cúbica:
+v = c_1 + c_2*x + c_3*x^2 + c_4*x^3
+#: No es una aproximación: es la forma EXACTA de la viga entre nudos. Y tiene cuatro constantes que encajan justo con los cuatro grados de libertad de flexión del elemento: el desplazamiento y el giro en cada extremo. Escritas en función de esos cuatro grados de libertad, esas cúbicas son las funciones de HERMITE.
+#: La deformación que importa en flexión es la CURVATURA, que es la segunda derivada de la deformada:
+kappa = Diff{Diff{v @ x} @ x}
+#: Sale lineal en x: la curvatura varía en línea recta dentro del elemento, y por eso el momento también. Las derivadas segundas de las funciones de forma son las filas de la matriz B, la que pasa de desplazamientos a deformaciones:
+#|  ε = B · u        (B = derivadas de las funciones de forma)
+#: Y la rigidez del elemento es la integral clásica del método, la energía de deformación puesta en forma de matriz:
+#|  K_e = ∫ Bᵀ · E · B  dx        (a lo largo del elemento, de 0 a L)
+
+#: Hecha esa integral con las cúbicas de Hermite, la matriz de una barra de pórtico plano tiene esta forma. Seis grados de libertad: en cada nudo dos desplazamientos y un giro. En letras primero, que es como hay que leerla:
+K_e = [EA_L, 0, 0, -EA_L, 0, 0; 0, t_f, b_f, 0, -t_f, b_f; 0, b_f, k_f, 0, -b_f, a_f; -EA_L, 0, 0, EA_L, 0, 0; 0, -t_f, -b_f, 0, t_f, -b_f; 0, b_f, a_f, 0, -b_f, k_f]
+#: Cómo se lee: es SIMÉTRICA (lo que el nudo i le hace al j es igual que lo que el j le hace al i). Las filas 1 y 4 son el axil puro y no se mezclan con nada: estirar no dobla. Las filas 2, 3, 5 y 6 son la flexión, y ahí todo está mezclado, porque bajar un extremo obliga a girarlo.
+#: Y los cinco coeficientes son los de siempre. El motor los tiene escritos tal cual en getLocalStiffnessMatrix.cpp:214-226:
+EA_L = E*A/L
+t_f = 12*E*I/L^3
+b_f = 6*E*I/L^2
+k_f = 4*E*I/L
+a_f = 2*E*I/L
+#: Mira las unidades y ya entiendes la física: EA/L es cuánta fuerza hace falta por metro de estiramiento, 12EI/L³ es cuánta fuerza por metro de bajada, 4EI/L es cuánto momento por radián de giro. Y fíjate en la L: la rigidez a flexión va con L al cubo. Partir un elemento en dos NO lo hace un poco más rígido, lo hace ocho veces más rígido.
+
+#: Pero el motor NO es Euler-Bernoulli puro: es TIMOSHENKO, o sea que también cuenta lo que la barra se deforma por CORTANTE. Eso entra con un solo número, phi, que compara la flexibilidad a cortante con la flexibilidad a flexión (getLocalStiffnessMatrix.cpp:198 y :211):
+phi = 12*E*I/(G*A_s*L^2)
+#: y los cuatro coeficientes de flexión se corrigen así (getLocalStiffnessMatrix.cpp:218-221). Si phi = 0 quedan exactamente los de Bernoulli, o sea que Bernoulli es el caso particular:
+t_T = (12*E*I/L^3)/(1 + phi)
+b_T = (6*E*I/L^2)/(1 + phi)
+k_T = (4*E*I/L)*(1 + phi/4)/(1 + phi)
+a_T = (2*E*I/L)*(1 - phi/2)/(1 + phi)
+#: El área de cortante por defecto es la de ETABS, 5/6 del área (getLocalStiffnessMatrix.cpp:209-210):
+A_s = 5*A/6
+#: Y aquí sale una fórmula bonita, todavía en letras. Para una sección rectangular de ancho b y canto t: el área es A = b·t, la inercia I = b·t³/12, y G = E/(2(1+ν)). Metiendo todo eso en phi, el ancho b se va, E y G se van, y queda solo la esbeltez del elemento:
+phi_sim = Simplify{12*E*(b*t^3/12)/((E/(2*(1 + nu)))*(5/6)*(b*t)*L^2)}
+#: Léelo así: phi = 12(1+ν)/5 por (t/L) al cuadrado. El cortante manda cuando el canto t es grande frente al LARGO DEL ELEMENTO L. Una barra larga y delgada tiene phi casi cero y Timoshenko y Bernoulli dan lo mismo; una barra corta y gruesa, no.
+
+#: Ahora los números, para UN elemento de la losa superior del ejemplo: canto t = 0.50 m, ancho de franja b = 1 m, y largo L = 0.1 m, porque el tablero está mallado al paso del camión.
+t_losa = 0.50
+b_fr = 1
+L_el = 0.1
+nu = 0.2
+A_el = dec(b_fr*t_losa, 4)
+I_el = dec(b_fr*t_losa^3/12, 8)
+phi_el = dec(12*(1 + nu)/5*(t_losa/L_el)^2, 2)
+#: phi = 72, y no es un detalle: el término 12EI/L³ queda dividido por 73. Si el motor fuera Bernoulli puro, ese elemento sería 73 veces más rígido. Por eso la malla fina no dispara la rigidez, y por eso la validación en OpenSees tuvo que hacerse con ElasticTimoshenkoBeam y no con la viga elástica normal (alcantarillaCargaMovil.ts:95).
+#: Con el hormigón del ejemplo, E = 250 000 kgf/cm² (1 kgf/cm² = 98.0665 kN/m²):
+E_kg = 250000
+E_c = dec(E_kg*98.0665, 0)
+G_c = dec(E_c/(2*(1 + nu)), 0)
+#: Y los cuatro coeficientes de flexión de ese elemento, ya en kN y m:
+t_num = dec((12*E_c*I_el/L_el^3)/(1 + phi_el), 0)
+b_num = dec((6*E_c*I_el/L_el^2)/(1 + phi_el), 0)
+k_num = dec((4*E_c*I_el/L_el)*(1 + phi_el/4)/(1 + phi_el), 0)
+a_num = dec((2*E_c*I_el/L_el)*(1 - phi_el/2)/(1 + phi_el), 0)
+#: Ojo al signo del último: con phi grande, el término que arrastra un extremo con el otro se vuelve NEGATIVO. Eso es Timoshenko, no un error.
+#: La matriz que escribe el motor es de 12x12, para el espacio (getLocalStiffnessMatrix.cpp:229-241): las seis casillas que hemos visto son su sub-bloque del plano. Las otras seis son la flexión fuera del plano y la torsión, y aquí están bloqueadas (modeloAlcantarilla.ts:13-16).
+
+#: ENSAMBLAJE. Cada barra tiene su matriz en SUS ejes. Para poder sumarlas hay que llevarlas a los ejes globales con la matriz de giro T (getGlobalStiffnessMatrix.cpp:69-80):
+K_glob = T_t*K_loc*T
+#: Y luego se SUMAN, casilla a casilla, en la matriz global: la fila de un grado de libertad es 6 por el número de nudo más el grado de libertad (getGlobalStiffnessMatrix.cpp:114-133). Sumar es todo el ensamblaje: si dos barras llegan al mismo nudo, sus rigideces se suman en la misma casilla. Por eso una esquina de la alcantarilla es rígida: ahí están la losa y el muro a la vez.
+#: Los MUELLES del suelo son aún más simples: se suman directamente a la casilla de la DIAGONAL de ese nudo y ese grado de libertad (deform.cpp:162-170). Eso es, exactamente, el muelle nodal de SAP2000:
+K_dd = K_dd + k_muelle
+#: Y el valor del muelle es el módulo de balasto por el área que le toca a ese nudo:
+k_muelle = k_s*b_trib*b_franja
+#: En números: ks = 2.0 kgf/cm³ son 19 613.3 kN/m³ (1 kgf/cm³ = 9806.65 kN/m³), con 0.5 m de tributario y la franja de 1 m:
+ks_kg = 2.0
+ks_kN = dec(ks_kg*9806.65, 1)
+k_muelle = dec(ks_kN*0.5*1, 0)
+#: Por último se quitan las filas de los apoyos y se resuelve (deform.cpp:214-238). Eso es UN caso de carga. Toda esta hoja va de no tener que hacerlo 14 424 veces.
+
+## 6 · Cómo saca el motor la línea de influencia
+
+#: Por cada nudo k del tablero se pone 1 kN hacia abajo y se resuelve (cargaMovil.ts:203-204): la carga es el vector [0, 0, -1, 0, 0, 0], o sea -1 en el grado de libertad vertical. De ahí sale el vector de desplazamientos de toda la estructura.
+#: ¿Y los momentos? Aquí está el truco de velocidad. Llamar al analizador en cada caso costaba 35 ms x 191 casos = 6.6 s (cargaMovil.ts:156). Como todo es lineal, las fuerzas de una barra son una matriz constante por sus 12 desplazamientos:
+f_barra = B*u_barra
+#: B es de 6x12: seis resultados (N, V, M en los dos extremos) por doce grados de libertad de la barra. Y no está reescrita a mano: se saca del PROPIO analizador, dándole desplazamientos unitarios y leyendo las columnas (cargaMovil.ts:150-186). Esa es la regla de la casa: no fabricar la formulación, extraerla.
+#: El signo es el del DIAGRAMA de CSI, no el de las fuerzas de extremo: en el nudo i el diagrama es -f, en el nudo j es +f (cargaMovil.ts:128-131 y :181-182).
+M_i = -f_i
+M_j = f_j
+#: La fuerza de los muelles Winkler, igual de simple: rigidez por lo que se hunde el nudo, con signo cambiado porque el muelle empuja hacia arriba (cargaMovil.ts:225):
+R_muelle = -k_s*u_z
+
+## 7 · GRÁFICA: las dos líneas de influencia del ejemplo
+
+#: Alcantarilla del enlace: 2 celdas, luz 9.5 m a ejes, alto 6.0 m, losa superior 0.50 m, losa inferior 0.55 m, muros 0.45 m (modeloAlcantarilla.ts:36-40). Hormigón E = 250 000 kgf/cm2, nu = 0.2; balasto ks = 2.0 kgf/cm3 bajo la losa inferior. Tablero de 19 m, malla de 0.1 m: 263 nudos, 264 barras, 39 muelles.
+#: Dos secciones de control: C, el centro de la celda 1 (x = 4.70 m, el nudo más cercano a 4.75), y W, sobre el muro central (x = 9.50 m). Cada curva dice cuánto momento (kN·m) aparece en esa sección cuando 1 kN se para en la abscisa x del tablero. Salen del motor: 191 casos unitarios, muestreados cada 0.5 m para la gráfica.
+#fila
+#fplot(IL_centro = [@ILC@], [0 19])
+#fplot(IL_muro = [@ILM@], [0 19])
+#finfila
+#: Léelas así, que es todo el oficio de la carga móvil:
+#: - IL_centro es casi toda POSITIVA en la celda 1 y con una punta justo encima de la sección. El pico vale 1.5299 kN·m por cada kN. Es decir: para el momento positivo del centro del vano, lo que manda es poner el eje pesado AHÍ.
+#: - En la celda 2 (x > 9.5) la misma curva se vuelve NEGATIVA, pequeña, unos -0.177. O sea: cargar la otra celda ALIVIA el centro de la primera. Por eso la envolvente busca posiciones, no una sola.
+#: - IL_muro es casi toda negativa, con su punta en x = 5.4 m y valor -1.0706. El momento negativo del apoyo se saca cargando el CENTRO del vano de al lado, no encima del muro. En x = 9.5 (justo sobre el muro) la curva vale +0.118, casi nada: una carga sobre el muro baja derecha a la zapata.
+
+## 8 · El camión en una posición: la regla de la palanca
+
+#: Un eje cae en un punto cualquiera, casi nunca justo en un nudo. Si cae entre el nudo i y el nudo j, se reparte por la regla de la palanca (cargaMovil.ts:279-283). Primero, dónde cae dentro del tramo, en tanto por uno:
+Despejar{x_e = s_i + t*(s_j - s_i) @ t}
+#: Y el reparto es el complementario en cada nudo: lo que está más cerca se lleva más:
+w_i = P_eje*(1 - t)
+w_j = P_eje*t
+#: Esto es una APROXIMACIÓN, y el motor lo dice y lo mide: devuelve «repartido», los kN que ha tenido que repartir, para que quien llama lo vea (cargaMovil.ts:22-25 y :263). El ejemplo está mallado a propósito con un nudo cada 0.1 m, y el camión avanza también de 0.1 en 0.1 (alcantarillaCargaMovil.ts:55): los ejes caen SIEMPRE en nudo y «repartido» sale 0. La carga móvil es exacta, sin palanca.
+#: El recorrido del camión no es el del tablero: empieza cuando entra el primer eje y acaba cuando sale el último (cargaMovil.ts:288-293). En letras:
+x_fin = L_tab + L_cam
+#: Con el tablero de 19 m y el camión corto de 8.6 m:
+L_tab = 19
+L_cam = 8.6
+x_fin = L_tab + L_cam
+paso = 0.1
+n_posic = x_fin/paso + 1
+
+## 9 · GRÁFICA: el momento según avanza el camión
+
+#: Ahora se aplica la suma R = P₁·IL₁ + P₂·IL₂ + P₃·IL₃ en cada posición. La curva de abajo es el momento en la sección C (centro de la celda 1) según dónde esté el eje DELANTERO. Camión solo, separación trasera 4.3 m, sin carril y sin IM. Datos del motor, cada 0.5 m:
+#fplot(M_centro = [@RXF@], [0 27.6])
+#: El pico está en x_F = 9.0 m. ¿Por qué justo ahí? Porque con el delantero en 9.0 los ejes caen en 9.0, en 9.0 - 4.3 = 4.7 y en 9.0 - 8.6 = 0.4. El eje de 145 kN se planta EXACTAMENTE sobre la sección C. Vamos a comprobarlo sumando a mano, con los tres valores de la línea de influencia:
+IL_04 = 0.09497629
+IL_47 = 1.52989986
+IL_90 = 0.08349465
+#: La suma, primero en letras:
+R_max = P_1*IL_90 + P_2*IL_47 + P_3*IL_04
+#: Y ahora con los números:
+R_max = dec(35*IL_90 + 145*IL_47 + 145*IL_04, 4)
+#: El motor, resolviendo el pórtico entero, da 238.5294 kN·m en esa posición. Coinciden cifra a cifra: la superposición no es una aproximación, es el mismo cálculo.
+R_tonf = dec(R_max/9.80665, 3)
+#: Y fíjate en la cola: pasado el metro 17 la curva se vuelve NEGATIVA (hasta -40.4 kN·m). Es el camión, ya en la celda 2, levantando el centro de la celda 1: la parte negativa de la línea de influencia del centro que vimos en la sección 7.
+
+## 10 · ANIMACIÓN: el camión HL-93 cruzando el tablero
+
+#: Dos películas a la vez, las dos con el mismo contador n (el fotograma). El camión avanza 1.2 m por fotograma: la posición del eje delantero es xF = 1.2·n.
+#: IZQUIERDA, el camión dibujado. La silueta (caja, cabina y chasis) está hecha con escalones: cada trozo es un rectángulo construido con sign(), que vale 1 dentro del tramo y 0 fuera. Debajo de la línea del suelo, tres marcas: son los EJES, en 0, 4.3 y 8.6 m por detrás del delantero. Y de fondo, la línea de influencia del centro de la celda 1, la misma de la sección 7.
+#: DERECHA, la respuesta. La curva es el momento en esa sección para cada posición del camión (la de la sección 9) y la barra que se mueve marca EN QUÉ posición va el camión de la izquierda. Cuando la rueda pesada se monta sobre la punta de la línea de influencia, la barra de la derecha llega al pico.
+#fila
+#anim fplot(camion = 0.55*(sign(x - 1.2*n + 9.0) + 1)*(sign(1.2*n + 0.9 - x) + 1)/4 + 1.05*(sign(x - 1.2*n + 8.9) + 1)*(sign(1.2*n - 1.3 - x) + 1)/4 + 0.55*(sign(x - 1.2*n + 1.1) + 1)*(sign(1.2*n + 0.75 - x) + 1)/4, ejes = -0.35*((sign(x - 1.2*n + 0.2) + 1)*(sign(1.2*n + 0.2 - x) + 1)/4 + (sign(x - 1.2*n + 4.5) + 1)*(sign(1.2*n - 4.1 - x) + 1)/4 + (sign(x - 1.2*n + 8.8) + 1)*(sign(1.2*n - 8.4 - x) + 1)/4), IL_centro = [@ILC@], [0 19]), n = 0:23
+#anim fplot(M_centro = [@RXF@], xF_ahora = 240*(sign(x - 1.2*n + 0.2) + 1)*(sign(1.2*n + 0.2 - x) + 1)/4, [0 27.6]), n = 0:23
+#finfila
+#: Lo que hay que mirar, y es TODO el oficio de la carga móvil: el momento de cada fotograma es la suma de la altura de la línea de influencia bajo cada eje, multiplicada por la carga de ese eje. Ni más ni menos. Cuando un eje pisa donde la curva es alta, suma mucho; cuando pisa donde la curva es negativa (la segunda celda), RESTA. Por eso el peor caso no es «el camión en el centro»: hay que probarlos todos.
+#: La silueta en letras, para que se vea que no hay magia. Un rectángulo entre a y b, de altura h, es:
+rect = h*(sign(x - a) + 1)*(sign(b - x) + 1)/4
+#: El primer paréntesis vale 2 si x está a la derecha de a y 0 si no; el segundo vale 2 si x está a la izquierda de b. Multiplicados y divididos entre 4 dan 1 solo DENTRO del tramo. Sumando tres rectángulos sale el camión, y moviendo a y b con n, el camión anda.
+
+## 11 · La envolvente: el peor de TODOS los casos
+
+#: La envolvente es, en cada punto de la estructura, el máximo y el mínimo de todas las posiciones probadas (cargaMovil.ts:375-383). Y no es un barrido: son TRES barridos anidados.
+#: (1) CADA SEPARACIÓN TRASERA. a₂ va de 4.3 a 9.0 cada 0.1 m (cargaMovil.ts:406-409). Son 48 camiones distintos:
+n_sep = (a_2max - a_2min)/0.1 + 1
+#: (2) CADA CAMIÓN RECORRE SU PROPIO LARGO. Esto fue un error que hubo que arreglar (registro del 19-sep-2026): un camión de 13.3 m tarda más en salir que uno de 8.6 m; si se usan las posiciones del corto, el largo se queda a medio salir (cargaMovil.ts:368-374). Posiciones de un camión con separación a₂:
+n_por_sep = (L_tab + a_1 + a_2)/paso + 1
+#: Sumando las 48 separaciones salen las 14 424 posiciones que dijimos arriba. Se comprueba: la suma de (19 + 4.3 + a₂)/0.1 + 1 para las 48 separaciones vale
+n_tot = 48*234 + 10*48*(a_2min + a_2max)/2
+#: (3) EL CARRIL, CARGADO «A TROZOS». El carril no se mueve: se pone donde hace daño y se quita donde ayuda. El motor recorre nudo a nudo y suma la contribución al máximo si es positiva y al mínimo si es negativa (cargaMovil.ts:396-399). En letras, la carga puntual equivalente de cada nudo es la carga repartida por su ancho tributario:
+q_k = w_c*b_k
+#: Y el ancho tributario es medio tramo a cada lado (cargaMovil.ts:120-123):
+b_k = (s_k - s_ant + s_sig - s_k)/2
+#: En el tablero, con nudos cada 0.1 m, eso vale 0.1 m en el interior. La carga nodal del carril:
+q_nodo = dec(w_c*0.1, 3)
+#: Y el reparto por signo: rₖ = qₖ·ILₖ; si rₖ es positivo suma al MÁXIMO, si es negativo suma al MÍNIMO. Así es como define SAP2000 el HL-93K: camión y carril a la vez (cargaMovil.ts:351-356).
+
+## 12 · GRÁFICAS: la envolvente de M y de V
+
+#: Momento en la losa superior a lo largo de los 19 m. Las dos curvas son el máximo y el mínimo de las 14 424 posiciones, camión más carril. Muestreadas cada 0.5 m:
+#fplot(M_max = [@EMAX@], M_min = [@EMIN@], [0 19])
+#: Cortante en la misma losa, máximo y mínimo:
+#fplot(V_max = [@VMAX@], V_min = [@VMIN@], [0 19])
+#: Lo que cuenta la primera gráfica, en oficio:
+#: - Dos jorobas positivas, una por celda, de unos 293-297 kN·m en el centro de cada vano.
+#: - Un pico negativo clavado en x = 9.5 m, el muro central: -346.99 kN·m. Es el mayor de la hoja, y manda la armadura de arriba sobre el muro.
+#: - En los extremos (x = 0 y x = 19) también hay negativo fuerte, -180 y -183 kN·m: la losa está unida a los muros exteriores, no simplemente apoyada.
+#: - La curva de máximos y la de mínimos no se cruzan nunca: la envolvente no es una curva, son DOS, y la sección se arma para las dos.
+#: La de cortante: el máximo aparece pegado a los muros (278.58 kN a la izquierda del muro central, -265.01 justo a su derecha) y pasa por cero cerca del centro de cada vano. El salto en x = 9.5 es la carga que baja por el muro.
+
+## 13 · Cuánto pone el carril
+
+#: El motor guarda las dos envolventes por separado: la del camión SOLO, antes de sumar el carril (cargaMovil.ts:388-389), y la total. Así se ve qué aporta cada uno. Momento máximo y mínimo del camión solo:
+#fplot(M_max_camion = [@CMAX@], M_min_camion = [@CMIN@], [0 19])
+#: Los picos, lado a lado:
+#tabla("Resultado","Camión solo:2","Camión + carril:2","Aumento [%]:1")({"M máx [kN·m]","M mín [kN·m]","Flecha Uz mín [mm]"}; [241.84, -254.45, -9.694]; [297.61, -346.99, -12.323]; [23.1, 36.4, 27.1])
+#: El carril no es un adorno: sube el momento negativo del muro central un 36 %. Y sube más el negativo que el positivo, porque la línea de influencia del muro es negativa en casi TODO el tablero (sección 7): el carril puede cargar los 19 m enteros y todos suman en contra.
+#: En unidades de Ecuador, los picos que mandan:
+M_pos_tonf = dec(297.61/9.80665, 3)
+M_neg_tonf = dec(-346.99/9.80665, 3)
+V_max_tonf = dec(279.95/9.80665, 3)
+
+## 14 · ¿Está bien? Lo que tiene juez y lo que no
+
+#: Regla de la casa: el oráculo es OTRO programa, mismo modelo, misma malla nodo a nodo, offsets = 0. Esto es lo que hay comprobado (validation/carga-movil/COMPARACION_ejemplo.md):
+#tabla("Comprobación","Hekatan:4","SAP2000 24 (juez):4","OpenSeesPy:4","dif [%]:4")({"M3 máx envolvente [kN·m]","M3 mín envolvente [kN·m]","Uz mín [mm]","Peor componente P/V2/M3"}; [77.3201, -89.6117, -6.5198, 0]; [77.3201, -89.6117, -6.5198, 0]; [77.3201, -89.6117, -6.5198, 0]; [0, 0, 0, 0])
+#: SÍ COMPROBADO: la alcantarilla del EJEMPLO, 2 celdas de 3.0 x 2.5 m con 0.30 m de espesor. SAP2000 24 y OpenSeesPy resolvieron los 61 casos unitarios y un código APARTE rehizo la envolvente de las 8 184 posiciones: 0.0000 % en Ux, Uz, Ry, P, V2 y M3. Cero a cuatro decimales significa que los tres programas hacen el MISMO cálculo.
+#: Y hay una segunda comprobación, más dura todavía: SAP2000 tiene camión NATIVO (caso Moving Load y caso Multi-Step Static con vehículo), o sea que hace la carga móvil con SU propio código, no con casos estáticos que le pasamos nosotros. Se montó un carril sobre las 60 barras de la losa y dos vehículos generales (35/145/145 con 4.3 m, y el HL-93 con carril 9.3 kN/m y trasera 4.3-9.0). Resultado (registros/2026-09-19_alcantarilla_verificacion.md):
+#tabla("Envolvente (ejemplo 3.0 x 2.5 m)","Hekatan:4","SAP2000 Moving Load nativo:4","dif [%]:3")({"Camión: M3 máx [kN·m]","Camión: M3 mín [kN·m]","Camión: Uz mín [mm]","HL-93 + carril: M3 máx [kN·m]","HL-93 + carril: M3 mín [kN·m]","HL-93 + carril: Uz mín [mm]"}; [71.5127, -77.7595, -5.8512, 77.3201, -89.6117, -6.5198]; [71.5128, -77.7599, -5.8512, 77.3194, -89.6053, -6.5198]; [0.000, 0.001, 0.000, 0.001, 0.007, 0.000])
+#: Y el camión paso a paso de SAP (Multi-Step Static, 147 pasos): 134 pasos casan con Hekatan a 5e-10 % en Ux, Uz, Ry, P, V2 y M3, todos los nudos y todas las barras. Los pasos que no casan son de convenio, no de cálculo: SAP no carga un eje que cae justo en x = 0 (el inicio del carril) y Hekatan sí.
+#: La hoja 51 de esta misma web, «Alcantarilla cajón con camión HL-93 - verificación analítica y SAP2000», lleva esa verificación con todas sus leyes: equilibrio, Maxwell-Betti, simetría y cotas a mano que encierran al elemento finito. Esta hoja EXPLICA; aquella VERIFICA.
+#: FALTA: el caso GRANDE de esta hoja, el de 9.5 x 6 m del enlace. Los números de las secciones 7 a 13 son del motor de Hekatan y están comprobados por equilibrio (suma de reacciones = suma de cargas a 1e-9 kN en todas las posiciones), pero SAP2000 aún no los ha arbitrado. No se ponen cifras de SAP2000 para este caso porque no existen: fabricarlas sería mentir.
+#: FALTA TAMBIÉN: el ancho de reparto E de AASHTO (sección 3b). Mientras no haya norma en la PC, E = 1 m y avisado en naranja.
+
+## 15 · Los límites, dichos y no escondidos
+
+#: El propio motor los escribe en su cabecera (cargaMovil.ts:22-30). Repetidos aquí:
+#: - Solo modelos LINEALES. Toda la hoja se apoya en la superposición. Muelles que solo trabajan a compresión (la zapata que se levanta del ejemplo 48) son NO lineales: ahí la superposición no vale y hay que resolver posición por posición.
+#: - El eje entre dos nudos se reparte por la palanca. Es exacto solo si cae en nudo. Por eso se malla a 0.1 m.
+#: - El carril no se dibuja en la animación: se ve el camión, pero en la envolvente el carril está sumado.
+#: - El modelo es una franja de 1 m en el plano XZ, con los grados de libertad de fuera del plano bloqueados y un Ux en el nudo inferior izquierdo para que el cajón no deslice (modeloAlcantarilla.ts:13-16). Las cargas son verticales, así que esa reacción sale 0: es un apoyo de sujeción, no de carga.
+#: - Sin factor de presencia múltiple (sección 3c) y sin reparto de la rueda por el relleno.

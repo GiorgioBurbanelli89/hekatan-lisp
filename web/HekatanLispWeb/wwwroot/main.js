@@ -283,6 +283,7 @@ async function abrirDesdeEnlace() {
   if (p.get('ej')) {
     const f = p.get('ej'), t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
     ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
+    setSolo(true);                       // abierto por enlace: se ve el resultado, no el código
     return true;
   }
   if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); return true; }
@@ -358,7 +359,8 @@ $('griegas').innerHTML = GR.map(([g, t]) => `<button class="sym gr" data-ins="${
 
 // lista de ejemplos: en Archivo → Ejemplos y en la lista de la barra de arriba
 let ejemploTexto = null;   // texto del ejemplo cargado: si no se tocó, el enlace lo nombra (corto)
-const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); });
+// un ejemplo se abre SIEMPRE con el resultado solo y a pantalla completa (Esc o ✎ para ver el código)
+const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); setSolo(true); });
 fetch('ejemplos.json').then(r => r.json()).then(l => {
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
   for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));

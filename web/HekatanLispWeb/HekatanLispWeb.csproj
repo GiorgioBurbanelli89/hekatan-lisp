@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="..\..\LispConverter.cs" Link="shared\LispConverter.cs" />
+    <Compile Include="..\..\LispUnidades.cs" Link="shared\LispUnidades.cs" />
     <Compile Include="..\..\LispEngine.cs" Link="shared\LispEngine.cs" />
     <Compile Include="..\..\MainWindow.Pipeline.cs" Link="shared\MainWindow.Pipeline.cs" />
     <Compile Include="..\..\MatlabToLisp.cs" Link="shared\MatlabToLisp.cs" />

@@ -1026,6 +1026,7 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
             var funcMap = new Dictionary<string, (List<string> ps, LispConverter.N body)>();  // f(x)=x²+1 → aplicar f(3)
             var deqTag = new string[lines.Length];             // etiqueta @@(…) que va a la DERECHA (estilo libro)
             var unitOf = new string[lines.Length];             // unidad VISIBLE [kN] del final de la línea (solo dibujo)
+            var barraOf = new string[lines.Length];            // forma (qshow …) de una línea con barra de unidad: 3m|cm
             var aliasOf = new List<string>[lines.Length];      // Fx = F_1 = Expand{…}: los nombres del medio (F_1)
             // ETIQUETA de ecuación: @@(texto) al FINAL de una línea de MATEMÁTICA → número a la derecha.
             // La VARIABLE queda a la IZQUIERDA (como Calcpad/Hekatan Lab). Compat: acepta el viejo #deq.
@@ -1090,6 +1091,16 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
                 var lm = System.Text.RegularExpressions.Regex.Match(lines[i].Trim(),
                             @"^([A-Za-z][\w']*)\s*=\s*(?![=])(.+)$");   // NAME = expr  (no ==)
                 if (lm.Success) { labels[i] = lm.Groups[1].Value; exprText = lm.Groups[2].Value; }
+                // BARRA de Calcpad: 3m|cm → el resultado se quiere ver en cm. Las letras
+                // de esa línea son UNIDADES, así que no pasa por el parser general.
+                if (LispUnidades.SepararBarra(exprText, out var cuerpoU, out var destU))
+                {
+                    var f = LispUnidades.Forma(cuerpoU, destU);
+                    // la unidad de destino se dibuja con el MISMO mecanismo del [kN]
+                    // visible: si va dentro del texto del resultado, el render la pierde
+                    // al volver a leer «300.0000 cm» como matemática.
+                    if (f != null) { barraOf[i] = f; exprText = cuerpoU; unitOf[i] = destU; }
+                }
                 treeOf[i] = TreeOfLine(exprText);
             }
             // mapa etiqueta → su árbol (para sustituir  Partial{v@x}  con la definición de v)
@@ -1115,9 +1126,9 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
                     var app = (funcMap.Count > 0 || vecMap.Count > 0)
                               ? LispConverter.SubstFuncs(treeOf[i], funcMap, vecMap) : treeOf[i];  // f(3)→3²+1, v(2)→componente
                     var sub = LispConverter.SubstLabels(app, prevLabels, labels[i], new HashSet<string>());
-                    formOf[i] = LispConverter.ToLisp(sub);
+                    formOf[i] = barraOf[i] ?? LispConverter.ToLisp(sub);
                 }
-                catch { formOf[i] = null; }
+                catch { formOf[i] = barraOf[i]; }
                 if (formOf[i] != null) { forms.Add(formOf[i]); idx.Add(i); }
                 if (labels[i] != null && !prevLabels.ContainsKey(labels[i])) prevLabels[labels[i]] = treeOf[i];
                 if (aliasOf[i] != null) foreach (var a in aliasOf[i]) if (!prevLabels.ContainsKey(a)) prevLabels[a] = treeOf[i];
@@ -1322,7 +1333,9 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
                     display[i] = labels[i] + " = " + string.Join(" = ", aliasOf[i]) + display[i].Substring(labels[i].Length);
             // UNIDAD visible: va pegada a la ecuación, ANTES de la etiqueta de la derecha.
             for (int i = 0; i < lines.Length && i < display.Count; i++)
-                if (unitOf[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal) && display[i] != LispConverter.PlotSlot)
+                // con un aviso de dimensiones no hay número, así que tampoco unidad que dibujar
+                if (unitOf[i] != null && display[i].Length > 0 && !display[i].Contains('⚠')
+                    && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal) && display[i] != LispConverter.PlotSlot)
                     display[i] += LispConverter.UnitSep + unitOf[i];
             // #deq: pega la ETIQUETA (a la derecha) al final de la línea de display correspondiente.
             for (int i = 0; i < lines.Length && i < display.Count; i++)

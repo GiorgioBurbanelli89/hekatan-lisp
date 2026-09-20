@@ -91,7 +91,7 @@ body{--slw:1600px;--slh:900px;}
 .slide{position:absolute;inset:0;width:var(--slw);height:var(--slh);
   background:var(--bg);color:var(--fg);border-radius:14px;
   box-shadow:0 30px 90px rgba(0,0,0,.55);
-  padding:58px 78px 86px 78px;opacity:0;pointer-events:none;
+  padding:54px 74px 78px 74px;opacity:0;pointer-events:none;
   transform:translateY(26px) scale(.985);transition:opacity .34s ease, transform .34s ease;
   overflow:hidden;}
 .slide.on{opacity:1;pointer-events:auto;transform:none;}
@@ -106,6 +106,8 @@ body{--slw:1600px;--slh:900px;}
 .slide .ws-eq{font-size:30px;margin:.5em 0;}
 .slide .m-expr{font-size:1em;}
 .slide img{max-width:100%;height:auto;}
+.slide svg{max-width:880px!important;}        /* gráficas de proyector, no de hoja A4 */
+.slide .hkfr svg{max-width:760px!important;}
 .slide .ws-h1{font-size:54px;font-weight:700;line-height:1.15;}
 .slide .ws-h2{display:none;}          /* el título va en la barra de arriba */
 h2.tit{margin:0 0 26px 0;font:600 40px/1.15 'Segoe UI',system-ui,sans-serif;
@@ -124,13 +126,14 @@ h2.tit .num{color:var(--dib-azul);margin-right:.35em;}
 #marca{position:fixed;left:18px;bottom:10px;z-index:20;display:flex;align-items:center;gap:9px;
   font:600 15px/1 'Segoe UI',system-ui,sans-serif;color:#8b93a7;}
 #marca img{height:26px;width:26px;border-radius:6px;opacity:.92;}
+/* marca de agua: va ENCIMA de la diapositiva (si va detrás, el papel la tapa) */
 #agua{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-  z-index:5;pointer-events:none;font:700 92px/1 'Segoe UI',system-ui,sans-serif;
-  color:#ffffff;opacity:.045;letter-spacing:.06em;white-space:nowrap;
-  transform:rotate(-18deg);}
+  z-index:15;pointer-events:none;font:700 104px/1 'Segoe UI',system-ui,sans-serif;
+  color:#171310;opacity:.04;letter-spacing:.06em;white-space:nowrap;
+  transform:rotate(-16deg);}
 #ayuda{position:fixed;right:18px;top:14px;z-index:20;font:500 14px/1.6 'Segoe UI',system-ui,sans-serif;
   color:#8b93a7;text-align:right;opacity:.85;}
-#indice{position:fixed;inset:0;z-index:30;background:rgba(10,12,18,.96);color:#e8ecf5;
+#indice{position:fixed;inset:0;z-index:30;background:#0a0c12;color:#e8ecf5;
   display:none;padding:46px 60px;overflow:auto;
   font:400 19px/1.75 'Segoe UI',system-ui,sans-serif;}
 #indice.on{display:block;}

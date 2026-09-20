@@ -1451,7 +1451,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
                 // #tabla(…)/#table(…): directiva de TABLA (headers)(cols) — no es prosa, se procesa aparte.
                 if (Regex.IsMatch(s0, @"^#+\s*(?:tabla|table)\s*\(", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
@@ -1466,7 +1466,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             }
             // LISP: ';' — esquema previo (compatibilidad)
             var s = s0.Substring(1).Trim();
-            if (Regex.IsMatch(s, @"^(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+            if (Regex.IsMatch(s, @"^(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
             if (s.StartsWith("##")) return ("h2", "center", s.Substring(2).Trim());
             if (s.StartsWith("#"))  return ("h1", "center", s.Substring(1).Trim());
             if (s.StartsWith("|") || s.StartsWith("=")) return ("p", "center", s.Substring(1).Trim());

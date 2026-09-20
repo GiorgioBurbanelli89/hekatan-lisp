@@ -58,9 +58,9 @@ rigido = Expand{(1-xi)/2*5 + (1+xi)/2*5} @@(u₁=u₂=5 → u=5)
 #: Da 5, constante, sin {xi}. Sin esta propiedad el elemento no pasa el patch test, y el programa inventaría fuerzas al mover la estructura entera.
 
 ## 9 · La interpolación en movimiento
-#: El nudo 1 se queda quieto y el nudo 2 se mueve. Mira cómo la recta interior sigue a los nudos: eso es la función de forma trabajando. Pasa el ratón por encima para pausar.
-#anim fplot(u = (1+x)/2*n/8, u_maximo = (1+x)/2, [-1 1]), n = 0:8
-#: Cada cuadro es {u_2} creciendo; la forma es **siempre** la misma recta, escalada. La forma la ponen las N; el tamaño lo ponen los nudos.
+#: El nudo 1 se queda quieto y el nudo 2 se mueve. Mira cómo la recta interior sigue a los nudos: eso es la función de forma trabajando. Mueve tú la barra: el nudo 2 baja y sube cuando tú quieras.
+#slider fplot(u = (1+x)/2*n/8, u_maximo = (1+x)/2, [-1 1]), n = 0:8
+#: Cada posición de la barra es un {u_2} distinto; la forma es **siempre** la misma recta, escalada. La forma la ponen las N; el tamaño lo ponen los nudos.
 
 ## 10 · El mapa isoparamétrico: de ξ a x
 #: «Isoparamétrico» significa: **la geometría se interpola con las mismas funciones de forma que el desplazamiento**. Con el nudo 1 en 0 y el nudo 2 en {L}:
@@ -92,7 +92,46 @@ B = dN_dxi * J_inv @@(matriz deformación–desplazamiento)
 #: Y mira lo que dice {B}: la deformación es (u₂ − u₁)/{L}, o sea **alargamiento dividido para el largo**. La definición de toda la vida, deducida sola.
 #: Un detalle grande: {B} **no depende de {xi}**. La deformación es **constante** dentro del elemento. Por eso la barra lineal da tensión constante por elemento, y por eso en 2D al triángulo lineal se le llama CST, constant strain triangle.
 
-## 14 · La matriz de rigidez: de dónde sale la integral
+## 14 · Integrar sin integrar: la cuadratura
+#: Para armar K hace falta una **integral**. Pero un computador no sabe integrar símbolos: sabe **sumar y multiplicar**. Así que toda integral se cambia por una suma:
+#: **∫ f(ξ) dξ ≈ w₁·f(ξ₁) + w₂·f(ξ₂) + … + wₙ·f(ξₙ)** — evalúo la función en unos pocos puntos ξᵢ, multiplico cada valor por un peso wᵢ, y sumo. Eso es una **cuadratura**.
+#: Léelo como un área: cada término wᵢ·f(ξᵢ) es un **rectángulo** de ancho wᵢ y altura f(ξᵢ). La suma de esos rectángulos es el área. Mueve las barras: **n** son los puntos, **p** es el grado del polinomio que estoy integrando.
+#gauss
+#: Prueba esto: deja n = 2 y sube el grado. Hasta **p = 3** el error es CERO —exacto, no aproximado—; en p = 4 se despega. Sube a n = 3 y aguanta hasta p = 5. Esa es la regla: **con n puntos es exacto hasta el grado 2n − 1.**
+
+## 15 · ¿De dónde sale el 0.5774? (aquí está la clave)
+#: Trapecio y Simpson evalúan en puntos **fijos** —los extremos, el centro—. Gauss pregunta otra cosa: si puedo elegir **dónde** evaluar, ¿dónde conviene? Con 2 puntos tengo **4 números libres**: ξ₁, ξ₂, w₁, w₂. Con 4 libertades puedo exigir 4 condiciones: que la fórmula dé **exacta** la integral de 1, de ξ, de ξ² y de ξ³.
+#: Por simetría los puntos salen en −a y +a con el mismo peso. El motor calcula las integrales exactas que hay que igualar:
+I_0 = Area{1 @ xi=-1:1} @@(∫1 dξ)
+I_1 = Area{xi @ xi=-1:1} @@(∫ξ dξ)
+I_2 = Area{xi^2 @ xi=-1:1} @@(∫ξ² dξ)
+#: Con pesos 1 y 1: para f = 1 la suma da 1+1 = 2 = {I_0} ✔ (por eso los pesos valen 1). Para f = ξ da −a+a = 0 = {I_1} ✔ (por simetría, gratis). La única que manda es **f = ξ²**: la suma vale a² + a² = 2a², y tiene que dar {I_2}. De ahí sale el punto:
+a_gauss = dec(sqrt(1/3), 6) @@(2a² = 2/3 → a = 1/√3)
+#: Ese 0.577 no es un número mágico ni sacado de una tabla: es el **despeje de una ecuación**. Y los pesos valen 1 porque tenían que sumar 2, que es lo que mide el intervalo.
+
+## 16 · Míralo tú: mueve el punto
+#: Los dos puntos están en −a y +a con peso 1. Arrastra y mira las cuatro condiciones: las de 1, ξ y ξ³ salen **siempre** bien —por los pesos y por la simetría—; la de **ξ²** solo cuadra en un sitio.
+#gauss(porque)
+#: Ahí, y solo ahí, el error se hace cero: a = 1/√3 = 0.5774. Con dos evaluaciones estás integrando exacto hasta grado 3.
+
+## 17 · Gauss contra el trapecio, con el mismo trabajo
+#: Dos evaluaciones de la función, dos métodos. Integremos f(ξ) = ((1+ξ)/2)³ entre −1 y 1. La respuesta exacta, por el motor:
+exacta = Area{((1+xi)/2)^3 @ xi=-1:1} @@(valor exacto)
+#: **Trapecio** (evalúa en los extremos, ξ = −1 y ξ = +1, con peso 1 cada uno):
+trapecio = dec(((1-1)/2)^3 + ((1+1)/2)^3, 4) @@(f(−1) + f(+1))
+#: **Gauss** (evalúa en ξ = ∓0.5774, peso 1 cada uno):
+gauss_2 = dec(((1-0.5773503)/2)^3 + ((1+0.5773503)/2)^3, 4) @@(f(−a) + f(+a))
+#: Trapecio da 1.0 con un error del 100 %; Gauss da **exactamente** 0.5. **El mismo número de cuentas, y uno acierta al dígito.** Esa es toda la razón de que ETABS, SAP2000, SAFE y Abaqus integren con Gauss y no con trapecios.
+#: Los puntos y pesos para el segmento [−1, 1] son siempre los mismos —están en una tabla desde 1814—, y por eso **todo elemento se formula en coordenada natural**: para que esa tabla valga siempre, mida lo que mida el elemento real. El Jacobiano se encarga del resto.
+
+## 18 · Gauss dentro de la matriz de rigidez
+#: Ahora se junta todo. La K del elemento es K = ∫ Bᵀ·D·B·|J| dξ, así que el programa hace exactamente esto: por cada **punto de Gauss** ξᵢ, evalúa B(ξᵢ), multiplica Bᵀ·D·B, lo multiplica por |J| y por el peso wᵢ, y lo va **acumulando**:
+K_gauss = w_1*Bt_D_B_1*J + w_2*Bt_D_B_2*J @@(K = Σ wᵢ·Bᵀ D B·|J|)
+#: Cuántos puntos hacen falta se decide con la regla 2n − 1. En la barra lineal BᵀB es **constante** (grado 0), así que **con 1 punto ya es exacta**. En el cuadrilátero Q4 el integrando llega a grado 2 y se usan **2×2 = 4 puntos**; en el Q8, 3×3 = 9.
+#: Por eso los programas hablan de «integración completa» o «reducida»: usar menos puntos de los que pide la regla abarata el cálculo, pero puede dejar modos de deformación con energía cero —el *hourglassing*, esa malla que se ve como un reloj de arena—.
+#: Y por eso, cuando pides tensiones, ETABS o Abaqus las calculan **en los puntos de Gauss** y después las extrapolan a los nudos: ahí es donde el elemento de verdad hizo las cuentas.
+
+## 19 · La matriz de rigidez: de dónde sale la integral
 #: La energía de deformación de la barra es ½∫σ·ε·{A}·dx. Metiendo ε = B·u y σ = {E}·ε, todo lo que no son los desplazamientos queda dentro de una integral: **esa integral es K**.
 #: K = ∫ Bᵀ·{E}·{A}·B dx sobre la barra real. Cambio a la coordenada natural con el Jacobiano —uso 1 del paso 12—: K = ∫ Bᵀ·{E}·{A}·B·|J| dξ, con {xi} de −1 a +1. El motor hace la integral:
 BtB = Area{transpose(B)*B @ xi=-1:1} @@(∫BᵀB dξ)
@@ -100,7 +139,7 @@ K_elem = E*A*J*BtB @@(K = E·A·|J|·∫BᵀB dξ)
 #: Y ahí está, **deducida**, no copiada: la rigidez del elemento barra es (E·A/{L})·[1, −1; −1, 1]. El famoso EA/L no es un dato de tabla: es la integral de la matriz B contra sí misma.
 #: Fíjate en la simetría y en que las filas suman cero. Eso último es el cuerpo rígido del paso 8 otra vez: si mueves los dos nudos lo mismo, no aparece ninguna fuerza. Una K que **no** cumpla eso está mal ensamblada.
 
-## 15 · Ahora sí, los números
+## 20 · Ahora sí, los números
 #: Barra de acero, unidades de obra: {E} en tonf/cm², {A} en cm², {L} en cm, {P} en tonf.
 E_v = 2100 @@(módulo de elasticidad)
 A_v = 20 @@(área de la sección)
@@ -112,7 +151,7 @@ k_ax = dec(E_v*A_v/L_v, 1) @@(E·A/L, tonf/cm)
 K_num = k_ax*[1, -1; -1, 1] @@(K del elemento, tonf/cm)
 #: Leer esa matriz es fácil: para mover el nudo 2 un centímetro, con el nudo 1 quieto, hacen falta 140 toneladas. La diagonal dice «cuánto cuesta moverme»; los términos cruzados, «cuánto arrastro al vecino».
 
-## 16 · Ensamblaje: la estructura es la suma de sus elementos
+## 21 · Ensamblaje: la estructura es la suma de sus elementos
 #: Parto la barra en **dos** elementos de 150 cm. Cada uno es el doble de rígido:
 k_ax2 = dec(E_v*A_v/150, 1) @@(E·A/150, tonf/cm)
 K_1 = k_ax2*[1, -1; -1, 1] @@(elemento 1: nudos 1–2)
@@ -121,7 +160,7 @@ K_2 = k_ax2*[1, -1; -1, 1] @@(elemento 2: nudos 2–3)
 K_g = [280, -280, 0; -280, 560, -280; 0, -280, 280] @@(K global, 3 nudos)
 #: Eso es literalmente todo el ensamblaje: llevar cada número de cada K de elemento a la fila y a la columna del nudo que le toca, y sumar donde coincidan. Un pórtico de 20 pisos es esta misma operación, repetida miles de veces.
 
-## 17 · Condiciones de borde y solución
+## 22 · Condiciones de borde y solución
 #: El nudo 1 está empotrado, {u_1} = 0. Se tacha su fila y su columna —el programa dice «restringir el grado de libertad»— y queda un sistema de 2×2 con los nudos libres:
 K_ff = [560, -280; -280, 280] @@(K de los grados libres)
 F_f = [0; 10] @@(cargas: 0 en el nudo 2, P en el 3)
@@ -131,7 +170,7 @@ d_num = dec(P_v*L_v/(E_v*A_v), 4) @@(P·L/(E·A))
 #: El mismo número. El método reprodujo la solución exacta.
 #: Ese K⁻¹·F es la línea que se lleva el grueso del tiempo de cálculo en ETABS, SAP2000 o Abaqus. Todo lo anterior —las N, el Jacobiano, la B— existe solo para poder escribir esa K.
 
-## 18 · Y con los desplazamientos, todo lo demás
+## 23 · Y con los desplazamientos, todo lo demás
 #: Con los desplazamientos en la mano se vuelve hacia atrás por el mismo camino. En el elemento 2, que va del nudo 2 al 3:
 u_e2 = [0.0357; 0.0714] @@(desplazamientos del elemento, cm)
 B_num = dec([-1/150, 1/150], 6) @@(B del elemento, 1/cm)
@@ -140,19 +179,19 @@ sigma_e = dec(E_v*eps, 4) @@(tensión σ = E·ε, tonf/cm²)
 N_axial = dec(sigma_e*A_v, 2) @@(fuerza axial N = σ·A, tonf)
 #: Da {N_axial} tonf: las 10 tonf aplicadas. El equilibrio se cumple, el resultado se verifica solo. **Desplazamientos → deformaciones → tensiones → fuerzas**: ese es el orden en que sale todo informe de cualquier programa de elementos finitos.
 
-## 19 · ¿Y si la solución no es una recta?
-#: Con carga en la punta el elemento lineal acierta exacto, porque la solución **es** una recta. Con carga repartida —el peso propio— la solución exacta es una parábola, y una recta no puede serlo. Ahí es donde hay que mallar. Barra normalizada, exacta contra elementos finitos, de 1 a 8 elementos:
-#anim fplot(u = x - x^2/2, u_EF = floor(n*x)/n - (floor(n*x)/n)^2/2 + (1 - floor(n*x)/n - 1/(2*n))*(x - floor(n*x)/n), [0 0.999]), n = 1:8
+## 24 · ¿Y si la solución no es una recta?
+#: Con carga en la punta el elemento lineal acierta exacto, porque la solución **es** una recta. Con carga repartida —el peso propio— la solución exacta es una parábola, y una recta no puede serlo. Ahí es donde hay que mallar. Barra normalizada, exacta contra elementos finitos. Mueve la barra y refina la malla tú mismo, de 1 a 8 elementos:
+#slider fplot(u = x - x^2/2, u_EF = floor(n*x)/n - (floor(n*x)/n)^2/2 + (1 - floor(n*x)/n - 1/(2*n))*(x - floor(n*x)/n), [0 0.999]), n = 1:8
 #: En los nudos coincide **siempre**; entre nudos hay error. El error máximo dentro de cada tramo vale:
 e_u = h^2/8 @@(error entre nudos)
 #: Si duplicas el número de elementos, {h} baja a la mitad y el error baja a la **cuarta** parte. Eso es converger, y es la razón técnica —no la costumbre— de refinar una malla.
 
-## 20 · La tensión: por qué los programas la promedian
+## 25 · La tensión: por qué los programas la promedian
 #: El desplazamiento sale continuo, pero la tensión no: cada elemento da su constante, así que en un nudo interior hay **dos** valores distintos.
-#anim fplot(sigma = 1 - x, sigma_EF = 1 - floor(n*x)/n - 1/(2*n), [0 0.999]), n = 1:8
+#slider fplot(sigma = 1 - x, sigma_EF = 1 - floor(n*x)/n - 1/(2*n), [0 0.999]), n = 1:8
 #: Ese salto es el equilibrio que el método solo cumple en los nudos. Por eso SAP2000, ETABS y SAFE dejan elegir «Unaveraged» —con salto— o «Averaged» —promediado—. Y el promedio de los dos vecinos devuelve justo el valor exacto del nudo: promediar no es maquillaje, es recuperar información.
 
-## 21 · El camino completo, en una diapositiva
+## 26 · El camino completo, en una diapositiva
 #: **1. Funciones de forma** — reparten los valores de los nudos hacia adentro del elemento. Se deducen imponiendo que valgan 1 en su nudo y 0 en los demás.
 #: **2. Jacobiano** — el factor de escala entre el elemento de referencia y el real. |J| para medir (integrar), J⁻¹ para derivar.
 #: **3. Matriz B** — las derivadas de las funciones de forma pasadas por J⁻¹. Convierte desplazamientos de nudos en deformación.

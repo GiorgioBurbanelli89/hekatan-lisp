@@ -18,6 +18,30 @@ import sys, os, re, base64, argparse
 VOID = {"img", "br", "hr", "meta", "link", "input", "source", "col"}
 
 
+def _esconder_codigo(body: str):
+    """Saca <script> y <style> del texto antes de contar etiquetas.
+
+    Dentro de un script hay cosas como `for(i=0;i<n;i++)` o `k<f.length`: para el
+    contador de etiquetas eso parece una etiqueta `<n...>` que se abre y nunca se
+    cierra, y el troceo se va al traste (pasó al meter los widgets de sliders y
+    de Gauss: de 25 diapositivas salieron 10). Se guardan aparte y se devuelven
+    al final, intactos.
+    """
+    guardados = []
+
+    def fuera(m):
+        guardados.append(m.group(0))
+        return "[[HKCODE%d]]" % (len(guardados) - 1)
+
+    limpio = re.sub(r"<script.*?</script>|<style.*?</style>", fuera, body,
+                    flags=re.S | re.I)
+    return limpio, guardados
+
+
+def _devolver_codigo(txt: str, guardados):
+    return re.sub(r"\[\[HKCODE(\d+)\]\]", lambda m: guardados[int(m.group(1))], txt)
+
+
 def top_level_nodes(body: str):
     """Corta el body en nodos de PRIMER nivel (divs hermanos, scripts, style...).
 
@@ -26,6 +50,7 @@ def top_level_nodes(body: str):
     abrir y se resta al cerrar; cuando la profundidad vuelve a 0, ahí termina
     un nodo hermano.
     """
+    body, guardados = _esconder_codigo(body)
     nodes, depth, start = [], 0, 0
     for m in re.finditer(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>", body):
         closing, name, attrs = m.group(1), m.group(2).lower(), m.group(3)
@@ -48,7 +73,7 @@ def top_level_nodes(body: str):
                 start = m.end()
     if body[start:].strip():
         nodes.append(body[start:])
-    return nodes
+    return [_devolver_codigo(n, guardados) for n in nodes]
 
 
 def clase(node: str) -> str:

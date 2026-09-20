@@ -397,7 +397,7 @@ namespace HekatanLisp
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
         // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
         private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
-            @"^\s*[;#]+\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
+            @"^\s*[;#]+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
@@ -461,6 +461,20 @@ namespace HekatanLisp
                 if (kw is "anim" or "animar" or "animacion")
                 {
                     try { outList.Add(AnimHtml(rest, byName, fns, inv)); } catch { outList.Add(""); }
+                    continue;
+                }
+                // #slider: lo MISMO que #anim, pero el cuadro lo elige el usuario con una barra.
+                // 20-sep-2026, Jorge: «no usas gráficas con slider». En una clase hace falta PARAR
+                // en un valor y hablar de él; la animación automática no deja.
+                if (kw is "slider" or "barra_deslizante" or "deslizador")
+                {
+                    try { outList.Add(SliderHtml(rest, byName, fns, inv)); } catch { outList.Add(""); }
+                    continue;
+                }
+                // #gauss / #gauss(porque): la cuadratura de Gauss, interactiva.
+                if (kw is "gauss" or "cuadratura" or "gausslegendre")
+                {
+                    try { outList.Add(GaussHtml(rest)); } catch { outList.Add(""); }
                     continue;
                 }
                 if (isDiag)
@@ -658,6 +672,223 @@ namespace HekatanLisp
             return sb.ToString();
         }
 
+        private static int _sliderId;
+        private static int _gaussId;
+
+        /// <summary>#slider fplot(u = expr(x,n), [a b]), n = 1:8  → los MISMOS cuadros que #anim,
+        /// pero el usuario elige cuál ver con una barra. Los cuadros los calcula el motor una vez
+        /// (no hay matemática en JS): la barra solo enseña uno y esconde los demás.</summary>
+        private static string SliderHtml(string rest, Dictionary<string, LispConverter.N> byName,
+                                         List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv)
+        {
+            var R = System.Text.RegularExpressions.Regex.Match((rest ?? "").Trim(),
+                @"^(.*),\s*([A-Za-z]\w*)\s*=\s*(-?[\d.]+)\s*:\s*(-?[\d.]+)\s*(?::\s*(-?[\d.]+))?\s*$",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (!R.Success) return "";
+            string plot = R.Groups[1].Value.Trim(), par = R.Groups[2].Value;
+            double a = double.Parse(R.Groups[3].Value, inv), b = double.Parse(R.Groups[4].Value, inv), st = 1;
+            if (R.Groups[5].Success) { st = b; b = double.Parse(R.Groups[5].Value, inv); }
+            if (st <= 0 || b < a) return "";
+            plot = System.Text.RegularExpressions.Regex.Replace(plot, @"^(?:fplot|plot|ezplot)\s*(?=\()", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var vals = new List<double>();
+            for (double v = a; v <= b + st * 1e-9 && vals.Count < 60; v += st) vals.Add(v);
+            if (vals.Count == 0) return "";
+            int id = System.Threading.Interlocked.Increment(ref _sliderId);
+            string P(double v) => v.ToString("0.####", inv);
+            var sb = new StringBuilder();
+            sb.Append("<div class=\"hksl\" id=\"hksl").Append(id).Append("\" style=\"margin:1.1em 0;text-align:center\">");
+            sb.Append("<div style=\"display:grid\">");
+            for (int i = 0; i < vals.Count; i++)
+            {
+                string sv = P(vals[i]);
+                string sub = System.Text.RegularExpressions.Regex.Replace(plot,
+                    @"(?<![\w.])" + System.Text.RegularExpressions.Regex.Escape(par) + @"(?![\w(])", "(" + sv + ")");
+                sb.Append("<div class=\"hkfr\" style=\"grid-area:1/1;visibility:").Append(i == 0 ? "visible" : "hidden")
+                  .Append("\">").Append(OneFplotHtml(sub, byName, fns, inv)).Append("</div>");
+            }
+            sb.Append("</div>");
+            // El título va en su propio div (NO un <label> alrededor del input): envolviendo el
+            // input, el arrastre de la barra se rompe en algunos navegadores.
+            sb.Append("<div style=\"max-width:520px;margin:.5em auto 0\">")
+              .Append("<div style=\"color:var(--fg);font-size:1em;margin-bottom:.15em\"><i>")
+              .Append(System.Net.WebUtility.HtmlEncode(par)).Append("</i> = <b class=\"hkval\">").Append(P(vals[0]))
+              .Append("</b></div>")
+              .Append("<input type=\"range\" min=\"0\" max=\"").Append(vals.Count - 1)
+              .Append("\" value=\"0\" step=\"1\" style=\"display:block;width:100%\">")
+              .Append("<div style=\"display:flex;justify-content:space-between;color:var(--mut);font-size:.85em\"><span>")
+              .Append(P(vals[0])).Append("</span><span>arrastra</span><span>").Append(P(vals[vals.Count - 1]))
+              .Append("</span></div></div>");
+            sb.Append("<script>(function(){var c=document.getElementById('hksl").Append(id).Append("');")
+              .Append("var f=c.querySelectorAll('.hkfr'),r=c.querySelector('input'),v=c.querySelector('.hkval');")
+              .Append("var V=[").Append(string.Join(",", vals.ConvertAll(x => "'" + P(x) + "'"))).Append("];")
+              .Append("function u(){var i=+r.value;for(var k=0;k<f.length;k++)f[k].style.visibility=(k===i?'visible':'hidden');v.textContent=V[i];}")
+              .Append("r.addEventListener('input',u);r.addEventListener('change',u);u();})();</script>");
+            sb.Append("</div>");
+            return sb.ToString();
+        }
+
+        /// <summary>#gauss  ·  #gauss(porque)  — la cuadratura de Gauss, para tocarla.
+        ///
+        /// Integrar = área. Gauss dice: el área es una SUMA de pesos por alturas, w·f(ξ), donde
+        /// los ξ y los w no se eligen a ojo: se eligen para que la fórmula sea EXACTA con los
+        /// polinomios más altos posibles (grado 2n−1 con n puntos).
+        ///  · modo normal: barras para n (puntos) y para el grado del polinomio; se ve dónde deja
+        ///    de ser exacta.
+        ///  · modo «porque»: de dónde sale el ±0.5774 — se mueve el punto y se ve el error caer a 0.
+        /// El dibujo es un canvas con JS propio (no SkiaSharp): tiene que responder al arrastre.</summary>
+        private static string GaussHtml(string rest)
+        {
+            bool porque = (rest ?? "").ToLowerInvariant().Contains("porque")
+                       || (rest ?? "").ToLowerInvariant().Contains("por que")
+                       || (rest ?? "").ToLowerInvariant().Contains("deduc");
+            int id = System.Threading.Interlocked.Increment(ref _gaussId);
+            string q = "g" + id;
+            var sb = new StringBuilder();
+            sb.Append("<div id=\"").Append(q).Append("\" style=\"margin:1.1em auto;max-width:880px;text-align:center\">");
+            sb.Append("<canvas class=\"cv\" width=\"1280\" height=\"730\" style=\"width:100%;height:auto\"></canvas>");
+            if (porque)
+            {
+                sb.Append(Fila("a", "posición de los dos puntos &nbsp;<i>&xi;</i> = &plusmn;<b class=\"va\">0.300</b>",
+                               "10", "990", "300", "0.01", "0.99"));
+                sb.Append("<div class=\"rd\"></div>");
+            }
+            else
+            {
+                sb.Append(Fila("n", "puntos de Gauss &nbsp;n = <b class=\"vn\">2</b>", "1", "5", "2", "1", "5"));
+                sb.Append(Fila("g", "grado del polinomio &nbsp;p = <b class=\"vg\">3</b>", "0", "7", "3", "0", "7"));
+                sb.Append("<div class=\"rd\"></div>");
+            }
+            sb.Append("<style>#").Append(q).Append(" input{display:block;width:100%}")
+              .Append("#").Append(q).Append(" .ttl{color:var(--fg);font-size:1em;margin:.45em 0 .1em}")
+              .Append("#").Append(q).Append(" .ext{display:flex;justify-content:space-between;color:var(--mut);font-size:.85em}")
+              .Append("#").Append(q).Append(" .rd{margin:.6em auto 0;max-width:640px;background:#1d2333;color:#e8ecf5;")
+              .Append("border-radius:9px;padding:.55em .8em;font:500 15px/1.6 Consolas,monospace;text-align:left}")
+              .Append("#").Append(q).Append(" .ok{color:#7ee2a8}#").Append(q).Append(" .no{color:#ff9d7a}</style>");
+            sb.Append("<script>").Append(porque ? GaussJsPorque(q) : GaussJsNormal(q)).Append("</script>");
+            sb.Append("</div>");
+            return sb.ToString();
+        }
+
+        private static string Fila(string cls, string titulo, string min, string max, string val, string ini, string fin) =>
+            "<div style=\"max-width:520px;margin:0 auto\"><div class=\"ttl\">" + titulo + "</div>" +
+            "<input class=\"s" + cls + "\" type=\"range\" min=\"" + min + "\" max=\"" + max + "\" value=\"" + val + "\" step=\"1\">" +
+            "<div class=\"ext\"><span>" + ini + "</span><span>arrastra</span><span>" + fin + "</span></div></div>";
+
+        // tabla de Gauss-Legendre n = 1..5 (puntos y pesos en [-1, 1]), compartida por los dos widgets
+        private const string GaussTabla =
+            "var GX=[[0],[-0.5773502692,0.5773502692],[-0.7745966692,0,0.7745966692]," +
+            "[-0.8611363116,-0.3399810436,0.3399810436,0.8611363116]," +
+            "[-0.9061798459,-0.5384693101,0,0.5384693101,0.9061798459]];" +
+            "var GW=[[2],[1,1],[0.5555555556,0.8888888889,0.5555555556]," +
+            "[0.3478548451,0.6521451549,0.6521451549,0.3478548451]," +
+            "[0.2369268851,0.4786286705,0.5688888889,0.4786286705,0.2369268851]];";
+
+        // dibujo común: ejes de ξ ∈ [−1,1] y de f, con la curva
+        private const string GaussComun = @"
+var C=c.querySelector('.cv'),X=C.getContext('2d');
+var css=getComputedStyle(document.documentElement);
+function col(n,d){var v=css.getPropertyValue(n).trim();return v||d;}
+var FG=col('--fg','#171310'),MUT=col('--mut','#544d3a'),AZ=col('--dib-azul','#1c5fbf'),
+    NAR=col('--dib-nar','#d9480f'),VER=col('--dib-verde','#2b8a3e');
+var L=150,R=1180,T=40,B=560;                      // marco del dibujo en pixeles
+function px(x){return L+(x+1.25)/2.5*(R-L);}          // xi (-1..1)  -> pixel
+function py(y,ymin,ymax){return B-(y-ymin)/(ymax-ymin)*(B-T);}
+function ejes(ymin,ymax,rot){
+  X.clearRect(0,0,C.width,C.height);
+  X.strokeStyle=MUT;X.lineWidth=2;X.font='22px Segoe UI';X.fillStyle=MUT;X.textAlign='center';
+  var y0=py(0,ymin,ymax);
+  X.beginPath();X.moveTo(L,y0);X.lineTo(R,y0);X.stroke();
+  X.beginPath();X.moveTo(L,T);X.lineTo(L,B);X.stroke();
+  [-1,-0.5,0,0.5,1].forEach(function(t){
+    X.beginPath();X.moveTo(px(t),y0-7);X.lineTo(px(t),y0+7);X.stroke();
+    X.fillText(t.toFixed(1),px(t),y0+34);});
+  X.fillText(rot||'ξ',(L+R)/2,B+132);
+}
+function curva(f,ymin,ymax){
+  X.strokeStyle=AZ;X.lineWidth=4;X.beginPath();
+  for(var i=0;i<=400;i++){var t=-1+2*i/400,Y=py(f(t),ymin,ymax);
+    if(i===0)X.moveTo(px(t),Y);else X.lineTo(px(t),Y);}
+  X.stroke();
+}
+function area(f,ymin,ymax){                       // el area EXACTA, sombreada
+  X.fillStyle='rgba(28,95,191,.13)';X.beginPath();X.moveTo(px(-1),py(0,ymin,ymax));
+  for(var i=0;i<=400;i++){var t=-1+2*i/400;X.lineTo(px(t),py(f(t),ymin,ymax));}
+  X.lineTo(px(1),py(0,ymin,ymax));X.closePath();X.fill();
+}";
+
+        private static string GaussJsNormal(string q) => "(function(){var c=document.getElementById('" + q + "');" +
+            GaussTabla + GaussComun + @"
+var sn=c.querySelector('.sn'),sg=c.querySelector('.sg'),rd=c.querySelector('.rd'),
+    vn=c.querySelector('.vn'),vg=c.querySelector('.vg');
+function dib(){
+  var n=+sn.value, g=+sg.value;
+  vn.textContent=n; vg.textContent=g;
+  var f=function(t){return Math.pow((1+t)/2,g);};   // polinomio de grado g, entre 0 y 1
+  var ex=2/(g+1);                                   // su integral exacta en [-1,1]
+  var ap=0,xs=GX[n-1],ws=GW[n-1];
+  for(var i=0;i<n;i++) ap+=ws[i]*f(xs[i]);
+  var ymin=-0.12,ymax=1.15;
+  ejes(ymin,ymax);
+  area(f,ymin,ymax);
+  // cada punto de Gauss = un RECTANGULO de ancho w_i y alto f(xi_i): su area ES w_i*f(xi_i),
+  // por eso la suma de los rectangulos y el area bajo la curva se parecen tanto.
+  for(var i=0;i<n;i++){
+    var x0=xs[i]-ws[i]/2, x1=xs[i]+ws[i]/2, h=f(xs[i]);
+    X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
+    var yt=py(h,ymin,ymax), yb=py(0,ymin,ymax);
+    X.fillRect(px(x0),yt,px(x1)-px(x0),yb-yt);
+    X.strokeRect(px(x0),yt,px(x1)-px(x0),yb-yt);
+    X.beginPath();X.arc(px(xs[i]),yt,9,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
+    X.fillText('w='+ws[i].toFixed(3),px(xs[i]),yb+70);
+    X.fillText('ξ='+xs[i].toFixed(4),px(xs[i]),yb+96);
+  }
+  curva(f,ymin,ymax);
+  var err=Math.abs(ap-ex), exacto=(err<1e-9);
+  rd.innerHTML='f(ξ) = ((1+ξ)/2)<sup>'+g+'</sup> &nbsp; grado '+g+
+    '<br>exacta &nbsp;∫ f dξ = '+ex.toFixed(6)+
+    '<br>Gauss &nbsp;Σ w<sub>i</sub>·f(ξ<sub>i</sub>) = '+ap.toFixed(6)+
+    '<br>error = '+err.toFixed(6)+' &nbsp; '+
+    (exacto?'<span class=""ok"">EXACTO</span>':'<span class=""no"">ya no alcanza</span>')+
+    '<br>con n = '+n+' puntos es exacto hasta grado 2n−1 = '+(2*n-1);
+}
+sn.addEventListener('input',dib);sn.addEventListener('change',dib);
+sg.addEventListener('input',dib);sg.addEventListener('change',dib);dib();})();";
+
+        private static string GaussJsPorque(string q) => "(function(){var c=document.getElementById('" + q + "');" +
+            GaussComun + @"
+var sa=c.querySelector('.sa'),rd=c.querySelector('.rd'),va=c.querySelector('.va');
+function dib(){
+  var a=+sa.value/1000;                       // los dos puntos, en -a y +a, con peso 1 cada uno
+  va.textContent=a.toFixed(3);
+  var ymin=-0.12,ymax=1.15, f=function(t){return t*t;};
+  ejes(ymin,ymax);
+  area(f,ymin,ymax);
+  [-a,a].forEach(function(xi){
+    var x0=xi-0.5,x1=xi+0.5,h=f(xi);
+    var yt=py(h,ymin,ymax),yb=py(0,ymin,ymax);
+    X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
+    X.fillRect(px(x0),yt,px(x1)-px(x0),yb-yt);X.strokeRect(px(x0),yt,px(x1)-px(x0),yb-yt);
+    X.beginPath();X.arc(px(xi),yt,9,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
+    X.fillText('ξ='+xi.toFixed(4),px(xi),yb+70);
+  });
+  curva(f,ymin,ymax);
+  var s2=2*a*a, e2=Math.abs(s2-2/3);          // la unica condicion que no sale sola
+  function fila(t,ex,ap){var ok=Math.abs(ex-ap)<1.5e-3;
+    return '<br>'+t+' : exacta '+ex.toFixed(4)+' &nbsp; Gauss '+ap.toFixed(4)+' &nbsp; '+
+      (ok?'<span class=""ok"">&#10003;</span>':'<span class=""no"">&#10007;</span>');}
+  rd.innerHTML='dos puntos en ±'+a.toFixed(4)+', pesos 1 y 1 → cuatro condiciones:'+
+    fila('f = 1 &nbsp;&nbsp;',2,2)+
+    fila('f = ξ &nbsp;&nbsp;',0,0)+
+    fila('f = ξ² &nbsp;',2/3,s2)+
+    fila('f = ξ³ &nbsp;',0,0)+
+    '<br>error en ξ² = '+e2.toFixed(6)+
+    (e2<1.5e-3?' &nbsp;<span class=""ok"">2a² = 2/3 → a = 1/√3 = 0.5774</span>':'');
+}
+sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
+
         // agrega una función: por NOMBRE ya deducido, o expresión MATLAB inline (1-s^2)
         private static void AddFn(List<(string, LispConverter.N)> sel, Dictionary<string, LispConverter.N> byName, string spec)
         {
@@ -807,7 +1038,7 @@ namespace HekatanLisp
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                                   @"^#\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                                System.Text.RegularExpressions.Regex.IsMatch(s, @"^#\s*(?:tabla|table)\s*\(",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -832,7 +1063,7 @@ namespace HekatanLisp
                 if (manualTables[i] != null) { textOf[i] = ("table", "left", manualTables[i]); continue; }   // tabla de TEXTO (#|…|)
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*[;#]+\s*(anim|animar|animacion|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                        @"^\s*[;#]+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var tspec = ParseTablaDirective(lines[i]);
                 if (tspec != null) { isTabla[i] = true; tablaSpecOf[i] = tspec; continue; }

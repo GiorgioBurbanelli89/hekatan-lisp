@@ -59,7 +59,7 @@ rigido = Expand{(1-xi)/2*5 + (1+xi)/2*5} @@(u₁=u₂=5 → u=5)
 
 ## 9 · La interpolación en movimiento
 #: El nudo 1 se queda quieto y el nudo 2 se mueve. Mira cómo la recta interior sigue a los nudos: eso es la función de forma trabajando. Pasa el ratón por encima para pausar.
-#anim fplot(u = (1+x)/2*n/8, [-1 1]), n = 0:8
+#anim fplot(u = (1+x)/2*n/8, u_maximo = (1+x)/2, [-1 1]), n = 0:8
 #: Cada cuadro es {u_2} creciendo; la forma es **siempre** la misma recta, escalada. La forma la ponen las N; el tamaño lo ponen los nudos.
 
 ## 10 · El mapa isoparamétrico: de ξ a x
@@ -108,15 +108,15 @@ L_v = 300 @@(largo)
 P_v = 10 @@(carga axial)
 #: Rigidez del elemento y Jacobiano de esta barra:
 J_v = dec(L_v/2, 1) @@(Jacobiano, cm por unidad de ξ)
-kax = dec(E_v*A_v/L_v, 1) @@(E·A/L, tonf/cm)
-K_num = kax*[1, -1; -1, 1] @@(K del elemento, tonf/cm)
+k_ax = dec(E_v*A_v/L_v, 1) @@(E·A/L, tonf/cm)
+K_num = k_ax*[1, -1; -1, 1] @@(K del elemento, tonf/cm)
 #: Leer esa matriz es fácil: para mover el nudo 2 un centímetro, con el nudo 1 quieto, hacen falta 140 toneladas. La diagonal dice «cuánto cuesta moverme»; los términos cruzados, «cuánto arrastro al vecino».
 
 ## 16 · Ensamblaje: la estructura es la suma de sus elementos
 #: Parto la barra en **dos** elementos de 150 cm. Cada uno es el doble de rígido:
-kax_2 = dec(E_v*A_v/150, 1) @@(E·A/150, tonf/cm)
-K_1 = kax_2*[1, -1; -1, 1] @@(elemento 1: nudos 1–2)
-K_2 = kax_2*[1, -1; -1, 1] @@(elemento 2: nudos 2–3)
+k_ax2 = dec(E_v*A_v/150, 1) @@(E·A/150, tonf/cm)
+K_1 = k_ax2*[1, -1; -1, 1] @@(elemento 1: nudos 1–2)
+K_2 = k_ax2*[1, -1; -1, 1] @@(elemento 2: nudos 2–3)
 #: El nudo 2 lo comparten los dos elementos, así que ahí las rigideces se **suman**. Ensamblada, la estructura completa de 3 nudos:
 K_g = [280, -280, 0; -280, 560, -280; 0, -280, 280] @@(K global, 3 nudos)
 #: Eso es literalmente todo el ensamblaje: llevar cada número de cada K de elemento a la fila y a la columna del nudo que le toca, y sumar donde coincidan. Un pórtico de 20 pisos es esta misma operación, repetida miles de veces.
@@ -136,8 +136,8 @@ d_num = dec(P_v*L_v/(E_v*A_v), 4) @@(P·L/(E·A))
 u_e2 = [0.0357; 0.0714] @@(desplazamientos del elemento, cm)
 B_num = dec([-1/150, 1/150], 6) @@(B del elemento, 1/cm)
 eps = dec(B_num*u_e2, 6) @@(deformación ε = B·u)
-sig = dec(E_v*eps, 4) @@(tensión σ = E·ε, tonf/cm²)
-N_axial = dec(sig*A_v, 2) @@(fuerza axial N = σ·A, tonf)
+sigma_e = dec(E_v*eps, 4) @@(tensión σ = E·ε, tonf/cm²)
+N_axial = dec(sigma_e*A_v, 2) @@(fuerza axial N = σ·A, tonf)
 #: Da {N_axial} tonf: las 10 tonf aplicadas. El equilibrio se cumple, el resultado se verifica solo. **Desplazamientos → deformaciones → tensiones → fuerzas**: ese es el orden en que sale todo informe de cualquier programa de elementos finitos.
 
 ## 19 · ¿Y si la solución no es una recta?

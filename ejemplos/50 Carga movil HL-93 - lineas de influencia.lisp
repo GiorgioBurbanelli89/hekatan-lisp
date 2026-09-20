@@ -53,8 +53,8 @@ P_eje33 = dec(145*f_IM, 2)
 
 #: (b) ANCHO DE REPARTO E. El modelo es un pórtico plano: una FRANJA de 1 m de la alcantarilla (modeloAlcantarilla.ts:1-2). Un eje real se reparte a lo ancho, así que la carga que entra en la franja es:
 P_franja = P_eje/E_r
-#: Y al revés: el ancho que haría falta para que en la franja entre una carga P_obj sale de despejar E:
-Despejar{P_obj = P_eje/E_r @ E_r}
+#: Y al revés: si quieres que en la franja entre una carga P_obj, el ancho que hace falta sale de despejar E:
+Despejar{P_eje = P_obj*E_r @ E_r}
 #: AVISO: aquí la hoja dice lo que NO sabe. El ancho de reparto de AASHTO LRFD para alcantarillas (franja equivalente más la propagación de la rueda por el relleno) NO tiene fuente en esta PC: no hay PDF de AASHTO y los manuales de CSI no lo traen. Por eso el ejemplo abre con E_r = 1 m, o sea el eje ENTERO sobre la franja de 1 m, que es el lado seguro, y lo avisa en pantalla en naranja (alcantarillaCargaMovil.ts:53 y :193-196). No se inventa un número.
 E_r = 1
 

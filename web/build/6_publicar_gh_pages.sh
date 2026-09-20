@@ -6,6 +6,11 @@ RAIZ="$PWD"
 # (pasó el 2026-09-18: el sitio pedía «main» y «hlisp» → 404 y la página no cargaba)
 cd web/HekatanLispWeb && rm -rf bin/Release obj/Release && dotnet publish -c Release > /dev/null && cd "$RAIZ"
 PUB="$RAIZ/web/HekatanLispWeb/bin/Release/net10.0/publish/wwwroot"
+# guarda: si el publish fallo (o alguien borro la carpeta a medias) NO se publica un sitio vacio
+#   paso el 2026-09-19: dos sesiones compilando a la vez -> wasm-ld "permission denied" -> gh-pages vacia
+[ -f "$PUB/index.html" ] || { echo "ERROR: no hay $PUB/index.html (el publish fallo); NO se publica"; exit 1; }
+N=$(find "$PUB/ejemplos" -name '*.lisp' 2>/dev/null | wc -l)
+[ "$N" -ge 10 ] || { echo "ERROR: solo $N ejemplos en el publish; NO se publica"; exit 1; }
 if grep -q '{fingerprint}' "$PUB/index.html"; then echo "ERROR: index.html con marcadores sin reemplazar; NO se publica"; exit 1; fi
 T=$(mktemp -d)
 git clone -q --branch gh-pages --single-branch https://github.com/GiorgioBurbanelli89/hekatan-lisp.git "$T"

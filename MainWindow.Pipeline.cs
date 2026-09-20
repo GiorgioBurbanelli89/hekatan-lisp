@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -1026,6 +1026,7 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
             var funcMap = new Dictionary<string, (List<string> ps, LispConverter.N body)>();  // f(x)=x²+1 → aplicar f(3)
             var deqTag = new string[lines.Length];             // etiqueta @@(…) que va a la DERECHA (estilo libro)
             var unitOf = new string[lines.Length];             // unidad VISIBLE [kN] del final de la línea (solo dibujo)
+            var descOf = new string[lines.Length];             // descripción 'texto del final de la línea (estilo Calcpad)
             var barraOf = new string[lines.Length];            // forma (qshow …) de una línea con barra de unidad: 3m|cm
             var aliasOf = new List<string>[lines.Length];      // Fx = F_1 = Expand{…}: los nombres del medio (F_1)
             // ETIQUETA de ecuación: @@(texto) al FINAL de una línea de MATEMÁTICA → número a la derecha.
@@ -1050,6 +1051,8 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
                     lines[i] = System.Text.RegularExpressions.Regex.Replace(m.Groups[1].Value.Trim(), @"^#deq\s+", "");
                     deqTag[i] = m.Groups[2].Value;
                 }
+                // DESCRIPCIÓN al lado:  h = 6m|m 'Altura del objeto   (la comilla, como en Calcpad)
+                if (LispConverter.SepararDescripcion(lines[i].TrimEnd(), out var sinDesc, out var descVis)) { lines[i] = sinDesc; descOf[i] = descVis; }
                 // UNIDAD visible al final:  P_1 = 35 [kN]  → se quita ANTES de calcular y se dibuja después
                 if (LispConverter.SepararUnidad(lines[i].TrimEnd(), out var sinUnidad, out var unidadVis)) { lines[i] = sinUnidad; unitOf[i] = unidadVis; }
             }
@@ -1337,6 +1340,10 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
                 if (unitOf[i] != null && display[i].Length > 0 && !display[i].Contains('⚠')
                     && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal) && display[i] != LispConverter.PlotSlot)
                     display[i] += LispConverter.UnitSep + unitOf[i];
+            // DESCRIPCIÓN al lado ('texto), como en Calcpad: detrás de la unidad.
+            for (int i = 0; i < lines.Length && i < display.Count; i++)
+                if (descOf[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal) && display[i] != LispConverter.PlotSlot)
+                    display[i] += LispConverter.DescSep + descOf[i];
             // #deq: pega la ETIQUETA (a la derecha) al final de la línea de display correspondiente.
             for (int i = 0; i < lines.Length && i < display.Count; i++)
                 if (deqTag[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal))

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -1280,7 +1280,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 .ws-prosa{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-style:normal;margin-right:.45em;}
 /* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
-.ws-unit{font-family:'Segoe UI',Arial,sans-serif;font-style:normal;font-weight:normal;margin-left:.35em;white-space:nowrap;}
+.ws-unit{font-family:'Segoe UI',Arial,sans-serif;font-style:normal;font-weight:normal;margin-left:.35em;white-space:nowrap;}\n.ws-desc{font-family:'Segoe UI',Arial,sans-serif;font-style:normal;font-weight:normal;color:#6b6257;margin-left:1.6em;}
 .ws-deq{display:flex;flex-wrap:wrap;align-items:center;gap:.3em 1.2em;overflow:visible;}
 .ws-deq>.deq-body{flex:0 1 auto;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:.4em 0 .25em;}
 .ws-deq>.deq-tag{flex:0 0 auto;margin-left:auto;color:var(--mut);font-size:.85em;white-space:nowrap;font-family:'Segoe UI',sans-serif;}
@@ -1526,6 +1526,35 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // línea (el dato o el resultado), en letra recta. Es solo dibujo: el cálculo sigue con números puros, así que
         // no convierte ni comprueba dimensiones (eso sería el paso 2). La línea de display trae "...ecuación...\x04kN".
         public const char UnitSep = '\x04';
+        // DESCRIPCION de una variable, como en Calcpad:  h = 6m|m 'Altura del objeto
+        // Va a la derecha de la linea, en texto normal. Solo dibujo.
+        public const char DescSep = '\x05';
+        static readonly Regex RxDescFinal = new Regex(@"^(?<cuerpo>.*?)\s+'(?<d>[^']*)$", RegexOptions.Compiled);
+        public static bool SepararDescripcion(string linea, out string cuerpo, out string desc)
+        {
+            cuerpo = linea; desc = null;
+            if (string.IsNullOrEmpty(linea)) return false;
+            var m = RxDescFinal.Match(linea);
+            if (!m.Success) return false;
+            var c = m.Groups["cuerpo"].Value.TrimEnd();
+            if (c.Length == 0) return false;
+            cuerpo = c; desc = m.Groups["d"].Value.Trim();
+            return desc.Length > 0;
+        }
+        static string InjectDesc(string div, string desc)
+        {
+            int end = div.LastIndexOf("</div>");
+            if (end < 0 || string.IsNullOrEmpty(desc)) return div;
+            return div.Substring(0, end) + "<span class=\"ws-desc\" style=\"font-family:'Segoe UI',Arial,sans-serif;font-style:normal;font-weight:400;color:#6b6257;margin-left:1.8em;\">" + System.Net.WebUtility.HtmlEncode(desc) + "</span>" + div.Substring(end);
+        }
+        static string QuitarDesc(ref string raw)
+        {
+            int ds = raw.IndexOf(DescSep);
+            if (ds < 0) return null;
+            var d = raw.Substring(ds + 1);
+            raw = raw.Substring(0, ds);
+            return d;
+        }
         // No es una matriz: empieza por letra (o ° % µ Ω), sin espacios, comas ni punto y coma dentro, y lo de antes
         // no acaba en un operador ni en '=' (así  v = [a]  y  K = [1 2; 3 4]  siguen siendo matrices).
         static readonly Regex RxUnidadFinal = new Regex(@"^(?<cuerpo>.*\S)\s+\[(?<u>[A-Za-zµμΩ°º%‰][^\[\]\s;,]*)\]\s*$", RegexOptions.Compiled);
@@ -1548,7 +1577,10 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             // «m2» y «cm2» (como se escriben en obra) también son m² y cm²: un dígito
             // pegado detrás de letras es un exponente, no parte del nombre de la unidad.
             u = Regex.Replace(u, @"(?<=[A-Za-zµμΩ°º])(\d)(?![A-Za-z0-9])", m => SUP[m.Value[0] - '0'].ToString());
-            u = u.Replace("*", "·");
+            // como Calcpad (HtmWriter.cs: UnitDivision / UnitProduct): el producto va
+            // con punto medio y espacio fino, y la división con el SLASH de división
+            // (U+2215), no la barra de teclado — es la que no se confunde con un 1.
+            u = u.Replace("*", " · ").Replace("/", " ∕ ");
             return System.Net.WebUtility.HtmlEncode(u);
         }
         // mete la unidad al final del contenido del <div> de la ecuación (después del último número)
@@ -1598,9 +1630,11 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                 if (raw.IndexOf(SbsSep) >= 0) div = RenderSideBySide(raw, fromLisp);
                 else
                 {
+                    string desc = QuitarDesc(ref raw);
                     string unidad = QuitarUnidad(ref raw);
                     div = RenderLineHtml(raw, fromLisp);
                     if (unidad != null && div.StartsWith("<div class=\"ws-eq")) div = InjectUnit(div, unidad);
+                    if (desc != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDesc(div, desc);
                 }
                 if (deqTag != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDeqTag(div, deqTag);
                 body.Append(div);
@@ -1619,17 +1653,24 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             foreach (var part in raw.Split(SbsSep))
             {
                 if (part.Trim().Length == 0) continue;
-                string parte = part, uParte = QuitarUnidad(ref parte);
+                string parte = part;
+                string dParte = QuitarDesc(ref parte);
+                string uParte = QuitarUnidad(ref parte);
                 string d = RenderLineHtml(parte, fromLisp);
                 if (uParte != null && d.StartsWith("<div class=\"ws-eq")) d = InjectUnit(d, uParte);
+                if (dParte != null && d.StartsWith("<div class=\"ws-eq")) d = InjectDesc(d, dParte);
                 int gt = d.IndexOf('>'); int end = d.LastIndexOf("</div>");
                 string inner = (gt >= 0 && end > gt) ? d.Substring(gt + 1, end - gt - 1) : d;
                 cells.Append("<span class=\"sbs-cell\">").Append(inner).Append("</span>");
             }
             // El flex va en un span INTERNO (hijo único), no en el .ws-eq: el auto-fit (MAT_JS) mete todos
             // los hijos del .ws-eq en un solo span y colapsaría el flex si estuviera en el .ws-eq.
-            return "<div class=\"ws-eq\"><span style=\"display:inline-flex;flex-wrap:wrap;"
-                   + "gap:.5em 3em;align-items:baseline\">" + cells + "</span></div>";
+            // REJILLA, no flex: con flex cada celda se ajusta a su contenido y dos filas
+            // seguidas no alinean sus columnas — no parecía una tabla. Con columnas de
+            // ancho igual (1fr), dos filas con el mismo número de celdas alinean.
+            return "<div class=\"ws-eq\"><span style=\"display:grid;grid-auto-flow:column;"
+                   + "grid-auto-columns:minmax(0,1fr);gap:.4em 2em;align-items:baseline;width:100%;justify-items:start\">"
+                   + cells + "</span></div>";
         }
 
         // renderiza UNA línea de display (texto formateado o ecuación) a su <div>. "" si es vacía/omitida.

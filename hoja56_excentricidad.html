@@ -1,0 +1,309 @@
+<!doctype html><html><head><meta charset="utf-8"><style>:root{--bg:#FBF7EC;--fg:#171310;--mut:#544d3a;--var:#0b4fa8;--num:#08306b;--nary:#7a1fa8;--sep:#9c86b8;--dib-rojo:#c62828;--dib-azul:#1c5fbf;--dib-verde:#2b8a3e;--dib-nar:#d9480f;--dib-acero:#b3141c;}
+*{box-sizing:border-box;}
+.pagebreak{break-before:page;page-break-before:always;height:0;margin:0;border:0;}
+@media print{ body{background:#fff;} .pagebreak{break-before:page;page-break-before:always;}
+  /* al imprimir la columna es mas angosta que la pantalla: fit() se calculo para pantalla, asi
+     que una ecuacion ancha (K = integral BtB) puede desbordar y overflow-x:auto imprime la barra.
+     En papel NUNCA queremos barra: se oculta (el contenido ya cabe, la barra sobraba). */
+  .ws-eq,.deq-body{overflow-x:hidden !important;overflow-y:hidden !important;}
+  /* el título y la frase que PRESENTA una fórmula no se quedan solos al pie de la hoja */
+  .ws-h1,.ws-h2,.ws-h3,.ws-fmt:has(+ .ws-eq),.ws-fmt:has(+ .ws-deq),.ws-fmt:has(+ .hk-plotslot){break-after:avoid;page-break-after:avoid;}
+  .ws-eq,.ws-deq{break-inside:avoid;page-break-inside:avoid;}
+  .ws-tbl-wrap{break-inside:avoid;page-break-inside:avoid;overflow-x:visible;}
+  /* en papel una tabla ancha NO debe salir con barra de desplazamiento: las celdas se parten */
+  table.ws-table td,table.ws-table th{white-space:normal;} }
+body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
+  font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
+.ws-eq{margin:0.4em 0;padding:.4em 0 .25em;
+  font-family:Georgia,'Times New Roman',Times,serif;font-size:11.5pt;
+  font-variant-numeric:lining-nums;font-feature-settings:'lnum' 1;
+  overflow-x:auto;overflow-y:hidden;max-width:100%;}   /* padding = aire para glifos altos (∫ Σ) que overflow-y:hidden recortaría; overflow-x:auto = scroll para matrices anchas */
+/* gráficas: alto acotado para que NO ocupen una hoja entera en el PDF, y no partirlas entre páginas */
+.hk-plotslot{break-inside:avoid;page-break-inside:avoid;}
+.hk-plotslot:has(> .hk-lado){display:inline-block;width:49%;vertical-align:top;}
+.hk-lado svg,.hk-lado img{max-width:100% !important;}
+.hk-lado > div[class^=hkan]{margin-top:0 !important;}
+@media print{ .hk-plotslot img,.hk-plotslot svg{max-height:300px;width:auto;max-width:100%;height:auto;} }
+.ws-eq::-webkit-scrollbar{height:8px;} .ws-eq::-webkit-scrollbar-thumb{background:var(--mut);border-radius:4px;}
+.ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
+.ws-prosa{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-style:normal;margin-right:.45em;}
+/* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
+.ws-unit{font-family:'Segoe UI',Arial,sans-serif;font-style:normal;font-weight:normal;margin-left:.35em;white-space:nowrap;}
+.ws-deq{display:flex;flex-wrap:wrap;align-items:center;gap:.3em 1.2em;overflow:visible;}
+.ws-deq>.deq-body{flex:0 1 auto;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:.4em 0 .25em;}
+.ws-deq>.deq-tag{flex:0 0 auto;margin-left:auto;color:var(--mut);font-size:.85em;white-space:nowrap;font-family:'Segoe UI',sans-serif;}
+/* texto con formato (directivas ; estilo Hekatan Lab) */
+.ws-fmt{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;margin:.35em 0;color:var(--fg);}
+.ws-h1{font-weight:700;font-size:15pt;margin:.7em 0 .35em;}
+.ws-h2{font-weight:600;font-size:12.5pt;margin:.55em 0 .3em;}
+.ws-h3{font-weight:600;font-size:11pt;margin:.45em 0 .25em;color:var(--mut);}
+.al-left{text-align:left;} .al-center{text-align:center;} .al-right{text-align:right;}
+/* TABLAS (texto escrito a mano #|…|…| o resultados calculados #tabla(…)): estilo libro tecnico,
+   sin lineas verticales (booktabs) — regla arriba/abajo del encabezado, filita fina entre datos. */
+.ws-tbl-wrap{margin:.5em 0 .9em;overflow-x:auto;}
+table.ws-table{border-collapse:collapse;font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;
+  font-size:10.3pt;margin:0;}
+table.ws-table caption{caption-side:top;text-align:left;font-weight:600;color:var(--fg);margin-bottom:.3em;}
+table.ws-table thead tr{border-top:1.4px solid var(--fg);}
+table.ws-table th{font-weight:700;color:var(--fg);border-bottom:1.4px solid var(--fg);
+  padding:.3em .85em;white-space:nowrap;text-align:left;}
+table.ws-table td{padding:.26em .85em;border-bottom:.75px solid var(--sep);color:var(--fg);white-space:nowrap;}
+table.ws-table tbody tr:last-child td{border-bottom:1.4px solid var(--fg);}
+table.ws-table th.ws-c-num,table.ws-table td.ws-c-num{text-align:right;font-variant-numeric:tabular-nums;color:var(--num);}
+table.ws-table th.ws-c-txt,table.ws-table td.ws-c-txt{text-align:left;}
+table.ws-table th.ws-c-center,table.ws-table td.ws-c-center{text-align:center;}
+table.ws-table sub{font-size:.72em;} table.ws-table sup{font-size:.72em;}
+/* DIBUJO TÉCNICO (#dibujo … #fin): SVG en mm de papel, colores del tema; no se parte entre páginas */
+.hk-dib{margin:.6em 0 1em;break-inside:avoid;page-break-inside:avoid;}
+.hk-dib-tit{font-family:'Segoe UI',sans-serif;font-size:10pt;color:var(--fg);margin-bottom:.3em;}
+.hk-dib-esc{color:var(--mut);font-size:.92em;}
+.hk-dib-svg{display:block;margin:0 auto;}
+.hk-dib-ley{display:flex;flex-wrap:wrap;gap:.2em 1.3em;font-family:'Segoe UI',sans-serif;font-size:9.5pt;color:var(--fg);margin:.35em 0 .2em;}
+.hk-dib-li{display:inline-flex;align-items:center;gap:.35em;}
+.hk-dib-err{color:var(--dib-rojo);font-family:'Segoe UI',sans-serif;font-size:9.5pt;margin:.3em 0;}
+table.hk-obs td{white-space:normal;vertical-align:top;}
+table.hk-obs td:nth-child(3){min-width:22em;}
+.hk-obs-n{display:inline-block;width:1.7em;height:1.7em;line-height:1.7em;border-radius:50%;color:#fff;text-align:center;font-weight:700;font-size:.88em;}
+.hk-obs-e{font-weight:600;}
+.m-var{font-style:italic;color:var(--var);font-size:105%;} .m-num{color:var(--num);}
+.m-op{color:var(--mut);padding:0 .08em;}
+.m-fn{font-style:normal;font-weight:600;color:var(--fg);padding-right:.05em;}
+.m-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .15em;line-height:110%;}
+.m-frn{border-bottom:1pt solid currentColor;padding:0 .35em .5pt;}
+.m-frd{padding:.5pt .35em 0;}
+/* potencia y subindice — reglas EXACTAS de Calcpad (.eq sup/.eq sub) */
+.m-sup{display:inline-block;margin-left:1pt;margin-top:-3pt;font-size:75%;}
+.m-sub{font-family:Calibri,Candara,Corbel,sans-serif;font-size:80%;vertical-align:-18%;margin-left:1pt;}
+.m-sqrt{display:inline-flex;align-items:flex-start;}
+.m-rad{font-size:1.05em;}
+.m-radarg{border-top:1.2px solid currentColor;padding:0 .2em;margin-left:-.05em;}
+/* paréntesis que crecen (arcos): inline-flex + border-radius, se estiran al alto del contenido */
+.m-paren{display:inline-flex;align-items:stretch;vertical-align:middle;}
+.m-paren>.m-pl,.m-paren>.m-pr{width:.26em;flex:0 0 auto;border:.075em solid var(--mut);border-radius:50%;}
+.m-paren>.m-pl{border-right:0;border-top-right-radius:0;border-bottom-right-radius:0;margin-right:.14em;}
+.m-paren>.m-pr{border-left:0;border-top-left-radius:0;border-bottom-left-radius:0;margin-left:.14em;}
+.m-mat{display:inline-flex;align-items:stretch;vertical-align:middle;margin:0 .2em;}
+.m-brk{width:.32em;}
+.m-brl{border:1.4px solid currentColor;border-right:none;}
+.m-brr{border:1.4px solid currentColor;border-left:none;}
+.m-transp-wrap{display:inline-flex;align-items:flex-start;vertical-align:middle;}
+.m-transp{font-size:.72em;font-style:normal;line-height:1;margin-left:1px;}
+.m-detl{border-left:1.4px solid currentColor;}
+.m-detr{border-right:1.4px solid currentColor;}
+.m-detbar{color:currentColor;margin:0 .08em;}
+.m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
+.m-cell{color:var(--num);white-space:nowrap;}
+/* matriz GRANDE: índices en los bordes + centro colapsado (… ⋮ ⋱), como Hekatan Calc */
+.m-matx{display:inline-grid;position:relative;vertical-align:middle;margin:0 .25em;row-gap:.05em;column-gap:0;align-items:center;justify-items:center;}
+/* manija para ARRASTRAR la matriz y ver mas/menos celdas (igual que Hekatan Calc web) */
+.mat-grip{position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;cursor:nwse-resize;opacity:.4;transition:opacity .15s;z-index:3;}
+.mat-grip::before{content:'';position:absolute;right:2px;bottom:2px;width:11px;height:11px;border-right:2.5px solid #4a90d9;border-bottom:2.5px solid #4a90d9;}
+.m-matx:hover>.mat-grip,.mat-resizing>.mat-grip{opacity:1;}
+.mat-resizing{outline:1.5px dashed #4a90d9 !important;outline-offset:3px;}
+.m-mh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .45em .1em;}
+.m-mrh{color:var(--mut);font-family:Calibri,Candara,Corbel,sans-serif;font-size:.72em;padding:0 .35em 0 0;justify-self:end;}
+.m-mc{color:var(--num);padding:.12em .45em;text-align:center;white-space:nowrap;}
+.m-matx>.m-brl{min-width:.3em;margin-right:.18em;align-self:stretch;}
+.m-matx>.m-brr{min-width:.3em;margin-left:.18em;align-self:stretch;}
+.m-ell{color:var(--mut);}
+/* n-ario apilado (Σ Π) — medidas EXACTAS de Hekatan Lab (.dvr/.nary) */
+.m-dvr{display:inline-block;vertical-align:middle;text-align:center;line-height:110%;white-space:nowrap;position:relative;top:-3pt;margin:0 .12em;}
+.m-dvr small{font-family:Calibri,Candara,Corbel,sans-serif;font-size:70%;display:block;}
+.m-nary{display:block;font-size:240%;line-height:70%;font-weight:200;color:var(--nary);font-family:'Georgia Pro Light','Georgia Pro','Century Schoolbook',serif;margin:0 1pt 2.5pt 1pt;}
+/* ∫ inclinado y delgado (como Hekatan Lab .nary em): scaleX 0.7 + rotate 7deg */
+.m-nary em{display:block;font-style:normal;transform:scaleX(0.7) rotate(7deg);}
+.m-cond{color:#e000d0;font-style:italic;padding:0 .05em;}
+/* límite:  lim  apilado con  x→a  debajo */
+.m-lim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .12em;}
+.m-lim-op{font-style:normal;}
+.m-lim-sub{font-family:Calibri,Candara,Corbel,sans-serif;font-size:.66em;margin-top:1px;color:var(--mut);}</style></head><body><div class="ws-fmt ws-h1 al-center">La excentricidad no es una carga fuera de la columna</div><div class="ws-fmt  al-left">En los dibujos de las hojas 48 y 54 aparece un punto de carga CORRIDO respecto al eje de la columna, y la duda es buena: por ah&#237; no baja nada. <b>La carga baja por la columna, centrada, siempre.</b> Lo que est&#225; corrido es otra cosa, y esta hoja la separa.</div><div class="ws-fmt ws-h2 al-center">1 &#183; Lo que de verdad llega a la zapata</div><div class="ws-fmt  al-left">De la columna bajan DOS cosas a la vez: una fuerza vertical P, centrada en su eje, y un momento M. El momento no lo inventa nadie: viene del sismo, del viento, de la continuidad del p&#243;rtico o de que la viga de un lado carga m&#225;s que la del otro.</div><div class="hk-dib"><div class="hk-dib-tit"><b>Lo que baja por la columna: fuerza centrada P y momento M</b> · <span class="hk-dib-esc">Esc. 1:22 · geometría en m</span></div><svg class="hk-dib-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 106.909 137.364" width="106.909mm" height="137.364mm" style="max-width:100%;height:auto"><defs><pattern id="hkd7a5190-diag" patternUnits="userSpaceOnUse" width="1.6" height="1.6" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.6" style="stroke:var(--mut);stroke-width:.16"/></pattern><pattern id="hkd7a5190-cruz" patternUnits="userSpaceOnUse" width="1.8" height="1.8" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.8" style="stroke:var(--mut);stroke-width:.14"/><line x1="0" y1="0" x2="1.8" y2="0" style="stroke:var(--mut);stroke-width:.14"/></pattern><pattern id="hkd7a5190-conc" patternUnits="userSpaceOnUse" width="3" height="3"><circle cx=".7" cy=".8" r=".16" style="fill:var(--mut)"/><circle cx="2.2" cy="2.1" r=".12" style="fill:var(--mut)"/><path d="M1.9 .5 l.45 .7 h-.9 z" style="fill:none;stroke:var(--mut);stroke-width:.1"/></pattern></defs><polygon points="8,110.273 98.909,110.273 98.909,96.636 8,96.636" style="stroke:none;fill:url(#hkd7a5190-diag)"/><polygon points="46.636,96.636 60.273,96.636 60.273,46.636 46.636,46.636" style="stroke:none;fill:url(#hkd7a5190-diag)"/><polygon points="8,110.273 98.909,110.273 98.909,96.636 8,96.636" style="stroke:var(--fg);stroke-width:0.5;stroke-linecap:round;stroke-linejoin:round;fill:none"/><polygon points="46.636,96.636 60.273,96.636 60.273,46.636 46.636,46.636" style="stroke:var(--fg);stroke-width:0.5;stroke-linecap:round;stroke-linejoin:round;fill:none"/><line x1="53.455" y1="14.818" x2="53.455" y2="39.818" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round"/><polygon points="53.455,43 50.273,34.818 56.636,34.818" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><path d="M35.515 37.257 A19.091 19.091 0 0 0 71.394 37.257" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><polygon points="72.545,30.727 68,36.636 68,25.727" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><line x1="53.455" y1="117.091" x2="53.455" y2="8" style="stroke:var(--mut);stroke-width:0.18;stroke-dasharray:7 1.2 1.2 1.2;stroke-linecap:round;stroke-linejoin:round"/><text x="58.909" y="21.636" font-size="3.2" text-anchor="start" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">P</text><text x="81.636" y="29.364" font-size="3.2" text-anchor="start" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">M</text><text x="53.455" y="129.364" font-size="2.4" text-anchor="middle" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">el eje de la columna</text></svg></div><div class="ws-fmt  al-left">Las dos bajan por el MISMO sitio: el eje de la columna. No hay ninguna fuerza aplicada por fuera.</div><div class="ws-fmt ws-h2 al-center">2 &#183; Por qu&#233; entonces se dibuja corrida</div><div class="ws-fmt  al-left">Porque una fuerza se puede TRASLADAR, si se paga el precio. Mover P una distancia e de su sitio cambia el momento que produce en la base: aparece un momento de valor P por e. Entonces, si se elige esa distancia de modo que el momento que aparece sea exactamente M, las dos situaciones son la misma para la base:</div><div class="ws-eq"><span class="m-var">M</span><sub class="m-sub">gen</sub><span class="m-op"> = </span><span class="m-expr"><span class="m-var">e</span><span class="m-op">·</span><span class="m-var">P</span></span></div><div class="ws-fmt  al-left">Igualando el momento generado al momento real y despejando la distancia:</div><div class="ws-eq"><span class="m-var">e</span><span class="m-op"> = </span><span class="m-expr"><span class="m-frac"><span class="m-frn"><span class="m-var">M</span></span><span class="m-frd"><span class="m-var">P</span></span></span></span></div><div class="ws-fmt  al-left">Eso es la excentricidad: <b>la distancia a la que habr&#237;a que poner P, ella sola, para producir la misma fuerza y el mismo momento</b>. No es d&#243;nde est&#225; la carga: es d&#243;nde est&#225; su RESULTANTE.</div><div class="hk-dib"><div class="hk-dib-tit"><b>Las dos situaciones son la misma para el suelo</b> · <span class="hk-dib-esc">Esc. 1:26 (a 1:26 no cabe en 170 mm: se reduce en pantalla) · geometría en m · cotas en m</span></div><svg class="hk-dib-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300.615 114.077" width="300.615mm" height="114.077mm" style="max-width:100%;height:auto"><defs><pattern id="hkd04868b-diag" patternUnits="userSpaceOnUse" width="1.6" height="1.6" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.6" style="stroke:var(--mut);stroke-width:.16"/></pattern><pattern id="hkd04868b-cruz" patternUnits="userSpaceOnUse" width="1.8" height="1.8" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1.8" style="stroke:var(--mut);stroke-width:.14"/><line x1="0" y1="0" x2="1.8" y2="0" style="stroke:var(--mut);stroke-width:.14"/></pattern><pattern id="hkd04868b-conc" patternUnits="userSpaceOnUse" width="3" height="3"><circle cx=".7" cy=".8" r=".16" style="fill:var(--mut)"/><circle cx="2.2" cy="2.1" r=".12" style="fill:var(--mut)"/><path d="M1.9 .5 l.45 .7 h-.9 z" style="fill:none;stroke:var(--mut);stroke-width:.1"/></pattern></defs><polygon points="8,88.769 84.923,88.769 84.923,77.231 8,77.231" style="stroke:none;fill:url(#hkd04868b-diag)"/><polygon points="111.846,88.769 292.615,88.769 292.615,77.231 111.846,77.231" style="stroke:none;fill:url(#hkd04868b-diag)"/><polygon points="8,88.769 84.923,88.769 84.923,77.231 8,77.231" style="stroke:var(--fg);stroke-width:0.5;stroke-linecap:round;stroke-linejoin:round;fill:none"/><polygon points="40.692,77.231 52.231,77.231 52.231,38.769 40.692,38.769" style="stroke:var(--fg);stroke-width:0.5;stroke-linecap:round;stroke-linejoin:round;fill:none"/><line x1="46.462" y1="11.846" x2="46.462" y2="31.077" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round"/><polygon points="46.462,33.385 43.769,27.231 49.154,27.231" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><path d="M33.45 28.89 A13.846 13.846 0 0 0 59.473 28.89" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><polygon points="60.308,24.154 56.846,28.385 56.846,19.923" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><line x1="46.462" y1="93.385" x2="46.462" y2="8" style="stroke:var(--mut);stroke-width:0.18;stroke-dasharray:7 1.2 1.2 1.2;stroke-linecap:round;stroke-linejoin:round"/><polygon points="111.846,88.769 292.615,88.769 292.615,77.231 111.846,77.231" style="stroke:var(--fg);stroke-width:0.5;stroke-linecap:round;stroke-linejoin:round;fill:none"/><polygon points="144.538,77.231 156.077,77.231 156.077,38.769 144.538,38.769" style="stroke:var(--fg);stroke-width:0.5;stroke-linecap:round;stroke-linejoin:round;fill:none"/><line x1="161.846" y1="11.846" x2="161.846" y2="31.077" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round"/><polygon points="161.846,33.385 159.154,27.231 164.538,27.231" style="stroke:var(--dib-rojo);stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;fill:none"/><line x1="150.308" y1="93.385" x2="150.308" y2="8" style="stroke:var(--mut);stroke-width:0.18;stroke-dasharray:7 1.2 1.2 1.2;stroke-linecap:round;stroke-linejoin:round"/><text x="50.308" y="16.462" font-size="3" text-anchor="start" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">P</text><text x="66.462" y="23.385" font-size="3" text-anchor="start" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">M</text><text x="46.462" y="106.077" font-size="2.5" text-anchor="middle" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">P centrada + M</text><text x="98.385" y="54.154" font-size="2.6" text-anchor="middle" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">ES LO MISMO</text><text x="98.385" y="65.692" font-size="2.3" text-anchor="middle" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">para la base</text><text x="166.462" y="16.462" font-size="3" text-anchor="start" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">P</text><line x1="150.308" y1="36.046" x2="150.308" y2="27.954" style="stroke:var(--fg);stroke-width:.18"/><line x1="161.846" y1="36.046" x2="161.846" y2="27.954" style="stroke:var(--fg);stroke-width:.18"/><line x1="150.308" y1="29.154" x2="161.846" y2="29.154" style="stroke:var(--fg);stroke-width:.18"/><polygon points="150.308,29.154 152.108,28.604 152.108,29.704" style="fill:var(--fg);stroke:none"/><polygon points="161.846,29.154 160.046,29.704 160.046,28.604" style="fill:var(--fg);stroke:none"/><text x="156.077" y="27.454" font-size="2.3" text-anchor="middle" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">e = M/P</text><text x="150.308" y="106.077" font-size="2.5" text-anchor="middle" dominant-baseline="middle" style="fill:var(--fg);stroke:none;font-family:'Segoe UI',Arial,sans-serif">P corrida una distancia e</text></svg></div><div class="ws-fmt  al-left">Los dos dibujos dan la misma fuerza vertical y el mismo momento en la base de la zapata. Y el suelo no ve columnas ni momentos: ve una resultante. Por eso se trabaja con el de la derecha, que es m&#225;s f&#225;cil de dibujar y de repartir.</div><div class="ws-fmt  al-left"><b>La flecha corrida es la resultante equivalente, no una carga colgada del aire.</b> Si el punto cae fuera de la zapata (e mayor que la mitad del lado) eso ya no es un dibujo raro: significa que la zapata vuelca.</div><div class="ws-fmt ws-h2 al-center">3 &#183; La presi&#243;n, en 3D</div><div class="ws-fmt  al-left">Aqu&#237; se ve por qu&#233; importa. La zapata del ejemplo 3.8 mide 1.5 &#215; 1.5 m y le llegan P = 606 kN con excentricidades de 0.15 y 0.30 m. El reparto lineal de una zapata r&#237;gida es un PLANO inclinado: presi&#243;n media m&#225;s lo que aporta cada momento. Los ejes horizontales son los dos lados de la zapata en metros y el vertical es la presi&#243;n en [kPa]. <b>Se arrastra con el rat&#243;n para girarlo.</b></div><div style="text-align:center;margin:1.1em 0"><canvas class="hk-surf" width="560" height="420" style="max-width:100%;touch-action:none;cursor:grab" data-id="0" data-nn="32" data-xa="0" data-xb="1.5" data-ya="0" data-yb="1.5" data-vx="x" data-vy="y" data-zmin="-215.425" data-zmax="754.025" data-z='[-215.425,-205.3281,-195.2312,-185.1344,-175.0375,-164.9406,-154.8437,-144.7469,-134.65,-124.5531,-114.4562,-104.3594,-94.2625,-84.1656,-74.0687,-63.9719,-53.875,-43.7781,-33.6812,-23.5844,-13.4875,-3.3906,6.7063,16.8031,26.9,36.9969,47.0938,57.1906,67.2875,77.3844,87.4813,97.5781,107.675,-195.2266,-185.1297,-175.0328,-164.9359,-154.8391,-144.7422,-134.6453,-124.5484,-114.4516,-104.3547,-94.2578,-84.1609,-74.0641,-63.9672,-53.8703,-43.7734,-33.6766,-23.5797,-13.4828,-3.3859,6.7109,16.8078,26.9047,37.0016,47.0984,57.1953,67.2922,77.3891,87.4859,97.5828,107.6797,117.7766,127.8734,-175.0281,-164.9312,-154.8344,-144.7375,-134.6406,-124.5438,-114.4469,-104.35,-94.2531,-84.1562,-74.0594,-63.9625,-53.8656,-43.7687,-33.6719,-23.575,-13.4781,-3.3812,6.7156,16.8125,26.9094,37.0063,47.1031,57.2,67.2969,77.3938,87.4906,97.5875,107.6844,117.7813,127.8781,137.975,148.0719,-154.8297,-144.7328,-134.6359,-124.5391,-114.4422,-104.3453,-94.2484,-84.1516,-74.0547,-63.9578,-53.8609,-43.7641,-33.6672,-23.5703,-13.4734,-3.3766,6.7203,16.8172,26.9141,37.0109,47.1078,57.2047,67.3016,77.3984,87.4953,97.5922,107.6891,117.7859,127.8828,137.9797,148.0766,158.1734,168.2703,-134.6312,-124.5344,-114.4375,-104.3406,-94.2438,-84.1469,-74.05,-63.9531,-53.8562,-43.7594,-33.6625,-23.5656,-13.4687,-3.3719,6.725,16.8219,26.9188,37.0156,47.1125,57.2094,67.3062,77.4031,87.5,97.5969,107.6938,117.7906,127.8875,137.9844,148.0813,158.1781,168.275,178.3719,188.4688,-114.4328,-104.3359,-94.2391,-84.1422,-74.0453,-63.9484,-53.8516,-43.7547,-33.6578,-23.5609,-13.4641,-3.3672,6.7297,16.8266,26.9234,37.0203,47.1172,57.2141,67.3109,77.4078,87.5047,97.6016,107.6984,117.7953,127.8922,137.9891,148.0859,158.1828,168.2797,178.3766,188.4734,198.5703,208.6672,-94.2344,-84.1375,-74.0406,-63.9438,-53.8469,-43.75,-33.6531,-23.5562,-13.4594,-3.3625,6.7344,16.8313,26.9281,37.025,47.1219,57.2188,67.3156,77.4125,87.5094,97.6062,107.7031,117.8,127.8969,137.9938,148.0906,158.1875,168.2844,178.3813,188.4781,198.575,208.6719,218.7688,228.8656,-74.0359,-63.9391,-53.8422,-43.7453,-33.6484,-23.5516,-13.4547,-3.3578,6.7391,16.8359,26.9328,37.0297,47.1266,57.2234,67.3203,77.4172,87.5141,97.6109,107.7078,117.8047,127.9016,137.9984,148.0953,158.1922,168.2891,178.3859,188.4828,198.5797,208.6766,218.7734,228.8703,238.9672,249.0641,-53.8375,-43.7406,-33.6437,-23.5469,-13.45,-3.3531,6.7438,16.8406,26.9375,37.0344,47.1313,57.2281,67.325,77.4219,87.5188,97.6156,107.7125,117.8094,127.9063,138.0031,148.1,158.1969,168.2938,178.3906,188.4875,198.5844,208.6813,218.7781,228.875,238.9719,249.0688,259.1656,269.2625,-33.6391,-23.5422,-13.4453,-3.3484,6.7484,16.8453,26.9422,37.0391,47.1359,57.2328,67.3297,77.4266,87.5234,97.6203,107.7172,117.8141,127.9109,138.0078,148.1047,158.2016,168.2984,178.3953,188.4922,198.5891,208.6859,218.7828,228.8797,238.9766,249.0734,259.1703,269.2672,279.3641,289.4609,-13.4406,-3.3437,6.7531,16.85,26.9469,37.0438,47.1406,57.2375,67.3344,77.4312,87.5281,97.625,107.7219,117.8188,127.9156,138.0125,148.1094,158.2062,168.3031,178.4,188.4969,198.5938,208.6906,218.7875,228.8844,238.9812,249.0781,259.175,269.2719,279.3688,289.4656,299.5625,309.6594,6.7578,16.8547,26.9516,37.0484,47.1453,57.2422,67.3391,77.4359,87.5328,97.6297,107.7266,117.8234,127.9203,138.0172,148.1141,158.2109,168.3078,178.4047,188.5016,198.5984,208.6953,218.7922,228.8891,238.9859,249.0828,259.1797,269.2766,279.3734,289.4703,299.5672,309.6641,319.7609,329.8578,26.9563,37.0531,47.15,57.2469,67.3438,77.4406,87.5375,97.6344,107.7313,117.8281,127.925,138.0219,148.1188,158.2156,168.3125,178.4094,188.5063,198.6031,208.7,218.7969,228.8938,238.9906,249.0875,259.1844,269.2813,279.3781,289.475,299.5719,309.6688,319.7656,329.8625,339.9594,350.0563,47.1547,57.2516,67.3484,77.4453,87.5422,97.6391,107.7359,117.8328,127.9297,138.0266,148.1234,158.2203,168.3172,178.4141,188.5109,198.6078,208.7047,218.8016,228.8984,238.9953,249.0922,259.1891,269.2859,279.3828,289.4797,299.5766,309.6734,319.7703,329.8672,339.9641,350.0609,360.1578,370.2547,67.3531,77.45,87.5469,97.6438,107.7406,117.8375,127.9344,138.0313,148.1281,158.225,168.3219,178.4188,188.5156,198.6125,208.7094,218.8062,228.9031,239,249.0969,259.1938,269.2906,279.3875,289.4844,299.5813,309.6781,319.775,329.8719,339.9688,350.0656,360.1625,370.2594,380.3563,390.4531,87.5516,97.6484,107.7453,117.8422,127.9391,138.0359,148.1328,158.2297,168.3266,178.4234,188.5203,198.6172,208.7141,218.8109,228.9078,239.0047,249.1016,259.1984,269.2953,279.3922,289.4891,299.5859,309.6828,319.7797,329.8766,339.9734,350.0703,360.1672,370.2641,380.3609,390.4578,400.5547,410.6516,107.75,117.8469,127.9438,138.0406,148.1375,158.2344,168.3312,178.4281,188.525,198.6219,208.7188,218.8156,228.9125,239.0094,249.1062,259.2031,269.3,279.3969,289.4938,299.5906,309.6875,319.7844,329.8812,339.9781,350.075,360.1719,370.2688,380.3656,390.4625,400.5594,410.6562,420.7531,430.85,127.9484,138.0453,148.1422,158.2391,168.3359,178.4328,188.5297,198.6266,208.7234,218.8203,228.9172,239.0141,249.1109,259.2078,269.3047,279.4016,289.4984,299.5953,309.6922,319.7891,329.8859,339.9828,350.0797,360.1766,370.2734,380.3703,390.4672,400.5641,410.6609,420.7578,430.8547,440.9516,451.0484,148.1469,158.2438,168.3406,178.4375,188.5344,198.6312,208.7281,218.825,228.9219,239.0188,249.1156,259.2125,269.3094,279.4062,289.5031,299.6,309.6969,319.7938,329.8906,339.9875,350.0844,360.1812,370.2781,380.375,390.4719,400.5688,410.6656,420.7625,430.8594,440.9563,451.0531,461.15,471.2469,168.3453,178.4422,188.5391,198.6359,208.7328,218.8297,228.9266,239.0234,249.1203,259.2172,269.3141,279.4109,289.5078,299.6047,309.7016,319.7984,329.8953,339.9922,350.0891,360.1859,370.2828,380.3797,390.4766,400.5734,410.6703,420.7672,430.8641,440.9609,451.0578,461.1547,471.2516,481.3484,491.4453,188.5438,198.6406,208.7375,218.8344,228.9312,239.0281,249.125,259.2219,269.3188,279.4156,289.5125,299.6094,309.7062,319.8031,329.9,339.9969,350.0938,360.1906,370.2875,380.3844,390.4812,400.5781,410.675,420.7719,430.8688,440.9656,451.0625,461.1594,471.2562,481.3531,491.45,501.5469,511.6438,208.7422,218.8391,228.9359,239.0328,249.1297,259.2266,269.3234,279.4203,289.5172,299.6141,309.7109,319.8078,329.9047,340.0016,350.0984,360.1953,370.2922,380.3891,390.4859,400.5828,410.6797,420.7766,430.8734,440.9703,451.0672,461.1641,471.2609,481.3578,491.4547,501.5516,511.6484,521.7453,531.8422,228.9406,239.0375,249.1344,259.2312,269.3281,279.425,289.5219,299.6188,309.7156,319.8125,329.9094,340.0062,350.1031,360.2,370.2969,380.3938,390.4906,400.5875,410.6844,420.7812,430.8781,440.975,451.0719,461.1688,471.2656,481.3625,491.4594,501.5562,511.6531,521.75,531.8469,541.9438,552.0406,249.1391,259.2359,269.3328,279.4297,289.5266,299.6234,309.7203,319.8172,329.9141,340.0109,350.1078,360.2047,370.3016,380.3984,390.4953,400.5922,410.6891,420.7859,430.8828,440.9797,451.0766,461.1734,471.2703,481.3672,491.4641,501.5609,511.6578,521.7547,531.8516,541.9484,552.0453,562.1422,572.2391,269.3375,279.4344,289.5312,299.6281,309.725,319.8219,329.9188,340.0156,350.1125,360.2094,370.3062,380.4031,390.5,400.5969,410.6938,420.7906,430.8875,440.9844,451.0812,461.1781,471.275,481.3719,491.4688,501.5656,511.6625,521.7594,531.8562,541.9531,552.05,562.1469,572.2438,582.3406,592.4375,289.5359,299.6328,309.7297,319.8266,329.9234,340.0203,350.1172,360.2141,370.3109,380.4078,390.5047,400.6016,410.6984,420.7953,430.8922,440.9891,451.0859,461.1828,471.2797,481.3766,491.4734,501.5703,511.6672,521.7641,531.8609,541.9578,552.0547,562.1516,572.2484,582.3453,592.4422,602.5391,612.6359,309.7344,319.8312,329.9281,340.025,350.1219,360.2188,370.3156,380.4125,390.5094,400.6062,410.7031,420.8,430.8969,440.9938,451.0906,461.1875,471.2844,481.3812,491.4781,501.575,511.6719,521.7688,531.8656,541.9625,552.0594,562.1562,572.2531,582.35,592.4469,602.5438,612.6406,622.7375,632.8344,329.9328,340.0297,350.1266,360.2234,370.3203,380.4172,390.5141,400.6109,410.7078,420.8047,430.9016,440.9984,451.0953,461.1922,471.2891,481.3859,491.4828,501.5797,511.6766,521.7734,531.8703,541.9672,552.0641,562.1609,572.2578,582.3547,592.4516,602.5484,612.6453,622.7422,632.8391,642.9359,653.0328,350.1312,360.2281,370.325,380.4219,390.5187,400.6156,410.7125,420.8094,430.9062,441.0031,451.1,461.1969,471.2938,481.3906,491.4875,501.5844,511.6812,521.7781,531.875,541.9719,552.0688,562.1656,572.2625,582.3594,592.4563,602.5531,612.65,622.7469,632.8438,642.9406,653.0375,663.1344,673.2312,370.3297,380.4266,390.5234,400.6203,410.7172,420.8141,430.9109,441.0078,451.1047,461.2016,471.2984,481.3953,491.4922,501.5891,511.6859,521.7828,531.8797,541.9766,552.0734,562.1703,572.2672,582.3641,592.4609,602.5578,612.6547,622.7516,632.8484,642.9453,653.0422,663.1391,673.2359,683.3328,693.4297,390.5281,400.625,410.7219,420.8188,430.9156,441.0125,451.1094,461.2062,471.3031,481.4,491.4969,501.5938,511.6906,521.7875,531.8844,541.9812,552.0781,562.175,572.2719,582.3688,592.4656,602.5625,612.6594,622.7562,632.8531,642.95,653.0469,663.1438,673.2406,683.3375,693.4344,703.5312,713.6281,410.7266,420.8234,430.9203,441.0172,451.1141,461.2109,471.3078,481.4047,491.5016,501.5984,511.6953,521.7922,531.8891,541.9859,552.0828,562.1797,572.2766,582.3734,592.4703,602.5672,612.6641,622.7609,632.8578,642.9547,653.0516,663.1484,673.2453,683.3422,693.4391,703.5359,713.6328,723.7297,733.8266,430.925,441.0219,451.1188,461.2156,471.3125,481.4094,491.5062,501.6031,511.7,521.7969,531.8938,541.9906,552.0875,562.1844,572.2812,582.3781,592.475,602.5719,612.6688,622.7656,632.8625,642.9594,653.0562,663.1531,673.25,683.3469,693.4437,703.5406,713.6375,723.7344,733.8312,743.9281,754.025]'></canvas><div style="color:var(--mut);font-size:.85em;margin-top:.2em">z = 269.3 + 215.4*(x - 0.75) + 430.9*(y - 0.75)  ·  <span style="opacity:.7">arrastra para girar</span></div></div><div class="ws-fmt  al-left">El plano se inclina hacia la esquina a la que se corri&#243; la carga. En esa esquina la presi&#243;n llega a unos 754 kPa; en la opuesta, el plano baja por debajo de cero: la f&#243;rmula pide que el suelo TIRE de la zapata.</div><div class="ws-fmt  al-left">El suelo no tira. Lo que pasa de verdad es que esa parte se despega y queda con presi&#243;n cero. La misma superficie, con lo negativo recortado:</div><div style="text-align:center;margin:1.1em 0"><canvas class="hk-surf" width="560" height="420" style="max-width:100%;touch-action:none;cursor:grab" data-id="1" data-nn="32" data-xa="0" data-xb="1.5" data-ya="0" data-yb="1.5" data-vx="x" data-vy="y" data-zmin="0" data-zmax="754.025" data-z='[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6.7063,16.8031,26.9,36.9969,47.0938,57.1906,67.2875,77.3844,87.4813,97.5781,107.675,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6.7109,16.8078,26.9047,37.0016,47.0984,57.1953,67.2922,77.3891,87.4859,97.5828,107.6797,117.7766,127.8734,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6.7156,16.8125,26.9094,37.0063,47.1031,57.2,67.2969,77.3938,87.4906,97.5875,107.6844,117.7813,127.8781,137.975,148.0719,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6.7203,16.8172,26.9141,37.0109,47.1078,57.2047,67.3016,77.3984,87.4953,97.5922,107.6891,117.7859,127.8828,137.9797,148.0766,158.1734,168.2703,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6.725,16.8219,26.9188,37.0156,47.1125,57.2094,67.3062,77.4031,87.5,97.5969,107.6938,117.7906,127.8875,137.9844,148.0813,158.1781,168.275,178.3719,188.4688,0,0,0,0,0,0,0,0,0,0,0,0,6.7297,16.8266,26.9234,37.0203,47.1172,57.2141,67.3109,77.4078,87.5047,97.6016,107.6984,117.7953,127.8922,137.9891,148.0859,158.1828,168.2797,178.3766,188.4734,198.5703,208.6672,0,0,0,0,0,0,0,0,0,0,6.7344,16.8313,26.9281,37.025,47.1219,57.2188,67.3156,77.4125,87.5094,97.6062,107.7031,117.8,127.8969,137.9938,148.0906,158.1875,168.2844,178.3813,188.4781,198.575,208.6719,218.7688,228.8656,0,0,0,0,0,0,0,0,6.7391,16.8359,26.9328,37.0297,47.1266,57.2234,67.3203,77.4172,87.5141,97.6109,107.7078,117.8047,127.9016,137.9984,148.0953,158.1922,168.2891,178.3859,188.4828,198.5797,208.6766,218.7734,228.8703,238.9672,249.0641,0,0,0,0,0,0,6.7438,16.8406,26.9375,37.0344,47.1313,57.2281,67.325,77.4219,87.5188,97.6156,107.7125,117.8094,127.9063,138.0031,148.1,158.1969,168.2938,178.3906,188.4875,198.5844,208.6813,218.7781,228.875,238.9719,249.0688,259.1656,269.2625,0,0,0,0,6.7484,16.8453,26.9422,37.0391,47.1359,57.2328,67.3297,77.4266,87.5234,97.6203,107.7172,117.8141,127.9109,138.0078,148.1047,158.2016,168.2984,178.3953,188.4922,198.5891,208.6859,218.7828,228.8797,238.9766,249.0734,259.1703,269.2672,279.3641,289.4609,0,0,6.7531,16.85,26.9469,37.0438,47.1406,57.2375,67.3344,77.4312,87.5281,97.625,107.7219,117.8188,127.9156,138.0125,148.1094,158.2062,168.3031,178.4,188.4969,198.5938,208.6906,218.7875,228.8844,238.9812,249.0781,259.175,269.2719,279.3688,289.4656,299.5625,309.6594,6.7578,16.8547,26.9516,37.0484,47.1453,57.2422,67.3391,77.4359,87.5328,97.6297,107.7266,117.8234,127.9203,138.0172,148.1141,158.2109,168.3078,178.4047,188.5016,198.5984,208.6953,218.7922,228.8891,238.9859,249.0828,259.1797,269.2766,279.3734,289.4703,299.5672,309.6641,319.7609,329.8578,26.9563,37.0531,47.15,57.2469,67.3438,77.4406,87.5375,97.6344,107.7313,117.8281,127.925,138.0219,148.1188,158.2156,168.3125,178.4094,188.5063,198.6031,208.7,218.7969,228.8938,238.9906,249.0875,259.1844,269.2813,279.3781,289.475,299.5719,309.6688,319.7656,329.8625,339.9594,350.0563,47.1547,57.2516,67.3484,77.4453,87.5422,97.6391,107.7359,117.8328,127.9297,138.0266,148.1234,158.2203,168.3172,178.4141,188.5109,198.6078,208.7047,218.8016,228.8984,238.9953,249.0922,259.1891,269.2859,279.3828,289.4797,299.5766,309.6734,319.7703,329.8672,339.9641,350.0609,360.1578,370.2547,67.3531,77.45,87.5469,97.6438,107.7406,117.8375,127.9344,138.0313,148.1281,158.225,168.3219,178.4188,188.5156,198.6125,208.7094,218.8062,228.9031,239,249.0969,259.1938,269.2906,279.3875,289.4844,299.5813,309.6781,319.775,329.8719,339.9688,350.0656,360.1625,370.2594,380.3563,390.4531,87.5516,97.6484,107.7453,117.8422,127.9391,138.0359,148.1328,158.2297,168.3266,178.4234,188.5203,198.6172,208.7141,218.8109,228.9078,239.0047,249.1016,259.1984,269.2953,279.3922,289.4891,299.5859,309.6828,319.7797,329.8766,339.9734,350.0703,360.1672,370.2641,380.3609,390.4578,400.5547,410.6516,107.75,117.8469,127.9438,138.0406,148.1375,158.2344,168.3312,178.4281,188.525,198.6219,208.7188,218.8156,228.9125,239.0094,249.1062,259.2031,269.3,279.3969,289.4938,299.5906,309.6875,319.7844,329.8812,339.9781,350.075,360.1719,370.2688,380.3656,390.4625,400.5594,410.6562,420.7531,430.85,127.9484,138.0453,148.1422,158.2391,168.3359,178.4328,188.5297,198.6266,208.7234,218.8203,228.9172,239.0141,249.1109,259.2078,269.3047,279.4016,289.4984,299.5953,309.6922,319.7891,329.8859,339.9828,350.0797,360.1766,370.2734,380.3703,390.4672,400.5641,410.6609,420.7578,430.8547,440.9516,451.0484,148.1469,158.2438,168.3406,178.4375,188.5344,198.6312,208.7281,218.825,228.9219,239.0188,249.1156,259.2125,269.3094,279.4062,289.5031,299.6,309.6969,319.7938,329.8906,339.9875,350.0844,360.1812,370.2781,380.375,390.4719,400.5688,410.6656,420.7625,430.8594,440.9563,451.0531,461.15,471.2469,168.3453,178.4422,188.5391,198.6359,208.7328,218.8297,228.9266,239.0234,249.1203,259.2172,269.3141,279.4109,289.5078,299.6047,309.7016,319.7984,329.8953,339.9922,350.0891,360.1859,370.2828,380.3797,390.4766,400.5734,410.6703,420.7672,430.8641,440.9609,451.0578,461.1547,471.2516,481.3484,491.4453,188.5438,198.6406,208.7375,218.8344,228.9312,239.0281,249.125,259.2219,269.3188,279.4156,289.5125,299.6094,309.7062,319.8031,329.9,339.9969,350.0938,360.1906,370.2875,380.3844,390.4812,400.5781,410.675,420.7719,430.8688,440.9656,451.0625,461.1594,471.2562,481.3531,491.45,501.5469,511.6438,208.7422,218.8391,228.9359,239.0328,249.1297,259.2266,269.3234,279.4203,289.5172,299.6141,309.7109,319.8078,329.9047,340.0016,350.0984,360.1953,370.2922,380.3891,390.4859,400.5828,410.6797,420.7766,430.8734,440.9703,451.0672,461.1641,471.2609,481.3578,491.4547,501.5516,511.6484,521.7453,531.8422,228.9406,239.0375,249.1344,259.2312,269.3281,279.425,289.5219,299.6188,309.7156,319.8125,329.9094,340.0062,350.1031,360.2,370.2969,380.3938,390.4906,400.5875,410.6844,420.7812,430.8781,440.975,451.0719,461.1688,471.2656,481.3625,491.4594,501.5562,511.6531,521.75,531.8469,541.9438,552.0406,249.1391,259.2359,269.3328,279.4297,289.5266,299.6234,309.7203,319.8172,329.9141,340.0109,350.1078,360.2047,370.3016,380.3984,390.4953,400.5922,410.6891,420.7859,430.8828,440.9797,451.0766,461.1734,471.2703,481.3672,491.4641,501.5609,511.6578,521.7547,531.8516,541.9484,552.0453,562.1422,572.2391,269.3375,279.4344,289.5312,299.6281,309.725,319.8219,329.9188,340.0156,350.1125,360.2094,370.3062,380.4031,390.5,400.5969,410.6938,420.7906,430.8875,440.9844,451.0812,461.1781,471.275,481.3719,491.4688,501.5656,511.6625,521.7594,531.8562,541.9531,552.05,562.1469,572.2438,582.3406,592.4375,289.5359,299.6328,309.7297,319.8266,329.9234,340.0203,350.1172,360.2141,370.3109,380.4078,390.5047,400.6016,410.6984,420.7953,430.8922,440.9891,451.0859,461.1828,471.2797,481.3766,491.4734,501.5703,511.6672,521.7641,531.8609,541.9578,552.0547,562.1516,572.2484,582.3453,592.4422,602.5391,612.6359,309.7344,319.8312,329.9281,340.025,350.1219,360.2188,370.3156,380.4125,390.5094,400.6062,410.7031,420.8,430.8969,440.9938,451.0906,461.1875,471.2844,481.3812,491.4781,501.575,511.6719,521.7688,531.8656,541.9625,552.0594,562.1562,572.2531,582.35,592.4469,602.5438,612.6406,622.7375,632.8344,329.9328,340.0297,350.1266,360.2234,370.3203,380.4172,390.5141,400.6109,410.7078,420.8047,430.9016,440.9984,451.0953,461.1922,471.2891,481.3859,491.4828,501.5797,511.6766,521.7734,531.8703,541.9672,552.0641,562.1609,572.2578,582.3547,592.4516,602.5484,612.6453,622.7422,632.8391,642.9359,653.0328,350.1312,360.2281,370.325,380.4219,390.5187,400.6156,410.7125,420.8094,430.9062,441.0031,451.1,461.1969,471.2938,481.3906,491.4875,501.5844,511.6812,521.7781,531.875,541.9719,552.0688,562.1656,572.2625,582.3594,592.4563,602.5531,612.65,622.7469,632.8438,642.9406,653.0375,663.1344,673.2312,370.3297,380.4266,390.5234,400.6203,410.7172,420.8141,430.9109,441.0078,451.1047,461.2016,471.2984,481.3953,491.4922,501.5891,511.6859,521.7828,531.8797,541.9766,552.0734,562.1703,572.2672,582.3641,592.4609,602.5578,612.6547,622.7516,632.8484,642.9453,653.0422,663.1391,673.2359,683.3328,693.4297,390.5281,400.625,410.7219,420.8188,430.9156,441.0125,451.1094,461.2062,471.3031,481.4,491.4969,501.5938,511.6906,521.7875,531.8844,541.9812,552.0781,562.175,572.2719,582.3688,592.4656,602.5625,612.6594,622.7562,632.8531,642.95,653.0469,663.1438,673.2406,683.3375,693.4344,703.5312,713.6281,410.7266,420.8234,430.9203,441.0172,451.1141,461.2109,471.3078,481.4047,491.5016,501.5984,511.6953,521.7922,531.8891,541.9859,552.0828,562.1797,572.2766,582.3734,592.4703,602.5672,612.6641,622.7609,632.8578,642.9547,653.0516,663.1484,673.2453,683.3422,693.4391,703.5359,713.6328,723.7297,733.8266,430.925,441.0219,451.1188,461.2156,471.3125,481.4094,491.5062,501.6031,511.7,521.7969,531.8938,541.9906,552.0875,562.1844,572.2812,582.3781,592.475,602.5719,612.6688,622.7656,632.8625,642.9594,653.0562,663.1531,673.25,683.3469,693.4437,703.5406,713.6375,723.7344,733.8312,743.9281,754.025]'></canvas><div style="color:var(--mut);font-size:.85em;margin-top:.2em">z = (269.3 + 215.4*(x - 0.75) + 430.9*(y - 0.75) + abs(269.3 + 215.4*(x - 0.75) + 430.9*(y - 0.75)))/2  ·  <span style="opacity:.7">arrastra para girar</span></div></div><div class="ws-fmt  al-left">La esquina plana del fondo es el trozo levantado. Esa es la no linealidad: no hay material que se rompa ni plastifique, solo una zapata que deja de tocar.</div><div class="ws-fmt  al-left">Gir&#225;ndolo se ve que el plano no cambia de forma al recortarlo: lo que cambia es el &#193;REA que trabaja. Y como la carga sigue siendo la misma, al repartirse en menos superficie la presi&#243;n de la esquina cargada sube. Es lo que mide la hoja 54.</div><div class="ws-fmt ws-h2 al-center">En una l&#237;nea</div><div class="ws-fmt  al-left">La carga baja por la columna y baja centrada; la excentricidad es la distancia a la que hay que imaginarla, ella sola, para producir tambi&#233;n el momento. Y cuando esa distancia saca la resultante del n&#250;cleo central, el suelo deja de tocar en una esquina, que es donde empieza la no linealidad.</div><script>(function(){function fit(){document.querySelectorAll('.ws-eq,.deq-body').forEach(function(eq){try{if(eq.dataset.fit||eq.classList.contains('ws-deq'))return;var w=eq.clientWidth;if(w<8)return;var inner=eq.querySelector(':scope>.ws-fit');if(!inner){inner=document.createElement('span');inner.className='ws-fit';inner.style.display='inline-block';inner.style.transformOrigin='left top';while(eq.firstChild)inner.appendChild(eq.firstChild);eq.appendChild(inner);}var cw=inner.scrollWidth;if(cw>w+2){var s=w/cw;inner.style.transform='scale('+s+')';eq.style.height=(inner.offsetHeight*s)+'px';eq.style.overflowX='hidden';}eq.dataset.fit='1';}catch(e){}});}window.addEventListener('load',function(){setTimeout(fit,40);setTimeout(fit,250);});if(document.readyState!=='loading')setTimeout(fit,40);})();</script><script>(function(){
+var arr=null;
+function lista(total,vis){var a=[],i;
+  if(vis>=total-1){for(i=0;i<total;i++)a.push(i);return a;}
+  for(i=0;i<vis;i++)a.push(i); a.push(-1); a.push(total-1); return a;}
+function pinta(el){
+  var cells=el.__hkCells, nrows=+el.dataset.hkR, ncols=+el.dataset.hkC;
+  var visR=+el.dataset.visRows, visC=+el.dataset.visCols, sep=el.dataset.hkSep==='1';
+  var cols=lista(ncols,visC), rws=lista(nrows,visR);
+  var showCol=ncols>1, showRow=nrows>1;
+  var brkCol=showRow?2:1, dataCol0=brkCol+1, brkRCol=dataCol0+cols.length, dataRow0=showCol?2:1;
+  var h='',ci,ri;
+  if(showCol&&showRow) h+='<span class="m-mh" style="grid-row:1;grid-column:1"></span>';
+  if(showCol) for(ci=0;ci<cols.length;ci++)
+    h+='<span class="m-mh" style="grid-row:1;grid-column:'+(dataCol0+ci)+'">'+(cols[ci]<0?'⋯':cols[ci])+'</span>';
+  if(showRow) for(ri=0;ri<rws.length;ri++)
+    h+='<span class="m-mrh" style="grid-row:'+(dataRow0+ri)+';grid-column:1">'+(rws[ri]<0?'⋮':rws[ri])+'</span>';
+  h+='<span class="m-brk m-brl" style="grid-row:'+dataRow0+' / span '+rws.length+';grid-column:'+brkCol+'"></span>';
+  h+='<span class="m-brk m-brr" style="grid-row:'+dataRow0+' / span '+rws.length+';grid-column:'+brkRCol+'"></span>';
+  for(ri=0;ri<rws.length;ri++)for(ci=0;ci<cols.length;ci++){
+    var r=rws[ri],c=cols[ci];
+    var txt=(r<0&&c<0)?'<span class="m-ell">⋱</span>':c<0?'<span class="m-ell">⋯</span>':
+            r<0?'<span class="m-ell">⋮</span>':((cells[r]&&cells[r][c]!==undefined)?cells[r][c]:'');
+    var bl=(sep&&ci>0)?';border-left:1px solid var(--sep)':'';
+    h+='<span class="m-mc" style="grid-row:'+(dataRow0+ri)+';grid-column:'+(dataCol0+ci)+bl+'">'+txt+'</span>';}
+  h+='<span class="mat-grip" title="Arrastrar para ver mas o menos celdas"></span>';
+  el.innerHTML=h; manija(el);}
+/* El auto-fit encoge TODO el bloque con transform:scale, y con el la manija: en una matriz
+   ancha quedaba de 8 px pegada al borde y no habia como agarrarla. Aqui se le aplica la
+   escala inversa para que siempre mida lo mismo en pantalla. */
+function manija(el){
+  var g=el.querySelector('.mat-grip'); if(!g)return;
+  var eq=el.closest('.ws-eq,.deq-body'); var inner=eq?eq.querySelector(':scope>.ws-fit'):null;
+  var s=1; if(inner&&inner.style.transform){var m=/scale\(([\d.]+)\)/.exec(inner.style.transform); if(m)s=parseFloat(m[1])||1;}
+  g.style.transformOrigin='bottom right';
+  g.style.transform=(s&&s!==1)?'scale('+(1/s)+')':'';}
+function manijas(){document.querySelectorAll('.m-matx[data-hk-cells]').forEach(manija);}
+window.addEventListener('load',function(){setTimeout(manijas,120);setTimeout(manijas,420);});
+if(document.readyState!=='loading')setTimeout(manijas,120);
+function celdas(el){ if(!el.__hkCells){ try{el.__hkCells=JSON.parse(el.dataset.hkCells);}catch(e){return null;} } return el.__hkCells; }
+document.addEventListener('mousedown',function(e){
+  var g=e.target.closest?e.target.closest('.mat-grip'):null; if(!g)return;
+  var el=g.closest('.m-matx'); if(!el||!el.dataset.hkCells)return;
+  if(!celdas(el))return;
+  e.preventDefault(); e.stopPropagation();
+  var cel=el.querySelector('.m-mc'), rc=cel?cel.getBoundingClientRect():null;
+  arr={el:el,x:e.clientX,y:e.clientY,r0:+el.dataset.visRows,c0:+el.dataset.visCols,
+       w:(rc&&rc.width)||26,h:(rc&&rc.height)||20};
+  el.classList.add('mat-resizing');},true);
+document.addEventListener('mousemove',function(e){
+  if(!arr)return; e.preventDefault();
+  var el=arr.el, nrows=+el.dataset.hkR, ncols=+el.dataset.hkC;
+  var nr=Math.max(1,Math.min(nrows,arr.r0+Math.round((e.clientY-arr.y)/arr.h)));
+  var nc=Math.max(1,Math.min(ncols,arr.c0+Math.round((e.clientX-arr.x)/arr.w)));
+  if(nr===+el.dataset.visRows&&nc===+el.dataset.visCols)return;
+  el.dataset.visRows=nr; el.dataset.visCols=nc; pinta(el);},true);
+document.addEventListener('mouseup',function(){
+  if(!arr)return; arr.el.classList.remove('mat-resizing');
+  // al crecer la matriz hay que rehacer el auto-fit del bloque, si no se sale de la pagina
+  var eq=arr.el.closest('.ws-eq,.deq-body');
+  if(eq){var inner=eq.querySelector(':scope>.ws-fit');
+    if(inner){inner.style.transform='';eq.style.height='';
+      var w=eq.clientWidth,cw=inner.scrollWidth;
+      if(cw>w+2){var s=w/cw;inner.style.transform='scale('+s+')';eq.style.height=(inner.offsetHeight*s)+'px';eq.style.overflowX='hidden';}}}
+  arr=null;},true);
+})();</script><script>
+(function(){
+ function jetr(t){t=1-Math.max(0,Math.min(1,t));
+   var r=Math.max(0,Math.min(1,1.5-Math.abs(4*t-3))),g=Math.max(0,Math.min(1,1.5-Math.abs(4*t-2))),b=Math.max(0,Math.min(1,1.5-Math.abs(4*t-1)));
+   return 'rgb('+(r*255|0)+','+(g*255|0)+','+(b*255|0)+')';}
+ function setup(cv){
+   var nn=+cv.dataset.nn, zmin=+cv.dataset.zmin, zmax=+cv.dataset.zmax, z=JSON.parse(cv.dataset.z);
+   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=-0.9,el=0.5,rng=(zmax-zmin)||1;
+   function Z(i,j){return z[j*(nn+1)+i];}
+   function proj(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+     var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;
+     var rx=-X*sa+Y*ca,up=-se*ca*X-se*sa*Y+ce*Zn;
+     return [W*0.5+rx*W*0.62,H*0.58-up*H*0.60];}
+   function dep(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+     var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;return ce*ca*X+ce*sa*Y+se*Zn;}
+   function draw(){ctx.clearRect(0,0,W,H);var c=[];
+     for(var i=0;i<nn;i++)for(var j=0;j<nn;j++){var zc=(Z(i,j)+Z(i+1,j)+Z(i+1,j+1)+Z(i,j+1))/4;c.push([dep(i,j,zc),i,j,zc]);}
+     c.sort(function(a,b){return a[0]-b[0];});
+     for(var k=0;k<c.length;k++){var i=c[k][1],j=c[k][2],zc=c[k][3];
+       var p0=proj(i,j,Z(i,j)),p1=proj(i+1,j,Z(i+1,j)),p2=proj(i+1,j+1,Z(i+1,j+1)),p3=proj(i,j+1,Z(i,j+1));
+       ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.lineTo(p3[0],p3[1]);ctx.closePath();
+       ctx.fillStyle=jetr((zc-zmin)/rng);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.stroke();}}
+   draw();cv.style.cursor='grab';
+   // ---- HOVER: el nudo mas cercano al cursor, con su x, y, z (17-sep-2026, Jorge) ----
+   var xa=+cv.dataset.xa,xb=+cv.dataset.xb,ya=+cv.dataset.ya,yb=+cv.dataset.yb;
+   var vx=cv.dataset.vx||'x',vy=cv.dataset.vy||'y';
+   var tip=document.createElement('div');
+   tip.style.cssText='position:fixed;z-index:9999;display:none;pointer-events:none;background:#fffffff2;'+
+     'border:1px solid #888;border-radius:4px;padding:3px 6px;font:12px/1.35 Consolas,monospace;color:#111;'+
+     'box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:pre';
+   document.body.appendChild(tip);
+   function num(v){var a=Math.abs(v);return (a>=1e5||(a>0&&a<1e-3))?v.toExponential(3):v.toFixed(4);}
+   function cerca(e){                     // nudo (i,j) cuya proyeccion queda mas cerca del cursor
+     var r=cv.getBoundingClientRect(),mx=(e.clientX-r.left)*W/r.width,my=(e.clientY-r.top)*H/r.height;
+     var mej=null,d2m=1e18;
+     for(var i=0;i<=nn;i++)for(var j=0;j<=nn;j++){
+       var p=proj(i,j,Z(i,j)),dx=p[0]-mx,dy=p[1]-my,d2=dx*dx+dy*dy;
+       if(d2<d2m){d2m=d2;mej=[i,j,d2];}}
+     return (mej&&mej[2]<400)?mej:null;    // 20 px de tolerancia
+   }
+   function mostrar(e){
+     var m=cerca(e);
+     if(!m){tip.style.display='none';return;}
+     var i=m[0],j=m[1];
+     tip.textContent=vx+' = '+num(xa+(xb-xa)*i/nn)+'\n'+vy+' = '+num(ya+(yb-ya)*j/nn)+'\nz = '+num(Z(i,j));
+     tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+   }
+   cv.addEventListener('pointerleave',function(){tip.style.display='none';});
+   var drag=false,px=0,py=0;
+   cv.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;py=e.clientY;cv.style.cursor='grabbing';tip.style.display='none';cv.setPointerCapture(e.pointerId);});
+   cv.addEventListener('pointerup',function(e){drag=false;cv.style.cursor='grab';});
+   cv.addEventListener('pointermove',function(e){if(!drag){mostrar(e);return;}az-=(e.clientX-px)*0.01;el+=(e.clientY-py)*0.01;
+     el=Math.max(0.05,Math.min(1.5,el));px=e.clientX;py=e.clientY;draw();});
+ }
+ function init(){var cs=document.querySelectorAll('canvas.hk-surf');for(var i=0;i<cs.length;i++)setup(cs[i]);}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script><script>
+(function(){
+ var CSI=[[255,0,255],[255,0,0],[255,140,0],[255,255,0],[0,255,0],[0,255,255],[0,0,255],[0,0,180]];
+ function csi(t){t=1-Math.max(0,Math.min(1,t));var u=t*(CSI.length-1),k=Math.min(CSI.length-2,Math.floor(u)),f=u-k;
+   var A=CSI[k],B=CSI[k+1];
+   return 'rgb('+((A[0]+(B[0]-A[0])*f)|0)+','+((A[1]+(B[1]-A[1])*f)|0)+','+((A[2]+(B[2]-A[2])*f)|0)+')';}
+ function setup(cv){
+   var F=JSON.parse(cv.dataset.f),a=+cv.dataset.a,b=+cv.dataset.b,h=+cv.dataset.h;
+   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=-0.75,el=0.42;
+   var m=Math.max(a,Math.max(b,h))||1;
+   function proj(X,Y,Z){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+     var x=X/m-a/m/2,y=Y/m-b/m/2,z=Z/m-h/m/2;
+     var rx=-x*sa+y*ca,up=-se*ca*x-se*sa*y+ce*z;
+     return [W*0.5+rx*W*0.60,H*0.52-up*H*0.58];}
+   function dep(X,Y,Z){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+     var x=X/m-a/m/2,y=Y/m-b/m/2,z=Z/m-h/m/2;return ce*ca*x+ce*sa*y+se*z;}
+   function draw(){ctx.clearRect(0,0,W,H);var n=F.length/13,ord=[];
+     for(var q=0;q<n;q++){var o=q*13,d=0;
+       for(var v=0;v<4;v++)d+=dep(F[o+v*3],F[o+v*3+1],F[o+v*3+2]);
+       ord.push([d/4,q]);}
+     ord.sort(function(p,r){return p[0]-r[0];});
+     for(var s=0;s<ord.length;s++){var o=ord[s][1]*13;
+       ctx.beginPath();
+       for(var v=0;v<4;v++){var P=proj(F[o+v*3],F[o+v*3+1],F[o+v*3+2]);
+         if(v===0)ctx.moveTo(P[0],P[1]);else ctx.lineTo(P[0],P[1]);}
+       ctx.closePath();ctx.fillStyle=csi(F[o+12]);ctx.fill();
+       ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=0.8;ctx.stroke();}}
+   var drag=false,px=0,py=0;
+   cv.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;py=e.clientY;cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+   cv.addEventListener('pointermove',function(e){if(!drag)return;az-=(e.clientX-px)*0.01;el+=(e.clientY-py)*0.01;
+     el=Math.max(-1.4,Math.min(1.4,el));px=e.clientX;py=e.clientY;draw();});
+   cv.addEventListener('pointerup',function(e){drag=false;cv.style.cursor='grab';});
+   draw();}
+ function todos(){var l=document.querySelectorAll('canvas.hk-sol');for(var i=0;i<l.length;i++)if(!l[i].__hk){l[i].__hk=1;setup(l[i]);}}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',todos);else todos();
+})();
+</script><script>
+(function(){
+ function setup(sp){
+   var nn=+sp.dataset.nn, z=JSON.parse(sp.dataset.z), im=sp.querySelector('img');
+   var W=+sp.dataset.w,H=+sp.dataset.h,pL=+sp.dataset.pl,pR=+sp.dataset.pr,pT=+sp.dataset.pt,pB=+sp.dataset.pb;
+   var xa=+sp.dataset.xa,xb=+sp.dataset.xb,ya=+sp.dataset.ya,yb=+sp.dataset.yb;
+   var vx=sp.dataset.vx||'x',vy=sp.dataset.vy||'y';
+   if(!im) return;
+   var tip=document.createElement('div');
+   tip.style.cssText='position:fixed;z-index:9999;display:none;pointer-events:none;background:#fffffff2;'+
+     'border:1px solid #888;border-radius:4px;padding:3px 6px;font:12px/1.35 Consolas,monospace;color:#111;'+
+     'box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:pre';
+   document.body.appendChild(tip);
+   function num(v){var a=Math.abs(v);return (a>=1e5||(a>0&&a<1e-3))?v.toExponential(3):v.toFixed(4);}
+   function Zi(i,j){return z[j*(nn+1)+i];}
+   im.addEventListener('pointermove',function(e){
+     var r=im.getBoundingClientRect();
+     var px=(e.clientX-r.left)*W/r.width, py=(e.clientY-r.top)*H/r.height;   // pixel del PNG original
+     var u=(px-pL)/(W-pL-pR), v=1-(py-pT)/(H-pT-pB);                        // 0..1 dentro de la placa
+     if(u<0||u>1||v<0||v>1){tip.style.display='none';return;}
+     var fi=u*nn, fj=v*nn, i=Math.min(nn-1,Math.floor(fi)), j=Math.min(nn-1,Math.floor(fj));
+     var a=fi-i,b=fj-j;
+     var zz=Zi(i,j)*(1-a)*(1-b)+Zi(i+1,j)*a*(1-b)+Zi(i,j+1)*(1-a)*b+Zi(i+1,j+1)*a*b;   // bilineal
+     tip.textContent=vx+' = '+num(xa+(xb-xa)*u)+'\n'+vy+' = '+num(ya+(yb-ya)*v)+'\nz = '+num(zz);
+     tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+   });
+   im.addEventListener('pointerleave',function(){tip.style.display='none';});
+   im.style.cursor='crosshair';
+ }
+ function init(){var m=document.querySelectorAll('span.hk-map');for(var i=0;i<m.length;i++)setup(m[i]);}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script></body></html>

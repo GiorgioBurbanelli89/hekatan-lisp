@@ -1208,7 +1208,8 @@
 ;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
 (defparameter *op-calls*
   '(partial derive-x deriv-steps factor expand* integ-var integ-x area-under slope-at
-    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar dec))
+    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar dec
+    qshow qval))
 
 ;; dec como FUNCION, para que `evops` la aplique en el camino ESCALAR (el de
 ;; matrices entra por `meval`). Sin n: 6 cifras y se podan los ceros de cola.
@@ -1744,3 +1745,221 @@
          (write-char (code-char 30)) (finish-output))                        ; \x1e = fin de respuesta (SIN newline)
         (t (handler-case (eval form) (error (e) (format t "; error: ~a~%" e)))
            (finish-output))))))
+
+;;;; ===== UNIDADES (pegado aquí a propósito: engine.lisp es lo ÚNICO que
+;;;; ===== se hornea en el core de SBCL y se compila dentro de hlisp.wasm) =====
+;;;; unidades.lisp — cantidades con unidades para Hekatan LISP
+;;;;
+;;;; El modelo está SACADO de dos programas, no inventado:
+;;;;
+;;;;   · Mathcad Prime 10 (sus DLL .NET, McdStaticUnitSystem): dimensiones base
+;;;;     con exponentes, y las unidades derivadas definidas por su FÓRMULA
+;;;;     física (newton = m·kg/s², pascal = N/m², joule = N·m…), no por una
+;;;;     tabla de factores a mano. Los prefijos son funciones: kilo(pascal).
+;;;;     Mathcad guarda los exponentes en punto fijo ×60000 para que ½ y ⅓
+;;;;     salgan exactos; aquí se usan RACIONALES de Common Lisp, que son
+;;;;     exactos por construcción y no necesitan esa escala.
+;;;;
+;;;;   · Calcpad (Calcpad.Core/BaseTypes/Unit.cs): el orden de las dimensiones
+;;;;     —incluido el ÁNGULO como una más— y la sintaxis `3m|cm`, donde lo que
+;;;;     va tras la barra es la unidad en la que se quiere VER el resultado.
+;;;;
+;;;; Una cantidad es (:q valor . dims) con dims = vector de 8 racionales:
+;;;;   0 masa · 1 longitud · 2 tiempo · 3 corriente · 4 temperatura
+;;;;   5 sustancia · 6 luminosidad · 7 ángulo
+;;;; El valor se guarda SIEMPRE en unidades base del SI (kg, m, s, A, K, mol,
+;;;; cd, rad): así sumar y comparar no necesita convertir nada.
+
+(defconstant +dim-n+ 8)
+(defparameter *dim-nombres* #("masa" "longitud" "tiempo" "corriente"
+                              "temperatura" "sustancia" "luminosidad" "ángulo"))
+
+(defun dims (&rest pares)
+  "dims :longitud 1 :tiempo -2  →  #(0 1 -2 0 0 0 0 0)"
+  (let ((v (make-array +dim-n+ :initial-element 0)))
+    (loop for (k e) on pares by #'cddr
+          do (setf (aref v (position (string-downcase (symbol-name k))
+                                     *dim-nombres* :test #'string=))
+                   e))
+    v))
+
+(defun q (valor &optional (d (make-array +dim-n+ :initial-element 0)))
+  (list* :q valor d))
+(defun q-p (x) (and (consp x) (eq (car x) :q)))
+(defun q-val (x) (if (q-p x) (cadr x) x))
+(defun q-dim (x) (if (q-p x) (cddr x) (make-array +dim-n+ :initial-element 0)))
+(defun adimensional-p (x) (every #'zerop (q-dim x)))
+
+(defun dim= (a b) (every #'= (q-dim a) (q-dim b)))
+(defun dim+ (a b) (map 'vector #'+ (q-dim a) (q-dim b)))
+(defun dim- (a b) (map 'vector #'- (q-dim a) (q-dim b)))
+(defun dim* (a k) (map 'vector (lambda (e) (* e k)) (q-dim a)))
+
+(defun dim-texto (x)
+  (let ((s '()))
+    (loop for i from 0 below +dim-n+
+          for e = (aref (q-dim x) i)
+          unless (zerop e)
+            do (push (format nil "~a^~a" (aref *dim-nombres* i) e) s))
+    (if s (format nil "~{~a~^·~}" (nreverse s)) "adimensional")))
+
+;;; ── Aritmética: la que comprueba dimensiones ──────────────────────────
+
+(define-condition unidades-incompatibles (error)
+  ((op :initarg :op) (a :initarg :a) (b :initarg :b))
+  (:report (lambda (c s)
+             (format s "no se puede ~a ~a con ~a"
+                     (slot-value c 'op)
+                     (dim-texto (slot-value c 'a))
+                     (dim-texto (slot-value c 'b))))))
+
+(defun q+ (a b)
+  (unless (dim= a b) (error 'unidades-incompatibles :op "sumar" :a a :b b))
+  (q (+ (q-val a) (q-val b)) (q-dim a)))
+(defun q- (a b)
+  (unless (dim= a b) (error 'unidades-incompatibles :op "restar" :a a :b b))
+  (q (- (q-val a) (q-val b)) (q-dim a)))
+(defun q* (a b) (q (* (q-val a) (q-val b)) (dim+ a b)))
+(defun q/ (a b) (q (/ (q-val a) (q-val b)) (dim- a b)))
+(defun q^ (a n)
+  (let ((k (q-val n)))
+    (unless (adimensional-p n)
+      (error 'unidades-incompatibles :op "elevar a" :a a :b n))
+    (q (expt (q-val a) k) (dim* a (rational k)))))
+
+;;; ── El catálogo: las bases valen 1, las derivadas son su fórmula ──────
+
+(defparameter *unidades* (make-hash-table :test #'equal))
+(defun def-u (nombre cantidad) (setf (gethash nombre *unidades*) cantidad) cantidad)
+(defun u-simple (nombre)
+  (or (gethash nombre *unidades*)
+      ;; «cm2» = cm^2: dígito final pegado, como se escribe en obra
+      (let* ((n (length nombre))
+             (c (and (> n 1) (char nombre (1- n)))))
+        (if (and c (digit-char-p c) (gethash (subseq nombre 0 (1- n)) *unidades*))
+            (q^ (gethash (subseq nombre 0 (1- n)) *unidades*)
+                (q (digit-char-p c)))
+            (error "unidad desconocida: ~a" nombre)))))
+
+(defun partir (cadena sep)
+  (loop with ini = 0 for i = (position sep cadena :start ini)
+        collect (subseq cadena ini i)
+        while i do (setf ini (1+ i))))
+
+(defun u-factor (trozo)
+  "kN, m^3, cm2 … un factor suelto con su potencia."
+  (let ((c (position #\^ trozo)))
+    (if c
+        (q^ (u-simple (subseq trozo 0 c))
+            (q (parse-integer (subseq trozo (1+ c)))))
+        (u-simple trozo))))
+
+(defun u (nombre)
+  "Una unidad, simple o compuesta: kN/m^2, tonf/m3, kgf/cm2, N*m."
+  (or (gethash nombre *unidades*)
+      (let* ((partes (partir nombre #\/))
+             (num (reduce #'q* (mapcar #'u-factor (partir (first partes) #\*)))))
+        (dolist (d (rest partes) num)
+          (setf num (q/ num (reduce #'q* (mapcar #'u-factor (partir d #\*)))))))))
+
+(def-u "kg"  (q 1 (dims :masa 1)))
+(def-u "m"   (q 1 (dims :longitud 1)))
+(def-u "s"   (q 1 (dims :tiempo 1)))
+(def-u "A"   (q 1 (dims :corriente 1)))
+(def-u "K"   (q 1 (dims :temperatura 1)))
+(def-u "mol" (q 1 (dims :sustancia 1)))
+(def-u "cd"  (q 1 (dims :luminosidad 1)))
+(def-u "rad" (q 1 (dims :ángulo 1)))
+
+;; prefijos como FUNCIONES, igual que Mathcad
+(defun kilo (x) (q* (q 1000) x))
+(defun mega (x) (q* (q 1000000) x))
+(defun giga (x) (q* (q 1000000000) x))
+(defun mili (x) (q* (q 1/1000) x))
+(defun centi (x) (q* (q 1/100) x))
+(defun deci (x) (q* (q 1/10) x))
+(defun micro (x) (q* (q 1/1000000) x))
+
+;; longitud
+(def-u "mm" (mili (u "m")))
+(def-u "cm" (centi (u "m")))
+(def-u "km" (kilo (u "m")))
+(def-u "in" (q* (q 254/10000) (u "m")))
+(def-u "ft" (q* (q 12) (u "in")))
+;; masa
+(def-u "g"  (mili (u "kg")))
+(def-u "t"  (kilo (u "kg")))
+;; tiempo
+(def-u "min" (q* (q 60) (u "s")))
+(def-u "h"   (q* (q 3600) (u "s")))
+;; derivadas mecánicas — la FÓRMULA, como en Mathcad
+(def-u "N"   (q/ (q* (u "m") (u "kg")) (q^ (u "s") (q 2))))
+(def-u "kN"  (kilo (u "N")))
+(def-u "MN"  (mega (u "N")))
+(def-u "Pa"  (q/ (u "N") (q^ (u "m") (q 2))))
+(def-u "kPa" (kilo (u "Pa")))
+(def-u "MPa" (mega (u "Pa")))
+(def-u "GPa" (giga (u "Pa")))
+(def-u "J"   (q* (u "N") (u "m")))
+(def-u "kJ"  (kilo (u "J")))
+(def-u "W"   (q/ (u "J") (u "s")))
+(def-u "kW"  (kilo (u "W")))
+;; las de obra en Ecuador (ver la regla de unidades de Jorge)
+(def-u "kgf"  (q* (q 980665/100000) (u "N")))
+(def-u "tonf" (kilo (u "kgf")))
+(def-u "kgf/cm2" (q/ (u "kgf") (q^ (u "cm") (q 2))))
+(def-u "tonf/m2" (q/ (u "tonf") (q^ (u "m") (q 2))))
+(def-u "tonf/m3" (q/ (u "tonf") (q^ (u "m") (q 3))))
+(def-u "kN/m2" (q/ (u "kN") (q^ (u "m") (q 2))))
+(def-u "kN/m3" (q/ (u "kN") (q^ (u "m") (q 3))))
+
+;;; ── La barra de Calcpad: 3m|cm ────────────────────────────────────────
+
+(defun en (cantidad nombre-unidad)
+  "El valor de CANTIDAD medido en NOMBRE-UNIDAD. Es el `|` de Calcpad.
+   Falla si las dimensiones no son las mismas: 3m|s no significa nada."
+  (let ((destino (u nombre-unidad)))
+    (unless (dim= cantidad destino)
+      (error 'unidades-incompatibles :op "expresar en" :a cantidad :b destino))
+    (/ (q-val cantidad) (q-val destino))))
+
+(defun mostrar (cantidad nombre-unidad &optional (dec 4))
+  (format nil "~,vf ~a" dec (float (en cantidad nombre-unidad) 1d0) nombre-unidad))
+
+(defun num (x nombre-unidad)
+  "3m se escribe (num 3 \"m\")."
+  (q* (q (rational x)) (u nombre-unidad)))
+
+;;; ── Evaluar un árbol de expresión CON unidades ────────────────────────
+;;; No pasa por `simplify` ni por `evops`: esos trabajan con números pelados
+;;; y no saben de dimensiones. Aquí se interpreta el árbol con q+ q- q* q/ q^,
+;;; que son los que comprueban. Un símbolo es una unidad del catálogo.
+
+(defun qeval (e)
+  (cond
+    ((numberp e) (q (rational e)))
+    ((stringp e) (u e))
+    ((symbolp e) (u (string-downcase (symbol-name e))))
+    ((consp e)
+     (let ((op (car e)) (args (mapcar #'qeval (cdr e))))
+       (case op
+         (+ (reduce #'q+ args))
+         (- (if (cdr args) (reduce #'q- args) (q* (q -1) (car args))))
+         (* (reduce #'q* args))
+         (/ (reduce #'q/ args))
+         ((expt ^) (q^ (first args) (second args)))
+         (t (error "operación sin unidades: ~a" op)))))
+    (t (error "no se puede evaluar: ~a" e))))
+
+(defun qval (e unidad &optional (dec 4))
+  "Como qshow pero devuelve SOLO el número: la unidad la dibuja la hoja al lado,
+   con el mismo mecanismo del [kN] visible. Si no cuadran las dimensiones,
+   devuelve el aviso como texto (y entonces no hay número que dibujar)."
+  (handler-case (let ((x (float (en (qeval e) unidad) 1d0)))
+                  (to-dec x dec nil))
+    (error (c) (format nil "⚠ ~a" c))))
+
+(defun qshow (e unidad &optional (dec 4))
+  "El `3m|cm` de la hoja: evalúa E con unidades y lo devuelve medido en UNIDAD."
+  (handler-case (mostrar (qeval e) unidad dec)
+    (error (c) (format nil "⚠ ~a" c))))

@@ -738,6 +738,8 @@ namespace HekatanLisp
                 if (t.Length == 0 || ((t[0] == '#' || t[0] == ';' || t[0] == '%') && !plotDir)) continue;
                 int at = ln.IndexOf("@@", StringComparison.Ordinal);
                 string body = at >= 0 ? ln.Substring(0, at) : ln, tail = at >= 0 ? ln.Substring(at) : "";
+                // la UNIDAD visible [kN] tampoco es matemática: sus letras no son nombres de la hoja
+                if (SepararUnidad(body.TrimEnd(), out var cuerpoSinU, out var uVis)) { tail = " [" + uVis + "] " + tail; body = cuerpoSinU; }
                 if (HasGreekUni(body))
                     body = RxIdentUni.Replace(body, m =>
                     {
@@ -1278,6 +1280,7 @@ body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
 .ws-txt{font-family:'Segoe UI',sans-serif;font-size:10.5pt;color:var(--mut);font-weight:600;margin-top:1em;}
 .ws-prosa{font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-style:normal;margin-right:.45em;}
 /* #deq: ecuación con ETIQUETA a la derecha, estilo libro/paper — «… (2.3.4)» */
+.ws-unit{font-family:'Segoe UI',Arial,sans-serif;font-style:normal;font-weight:normal;margin-left:.35em;white-space:nowrap;}
 .ws-deq{display:flex;flex-wrap:wrap;align-items:center;gap:.3em 1.2em;overflow:visible;}
 .ws-deq>.deq-body{flex:0 1 auto;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:.4em 0 .25em;}
 .ws-deq>.deq-tag{flex:0 0 auto;margin-left:auto;color:var(--mut);font-size:.85em;white-space:nowrap;font-family:'Segoe UI',sans-serif;}
@@ -1518,6 +1521,48 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // separador del tag de #deq: la línea de display trae  "...ecuación...\x02(etiqueta)".
         public const char DeqSep = '\x02';
 
+        // ── UNIDAD VISIBLE ──  P_1 = 35 [kN]   ·   w = dec(P_2/kB, 3) [mm]   ·   k_s = 19613.3 [kN/m^3]
+        // La unidad va entre corchetes al FINAL de una línea de matemática y se DIBUJA pegada al último número de la
+        // línea (el dato o el resultado), en letra recta. Es solo dibujo: el cálculo sigue con números puros, así que
+        // no convierte ni comprueba dimensiones (eso sería el paso 2). La línea de display trae "...ecuación...\x04kN".
+        public const char UnitSep = '\x04';
+        // No es una matriz: empieza por letra (o ° % µ Ω), sin espacios, comas ni punto y coma dentro, y lo de antes
+        // no acaba en un operador ni en '=' (así  v = [a]  y  K = [1 2; 3 4]  siguen siendo matrices).
+        static readonly Regex RxUnidadFinal = new Regex(@"^(?<cuerpo>.*\S)\s+\[(?<u>[A-Za-zµμΩ°º%‰][^\[\]\s;,]*)\]\s*$", RegexOptions.Compiled);
+        public static bool SepararUnidad(string linea, out string cuerpo, out string unidad)
+        {
+            cuerpo = linea; unidad = null;
+            if (string.IsNullOrEmpty(linea)) return false;
+            var m = RxUnidadFinal.Match(linea);
+            if (!m.Success) return false;
+            string c = m.Groups["cuerpo"].Value;
+            if ("=+-*/^(,·".IndexOf(c[c.Length - 1]) >= 0) return false;
+            cuerpo = c; unidad = m.Groups["u"].Value;
+            return true;
+        }
+        /// <summary>kN/m^3 → kN/m³ · kN*m → kN·m · m^-1 → m⁻¹ (texto ya codificado para HTML).</summary>
+        public static string FormatearUnidad(string u)
+        {
+            const string SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+            u = Regex.Replace(u ?? "", @"\^\(?(-?)(\d)\)?", m => (m.Groups[1].Value == "-" ? "⁻" : "") + SUP[m.Groups[2].Value[0] - '0']);
+            u = u.Replace("*", "·");
+            return System.Net.WebUtility.HtmlEncode(u);
+        }
+        // mete la unidad al final del contenido del <div> de la ecuación (después del último número)
+        static string InjectUnit(string div, string unidad)
+        {
+            int end = div.LastIndexOf("</div>");
+            if (end < 0 || string.IsNullOrEmpty(unidad)) return div;
+            return div.Substring(0, end) + "<span class=\"ws-unit\">" + FormatearUnidad(unidad) + "</span>" + div.Substring(end);
+        }
+        static string QuitarUnidad(ref string raw)
+        {
+            int us = raw.IndexOf(UnitSep);
+            if (us < 0) return null;
+            string u = raw.Substring(us + 1); raw = raw.Substring(0, us);
+            return u;
+        }
+
         // Separa asignaciones que venían de la MISMA línea (a=2; b=3) → se dibujan LADO A LADO en una fila.
         public const char SbsSep = '\x03';
 
@@ -1546,8 +1591,14 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                 string raw = raw0, deqTag = null;
                 int ds = raw0.IndexOf(DeqSep);
                 if (ds >= 0) { deqTag = raw0.Substring(ds + 1); raw = raw0.Substring(0, ds); }
-                string div = raw.IndexOf(SbsSep) >= 0 ? RenderSideBySide(raw, fromLisp)
-                                                      : RenderLineHtml(raw, fromLisp);
+                string div;
+                if (raw.IndexOf(SbsSep) >= 0) div = RenderSideBySide(raw, fromLisp);
+                else
+                {
+                    string unidad = QuitarUnidad(ref raw);
+                    div = RenderLineHtml(raw, fromLisp);
+                    if (unidad != null && div.StartsWith("<div class=\"ws-eq")) div = InjectUnit(div, unidad);
+                }
                 if (deqTag != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDeqTag(div, deqTag);
                 body.Append(div);
             }
@@ -1565,7 +1616,9 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             foreach (var part in raw.Split(SbsSep))
             {
                 if (part.Trim().Length == 0) continue;
-                string d = RenderLineHtml(part, fromLisp);
+                string parte = part, uParte = QuitarUnidad(ref parte);
+                string d = RenderLineHtml(parte, fromLisp);
+                if (uParte != null && d.StartsWith("<div class=\"ws-eq")) d = InjectUnit(d, uParte);
                 int gt = d.IndexOf('>'); int end = d.LastIndexOf("</div>");
                 string inner = (gt >= 0 && end > gt) ? d.Substring(gt + 1, end - gt - 1) : d;
                 cells.Append("<span class=\"sbs-cell\">").Append(inner).Append("</span>");
@@ -1849,6 +1902,7 @@ document.addEventListener('mouseup',function(){
 <tr><td><code>#: texto</code></td><td>párrafo (izquierda)</td></tr>
 <tr><td><code>#| texto</code> · <code>#&gt; texto</code> · <code>#&lt; texto</code></td><td>centrado · derecha · izquierda</td></tr>
 <tr><td><code>**negrita**</code> · <code>*cursiva*</code></td><td>inline (también <code>__</code> y <code>_</code>)</td></tr>
+<tr><td><code>P = 35 [kN]</code> · <code>w = P/k [mm]</code></td><td>unidad VISIBLE: entre corchetes al final de la línea; se dibuja pegada al número (dato o resultado) sin perder la fórmula. Solo dibujo: no convierte ni comprueba dimensiones. <code>^3</code>→³, <code>*</code>→·</td></tr>
 <tr><td><code>@var</code> · <code>@{expr}</code></td><td>combinar texto + variable: “var = valor” · valor</td></tr>
 </table>
 

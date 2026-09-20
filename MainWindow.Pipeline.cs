@@ -794,6 +794,7 @@ namespace HekatanLisp
             var notationOf = new string[lines.Length];        // línea de NOTACIÓN pura (f(x)=…, y=f(x)=…): se dibuja, no se calcula
             var funcMap = new Dictionary<string, (List<string> ps, LispConverter.N body)>();  // f(x)=x²+1 → aplicar f(3)
             var deqTag = new string[lines.Length];             // etiqueta @@(…) que va a la DERECHA (estilo libro)
+            var unitOf = new string[lines.Length];             // unidad VISIBLE [kN] del final de la línea (solo dibujo)
             var aliasOf = new List<string>[lines.Length];      // Fx = F_1 = Expand{…}: los nombres del medio (F_1)
             // ETIQUETA de ecuación: @@(texto) al FINAL de una línea de MATEMÁTICA → número a la derecha.
             // La VARIABLE queda a la IZQUIERDA (como Calcpad/Hekatan Lab). Compat: acepta el viejo #deq.
@@ -817,6 +818,8 @@ namespace HekatanLisp
                     lines[i] = System.Text.RegularExpressions.Regex.Replace(m.Groups[1].Value.Trim(), @"^#deq\s+", "");
                     deqTag[i] = m.Groups[2].Value;
                 }
+                // UNIDAD visible al final:  P_1 = 35 [kN]  → se quita ANTES de calcular y se dibuja después
+                if (LispConverter.SepararUnidad(lines[i].TrimEnd(), out var sinUnidad, out var unidadVis)) { lines[i] = sinUnidad; unitOf[i] = unidadVis; }
             }
             var isPlot = new bool[lines.Length];   // línea = directiva de gráfica → marca su POSICIÓN en el documento
             var isTabla = new bool[lines.Length];   // línea = #tabla(…)(…) de RESULTADOS calculados
@@ -1086,6 +1089,10 @@ namespace HekatanLisp
             for (int i = 0; i < lines.Length && i < display.Count; i++)
                 if (aliasOf[i] != null && aliasOf[i].Count > 0 && labels[i] != null && display[i].StartsWith(labels[i] + " = "))
                     display[i] = labels[i] + " = " + string.Join(" = ", aliasOf[i]) + display[i].Substring(labels[i].Length);
+            // UNIDAD visible: va pegada a la ecuación, ANTES de la etiqueta de la derecha.
+            for (int i = 0; i < lines.Length && i < display.Count; i++)
+                if (unitOf[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal) && display[i] != LispConverter.PlotSlot)
+                    display[i] += LispConverter.UnitSep + unitOf[i];
             // #deq: pega la ETIQUETA (a la derecha) al final de la línea de display correspondiente.
             for (int i = 0; i < lines.Length && i < display.Count; i++)
                 if (deqTag[i] != null && display[i].Length > 0 && !display[i].StartsWith(LispConverter.TxtMark, StringComparison.Ordinal))
@@ -1536,7 +1543,9 @@ namespace HekatanLisp
                 // y se conserva en matemática). La variable sigue a la izquierda.
                 string tg = null; var mt = System.Text.RegularExpressions.Regex.Match(l, @"^(.*?)\s*@@\((.*?)\)\s*$");
                 if (mt.Success) { tg = mt.Groups[2].Value; l = mt.Groups[1].Value.Trim(); }
+                string un = null; if (LispConverter.SepararUnidad(l, out var lSinU, out var uLinea)) { un = uLinea; l = lSinU; }
                 string conv = ConvertEqLine(l, toLisp);
+                if (un != null) conv += toLisp ? "   ; [" + un + "]" : " [" + un + "]";
                 if (tg != null) conv += toLisp ? "   ; " + tg : " @@(" + tg + ")";
                 sb.AppendLine(conv);
             }

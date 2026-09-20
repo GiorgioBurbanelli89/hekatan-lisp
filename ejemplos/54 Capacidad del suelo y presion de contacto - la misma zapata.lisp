@@ -180,6 +180,30 @@ rel = dec(q_max/q_med, 2)
 #tabla("Comprobación","Q_ué compara","Valor [tonf/m²]:2","Límite [tonf/m²]:2")({"Geotécnica (Meyerhof)","Estructural (contacto)"}; [17.26, 27.31]; [17.26, 0])
 #: La fila estructural no lleva límite porque no se compara contra el suelo: ese 27.31 tonf/m² entra como carga en el cálculo de la placa, y de ahí salen los momentos y el punzonamiento.
 
+## 9 · El ejemplo 3.8 de punta a punta, y su gráfica
+
+#: Todo junto, en el orden en que se resuelve: primero la geometría efectiva —lo único que cambia con la excentricidad—, después la resistencia del suelo, que casi no cambia, y al final la carga, que es el producto de las dos.
+#: El trapecio del caso II está elegido para que su centro de gravedad caiga bajo la carga. Con esa condición hay fórmula cerrada (deducida en la hoja 48) y no hace falta leer el ábaco a ojo. Con la excentricidad corta relativa 0.15/1.5 = 0.1:
+m_c = dec((0.75 - 0.3)/(0.5 + 6*0.1^2), 4) [m]
+L_1c = dec(1.6*0.8036, 4) [m]
+A_ef = dec(1.5*0.8036, 4) [m^2]
+B_ef = dec(1.2054/1.2857, 4) [m]
+#: El área efectiva sale 1.2054 m² contra los 1.193 m² que el libro lee del ábaco: **un 1 % de diferencia, y es del ábaco, no del método**. El lado corto efectivo, 0.9375 m, **no depende de la excentricidad larga**: al correr la carga el trapecio se acorta, pero no se estrecha.
+#: Con esa geometría, la presión última y la carga. Los factores de forma llevan ahora la relación efectiva 0.9375/1.2857 = 0.729:
+F_qsc = dec(1 + 0.729*tan(pi/6), 4)
+F_γsc = dec(1 - 0.4*0.729, 4)
+q_uc = dec(12.6*18.401*1.4209*1.1347 + 0.5*18*0.9375*22.402*0.7084, 1) [kPa]
+Q_uc = dec(1.2054*508.0, 1) [kN]
+#: 612.3 kN contra los 606 kN del libro: la diferencia viene entera del ábaco leído a ojo.
+
+### Lo que enseña la gráfica
+
+#: El eje horizontal es la excentricidad larga en metros, de cero a medio metro; el vertical, la carga última en [kN]. La zapata es siempre la misma y el suelo también: lo único que se mueve es dónde cae la carga.
+#fplot(Q_u = 2.678571*(452.1*(0.75 - x) + 25.03), [0 0.5])
+#: Es una RECTA que baja. Centrada, la zapata aguanta 975 kN; con la carga corrida 0.30 m —el caso del libro— aguanta 612; a 0.45 m, 430. **La mitad de la capacidad se pierde en 45 centímetros de excentricidad.**
+#: Y el porqué está en los dos factores. La resistencia del suelo apenas se mueve: 508 kPa con la carga corrida contra 485 kPa centrada, o sea **sube** un 5 % (el trapecio se hace más alargado y el factor de forma lo premia). Lo que se desploma es el área que trabaja: de 2.009 m² a 1.205 m², un 40 % menos. **La excentricidad no debilita el suelo: le quita superficie.**
+#: Por eso una zapata excéntrica no se arregla mejorando el terreno, sino agrandándola del lado al que se corre la carga, o quitando la excentricidad con una viga de amarre.
+
 ## En una línea
 
 #: La geotecnia dice cuánta carga aguanta el suelo, y de ahí salen el tamaño de la zapata y el balasto del modelo; la rigidez de la zapata dice si la presión se puede repartir con una recta; y solo cuando ese producto adimensional queda por debajo de π/4 la fórmula del libro y el elemento finito TIENEN que dar lo mismo, que es lo que se midió en la hoja 48.

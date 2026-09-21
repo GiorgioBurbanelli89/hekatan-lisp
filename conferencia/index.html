@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conferencia · El análisis modal — material</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4ecd8; --paper-dark:#e8dcc0; --ink:#1a2942; --ink-soft:#3d4f6f;
+    --ink-fade:#6a7a96; --gold:#b08d4f; --green:#2d6a4f; --red:#a23232;
+    --grid:rgba(26,41,66,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Newsreader',Georgia,serif;color:var(--ink);background:var(--paper);
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                     linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;
+    padding:56px 24px 90px;line-height:1.55;
+  }
+  .caja{max-width:1000px;margin:0 auto}
+  .kicker{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--gold);margin-bottom:12px;text-align:center}
+  h1{font-family:'Cormorant Garamond',serif;font-size:54px;font-weight:600;
+    text-align:center;line-height:1.08}
+  .sub{text-align:center;font-style:italic;color:var(--ink-soft);font-size:21px;
+    margin:8px 0 14px}
+  .quien{text-align:center;color:var(--ink-fade);font-size:17px;margin-bottom:40px;
+    font-family:'JetBrains Mono',monospace;letter-spacing:.06em}
+
+  h2{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;
+    margin:46px 0 6px;border-bottom:2px solid var(--gold);padding-bottom:8px}
+  .h2sub{color:var(--ink-soft);font-size:17px;font-style:italic;margin-bottom:18px}
+
+  .item{display:flex;gap:18px;align-items:flex-start;background:var(--paper-dark);
+    border-left:5px solid var(--gold);padding:18px 22px;margin-bottom:14px}
+  .item.verde{border-left-color:var(--green)}
+  .item .ic{font-size:30px;line-height:1;flex:0 0 auto;margin-top:2px}
+  .item .txt{flex:1}
+  .item .tit{font-size:21px;font-weight:600;margin-bottom:3px}
+  .item .des{font-size:16.5px;color:var(--ink-soft)}
+  .item a{color:var(--ink);text-decoration:none;border-bottom:1.5px solid var(--gold)}
+  .item a:hover{background:rgba(176,141,79,.2)}
+  .btn{font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:.1em;
+    text-transform:uppercase;background:var(--ink);color:var(--paper);
+    padding:9px 16px;text-decoration:none;border-radius:4px;white-space:nowrap;
+    align-self:center}
+  .btn:hover{background:var(--gold)}
+  .btn.claro{background:none;color:var(--ink);border:1px solid var(--ink)}
+
+  .aviso{background:rgba(176,141,79,.16);border-left:5px solid var(--gold);
+    padding:18px 24px;margin:26px 0;font-size:17.5px}
+  code{font-family:'JetBrains Mono',monospace;background:rgba(26,41,66,.08);
+    padding:2px 7px;border-radius:3px;font-size:.88em;word-break:break-all}
+
+  footer{text-align:center;margin-top:60px;padding-top:24px;
+    border-top:1px solid rgba(26,41,66,.2);color:var(--ink-fade);
+    font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase}
+  footer b{color:var(--gold);font-weight:400}
+  @media(max-width:640px){
+    h1{font-size:38px} .item{flex-wrap:wrap} .btn{align-self:flex-start}
+  }
+</style>
+</head>
+<body>
+<div class="caja">
+
+  <div class="kicker">CEINCI-LAB · 21 de septiembre de 2026</div>
+  <h1>El análisis modal</h1>
+  <div class="sub">de dónde sale la masa, qué hace el diafragma<br>y por qué un galpón no es un edificio</div>
+  <div class="quien">Ing. Jorge Burbano — Hekatan Engineers</div>
+
+  <div class="aviso">
+    <strong>Todo lo de aquí se abre en el navegador, sin instalar nada.</strong>
+    Las hojas de cálculo además <strong>se editan y se recalculan</strong>: quien quiera
+    comprobar un número, lo comprueba y cambia los datos.
+  </div>
+
+  <h2>Las diapositivas</h2>
+  <div class="h2sub">Se manejan con → ← o la barra espaciadora. Se escalan solas a cualquier pantalla.</div>
+
+  <div class="item">
+    <div class="ic">📽</div>
+    <div class="txt">
+      <div class="tit">El análisis modal, en 8 pantallas</div>
+      <div class="des">El sismo · qué es un modo · los tres modos del galpón ·
+        participación de masa · la masa que usa ETABS por defecto · la membrana ·
+        el galpón sin diafragma.</div>
+    </div>
+    <a class="btn" href="./diapositivas/CONFERENCIA_MODAL.html">abrir</a>
+  </div>
+
+  <h2>Las hojas de cálculo</h2>
+  <div class="h2sub">Hekatan LISP web — se ve el resultado, y con un clic el código que lo produce.</div>
+
+  <div class="item verde">
+    <div class="ic">📐</div>
+    <div class="txt">
+      <div class="tit">El análisis modal explicado: masa, diafragma y torsión</div>
+      <div class="des">Qué es un modo, de dónde sale la masa, qué hace el diafragma
+        rígido y flexible, el momento polar J, y la torsión. Con gráficas 3D que se giran
+        con el ratón.</div>
+    </div>
+    <a class="btn" href="https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=60%20El%20analisis%20modal%20explicado%20-%20masa%20diafragma%20y%20torsion.lisp">abrir</a>
+  </div>
+
+  <div class="item verde">
+    <div class="ic">📐</div>
+    <div class="txt">
+      <div class="tit">La membrana en ETABS y SAP2000</div>
+      <div class="des">Qué esfuerzos tiene y cuáles no, por qué la chapa no flecta
+        (con el cálculo de D), cómo reparte la carga a las correas, y la masa que
+        toma el modal si no tocas nada.</div>
+    </div>
+    <a class="btn" href="https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=64%20La%20membrana%20en%20ETABS%20y%20SAP2000%20-%20carga%20a%20las%20correas%20y%20masa%20del%20modal.lisp">abrir</a>
+  </div>
+
+  <h2>El modelo</h2>
+  <div class="h2sub">El galpón de verdad, con sus 12 modos, girable en el navegador.</div>
+
+  <div class="item">
+    <div class="ic">🏗</div>
+    <div class="txt">
+      <div class="tit">Galpón curvo 20 × 30 m — Hekatan Struct</div>
+      <div class="des">Modal de 12 modos. Se gira, se anima cada modo y se lee la
+        tabla de participación de masa.</div>
+    </div>
+    <a class="btn" href="https://giorgioburbanelli89.github.io/hekatan-struct-lineal/workspace/?m=95IbfMcEkc2xvBS&modal=12">abrir</a>
+  </div>
+
+  <h2>Los vídeos</h2>
+  <div class="h2sub">Cortos, con voz y subtítulos.</div>
+
+  <div class="item">
+    <div class="ic">🎬</div>
+    <div class="txt">
+      <div class="tit">El análisis modal explicado <span style="color:var(--ink-fade)">· 46 s</span></div>
+      <div class="des">Los tres modos del galpón, con sus periodos reales.</div>
+    </div>
+    <a class="btn claro" href="./videos/EL%20ANALISIS%20MODAL%20EXPLICADO.mp4" download>descargar</a>
+  </div>
+
+  <div class="item">
+    <div class="ic">🎬</div>
+    <div class="txt">
+      <div class="tit">Por qué se usa el análisis modal <span style="color:var(--ink-fade)">· 62 s</span></div>
+      <div class="des">El suelo se mueve · tu masa genera la fuerza · resonancia ·
+        el espectro · el desacople en modos.</div>
+    </div>
+    <a class="btn claro" href="./videos/POR%20QUE%20ANALISIS%20MODAL.mp4" download>descargar</a>
+  </div>
+
+  <h2>El código</h2>
+  <div class="h2sub">Para quien quiera reproducir los números.</div>
+
+  <div class="item">
+    <div class="ic">🐍</div>
+    <div class="txt">
+      <div class="tit">De n grados de libertad a 3 por planta</div>
+      <div class="des">La condensación estática y la matriz de coordenadas de piso:
+        <code>K_E = Σ Aᵀ K_L A</code>. Corre solo y se comprueba a mano.
+        Enseña que el acoplamiento <code>K_yθ</code> aparece cuando el centro de
+        rigidez se separa del de masa — eso es la torsión.</div>
+    </div>
+    <a class="btn claro" href="./condensacion_piso.py" download>descargar</a>
+  </div>
+
+  <div class="item">
+    <div class="ic">📄</div>
+    <div class="txt">
+      <div class="tit">Las hojas en texto plano</div>
+      <div class="des">Los dos <code>.lisp</code>, para abrirlos en Hekatan LISP de
+        escritorio o leerlos con cualquier editor.</div>
+    </div>
+    <a class="btn claro" href="./hojas/">ver</a>
+  </div>
+
+  <footer>
+    <b>Hekatan Engineers</b> — herramientas computacionales para ingeniería estructural
+  </footer>
+
+</div>
+</body>
+</html>

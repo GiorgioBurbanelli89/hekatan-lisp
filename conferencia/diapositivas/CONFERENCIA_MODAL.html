@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El análisis modal, en 8 pantallas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+<style>
+  :root{
+    --paper:#f4ecd8; --paper-dark:#e8dcc0; --ink:#1a2942; --ink-soft:#3d4f6f;
+    --ink-fade:#6a7a96; --gold:#b08d4f; --green:#2d6a4f; --red:#a23232;
+    --blue:#2c5e8e; --grid:rgba(26,41,66,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#0e1420;overflow:hidden}
+  body{font-family:'Newsreader',Georgia,serif;color:var(--ink)}
+
+  /* el escenario: una pantalla 16:9 que se escala sola */
+  #escena{position:fixed;inset:0;display:grid;place-items:center}
+  #hoja{
+    width:1600px;height:900px;background:var(--paper);position:relative;
+    box-shadow:0 30px 90px rgba(0,0,0,.55);
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                     linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;
+    transform-origin:center center;
+  }
+  .slide{display:none;position:absolute;inset:0;padding:64px 82px 88px}
+  .slide.on{display:block}
+
+  .kicker{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  h1{font-family:'Cormorant Garamond',serif;font-size:60px;font-weight:600;
+    line-height:1.06;margin-bottom:10px}
+  h1.chica{font-size:48px}
+  .sub{font-size:23px;color:var(--ink-soft);font-style:italic;margin-bottom:30px}
+  p{font-size:25px;line-height:1.5;margin-bottom:18px}
+  .lead{font-size:30px;line-height:1.42}
+  strong{color:var(--ink);font-weight:600}
+  em.g{color:var(--gold);font-style:normal;font-weight:600}
+  em.r{color:var(--red);font-style:normal;font-weight:600}
+  em.v{color:var(--green);font-style:normal;font-weight:600}
+
+  .caja{background:var(--paper-dark);border-left:6px solid var(--gold);
+    padding:24px 30px;margin:20px 0;font-size:25px;line-height:1.45}
+  .caja.roja{border-left-color:var(--red)}
+  .caja.verde{border-left-color:var(--green)}
+
+  .mate{text-align:center;margin:26px 0;font-size:30px}
+  .mate.gr{font-size:38px}
+
+  table{width:100%;border-collapse:collapse;font-size:22px;margin-top:14px}
+  th{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--gold);text-align:left;
+    padding:10px 14px;border-bottom:2px solid var(--gold)}
+  td{padding:11px 14px;border-bottom:1px solid rgba(26,41,66,.12);vertical-align:top}
+  td.n{text-align:right;font-family:'JetBrains Mono',monospace}
+  tr.destaca td{background:rgba(176,141,79,.18);font-weight:600}
+
+  code,pre{font-family:'JetBrains Mono',monospace}
+  pre{background:#16213a;color:#d8e3f2;padding:20px 24px;border-radius:6px;
+    font-size:18px;line-height:1.55;overflow:hidden;margin:16px 0}
+  pre b{color:#e8b84b}
+  code.i{background:rgba(26,41,66,.08);padding:2px 8px;border-radius:4px;font-size:.88em}
+
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:8px}
+  .col h3{font-family:'Cormorant Garamond',serif;font-size:32px;margin-bottom:12px}
+  .col.sano h3{color:var(--green)} .col.malo h3{color:var(--red)}
+
+  /* pie */
+  .pie{position:absolute;left:82px;right:82px;bottom:34px;display:flex;
+    justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.16em;
+    color:var(--ink-fade);text-transform:uppercase;
+    border-top:1px solid rgba(26,41,66,.16);padding-top:14px}
+  .marca{position:absolute;inset:0;display:grid;place-items:center;
+    font-family:'Cormorant Garamond',serif;font-size:96px;color:var(--ink);
+    opacity:.045;pointer-events:none;user-select:none}
+
+  /* portada */
+  .portada{display:grid;place-items:center;text-align:center;height:100%}
+  .portada h1{font-size:82px;margin-bottom:4px}
+  .franja{background:var(--ink);color:var(--paper);padding:18px 44px;
+    font-family:'Cormorant Garamond',serif;font-size:34px;margin:26px 0 22px}
+
+  /* dibujo del galpon */
+  svg .ln{stroke:var(--ink);stroke-width:3;fill:none}
+  svg .ln.mov{stroke:var(--blue);stroke-width:4}
+  svg .ln.gh{stroke:rgba(26,41,66,.2);stroke-width:2}
+
+  /* navegacion */
+  #nav{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    display:flex;gap:8px;align-items:center;background:rgba(14,20,32,.92);
+    padding:9px 14px;border-radius:30px;font-family:'JetBrains Mono',monospace;
+    font-size:13px;color:#cfd8e8;z-index:9}
+  #nav button{background:none;border:1px solid rgba(255,255,255,.28);color:#cfd8e8;
+    border-radius:16px;padding:5px 14px;cursor:pointer;font:inherit}
+  #nav button:hover{background:rgba(255,255,255,.12)}
+  #cnt{padding:0 8px;color:#e8b84b}
+</style>
+</head>
+<body>
+<div id="escena"><div id="hoja">
+
+<!-- 1 -->
+<section class="slide on">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="portada">
+    <div>
+      <div class="kicker">CEINCI-LAB · Conferencia</div>
+      <h1>El análisis modal</h1>
+      <div class="sub">de dónde sale la masa, qué hace el diafragma<br>y por qué un galpón no es un edificio</div>
+      <div class="franja">Hekatan Struct · galpón curvo de 20 × 30 m</div>
+      <p style="font-size:22px;color:var(--ink-soft)">Ing. Jorge Burbano — <em class="g">Hekatan Engineers</em></p>
+      <p style="font-size:19px;color:var(--ink-fade)">21 de septiembre de 2026</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">1 · el punto de partida</div>
+  <h1>El sismo no empuja: el suelo se mueve</h1>
+  <div class="sub">y por eso la fuerza la genera tu propia masa</div>
+  <div class="mate gr">$$\mathbf{M}\,\ddot{\mathbf u} \;+\; \mathbf{C}\,\dot{\mathbf u} \;+\; \mathbf{K}\,\mathbf u \;=\; -\,\mathbf{M}\,\mathbf r\,\ddot u_g(t)$$</div>
+  <div class="caja">
+    El lado derecho <strong>no es una carga que alguien aplica</strong>: es la aceleración
+    del suelo $\ddot u_g$ multiplicada por la masa.
+  </div>
+  <p class="lead" style="margin-top:22px">
+    <em class="r">Más masa = más sismo.</em> De ahí que en diseño sísmico se trabaje por
+    reducir peso, no por añadir sección.
+  </p>
+  <div class="pie"><span>Hekatan Struct</span><span>2 / 8</span></div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">3 · los tres modos del galpón</div>
+  <h1 class="chica">Dos trasladan, el tercero gira</h1>
+  <div class="mate" style="margin:10px 0 2px">$$\left(\mathbf{K}-\omega^2\mathbf{M}\right)\boldsymbol\phi=\mathbf 0\qquad T=\frac{2\pi}{\omega}\qquad \boldsymbol\phi_i^T\mathbf M\boldsymbol\phi_j=0\;\;(i\neq j)$$</div>
+  <svg viewBox="0 0 1440 300" style="width:100%;height:230px;margin:0">
+    <!-- modo 1: traslacion -->
+    <g transform="translate(60,20)">
+      <path class="ln gh" d="M20 240 L20 120 Q180 40 340 120 L340 240"/>
+      <path class="ln mov" d="M20 240 L48 120 Q200 40 356 120 L340 240"/>
+      <line class="ln" x1="0" y1="240" x2="360" y2="240" stroke-width="2"/>
+      <text x="180" y="278" text-anchor="middle" font-size="22" fill="#2c5e8e">MODO 1 · traslada · T = 0.3311 s</text>
+    </g>
+    <!-- modo 2: traslacion en planta -->
+    <g transform="translate(520,20)">
+      <rect class="ln gh" x="60" y="60" width="240" height="160"/>
+      <rect class="ln mov" x="92" y="60" width="240" height="160"/>
+      <text x="196" y="278" text-anchor="middle" font-size="22" fill="#2c5e8e">MODO 2 · traslada · T = 0.3238 s</text>
+    </g>
+    <!-- modo 3: torsion -->
+    <g transform="translate(980,20)">
+      <rect class="ln gh" x="60" y="60" width="240" height="160"/>
+      <g transform="rotate(7 180 140)"><rect x="60" y="60" width="240" height="160"
+         style="stroke:#a23232;stroke-width:4;fill:none"/></g>
+      <path d="M180 140 m -46 0 a 46 46 0 1 1 30 43" style="stroke:#b08d4f;stroke-width:3.5;fill:none"/>
+      <text x="180" y="278" text-anchor="middle" font-size="22" fill="#a23232">MODO 3 · GIRA · T = 0.2794 s</text>
+    </g>
+  </svg>
+  <div class="caja">
+    <strong>El orden es el criterio.</strong> Si el modo que gira saliera <em class="r">primero</em>,
+    la estructura tendría problema de torsión. Aquí gira el <em class="v">tercero</em>.
+  </div>
+  <div class="pie"><span>Hekatan Struct · SAP2000 · ETABS</span><span>3 / 8</span></div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">4 · participación de masa</div>
+  <h1 class="chica">Por qué basta con el 90 %</h1>
+  <div class="mate">$$\Gamma_i=\boldsymbol\phi_i^T\mathbf M\,\mathbf r
+  \qquad\qquad M_{\text{ef},i}=\Gamma_i^{\,2}
+  \qquad\qquad \%M_i=\frac{M_{\text{ef},i}}{M_{\text{total}}}\times100$$</div>
+  <table>
+    <tr><th>Modo</th><th>T [s]</th><th>Qué hace</th><th style="text-align:right">Suma de masa</th></tr>
+    <tr class="destaca"><td>1</td><td class="n">0.3311</td><td>traslada en $U_y$</td><td class="n">99.7 %</td></tr>
+    <tr><td>2</td><td class="n">0.3238</td><td>traslada en $U_x$</td><td class="n">99.9 %</td></tr>
+    <tr><td>3</td><td class="n">0.2794</td><td><em class="r">gira &mdash; $R_z$</em></td><td class="n">&mdash;</td></tr>
+    <tr><td>4</td><td class="n">0.1725</td><td><em class="g">la cubierta bota &mdash; $U_z$ 38 %</em></td><td class="n">&mdash;</td></tr>
+  </table>
+  <div class="caja" style="margin-top:20px">
+    Los modos altos casi no tienen masa, así que casi no aportan fuerza.
+    <strong>Por eso se corta en el 90 %</strong> &mdash; aquí con dos modos ya se cumple.
+  </div>
+  <div class="pie"><span>Hekatan Struct</span><span>4 / 8</span></div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">5 · de dónde sale la masa</div>
+  <h1 class="chica">Lo que ETABS escribe si no tocas nada</h1>
+<pre>MASSSOURCE  "MsSrc1"   INCLUDEELEMENTS "Yes"   INCLUDEADDEDMASS "Yes"
+                       <b>INCLUDELOADS "No"</b>       INCLUDELATERALMASS "Yes"
+                       <b>INCLUDEVERTICALMASS "No"</b>  LUMPATSTORIES "Yes"  ISDEFAULT "Yes"</pre>
+  <div class="dos" style="margin-top:14px">
+    <div class="col">
+      <h3 style="color:var(--red)">INCLUDELOADS "No"</h3>
+      <p style="font-size:22px">La carga de cubierta <strong>no es masa</strong> si no la añades
+      al <em>Mass Source</em>. La estructura sale más ligera, y por tanto más
+      <strong>rápida</strong>: periodos cortos y falsos.</p>
+    </div>
+    <div class="col">
+      <h3 style="color:var(--red)">INCLUDEVERTICALMASS "No"</h3>
+      <p style="font-size:22px">ETABS no cuenta masa vertical. <strong>SAP2000 sí</strong>,
+      por defecto. Mismo modelo, dos programas, periodos distintos
+      &mdash; y ninguno está equivocado.</p>
+    </div>
+  </div>
+  <div class="pie"><span>Extraído del .e2k que escribe ETABS 22</span><span>5 / 8</span></div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">6 · la cubierta</div>
+  <h1 class="chica">La membrana: sólo trabaja en su plano</h1>
+  <div class="dos">
+    <div class="col">
+      <table>
+        <tr><th>Esfuerzo</th><th>Membrana</th></tr>
+        <tr><td>$F_{11},F_{22}$ &mdash; axiles</td><td><em class="v">sí</em></td></tr>
+        <tr><td>$F_{12}$ &mdash; cortante en el plano</td><td><em class="v">sí</em></td></tr>
+        <tr><td>$M_{11},M_{22},M_{12}$</td><td><em class="r">NO</em></td></tr>
+        <tr><td>$V_{13},V_{23}$</td><td><em class="r">NO</em></td></tr>
+      </table>
+      <p style="font-size:21px;margin-top:14px">Y no es arbitrario:</p>
+      <div class="mate" style="font-size:23px;margin:8px 0">$$D=\frac{E\,t^{3}}{12(1-\nu^{2})}$$</div>
+      <p style="font-size:21px">El zinc de 0.8 mm tiene $D$ <strong>1 500 000 veces</strong>
+      menor que una losa de 20 cm. Va con $t^3$.</p>
+    </div>
+    <div class="col">
+      <h3>¿Y la carga a las correas?</h3>
+      <p style="font-size:22px">Sin flexión no la puede llevar por rigidez.
+      Así que <strong>no la calcula: la reparte</strong>.</p>
+      <pre style="font-size:17px">MODELINGTYPE   "Membrane"
+<b>ONEWAYLOADDIST "Yes"</b></pre>
+      <div class="caja verde" style="font-size:23px">
+        Por <strong>área tributaria</strong>, igual que a mano:
+        <div class="mate" style="font-size:27px;margin:10px 0">$$w = q\cdot s$$</div>
+      </div>
+      <p style="font-size:21px"><em class="r">Si la dejas como losa</em>, la chapa flecta
+      y se lleva carga que en obra no lleva: las correas salen descargadas de más.</p>
+    </div>
+  </div>
+  <div class="pie"><span>Hekatan Struct · ETABS · SAP2000</span><span>6 / 8</span></div>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">7 · el galpón no es un edificio</div>
+  <h1 class="chica">Sin losa no hay diafragma</h1>
+  <div class="dos">
+    <div class="col sano">
+      <h3>Edificio &mdash; diafragma rígido</h3>
+      <p style="font-size:22px">La losa obliga a todos los nudos de la planta a moverse
+      juntos: <strong>3 grados por piso</strong>.</p>
+      <div class="mate" style="font-size:24px">$$\mathbf{K}_E=\sum \mathbf{A}^T\,\mathbf{K}_L\,\mathbf{A}$$</div>
+      <p style="font-size:21px">con $\mathbf A=[\cos\alpha\;\;\operatorname{sen}\alpha\;\;r\,]$
+      y $\mathbf M=\operatorname{diag}(m,\,m,\,J)$.</p>
+    </div>
+    <div class="col malo">
+      <h3>Galpón &mdash; masas puntuales</h3>
+      <p style="font-size:22px">No hay losa. Cada nudo va por su cuenta:
+      <strong>masa en las tres direcciones</strong>.</p>
+      <div class="mate" style="font-size:24px">$$\mathbf M=\begin{bmatrix}\mathbf M_{HT}&&\\&\mathbf M_{HL}&\\&&\mathbf M_{V}\end{bmatrix}$$</div>
+      <p style="font-size:21px">Transversal, longitudinal y vertical &mdash; como en
+      <strong>Aguiar</strong>, estructuras de lámina delgada.</p>
+    </div>
+  </div>
+  <div class="caja roja" style="margin-top:18px">
+    <strong>Y por eso aquí la masa vertical importa.</strong> El arco de 20 m tiene modos
+    verticales de verdad &mdash; el modo 4, con $U_z$ del 38 %, es la cubierta botando.
+    ETABS, por defecto, no lo enseña.
+  </div>
+  <div class="pie"><span>Aguiar · CEINCI-ESPE</span><span>7 / 8</span></div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">9 · pruébalo tú</div>
+  <h1 class="chica">Abierto, en el navegador, sin instalar nada</h1>
+  <table>
+    <tr><th>Qué</th><th>Dónde</th></tr>
+    <tr class="destaca"><td>El galpón curvo, con sus 12 modos</td>
+      <td><code class="i">giorgioburbanelli89.github.io/hekatan-struct-lineal/workspace/?m=95IbfMcEkc2xvBS&amp;modal=12</code></td></tr>
+    <tr><td>El modal explicado, hoja de cálculo</td>
+      <td><code class="i">…/hekatan-lisp/#ej=60 El analisis modal explicado…</code></td></tr>
+    <tr><td>La membrana en ETABS y SAP2000</td>
+      <td><code class="i">…/hekatan-lisp/#ej=64 La membrana en ETABS y SAP2000…</code></td></tr>
+  </table>
+  <div class="caja" style="margin-top:26px;font-size:27px">
+    Las hojas <strong>se abren, se editan y se recalculan</strong> en el navegador.
+    Quien quiera comprobar un número, lo comprueba.
+  </div>
+  <p class="lead" style="margin-top:26px;text-align:center">
+    <em class="g">Hekatan Engineers</em> &mdash; herramientas computacionales para ingeniería estructural
+  </p>
+  <div class="pie"><span>Gracias</span><span>8 / 8</span></div>
+</section>
+
+</div></div>
+
+<div id="nav">
+  <button id="ant">← anterior</button>
+  <span id="cnt">1 / 8</span>
+  <button id="sig">siguiente →</button>
+</div>
+
+<script>
+const hoja = document.getElementById('hoja');
+const slides = [...document.querySelectorAll('.slide')];
+const cnt = document.getElementById('cnt');
+let i = 0;
+
+function ver(n){
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle('on', k === i));
+  cnt.textContent = (i + 1) + ' / ' + slides.length;
+  location.hash = 'd' + (i + 1);
+}
+function escalar(){
+  const s = Math.min(window.innerWidth / 1600, (window.innerHeight - 70) / 900);
+  hoja.style.transform = 'scale(' + s + ')';
+}
+document.getElementById('sig').onclick = () => ver(i + 1);
+document.getElementById('ant').onclick = () => ver(i - 1);
+addEventListener('keydown', e => {
+  if (['ArrowRight',' ','PageDown','Enter'].includes(e.key)) { e.preventDefault(); ver(i + 1); }
+  if (['ArrowLeft','PageUp','Backspace'].includes(e.key))   { e.preventDefault(); ver(i - 1); }
+  if (e.key === 'Home') ver(0);
+  if (e.key === 'End')  ver(slides.length - 1);
+});
+addEventListener('resize', escalar);
+escalar();
+const h = parseInt((location.hash || '').replace('#d', ''), 10);
+ver(isNaN(h) ? 0 : h - 1);
+</script>
+</body>
+</html>

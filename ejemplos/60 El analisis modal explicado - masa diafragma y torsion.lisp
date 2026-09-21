@@ -87,14 +87,15 @@ J_cm = dec(4.2012*(20^2 + 30^2)/12, 2)
 
 #: Cuanto mayor es J_cm, más le cuesta girar. Por eso una planta alargada gira más fácil que una cuadrada de la misma área.
 
-## 5b · La forma del modo, en 3D
+## 5b · La forma del modo, dibujada como es
 
-#: Así se deforma el galpón en su primer modo: una sola panza, sin nudos intermedios. **Gíralo con el ratón.**
-#surf(sin(pi*x)*sin(pi*y), [0 1], [0 1])
-#: Y el modo torsional, el que GIRA: una mitad sube mientras la otra baja. Por eso se llama torsión.
-#surf(sin(pi*x)*sin(2*pi*y), [0 1], [0 1])
-#: Míralos desde arriba y se entiende de un vistazo: el primero es todo del mismo signo; el torsional tiene una raya donde no se mueve nada.
-#map(sin(pi*x)*sin(2*pi*y), [0 1], [0 1])
+#: **Aviso, porque es un error muy común:** el modo 1 del galpón **no es una panza vertical**. Es **traslacional**: la estructura entera se va de lado. La panza vertical es otra cosa (un modo de placa), y aquí no toca.
+#: La forma del modo traslacional se mide en **altura**: abajo, en los apoyos, el movimiento es cero; arriba es el máximo. Crece con la altura, pero no en línea recta:
+#fplot(sin(pi*x/2), [0 1])
+#: El eje horizontal es la altura (0 en la base, 1 en la cubierta) y el vertical, cuánto se mueve. Toda la estructura se va **al mismo lado a la vez**: no hay ningún punto intermedio quieto.
+#: El **torsional** sí tiene un punto quieto, pero en **planta**, no en altura: el centro de giro. A un lado la estructura va a la derecha y al otro a la izquierda:
+#fplot(x - 0.5, [0 1])
+#: El cero del medio es el eje de giro. Eso es lo que distingue un modo que **traslada** de uno que **gira**: el que traslada no tiene cero, el que gira sí.
 
 ## 6 · Lo que hay que mirar, en orden
 

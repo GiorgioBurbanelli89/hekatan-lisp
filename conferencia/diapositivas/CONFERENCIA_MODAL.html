@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>El análisis modal, en 8 pantallas</title>
+<title>El análisis modal, en 9 pantallas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
@@ -126,6 +126,40 @@ MathJax = {
   </div>
 </section>
 
+<!-- 1b -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">0 &middot; el andamio, en una pantalla</div>
+  <h1 class="chica">La cadena es la misma en 1D y en 2D</h1>
+  <table style="font-size:21px">
+    <tr><th>Paso</th><th>1D &mdash; barra</th><th>2D &mdash; Q4</th></tr>
+    <tr><td><strong>1</strong> funciones de forma $N$</td>
+        <td>$N_1=\frac{1-\xi}{2}$ &mdash; 2 nudos</td>
+        <td>$N_i=\tfrac14(1+\xi\xi_i)(1+\eta\eta_i)$ &mdash; 4 nudos</td></tr>
+    <tr class="destaca"><td><strong>2</strong> jacobiano $J$</td>
+        <td><em class="v">escalar</em>: $J=L/2$</td>
+        <td><em class="r">matriz 2&times;2</em>: hacen falta $J^{-1}$ <em>y</em> $\det J$</td></tr>
+    <tr><td><strong>3</strong> matriz $B$</td>
+        <td>$B=\dfrac{dN}{d\xi}J^{-1}$ &mdash; $1\times 2$</td>
+        <td>$B=J^{-1}\dfrac{\partial N}{\partial \xi}$ &mdash; $3\times 8$</td></tr>
+    <tr><td><strong>4</strong> cuadratura de Gauss</td>
+        <td>$\sum_i w_i f(\xi_i)$</td>
+        <td>doble suma: $\sum_i\sum_j w_i w_j f(\xi_i,\eta_j)$</td></tr>
+    <tr><td><strong>5</strong> rigidez $K$</td>
+        <td>$\int B^T E B A dx$ &mdash; $2\times 2$</td>
+        <td>$\iint B^T \mathbf{D} B t \det J d\xi d\eta$ &mdash; $8\times 8$</td></tr>
+    <tr><td><strong>6</strong> resolver</td>
+        <td colspan="2" style="text-align:center">$\mathbf{K}\mathbf{u}=\mathbf{F}$ &mdash; igual en los dos</td></tr>
+  </table>
+  <div class="caja" style="margin-top:16px;font-size:22px">
+    <strong>Y esto es an&aacute;lisis LINEAL por tres hip&oacute;tesis a la vez:</strong>
+    material el&aacute;stico ($\mathbf{D}$ constante) &middot; peque&ntilde;os desplazamientos
+    ($B$ en la geometr&iacute;a inicial) &middot; equilibrio en la posici&oacute;n original.
+    Por eso $\mathbf{K}$ se arma <em class="g">una sola vez</em>.
+  </div>
+  <div class="pie"><span>Hekatan Struct</span><span>2 / 9</span></div>
+</section>
+
 <!-- 2 -->
 <section class="slide">
   <div class="marca">Hekatan Engineers</div>
@@ -141,7 +175,7 @@ MathJax = {
     <em class="r">Más masa = más sismo.</em> De ahí que en diseño sísmico se trabaje por
     reducir peso, no por añadir sección.
   </p>
-  <div class="pie"><span>Hekatan Struct</span><span>2 / 8</span></div>
+  <div class="pie"><span>Hekatan Struct</span><span>3 / 9</span></div>
 </section>
 
 <!-- 4 -->
@@ -177,7 +211,7 @@ MathJax = {
     <strong>El orden es el criterio.</strong> Si el modo que gira saliera <em class="r">primero</em>,
     la estructura tendría problema de torsión. Aquí gira el <em class="v">tercero</em>.
   </div>
-  <div class="pie"><span>Hekatan Struct · SAP2000 · ETABS</span><span>3 / 8</span></div>
+  <div class="pie"><span>Hekatan Struct · SAP2000 · ETABS</span><span>4 / 9</span></div>
 </section>
 
 <!-- 5 -->
@@ -199,7 +233,7 @@ MathJax = {
     Los modos altos casi no tienen masa, así que casi no aportan fuerza.
     <strong>Por eso se corta en el 90 %</strong> &mdash; aquí con dos modos ya se cumple.
   </div>
-  <div class="pie"><span>Hekatan Struct</span><span>4 / 8</span></div>
+  <div class="pie"><span>Hekatan Struct</span><span>5 / 9</span></div>
 </section>
 
 <!-- 6 -->
@@ -224,7 +258,7 @@ MathJax = {
       &mdash; y ninguno está equivocado.</p>
     </div>
   </div>
-  <div class="pie"><span>Extraído del .e2k que escribe ETABS 22</span><span>5 / 8</span></div>
+  <div class="pie"><span>Extraído del .e2k que escribe ETABS 22</span><span>6 / 9</span></div>
 </section>
 
 <!-- 7 -->
@@ -260,7 +294,7 @@ MathJax = {
       y se lleva carga que en obra no lleva: las correas salen descargadas de más.</p>
     </div>
   </div>
-  <div class="pie"><span>Hekatan Struct · ETABS · SAP2000</span><span>6 / 8</span></div>
+  <div class="pie"><span>Hekatan Struct · ETABS · SAP2000</span><span>7 / 9</span></div>
 </section>
 
 <!-- 8 -->
@@ -291,7 +325,7 @@ MathJax = {
     verticales de verdad &mdash; el modo 4, con $U_z$ del 38 %, es la cubierta botando.
     ETABS, por defecto, no lo enseña.
   </div>
-  <div class="pie"><span>Aguiar · CEINCI-ESPE</span><span>7 / 8</span></div>
+  <div class="pie"><span>Aguiar · CEINCI-ESPE</span><span>8 / 9</span></div>
 </section>
 
 <!-- 10 -->
@@ -315,14 +349,14 @@ MathJax = {
   <p class="lead" style="margin-top:26px;text-align:center">
     <em class="g">Hekatan Engineers</em> &mdash; herramientas computacionales para ingeniería estructural
   </p>
-  <div class="pie"><span>Gracias</span><span>8 / 8</span></div>
+  <div class="pie"><span>Gracias</span><span>9 / 9</span></div>
 </section>
 
 </div></div>
 
 <div id="nav">
   <button id="ant">← anterior</button>
-  <span id="cnt">1 / 8</span>
+  <span id="cnt">1 / 9</span>
   <button id="sig">siguiente →</button>
 </div>
 

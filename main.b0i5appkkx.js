@@ -280,6 +280,8 @@ async function abrirDesdeEnlace() {
   if (p.get('op')) op = p.get('op');
   if (p.get('v')) view = p.get('v');
   if (p.get('solo') === '1') setSolo(true);
+  // embebido en otra pagina: se esconde toda la aplicacion y queda el papel
+  if (p.get('embed') === '1') { setSolo(true); document.body.classList.add('embebido'); }
   if (p.get('ej')) {
     const f = p.get('ej'), t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
     ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;

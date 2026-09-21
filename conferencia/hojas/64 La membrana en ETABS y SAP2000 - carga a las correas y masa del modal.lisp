@@ -28,8 +28,8 @@ q = 0.5 'carga de cubierta [kN/m²] ; s = 1.5 'separación entre correas [m] ; �
 #: Las dos rigideces de una placa, por unidad de ancho. La de membrana va con `t`, la de flexión con `t³`:
 #: K_{m} = E·t / (1 − ν²)      y      D = E·t³ / (12·(1 − ν²))
 
-K_m = dec(200000000*0.0008/(1 - 0.3^2), 1) [kN/m] 'rigidez de MEMBRANA del zinc de 0.8 mm
-D_z = dec(200000000*0.0008^3/(12*(1 - 0.3^2)), 6) [kN·m] 'rigidez a FLEXIÓN del mismo zinc
+K_m = dec(200000000*0.0008/(1 - 0.3^2), 1) [kN/m] 'rigidez de membrana del zinc de 0.8 mm
+D_z = dec(200000000*0.0008^3/(12*(1 - 0.3^2)), 6) [kN·m] 'rigidez a flexión del mismo zinc
 D_h = dec(21000000*0.20^3/(12*(1 - 0.2^2)), 1) [kN·m] 'la de una losa de hormigón de 20 cm
 razon = dec(14583.3/0.009377, 0) [—] 'cuántas veces más rígida es la losa
 

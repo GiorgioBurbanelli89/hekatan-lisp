@@ -65,20 +65,21 @@
 
 ## 4b · Cada formulación, abierta y con números
 
-#: Cada una empieza en **símbolos**, sigue en **números** y acaba en **gráfica**. **Se abren con un clic** — o por su número, en el desplegable *ejemplos* de arriba:
+#: Cada una empieza en **símbolos**, sigue en **números** y acaba en **gráfica**. Se abren por su número, en el desplegable *ejemplos* de arriba:
 
 #| N.º | Hoja | Qué desarrolla |
 #|---|---|---|
-#| **40** | [Shell-Thin, la placa delgada como ETABS y SAP2000](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=40%20Shell%20Thin%20-%20placa%20delgada%20como%20ETABS%20y%20SAP2000.lisp) | la formulación que usan los dos |
-#| **41** | [Shell-Thin: primero simbólico, luego numérico](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=41%20Shell%20Thin%20-%20simbolico%20y%20luego%20numerico.lisp) | la `K` en símbolos y luego con cifras |
-#| **42** | [Shell-Thin: Jacobiano, forma y Gauss](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=42%20Shell%20Thin%20-%20Jacobiano%20funciones%20de%20forma%20y%20Gauss.lisp) | las tres piezas de la integral |
-#| **43** | [La teoría del Discrete Kirchhoff (DKQ)](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=43%20Placa%20DK%20-%20teoria%20del%20Discrete%20Kirchhoff%20y%20Shell-Thin.lisp) | de dónde sale el Shell-Thin |
-#| **44** | [M_{11}, M_{22} y M_{12}: el elemento MZC](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=44%20M11%20M22%20M12%20por%20elementos%20finitos%20-%20el%20elemento%20MZC.lisp) | los momentos, elemento a elemento |
-#| **39** | [Losa rectangular BFS](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=39%20Losa%20rectangular%20BFS%20-%20lo%20que%20el%20motor%20SI%20puede%20deducir.lisp) | lo que el motor sí deduce solo |
-#| **64** | [La membrana en ETABS y SAP2000](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=64%20La%20membrana%20en%20ETABS%20y%20SAP2000%20-%20carga%20a%20las%20correas%20y%20masa%20del%20modal.lisp) | esfuerzos, correas y masa |
-#| **11** | [Cáscara no lineal de Simo, Fox y Rifai](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=11%20Cascara%20no%20lineal%20-%20Simo-Fox-Rifai.lisp) | más allá de lo lineal |
+#| **40** | Shell-Thin, la placa delgada como ETABS y SAP2000 | la formulación que usan los dos |
+#| **41** | Shell-Thin: primero simbólico, luego numérico | la rigidez en símbolos y luego con cifras |
+#| **42** | Shell-Thin: Jacobiano, forma y Gauss | las tres piezas de la integral |
+#| **43** | La teoría del Discrete Kirchhoff (DKQ) | de dónde sale el Shell-Thin |
+#| **44** | M_{11}, M_{22} y M_{12}: el elemento MZC | los momentos, elemento a elemento |
+#| **39** | Losa rectangular BFS | lo que el motor sí deduce solo |
+#| **64** | La membrana en ETABS y SAP2000 | esfuerzos, correas y masa |
+#| **11** | Cáscara no lineal de Simo, Fox y Rifai | más allá de lo lineal |
 
-#: Y el modelo entero, con sus doce modos: [el galpón curvo en Hekatan Struct](https://giorgioburbanelli89.github.io/hekatan-struct-lineal/workspace/?m=95IbfMcEkc2xvBS&modal=12)
+#: Con su enlace directo, cada una, están en la carpeta de la conferencia.
+
 ## 5 · El análisis DINÁMICO
 
 #| Pieza | Wilson |

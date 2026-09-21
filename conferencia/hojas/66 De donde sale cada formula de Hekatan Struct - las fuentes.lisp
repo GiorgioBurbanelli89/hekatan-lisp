@@ -65,20 +65,20 @@
 
 ## 4b · Cada formulación, abierta y con números
 
-#: Cada una empieza en **símbolos**, sigue en **números** y acaba en **gráfica**. Se abren desde el desplegable **ejemplos** de arriba, por su número:
+#: Cada una empieza en **símbolos**, sigue en **números** y acaba en **gráfica**. Se abren por su número, en el desplegable *ejemplos* de arriba:
 
 #| N.º | Hoja | Qué desarrolla |
 #|---|---|---|
 #| **40** | Shell-Thin, la placa delgada como ETABS y SAP2000 | la formulación que usan los dos |
-#| **41** | Shell-Thin: primero simbólico, luego numérico | la `K` en símbolos y luego con cifras |
-#| **42** | Shell-Thin: Jacobiano, funciones de forma y Gauss | las tres piezas de la integral |
+#| **41** | Shell-Thin: primero simbólico, luego numérico | la rigidez en símbolos y luego con cifras |
+#| **42** | Shell-Thin: Jacobiano, forma y Gauss | las tres piezas de la integral |
 #| **43** | La teoría del Discrete Kirchhoff (DKQ) | de dónde sale el Shell-Thin |
-#| **44** | M_{11}, M_{22} y M_{12} por elementos finitos: el MZC | los momentos, elemento a elemento |
-#| **39** | Losa rectangular BFS | lo que el motor sí puede deducir solo |
-#| **64** | La membrana en ETABS y SAP2000 | esfuerzos, reparto a correas y masa |
-#| **11** | Cáscara no lineal de Simo, Fox y Rifai | la cáscara más allá de lo lineal |
+#| **44** | M_{11}, M_{22} y M_{12}: el elemento MZC | los momentos, elemento a elemento |
+#| **39** | Losa rectangular BFS | lo que el motor sí deduce solo |
+#| **64** | La membrana en ETABS y SAP2000 | esfuerzos, correas y masa |
+#| **11** | Cáscara no lineal de Simo, Fox y Rifai | más allá de lo lineal |
 
-#: Todas están también en la carpeta de la conferencia, con su enlace directo.
+#: Con su enlace directo, cada una, están en la carpeta de la conferencia.
 
 ## 5 · El análisis DINÁMICO
 

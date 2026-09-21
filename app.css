@@ -202,10 +202,12 @@ fieldset.grp legend { padding: 0 2px; }
   .menu .sub { min-width: 0; width: max-content; max-width: calc(100vw - 16px); }
 }
 
-/* Embebido en otra pagina (Hekatan Struct): se quitan el menu y la portada,
-   pero SE DEJA la barra de operaciones. Jorge, 21-sep-2026: la hoja se abre en
-   "solo resultado", y con ✎ se ve el codigo — asi la misma ventana sirve de
-   CALCULADORA DE COMPROBACION, que es para lo que se usa de verdad. */
-body.embebido .menu, body.embebido .intro { display: none !important; }
-body.embebido .ops { padding: 4px 8px; font-size: 12px; }
+/* Embebido en otra pagina (Hekatan Struct): se quitan el menu, la portada, la
+   marca y la barra de simplify/diff (esa es para expresiones sueltas). Queda lo
+   util: Ejecutar, las vistas, Compartir y el boton de volver al editor.
+   Jorge, 21-sep-2026: la hoja se abre en "solo resultado", y con la vuelta al
+   editor la misma ventana sirve de CALCULADORA DE COMPROBACION. */
+body.embebido .menu, body.embebido .intro, body.embebido .ops,
+body.embebido .modos .titulo, body.embebido .ejemplos { display: none !important; }
+body.embebido .modos { padding: 4px 8px; }
 body.embebido .salida { border-radius: 0; }

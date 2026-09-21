@@ -697,6 +697,7 @@ namespace HekatanLisp
             int id = System.Threading.Interlocked.Increment(ref _sliderId);
             string P(double v) => v.ToString("0.####", inv);
             var sb = new StringBuilder();
+            int ini = vals.Count / 2;       // se entra por el cuadro de en medio, no por el primero
             sb.Append("<div class=\"hksl\" id=\"hksl").Append(id).Append("\" style=\"margin:1.1em 0;text-align:center\">");
             sb.Append("<div style=\"display:grid\">");
             for (int i = 0; i < vals.Count; i++)
@@ -704,7 +705,7 @@ namespace HekatanLisp
                 string sv = P(vals[i]);
                 string sub = System.Text.RegularExpressions.Regex.Replace(plot,
                     @"(?<![\w.])" + System.Text.RegularExpressions.Regex.Escape(par) + @"(?![\w(])", "(" + sv + ")");
-                sb.Append("<div class=\"hkfr\" style=\"grid-area:1/1;visibility:").Append(i == 0 ? "visible" : "hidden")
+                sb.Append("<div class=\"hkfr\" style=\"grid-area:1/1;visibility:").Append(i == ini ? "visible" : "hidden")
                   .Append("\">").Append(OneFplotHtml(sub, byName, fns, inv)).Append("</div>");
             }
             sb.Append("</div>");
@@ -715,7 +716,7 @@ namespace HekatanLisp
               .Append(System.Net.WebUtility.HtmlEncode(par)).Append("</i> = <b class=\"hkval\">").Append(P(vals[0]))
               .Append("</b></div>")
               .Append("<input type=\"range\" min=\"0\" max=\"").Append(vals.Count - 1)
-              .Append("\" value=\"0\" step=\"1\" style=\"display:block;width:100%\">")
+              .Append("\" value=\"").Append(ini).Append("\" step=\"1\" style=\"display:block;width:100%\">")
               .Append("<div style=\"display:flex;justify-content:space-between;color:var(--mut);font-size:.85em\"><span>")
               .Append(P(vals[0])).Append("</span><span>arrastra</span><span>").Append(P(vals[vals.Count - 1]))
               .Append("</span></div></div>");

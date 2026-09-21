@@ -29,7 +29,7 @@ t.c = 0.20
 D.losa = dec(E.c*t.c^3/(12*(1 - 0.2^2)), 1)
 #: La relación entre las dos:
 razon = dec(D.losa/D.chapa, 0)
-#: **Por eso se modela como membrana.** No es una opción de gusto: la chapa es un millón y medio de veces menos rígida a flexión que una losa. Poner su flexión a cero no quita nada que existiera.
+#: **Por eso se modela como membrana.** No es un criterio arbitrario: la chapa es un millón y medio de veces menos rígida a flexión que una losa. Poner su flexión a cero no quita nada que existiera.
 #: Y se ve en la fórmula: la flexión va con **t al cubo**. Al bajar el espesor de 20 cm a 0.8 mm, el espesor se divide por 250, pero la rigidez a flexión se divide por 250 al cubo.
 
 ## 1b · Cuánto cae la rigidez a flexión al adelgazar
@@ -55,7 +55,7 @@ s = 1.5
 w = dec(q*s, 3)
 #: Esa `w` es la carga lineal que recibe cada correa. Y la misma cuenta a mano:
 #: cada correa recoge medio vano a cada lado, o sea el vano entero: `w = q · s`.
-#: **Aviso que cuesta caro:** si en vez de membrana dejas la cubierta como losa (`Shell`), la chapa empieza a **flectar** y se lleva carga que en la obra no lleva. Las correas salen más descargadas de lo que están de verdad.
+#: **Consecuencia de modelado:** si en vez de membrana dejas la cubierta como losa (`Shell`), la chapa empieza a **flectar** y se lleva carga que en la obra no lleva. Las correas salen más descargadas de lo que están de verdad.
 
 ## 2b · Cómo cambia la carga en la correa con la separación
 
@@ -75,9 +75,9 @@ w = dec(q*s, 3)
 #| `INCLUDEVERTICALMASS` | **No** | **masa vertical no** |
 #| `LUMPATSTORIES` | **Yes** | la concentra en los niveles |
 
-#: Léelo despacio, porque son dos trampas seguidas:
-#: **Trampa 1 — `INCLUDELOADS "No"`.** Si pones la cubierta como carga distribuida y no la metes en el *Mass Source*, para el modal **esa carga no existe**. La estructura pesa solo lo que pesan sus perfiles. Sale más ligera, y por tanto **más rápida**: periodos cortos y falsos.
-#: **Trampa 2 — `INCLUDEVERTICALMASS "No"`.** ETABS no cuenta la masa vertical. SAP2000 **sí** la cuenta por defecto. Mismo modelo, dos programas, periodos distintos — y ninguno está equivocado.
+#: Léelo despacio, porque son dos hipótesis implícitas seguidas:
+#: **Aviso 1 — `INCLUDELOADS "No"`.** Si pones la cubierta como carga distribuida y no la metes en el *Mass Source*, para el modal **esa carga no existe**. La estructura pesa solo lo que pesan sus perfiles. Sale más ligera, y por tanto **más rápida**: periodos cortos y falsos.
+#: **Aviso 2 — `INCLUDEVERTICALMASS "No"`.** ETABS no cuenta la masa vertical. SAP2000 **sí** la cuenta por defecto. Mismo modelo, dos programas, periodos distintos — y ninguno está equivocado.
 
 #| Programa | Masa de las cargas | Masa vertical |
 #|---|---|---|

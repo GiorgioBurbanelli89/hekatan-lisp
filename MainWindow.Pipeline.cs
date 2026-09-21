@@ -739,15 +739,33 @@ namespace HekatanLisp
         /// El dibujo es un canvas con JS propio (no SkiaSharp): tiene que responder al arrastre.</summary>
         private static string GaussHtml(string rest)
         {
-            bool porque = (rest ?? "").ToLowerInvariant().Contains("porque")
-                       || (rest ?? "").ToLowerInvariant().Contains("por que")
-                       || (rest ?? "").ToLowerInvariant().Contains("deduc");
+            string arg = (rest ?? "").ToLowerInvariant();
+            bool porque = arg.Contains("porque") || arg.Contains("por que") || arg.Contains("deduc");
+            // 21-sep-2026, Jorge: «la posicion de cada rectangulo y sus valores: necesito
+            // entender todas las variables» y «las 4 incognitas para encontrar xi con dos
+            // puntos no esta». De ahi estos dos modos.
+            bool vars = arg.Contains("vars") || arg.Contains("variables") || arg.Contains("tabla");
+            bool sist = arg.Contains("sistema") || arg.Contains("incognita");
             int id = System.Threading.Interlocked.Increment(ref _gaussId);
             string q = "g" + id;
             var sb = new StringBuilder();
             sb.Append("<div id=\"").Append(q).Append("\" style=\"margin:1.1em auto;max-width:880px;text-align:center\">");
             sb.Append("<canvas class=\"cv\" width=\"1280\" height=\"730\" style=\"width:100%;height:auto\"></canvas>");
-            if (porque)
+            if (sist)
+            {
+                // CUATRO barras para CUATRO incognitas: se ve que solo una combinacion
+                // cumple las cuatro condiciones a la vez.
+                sb.Append(Fila("x1", "<i>&xi;</i><sub>1</sub> = <b class=\"vx1\">-0.300</b>",
+                               "-990", "990", "-300", "-0.99", "0.99"));
+                sb.Append(Fila("x2", "<i>&xi;</i><sub>2</sub> = <b class=\"vx2\">0.300</b>",
+                               "-990", "990", "300", "-0.99", "0.99"));
+                sb.Append(Fila("w1", "<i>w</i><sub>1</sub> = <b class=\"vw1\">0.60</b>",
+                               "1", "200", "60", "0.01", "2.00"));
+                sb.Append(Fila("w2", "<i>w</i><sub>2</sub> = <b class=\"vw2\">0.60</b>",
+                               "1", "200", "60", "0.01", "2.00"));
+                sb.Append("<div class=\"rd\"></div>");
+            }
+            else if (porque)
             {
                 sb.Append(Fila("a", "posición de los dos puntos &nbsp;<i>&xi;</i> = &plusmn;<b class=\"va\">0.300</b>",
                                "10", "990", "300", "0.01", "0.99"));
@@ -763,9 +781,13 @@ namespace HekatanLisp
               .Append("#").Append(q).Append(" .ttl{color:var(--fg);font-size:1em;margin:.45em 0 .1em}")
               .Append("#").Append(q).Append(" .ext{display:flex;justify-content:space-between;color:var(--mut);font-size:.85em}")
               .Append("#").Append(q).Append(" .rd{margin:.6em auto 0;max-width:640px;background:#1d2333;color:#e8ecf5;")
-              .Append("border-radius:9px;padding:.55em .8em;font:500 15px/1.6 Consolas,monospace;text-align:left}")
+              .Append("border-radius:9px;padding:.5em .8em;font:600 21px/1.5 Consolas,monospace;text-align:left}")
               .Append("#").Append(q).Append(" .ok{color:#7ee2a8}#").Append(q).Append(" .no{color:#ff9d7a}</style>");
-            sb.Append("<script>").Append(porque ? GaussJsPorque(q) : GaussJsNormal(q)).Append("</script>");
+            sb.Append("<script>")
+              .Append(sist ? GaussJsSistema(q)
+                     : porque ? GaussJsPorque(q)
+                     : vars ? GaussJsVars(q) : GaussJsNormal(q))
+              .Append("</script>");
             sb.Append("</div>");
             return sb.ToString();
         }
@@ -889,6 +911,93 @@ function dib(){
 }
 sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
 
+        /// <summary>#gauss(vars): la misma cuadratura, pero enseñando TODAS las variables de
+        /// cada punto: dónde empieza y acaba su rectángulo, su peso, su altura y su aporte.</summary>
+        private static string GaussJsVars(string q) => "(function(){var c=document.getElementById('" + q + "');" +
+            GaussTabla + GaussComun + @"
+var sn=c.querySelector('.sn'),sg=c.querySelector('.sg'),rd=c.querySelector('.rd'),
+    vn=c.querySelector('.vn'),vg=c.querySelector('.vg');
+function dib(){
+  var n=+sn.value, g=+sg.value; vn.textContent=n; vg.textContent=g;
+  var f=function(t){return Math.pow((1+t)/2,g);};
+  var ex=2/(g+1), ap=0, xs=GX[n-1], ws=GW[n-1];
+  var ymin=-0.12,ymax=1.15;
+  ejes(ymin,ymax); area(f,ymin,ymax);
+  var filas='<table style=""width:100%;border-collapse:collapse;font-size:20px"">'+
+    '<tr style=""color:#9fb0d0""><td>i</td><td>xi_i</td><td>w_i</td>'+
+    '<td>f(xi_i)</td><td>w_i*f</td><td>su rectángulo</td></tr>';
+  for(var i=0;i<n;i++){
+    var x0=xs[i]-ws[i]/2, x1=xs[i]+ws[i]/2, h=f(xs[i]), apo=ws[i]*h; ap+=apo;
+    var yt=py(h,ymin,ymax), yb=py(0,ymin,ymax);
+    X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
+    X.fillRect(px(x0),yt,px(x1)-px(x0),yb-yt);
+    X.strokeRect(px(x0),yt,px(x1)-px(x0),yb-yt);
+    X.beginPath();X.arc(px(xs[i]),yt,9,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
+    X.fillText((i+1)+'',px(xs[i]),yb+42);
+    X.fillText('xi='+xs[i].toFixed(4),px(xs[i]),yb+72);
+    X.fillText('w='+ws[i].toFixed(4),px(xs[i]),yb+98);
+    filas+='<tr><td>'+(i+1)+'</td><td>'+xs[i].toFixed(4)+'</td><td>'+ws[i].toFixed(4)+
+           '</td><td>'+h.toFixed(4)+'</td><td>'+apo.toFixed(4)+'</td><td>de '+x0.toFixed(3)+
+           ' a '+x1.toFixed(3)+'</td></tr>';
+  }
+  filas+='</table>';
+  curva(f,ymin,ymax);
+  var err=Math.abs(ap-ex), anchos=0;
+  for(var j=0;j<n;j++) anchos+=ws[j];
+  rd.innerHTML='f(xi) = ((1+xi)/2)^'+g+filas+
+    'suma de los aportes = '+ap.toFixed(6)+' &nbsp; exacta = '+ex.toFixed(6)+
+    ' &nbsp; error = '+err.toFixed(6)+' '+
+    (err<1e-9?'<span class=""ok"">EXACTO</span>':'<span class=""no"">no llega</span>')+
+    '<br>los anchos suman '+anchos.toFixed(4)+' = el ancho del intervalo';
+}
+sn.addEventListener('input',dib);sn.addEventListener('change',dib);
+sg.addEventListener('input',dib);sg.addEventListener('change',dib);dib();})();";
+
+        /// <summary>#gauss(sistema): las CUATRO incógnitas de dos puntos —xi1, xi2, w1, w2—,
+        /// una barra por incógnita, y las cuatro condiciones que deben cumplirse a la vez.</summary>
+        private static string GaussJsSistema(string q) => "(function(){var c=document.getElementById('" + q + "');" +
+            GaussComun + @"
+var s1=c.querySelector('.sx1'),s2=c.querySelector('.sx2'),
+    q1=c.querySelector('.sw1'),q2=c.querySelector('.sw2'),rd=c.querySelector('.rd'),
+    v1=c.querySelector('.vx1'),v2=c.querySelector('.vx2'),
+    u1=c.querySelector('.vw1'),u2=c.querySelector('.vw2');
+function dib(){
+  var x1=+s1.value/1000, x2=+s2.value/1000, w1=+q1.value/100, w2=+q2.value/100;
+  v1.textContent=x1.toFixed(3); v2.textContent=x2.toFixed(3);
+  u1.textContent=w1.toFixed(2); u2.textContent=w2.toFixed(2);
+  var ymin=-0.12,ymax=1.15, f=function(t){return t*t;};
+  ejes(ymin,ymax); area(f,ymin,ymax);
+  var P=[[x1,w1],[x2,w2]];
+  for(var i=0;i<2;i++){
+    var xi=P[i][0], w=P[i][1], h=f(xi);
+    var yt=py(h,ymin,ymax), yb=py(0,ymin,ymax);
+    X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
+    X.fillRect(px(xi-w/2),yt,px(xi+w/2)-px(xi-w/2),yb-yt);
+    X.strokeRect(px(xi-w/2),yt,px(xi+w/2)-px(xi-w/2),yb-yt);
+    X.beginPath();X.arc(px(xi),yt,9,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
+    X.fillText('xi'+(i+1)+'='+xi.toFixed(3),px(xi),yb+72);
+    X.fillText('w'+(i+1)+'='+w.toFixed(2),px(xi),yb+98);
+  }
+  curva(f,ymin,ymax);
+  var S=[w1+w2, w1*x1+w2*x2, w1*x1*x1+w2*x2*x2, w1*Math.pow(x1,3)+w2*Math.pow(x2,3)];
+  var E=[2, 0, 2/3, 0];
+  var N=['f = 1 &nbsp;&nbsp;','f = xi &nbsp;','f = xi^2','f = xi^3'];
+  var txt='4 incógnitas: xi1, xi2, w1, w2 &nbsp;&rarr;&nbsp; 4 condiciones:', bien=0;
+  for(var k=0;k<4;k++){
+    var ok=Math.abs(S[k]-E[k])<2e-3; if(ok) bien++;
+    txt+='<br>'+N[k]+' : suma = '+S[k].toFixed(4)+' &nbsp; debe ser '+E[k].toFixed(4)+' &nbsp; '+
+         (ok?'<span class=""ok"">OK</span>':'<span class=""no"">no</span>');
+  }
+  txt+='<br>'+(bien===4
+      ? '<span class=""ok"">LAS CUATRO A LA VEZ: xi = -+0.5774 y w = 1, 1</span>'
+      : '<span class=""no"">cumples '+bien+' de 4</span>');
+  rd.innerHTML=txt;
+}
+[s1,s2,q1,q2].forEach(function(s){s.addEventListener('input',dib);s.addEventListener('change',dib);});
+dib();})();";
+
         // agrega una función: por NOMBRE ya deducido, o expresión MATLAB inline (1-s^2)
         private static void AddFn(List<(string, LispConverter.N)> sel, Dictionary<string, LispConverter.N> byName, string spec)
         {
@@ -940,6 +1049,76 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
 
         /// <summary>El RESULTADO como FORMAS LISP. Autodetecta programa (ejecuta) vs expresiones
         /// (les aplica la operación elegida: auto/simplify/expand/deriv).</summary>
+        /// Salida de cada bloque de control plegado, por numero de linea (ver PlegarBloques).
+        private Dictionary<int, string> _salidasProg = new Dictionary<int, string>();
+
+        /// <summary>
+        /// Trocea una hoja que MEZCLA texto y bloques de control (for/while/if/function).
+        ///
+        /// Jorge, 21-sep-2026: «el for de MATLAB en la hoja no funciona». Y no era el
+        /// `for`: era que en cuanto aparecia uno, TODA la hoja se traducia y se ejecutaba
+        /// como un programa, devolviendo un solo valor. Titulo, textos y formulas
+        /// desaparecian.
+        ///
+        /// Aqui se hace como Mathcad Prime (medido en un .mcdx real: `ml:program` con
+        /// `ml:for` dentro): el bloque de control es UNA COSA dentro de la hoja, no un
+        /// modo aparte. Cada bloque se pliega a una sola linea marcador, se ejecuta con
+        /// las asignaciones que venian antes (para que vea sus variables) y su salida se
+        /// guarda para pintarla en ese sitio. El resto de la hoja sigue su camino de
+        /// siempre, linea a linea.
+        /// </summary>
+        private string PlegarBloques(string text, out Dictionary<int, string> salidas)
+        {
+            salidas = new Dictionary<int, string>();
+            var src = text.Replace("\r", "").Split('\n');
+            var abre = new System.Text.RegularExpressions.Regex(
+                @"^\s*(for|while|if|function)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var cierra = new System.Text.RegularExpressions.Regex(
+                @"^\s*end\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            // una asignacion simple: «s = 0», «E = 2.1e8». Es el contexto que ve el bloque.
+            var asigna = new System.Text.RegularExpressions.Regex(@"^\s*([A-Za-z_]\w*)\s*=\s*[^=].*$");
+
+            var salida = new List<string>();
+            var contexto = new List<string>();
+            for (int i = 0; i < src.Length; i++)
+            {
+                if (!abre.IsMatch(src[i]))
+                {
+                    if (asigna.IsMatch(src[i]) && !src[i].TrimStart().StartsWith("#")) contexto.Add(src[i]);
+                    salida.Add(src[i]);
+                    continue;
+                }
+                // el bloque: hasta su `end`, contando los anidados
+                var cuerpo = new List<string>();
+                int nivel = 0, j = i;
+                for (; j < src.Length; j++)
+                {
+                    if (abre.IsMatch(src[j])) nivel++;
+                    else if (cierra.IsMatch(src[j])) nivel--;
+                    cuerpo.Add(src[j]);
+                    if (nivel == 0) break;
+                }
+                i = j;
+                // se ejecuta con el contexto delante, para que vea las variables de la hoja
+                string prog = string.Join("\n", contexto) + (contexto.Count > 0 ? "\n" : "") +
+                              string.Join("\n", cuerpo);
+                string res;
+                try { res = RunLispClean(MatlabToLisp.Translate(prog).Executable); }
+                catch (Exception ex) { res = "(" + ex.Message + ")"; }
+                salidas[salida.Count] = (res ?? "").TrimEnd();
+                // marcador: una linea de TEXTO, que el resto del pipeline ya sabe pintar
+                salida.Add("#: " + Esc(res));
+            }
+            return string.Join("\n", salida);
+        }
+
+        /// El resultado de un bloque, como texto de una sola linea para la hoja.
+        private static string Esc(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "(sin salida)";
+            return "`" + s.Replace("\r", "").Replace("\n", " · ").Trim() + "`";
+        }
+
         private List<string> ComputeResult(string text, string dvar)
         {
             _ranProgram = false;
@@ -951,6 +1130,28 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
             // palabras de la prosa como «Y», «El», «La».
             // Además: griegas Unicode (λ) → nombre, y los nombres que chocarían en LISP (m/M, T, Pi)
             // renombrados a una forma única. Ver LispConverter.PrepareNames.
+            // Los bloques de control se pliegan ANTES de preparar nombres: plegar
+            // cambia el numero de lineas, y de aqui para abajo todo el pipeline
+            // trabaja con arrays indexados por linea. Plegar despues los descuadra
+            // (probado el 21-sep-2026: salia el CSS volcado como contenido).
+            if (!LooksLikeLisp(text) &&
+                System.Text.RegularExpressions.Regex.IsMatch(text, @"(^|
+)\s*(for|while|if|function)"))
+            {
+                bool hayHoja = System.Text.RegularExpressions.Regex.IsMatch(
+                    text, @"(^|
+)\s*(#[:#>|<]|#\s*(dibujo|map|mapa|fplot|surf|tabla|graf))",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!hayHoja)
+                {
+                    _ranProgram = true;
+                    try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
+                    catch (Exception ex) { return new List<string> { "...  (" + ex.Message + ")" }; }
+                }
+                text = PlegarBloques(text, out _salidasProg);
+
+            }
+
             text = LispConverter.PrepareNames(text);
             _srcPrepared = text;
 
@@ -963,14 +1164,6 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
             }
             // Solo EJECUTAR (imperativo) si hay CONTROL DE FLUJO real (for/while/if/function).
             // Las asignaciones simples "N1 = expr" NO se ejecutan: son etiquetas simbólicas.
-            if (!LooksLikeLisp(text) &&
-                System.Text.RegularExpressions.Regex.IsMatch(text, @"(^|\n)\s*(for|while|if|function)\b"))
-            {
-                _ranProgram = true;
-                try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
-                catch (Exception ex) { return new List<string> { "…  (" + ex.Message + ")" }; }
-            }
-
             // DESPEJAR: cada línea "lhs = rhs" (o "expr" que implica expr = 0) → resolver para la variable.
             if (_op == "despejar")
             {

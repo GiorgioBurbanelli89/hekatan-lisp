@@ -122,26 +122,33 @@ body{--slw:1600px;--slh:900px;}
 .slide.on{opacity:1;pointer-events:auto;transform:none;}
 .slide.portada{display:flex;flex-direction:column;justify-content:center;text-align:center;}
 
+/* ecuaciones y gráfica LADO A LADO: apiladas, la gráfica caía al borde inferior
+   y no se leía nada desde la sala */
+.dos{display:flex;gap:34px;align-items:flex-start;}
+.dos>.izq{flex:1 1 46%;min-width:0;}
+.dos>.der{flex:1 1 54%;min-width:0;}
+.dos .ws-eq{font-size:32px;}
+.dos svg{max-width:100%!important;}
+
 /* el contenido se encoge solo si no cabe (JS mide y pone --k) */
 .wrap{transform-origin:top left;}
 .slide.portada .wrap{transform-origin:top center;}
 
 /* tipografía de PROYECTOR: todo más grande que en la hoja */
-.slide .ws-fmt{font-size:26px;line-height:1.5;margin:.42em 0;}
-.slide .ws-eq{font-size:30px;margin:.5em 0;}
+.slide .ws-fmt{font-size:30px;line-height:1.45;margin:.35em 0;}
+.slide .ws-eq{font-size:36px;margin:.42em 0;}
 .slide .m-expr{font-size:1em;}
 .slide img{max-width:100%;height:auto;}
-.slide svg{max-width:880px!important;}        /* gráficas de proyector, no de hoja A4 */
-.slide .hkfr svg{max-width:760px!important;}
+.slide svg{max-width:1180px!important;}       /* gráficas de proyector, no de hoja A4 */
+.slide .hkfr svg{max-width:1100px!important;}
 .slide .ws-h1{font-size:54px;font-weight:700;line-height:1.15;}
 .slide .ws-h2{display:none;}          /* el título va en la barra de arriba */
 h2.tit{margin:0 0 26px 0;font:600 40px/1.15 'Segoe UI',system-ui,sans-serif;
   color:var(--fg);border-bottom:3px solid var(--dib-azul);padding-bottom:14px;}
 h2.tit .num{color:var(--dib-azul);margin-right:.35em;}
 
-/* revelado por pasos: lo que aún no toca, atenuado (no oculto: no salta el layout) */
-.step{opacity:.08;filter:blur(1.5px);transition:opacity .3s ease, filter .3s ease;}
-.step.vis{opacity:1;filter:none;}
+/* la diapositiva entra COMPLETA (Jorge: «no hagas que pase por partes, déjalo colocado») */
+.step{opacity:1;}
 
 /* cromo */
 #barra{position:fixed;left:0;bottom:0;height:5px;background:var(--dib-azul);
@@ -198,22 +205,15 @@ JS = """
   }
   function pinta(){
     slides.forEach(function(s,n){ s.classList.toggle('on', n===i); });
-    var ps=pasos(slides[i]);
-    ps.forEach(function(p,n){ p.classList.toggle('vis', n<=paso); });
+
     pie.textContent=(i+1)+' / '+slides.length;
     barra.style.width=((i)/(slides.length-1)*100)+'%';
     escala();
     location.hash='d'+(i+1);
   }
-  function adelante(){
-    var ps=pasos(slides[i]);
-    if(paso<ps.length-1){ paso++; pinta(); return; }
-    if(i<slides.length-1){ i++; paso=0; pinta(); }
-  }
-  function atras(){
-    if(paso>0){ paso--; pinta(); return; }
-    if(i>0){ i--; paso=pasos(slides[i]).length-1; pinta(); }
-  }
+  // sin pasos: la flecha pasa de DIAPOSITIVA, no de bloque
+  function adelante(){ if(i<slides.length-1){ i++; pinta(); } }
+  function atras(){ if(i>0){ i--; pinta(); } }
   function ir(n){ i=Math.max(0,Math.min(slides.length-1,n)); paso=pasos(slides[i]).length-1; pinta(); }
 
   document.addEventListener('keydown',function(e){
@@ -229,7 +229,7 @@ JS = """
     else if(e.key==='End'){ ir(slides.length-1); }
     else if(e.key==='t'||e.key==='T'){ document.body.classList.toggle('claro'); }
     else if(e.key==='f'||e.key==='F'){ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
-    else if(e.key==='a'||e.key==='A'){ slides[i].querySelectorAll('.step').forEach(function(p){p.classList.add('vis');}); paso=pasos(slides[i]).length-1; }
+
   });
   document.getElementById('deck').addEventListener('click',function(e){
     if(e.target.closest('a')) return;
@@ -266,9 +266,23 @@ def construir(html: str, logo_b64: str, titulo_pie: str) -> str:
                    + "</span>" + resto.strip() + "</h2>")
         else:
             cab = '<h2 class="tit">' + tit + "</h2>"
-        pasos = "".join('<div class="step">' + b + "</div>" for b in bloques)
+        # un bloque es "media" si trae dibujo: gráfica del motor, canvas o imagen
+        def es_media(b):
+            return ("hk-plotslot" in b or "<svg" in b or "<canvas" in b
+                    or "<img" in b or "hksl" in b)
+        media = [b for b in bloques if es_media(b)]
+        texto = [b for b in bloques if not es_media(b)]
+        ecs = sum(1 for b in texto if "ws-eq" in b)
+        if media and ecs >= 2:          # ecuaciones + dibujo: a dos columnas
+            cuerpo = ('<div class="dos"><div class="izq">'
+                      + "".join('<div class="step">' + b + "</div>" for b in texto)
+                      + '</div><div class="der">'
+                      + "".join('<div class="step">' + b + "</div>" for b in media)
+                      + "</div></div>")
+        else:
+            cuerpo = "".join('<div class="step">' + b + "</div>" for b in bloques)
         out.append('<section class="slide">' + cab + '<div class="wrap">'
-                   + pasos + "</div></section>")
+                   + cuerpo + "</div></section>")
         ind.append('<a href="#" onclick="hkIr(%d);return false;">%s</a>' % (k, tit))
 
     marca = ('<div id="marca">'
@@ -282,7 +296,7 @@ def construir(html: str, logo_b64: str, titulo_pie: str) -> str:
         + '<div id="deck"><div id="stage">' + "".join(out) + "</div></div>"
         + '<div id="barra"></div>' + marca
         + '<div id="pie">1 / 1</div>'
-        + '<div id="ayuda">← →  avanzar · O índice · F pantalla completa · A todo</div>'
+        + '<div id="ayuda">← →  pasar · O índice · F pantalla completa</div>'
         + '<div id="indice"><h3>' + titulo_pie + "</h3>"
         + '<a href="#" onclick="hkIr(0);return false;">Portada</a>' + "".join(ind) + "</div>"
         + "".join(colas)

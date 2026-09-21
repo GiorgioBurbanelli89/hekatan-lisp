@@ -274,6 +274,24 @@ namespace HekatanLisp
              .Append("\" style=\"").Append(css).Append("\"/>");
             c.Ext(a, b); c.Ext(d, e);
         }
+        // Punta de flecha RELLENA, orientada según (x0,y0)->(x1,y1) y de tamaño
+        // constante en papel. Antes las puntas se dibujaban con poligono() de
+        // vértices fijos: quedaban huecas, torcidas y separadas del trazo.
+        const double PUNTA_MM = 2.6, PUNTA_ANCHO = 0.40;   // ancho = fracción del largo
+
+        static double PuntaLargo(Ctx c) => PUNTA_MM / c.K;   // mm de papel -> unidades de dibujo
+
+        static void Punta(Ctx c, double x0, double y0, double x1, double y1, Sty st, bool conTrazo)
+        {
+            double dx = x1 - x0, dy = y1 - y0, n = Math.Sqrt(dx * dx + dy * dy);
+            if (n < 1e-12) return;
+            double ux = dx / n, uy = dy / n, lg = Math.Min(PuntaLargo(c), n * 0.9), an = lg * PUNTA_ANCHO;
+            if (conTrazo) Line(c, x0, y0, x1 - ux * lg * 0.85, y1 - uy * lg * 0.85, st);
+            var relleno = new Sty { Col = st.Col, Fill = true, FillOp = 1.0, NoStroke = true };
+            Poly(c, new[] { x1, x1 - ux * lg - uy * an, x1 - ux * lg + uy * an },
+                    new[] { y1, y1 - uy * lg + ux * an, y1 - uy * lg - ux * an }, true, relleno);
+        }
+
         static void Poly(Ctx c, IList<double> xs, IList<double> ys, bool closed, Sty st, string extraFill = null)
         {
             var sb = new StringBuilder();
@@ -302,7 +320,7 @@ namespace HekatanLisp
         sealed class Obs { public int N; public string Estado; public string Texto; public double[] X, Y; public double Dx = double.NaN, Dy = double.NaN; }
 
         static readonly HashSet<string> Known = new HashSet<string> {
-            "linea","polilinea","poligono","rect","circulo","arco","texto","cota","cotas","cotasx","cotasy",
+            "linea","polilinea","poligono","rect","circulo","arco","flecha","flechamomento","texto","cota","cotas","cotasx","cotasy",
             "ejex","ejey","ejesx","ejesy","hueco","achurado","varilla","varillas","fila","estribo","seccion",
             "leyenda","obs","observacion"
         };
@@ -653,6 +671,35 @@ namespace HekatanLisp
                      .Append(" 0 ").Append(sweep > 180 ? 1 : 0).Append(" 0 ").Append(F(ex)).Append(' ').Append(F(ey))
                      .Append("\" style=\"").Append(StrokeCss(st)).Append(";fill:none\"/>");
                     c.Ext(c.Px(x - r), c.Py(y + r)); c.Ext(c.Px(x + r), c.Py(y - r));
+                    break;
+                }
+                case "flecha":   // flecha(x0, y0, x1, y1, estilo) — la PUNTA cae exactamente en (x1,y1)
+                {
+                    double x0 = V(c, Pos(p, 0)), y0 = V(c, Pos(p, 1)), x1 = V(c, Pos(p, 2)), y1 = V(c, Pos(p, 3));
+                    var st = Style(StyS(p));
+                    Punta(c, x0, y0, x1, y1, st, true);
+                    break;
+                }
+                case "flechamomento":   // flechamomento(xc, yc, r, a1, a2, estilo): arco con la punta TANGENTE en a2
+                {
+                    double xc = V(c, Pos(p, 0)), yc = V(c, Pos(p, 1)), r = V(c, Pos(p, 2));
+                    double a1 = V(c, Pos(p, 3)), a2 = V(c, Pos(p, 4));
+                    var st = Style(StyS(p));
+                    // el arco se traza por puntos para poder derivar la tangente en el extremo;
+                    // con <path A> no se sabe con qué pendiente termina y la punta sale torcida
+                    int n = 96;
+                    var xs = new double[n]; var ys = new double[n];
+                    for (int i = 0; i < n; i++)
+                    {
+                        double t = (a1 + (a2 - a1) * i / (n - 1.0)) * Math.PI / 180;
+                        xs[i] = xc + r * Math.Cos(t); ys[i] = yc + r * Math.Sin(t);
+                    }
+                    // se corta antes del final: ahí empieza la punta
+                    double lg = PuntaLargo(c);
+                    int corte = n - 1;
+                    while (corte > 1 && Math.Sqrt(Math.Pow(xs[corte] - xs[n - 1], 2) + Math.Pow(ys[corte] - ys[n - 1], 2)) < lg) corte--;
+                    Poly(c, xs.Take(corte + 1).ToArray(), ys.Take(corte + 1).ToArray(), false, st);
+                    Punta(c, xs[corte], ys[corte], xs[n - 1], ys[n - 1], st, false);
                     break;
                 }
                 case "texto":   // texto(x, y, "texto", tamaño_mm, ancla "i|c|d", ángulo) — x, y pueden ser vectores

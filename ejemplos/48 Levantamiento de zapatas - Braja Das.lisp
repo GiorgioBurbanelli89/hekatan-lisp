@@ -36,8 +36,7 @@ e_c = B/6
 #  achurado(0.8, 0.5, 0.4, 0.9, "diagonal")
 #  rect(0.8, 0.5, 0.4, 0.9, "media")
 #  linea(1, -0.1, 1, 1.9, "eje")
-#  linea(1.2, 2.0, 1.2, 1.45, "rojo")
-#  poligono(1.2, 1.42, 1.15, 1.56, 1.25, 1.56, "rojo")
+#  flecha(1.2, 2.0, 1.2, 1.42, "rojo")
 #  texto(1.27, 1.85, "Q", 3, "i")
 #  poligono(0, 0, 2, 0, 2, -0.8, 0, -0.2, "azul")
 #  linea(0, -0.2, 2, -0.8, "azul")
@@ -66,11 +65,9 @@ q_t = 4*Q/(3*L*(B - 2*e))
 #  achurado(0.8, 0.5, 0.4, 0.9, "diagonal")
 #  rect(0.8, 0.5, 0.4, 0.9, "media")
 #  linea(1, -0.1, 1, 1.9, "eje")
-#  linea(1.6, 2.0, 1.6, 1.45, "rojo")
-#  poligono(1.6, 1.42, 1.55, 1.56, 1.65, 1.56, "rojo")
+#  flecha(1.6, 2.0, 1.6, 1.42, "rojo")
 #  texto(1.67, 1.85, "Q", 3, "i")
-#  linea(1.6, 1.4, 1.6, -1.0, "puntos")
-#  poligono(0.8, 0, 2, 0, 2, -1.0, "azul")
+#  flecha(1.6, 1.4, 0.8, 0, "puntos")
 #  linea(1.1, 0, 1.1, -0.25, "azul")
 #  linea(1.4, 0, 1.4, -0.5, "azul")
 #  linea(1.7, 0, 1.7, -0.75, "azul")
@@ -158,8 +155,8 @@ A_c = dec(0.5*(L_1c + L_2c)*B_d, 4)
 
 #: El área efectiva A' de Das es de CAPACIDAD DE CARGA: una presión última UNIFORME sobre la parte de la zapata cuyo centroide cae bajo la carga. No es el área que de verdad toca el suelo en servicio. Para la presión de contacto, Das (ec. 6.53) y la sección 3 suponen una zapata RÍGIDA con reparto LINEAL.
 #: El FEM no supone eso: la zapata es una placa (flexible) sobre resortes que solo trabajan a compresión (el «Gap» de CSI: fuerza = k·d si el resorte se comprime, cero si se estira). Se resuelve, se apagan los resortes que quedaron en tracción y se vuelve a resolver hasta que el contacto no cambia. Mismo ejemplo 6.10, con Q = 606 kN; lo que Das no da se eligió: espesor 0.40 m, columna 0.30 m, f'c 240 kgf/cm², ks = 2000 tonf/m³. Malla 30 × 30, la misma nudo a nudo en los cuatro programas.
-#tabla("Programa","q_max [tonf/m²]:3","Contacto [m²]:3","Nudos en contacto:0","vs SAP2000 [%]:4")({"SAP2000 24 (juez)","Hekatan Struct","SAFE 20","ETABS 22","Zapata RÍGIDA","Lineal (el suelo tira)"}; [81.914, 81.915, 81.915, 81.915, 82.211, 76.670]; [1.888, 1.888, 1.888, 1.888, 1.884, 2.250]; [798, 798, 798, 798, 0, 961]; [0, 0.0002, 0.0002, 0.0010, 0.36, -6.4])
-#: Los cuatro programas dan lo mismo a 4 cifras y despegan el MISMO borde (798 de 961 nudos tocan). La zapata rígida da 0.36 % más de presión máxima: la placa real se flexa un poco y reparte mejor. Si se deja que el suelo tire (análisis lineal) la presión máxima sale un 6 % MENOR y hay tracción bajo el borde levantado: el lineal queda del lado inseguro.
+#tabla("Programa","q_max [tonf/m²]:3","Contacto [m²]:3","Nudos en contacto:0","vs SAP2000 [%]:4")({"SAP2000 24 (juez)","Hekatan Struct","SAFE 20","ETABS 22","Zapata RÍGIDA (fórmula)","Lineal (el suelo tira)"}; [81.914, 81.915, 81.915, 81.915, 82.211, 76.670]; [1.888, 1.888, 1.888, 1.888, 1.884, 2.250]; [798, 798, 798, 798, 0, 961]; [0, 0.0002, 0.0002, 0.0010, 0.36, -6.4])
+#: Los cuatro programas dan lo mismo a 4 cifras y despegan el MISMO borde (798 de 961 nudos tocan). Ojo con la columna de nudos en las dos últimas filas: son FÓRMULAS, no modelos de elementos finitos, así que ahí el 0 significa «no aplica», no «no toca ningún nudo». La zapata rígida da 0.36 % más de presión máxima: la placa real se flexa un poco y reparte mejor. Si se deja que el suelo tire (análisis lineal) la presión máxima sale un 6 % MENOR y hay tracción bajo el borde levantado: el lineal queda del lado inseguro.
 
 ## 6 · La animación: la presión al crecer e (una dirección)
 

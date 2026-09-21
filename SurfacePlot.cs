@@ -89,7 +89,7 @@ namespace HekatanLisp
         // Script del ORBIT (se emite UNA vez). jet_r + proyección 3/4 + arrastre con el mouse.
         public const string OrbitScript = @"<script>
 (function(){
- function jetr(t){t=1-Math.max(0,Math.min(1,t));
+ function jetr(t){t=Math.max(0,Math.min(1,t));
    var r=Math.max(0,Math.min(1,1.5-Math.abs(4*t-3))),g=Math.max(0,Math.min(1,1.5-Math.abs(4*t-2))),b=Math.max(0,Math.min(1,1.5-Math.abs(4*t-1)));
    return 'rgb('+(r*255|0)+','+(g*255|0)+','+(b*255|0)+')';}
  function setup(cv){
@@ -146,9 +146,13 @@ namespace HekatanLisp
 })();
 </script>";
 
-        static SKColor JetR(double t)   // colormap jet_r (jet invertido): 0=rojo … 1=azul
+        // 20-sep-2026, Jorge: «azul es donde no hay esfuerzos y rojo donde si».
+        // En un resultado (presion de contacto, tension, momento) el MAXIMO tiene que
+        // ser rojo: es la convencion de ETABS/SAFE y la que lee cualquier ingeniero.
+        // Antes era jet_r y pintaba de ROJO la zona DESPEGADA, que vale cero.
+        static SKColor JetR(double t)   // jet normal: 0 = azul ... 1 = rojo
         {
-            t = 1 - Math.Max(0, Math.Min(1, t));
+            t = Math.Max(0, Math.Min(1, t));
             double r = Math.Max(0, Math.Min(1, 1.5 - Math.Abs(4 * t - 3)));
             double g = Math.Max(0, Math.Min(1, 1.5 - Math.Abs(4 * t - 2)));
             double b = Math.Max(0, Math.Min(1, 1.5 - Math.Abs(4 * t - 1)));

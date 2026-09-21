@@ -1,0 +1,3 @@
+# Blazor firma cada archivo (SRI): si git cambia LF por CRLF el hash deja de
+# cuadrar y el navegador rechaza el framework entero. NADA de conversion.
+* -text

@@ -10,6 +10,15 @@ header{padding:48px 6vw 26px;border-bottom:3px solid var(--azul);}
 header h1{margin:0;font-size:44px;line-height:1.1}
 header .sub{color:var(--azul);font-weight:600;font-size:20px;margin-top:8px}
 header .pie{color:var(--gris);font-size:16px;margin-top:14px}
+.botones{position:absolute;top:34px;right:6vw;display:flex;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:10px;
+  font:600 17px 'Segoe UI',system-ui,sans-serif;text-decoration:none;border:0;cursor:pointer}
+.btn-pdf{background:var(--azul);color:#fff}
+.btn-pdf:hover{background:#164a8f}
+.btn-imp{background:#efe6d2;color:var(--tinta);border:2px solid #d9cfb6}
+.btn-imp:hover{background:#e7dcc4}
+@media print{.botones{display:none}}
+header{position:relative}
 nav{padding:22px 6vw;background:#f3ecdd;}
 nav a{display:inline-block;margin:4px 16px 4px 0;color:var(--azul);text-decoration:none;font-weight:600}
 nav a:hover{text-decoration:underline}
@@ -31,6 +40,10 @@ footer{padding:40px 6vw 70px;color:var(--gris)}
 @media print{ section{break-inside:avoid} .shot{box-shadow:none} }
 </style></head><body>
 <header>
+  <div class="botones">
+    <a class="btn btn-pdf" href="Manual_Hekatan_Struct.pdf" download>⬇ Descargar PDF</a>
+    <button class="btn btn-imp" onclick="window.print()">🖨 Imprimir</button>
+  </div>
   <h1>Manual de la interfaz</h1>
   <div class="sub">Hekatan Struct</div>
   <div class="pie">Cada recuadro señala el control real de la pantalla. Las capturas son del programa en marcha.</div>
@@ -394,12 +407,12 @@ footer{padding:40px 6vw 70px;color:var(--gris)}
    <defs><marker id="pta" markerWidth="11" markerHeight="11" refX="9" refY="5.5"
         orient="auto"><path d="M0,0 L11,5.5 L0,11 z" fill="#d9480f"/></marker></defs>
    
-   <rect x="1051" y="554" width="275" height="38" rx="7" fill="none"
+   <rect x="1430" y="674" width="172" height="32" rx="7" fill="none"
          stroke="#d9480f" stroke-width="3.5"/>
-   <line x1="1051" y1="573.0" x2="1033" y2="573.0" stroke="#d9480f" stroke-width="3"
+   <line x1="1430" y1="690.0" x2="1412" y2="690.0" stroke="#d9480f" stroke-width="3"
          marker-end="url(#pta)"/>
-   <circle cx="1017" cy="573.0" r="16" fill="#d9480f"/>
-   <text x="1017" y="579.0" text-anchor="middle" font-family="Segoe UI"
+   <circle cx="1396" cy="690.0" r="16" fill="#d9480f"/>
+   <text x="1396" y="696.0" text-anchor="middle" font-family="Segoe UI"
          font-size="19" font-weight="700" fill="#fff">1</text>
    <rect x="1274" y="173" width="332" height="36" rx="7" fill="none"
          stroke="#d9480f" stroke-width="3.5"/>
@@ -467,24 +480,24 @@ footer{padding:40px 6vw 70px;color:var(--gris)}
          font-size="19" font-weight="700" fill="#fff">1</text>
    <rect x="1184" y="869" width="412" height="37" rx="7" fill="none"
          stroke="#d9480f" stroke-width="3.5"/>
-   <line x1="1184" y1="887.5" x2="1166" y2="887.5" stroke="#d9480f" stroke-width="3"
+   <line x1="1390.0" y1="869" x2="1390.0" y2="859" stroke="#d9480f" stroke-width="3"
          marker-end="url(#pta)"/>
-   <circle cx="1150" cy="887.5" r="16" fill="#d9480f"/>
-   <text x="1150" y="893.5" text-anchor="middle" font-family="Segoe UI"
+   <circle cx="1390.0" cy="843" r="16" fill="#d9480f"/>
+   <text x="1390.0" y="849" text-anchor="middle" font-family="Segoe UI"
          font-size="19" font-weight="700" fill="#fff">2</text>
    <rect x="2" y="869" width="342" height="37" rx="7" fill="none"
          stroke="#d9480f" stroke-width="3.5"/>
-   <line x1="344" y1="887.5" x2="362" y2="887.5" stroke="#d9480f" stroke-width="3"
+   <line x1="173.0" y1="869" x2="173.0" y2="859" stroke="#d9480f" stroke-width="3"
          marker-end="url(#pta)"/>
-   <circle cx="378" cy="887.5" r="16" fill="#d9480f"/>
-   <text x="378" y="893.5" text-anchor="middle" font-family="Segoe UI"
+   <circle cx="173.0" cy="843" r="16" fill="#d9480f"/>
+   <text x="173.0" y="849" text-anchor="middle" font-family="Segoe UI"
          font-size="19" font-weight="700" fill="#fff">3</text>
    <rect x="574" y="839" width="912" height="37" rx="7" fill="none"
          stroke="#d9480f" stroke-width="3.5"/>
-   <line x1="1486" y1="857.5" x2="1504" y2="857.5" stroke="#d9480f" stroke-width="3"
+   <line x1="1030.0" y1="839" x2="1030.0" y2="829" stroke="#d9480f" stroke-width="3"
          marker-end="url(#pta)"/>
-   <circle cx="1520" cy="857.5" r="16" fill="#d9480f"/>
-   <text x="1520" y="863.5" text-anchor="middle" font-family="Segoe UI"
+   <circle cx="1030.0" cy="813" r="16" fill="#d9480f"/>
+   <text x="1030.0" y="819" text-anchor="middle" font-family="Segoe UI"
          font-size="19" font-weight="700" fill="#fff">4</text></svg></div>
   <ol class="ley"><li><span class="n">1</span>Separación de la rejilla.</li><li><span class="n">2</span>Abajo a la derecha: SNAP F9, ORTO F8, POLAR F10 y OSNAP F3.</li><li><span class="n">3</span>Abajo a la izquierda: la coordenada del cursor en el momento.</li><li><span class="n">4</span>Los comandos cortos: L línea · REC rectángulo · M mover · CO copiar · TR recortar.</li></ol>
 </section><section id="s11">
@@ -528,33 +541,22 @@ al nivel del resto, dicho sin adornos.</p>
   @media print{
     #hk-pdf,#nav{display:none !important}
     html,body{background:#fff !important;overflow:visible !important;height:auto !important}
+    /* las diapositivas: TODAS, una por hoja */
     #escena{position:static !important;display:block !important}
     #hoja{
       transform:none !important;box-shadow:none !important;
-      width:1600px !important;height:auto !important;margin:0 !important;
+      width:100% !important;height:auto !important;min-height:0 !important;
     }
     .slide{
       display:block !important;position:relative !important;inset:auto !important;
       width:1600px;height:900px;page-break-after:always;break-after:page;
-      margin:0;overflow:hidden;
+      transform:scale(.62);transform-origin:top left;
+      margin:0 0 -342px 0;
     }
-    .slide:last-of-type{page-break-after:auto;break-after:auto}
-    .item,.caja,table,pre,section{break-inside:avoid}
+    .item,.caja,table,pre{break-inside:avoid}
   }
+  @page{size:A4 landscape;margin:8mm}
 </style>
-<script>
-/* la hoja de papel se ajusta a lo que hay: las diapositivas van a su medida
-   (16:9), y cualquier otra pagina a A4. Si no, la diapositiva sale en un
-   tercio de la hoja y el resto en blanco. */
-(function(){
-  var css = document.createElement("style");
-  var hay = document.querySelector("#hoja .slide");
-  css.textContent = hay
-    ? "@page{size:1600px 900px;margin:0}"
-    : "@page{size:A4;margin:12mm}";
-  document.head.appendChild(css);
-})();
-</script>
 <button id="hk-pdf" onclick="window.print()" title="Guardar esta pagina como PDF">
   &#11015; Descargar PDF
 </button>

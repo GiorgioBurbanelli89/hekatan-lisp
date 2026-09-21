@@ -54,8 +54,9 @@ e = M/P
 
 #: Aquí se ve por qué importa. La zapata del ejemplo 3.8 mide 1.5 × 1.5 m y le llegan P = 606 kN con excentricidades de 0.15 y 0.30 m. El reparto lineal de una zapata rígida es un PLANO inclinado: presión media más lo que aporta cada momento. Los ejes horizontales son los dos lados de la zapata en metros y el vertical es la presión en [kPa]. **Se arrastra con el ratón para girarlo.**
 #surf(269.3 + 215.4*(x - 0.75) + 430.9*(y - 0.75), [0 1.5], [0 1.5])
-#: El plano se inclina hacia la esquina a la que se corrió la carga. En esa esquina la presión llega a unos 754 kPa; en la opuesta, el plano baja por debajo de cero: la fórmula pide que el suelo TIRE de la zapata.
+#: **El eje vertical es la presión sobre el suelo, en [kPa]: cuanto más alto, más aprieta la zapata.** El plano se inclina hacia la esquina a la que se corrió la carga. En esa esquina la presión llega a unos 754 kPa; en la opuesta, el plano baja por debajo de cero: la fórmula pide que el suelo TIRE de la zapata.
 #: El suelo no tira. Lo que pasa de verdad es que esa parte se despega y queda con presión cero. La misma superficie, con lo negativo recortado:
+#: **Antes de mirarlo, una advertencia, porque se lee al revés con facilidad: la altura de este dibujo es la PRESIÓN, no la zapata.** No es la deformada. Lo ALTO y ROJO es donde la zapata APLASTA el suelo (la esquina cargada, 754 kPa); lo PLANO y AZUL es donde la zapata SE LEVANTA y no toca (presión cero). La esquina levantada aparece abajo porque su presión vale cero, no porque baje la zapata.
 #surf((269.3 + 215.4*(x - 0.75) + 430.9*(y - 0.75) + abs(269.3 + 215.4*(x - 0.75) + 430.9*(y - 0.75)))/2, [0 1.5], [0 1.5])
 #: La esquina plana del fondo es el trozo levantado. Esa es la no linealidad: no hay material que se rompa ni plastifique, solo una zapata que deja de tocar.
 #: Girándolo se ve que el plano no cambia de forma al recortarlo: lo que cambia es el ÁREA que trabaja. Y como la carga sigue siendo la misma, al repartirse en menos superficie la presión de la esquina cargada sube. Es lo que mide la hoja 54.

@@ -202,12 +202,10 @@ fieldset.grp legend { padding: 0 2px; }
   .menu .sub { min-width: 0; width: max-content; max-width: calc(100vw - 16px); }
 }
 
-/* Embebido en otra pagina (Hekatan Struct, por ejemplo): NADA de la aplicacion,
-   solo el papel con el resultado. Se entra con #...&embed=1 y no hay vuelta:
-   quien lo abre no esta usando Hekatan LISP, esta LEYENDO una hoja. */
-body.embebido .menu, body.embebido .ops, body.embebido .intro,
-body.embebido .split, body.embebido #btn-keypad,
-body.embebido .main > .col:first-child { display: none !important; }
-body.embebido .main { grid-template-columns: 1fr; }
-body.embebido .salida { height: 100vh; border: none; border-radius: 0; }
-body.embebido { overflow: hidden; }
+/* Embebido en otra pagina (Hekatan Struct): se quitan el menu y la portada,
+   pero SE DEJA la barra de operaciones. Jorge, 21-sep-2026: la hoja se abre en
+   "solo resultado", y con ✎ se ve el codigo — asi la misma ventana sirve de
+   CALCULADORA DE COMPROBACION, que es para lo que se usa de verdad. */
+body.embebido .menu, body.embebido .intro { display: none !important; }
+body.embebido .ops { padding: 4px 8px; font-size: 12px; }
+body.embebido .salida { border-radius: 0; }

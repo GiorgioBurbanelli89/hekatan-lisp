@@ -1,0 +1,7 @@
+# El deploy se sube TAL CUAL: sin normalizar finales de linea.
+#
+# Blazor firma cada fichero del runtime con integrity="sha256-...". Si git
+# cambia LF por CRLF en un .js del _framework, el sha deja de cuadrar, el
+# navegador rechaza el modulo SIN decir nada y la pagina se queda en
+# «Cargando Hekatan LISP…» para siempre. Paso el 21-sep-2026.
+* -text

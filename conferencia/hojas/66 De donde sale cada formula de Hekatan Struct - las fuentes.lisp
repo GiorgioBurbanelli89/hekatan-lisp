@@ -48,18 +48,33 @@
 
 ## 4 · Cada elemento de Hekatan Struct, con su fuente
 
-#| Elemento de Hekatan | Formulación | Fuente |
-#|---|---|---|
-#| **Barra** (columna, viga, cordón) | viga de Timoshenko con áreas de cortante | Wilson **Cap. 4**, 4-2 a 4-12 (*One-Dimensional Elements*, incluye *Member End-Releases*) |
-#| **Placa gruesa** (`shelltype thick`) | Reissner-Mindlin tipo MITC + modos incompatibles | Bathe & Dvorkin (1985); modos incompatibles en Wilson **Cap. 6**, 6-3 a 6-5 |
-#| **Placa delgada** (`shelltype thin`) | DKQ de Kirchhoff | Batoz & Tahar (1982); y Wilson **Cap. 8**, *Plate Bending Elements* |
-#| **Membrana con giro** (*drilling*) | Allman + burbuja, el giro dentro del campo de desplazamientos | **Ibrahimbegović, Taylor & Wilson (1990)**, IJNME 30:445-457; y Wilson **Cap. 9**, *Membrane Element with Normal Rotations* |
-#| **Cáscara** (membrana + placa) | cáscara plana ensamblada | Wilson **Cap. 10**, *Shell Elements* |
-#| **Diafragma rígido** | restricción de cuerpo rígido en planta | Wilson **Cap. 7**, **7-6** *Floor Diaphragm Constraints* y 7-11 *Rigid Constraints* |
-#| **Condensación estática** | eliminar grados que no interesan | Wilson **Cap. 8**, 8-10, y **Apéndice C**, *Partial Gauss Elimination, Static Condensation* |
-#| **Suelo** | muelles de Winkler, módulo de balasto | Bowles, *Foundation Analysis and Design*; el no lineal es contacto unilateral |
+#: La tabla, corta para que se lea entera. **Debajo está el enlace de cada formulación**, con su desarrollo simbólico, luego numérico y su gráfica.
 
-#: **Aquí está lo importante:** el elemento de membrana con giro que usa Hekatan es de un artículo que **firma el propio Wilson** (1990), y tiene capítulo en su libro. No es una formulación heredada de nadie: es la publicada.
+#| Elemento | Formulación | Wilson |
+#|---|---|---|
+#| **Barra** | Timoshenko con `As` | **Cap. 4**, 4-2 a 4-12 |
+#| **Placa gruesa** | Reissner-Mindlin MITC | **Cap. 6**, 6-3 a 6-5 |
+#| **Placa delgada** | DKQ de Kirchhoff | **Cap. 8** |
+#| **Membrana con giro** | Allman + burbuja | **Cap. 9** |
+#| **Cáscara** | membrana + placa | **Cap. 10** |
+#| **Diafragma rígido** | cuerpo rígido en planta | **Cap. 7**, 7-6 |
+#| **Condensación** | eliminar grados | **Cap. 8**, 8-10 |
+#| **Suelo** | muelles de Winkler | Bowles |
+
+#: Y las fuentes de fuera de Wilson: placa gruesa **Bathe & Dvorkin (1985)**; placa delgada **Batoz & Tahar (1982)**; membrana con giro **Ibrahimbegović, Taylor & Wilson (1990)**, IJNME 30:445-457 — que firma el propio Wilson.
+
+### Cada formulación, abierta y con números
+
+#: Cada una empieza en **símbolos**, sigue en **números** y acaba en **gráfica**. Se abren, se editan y se recalculan.
+
+#: · [Shell-Thin: la placa delgada como ETABS y SAP2000](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=40%20Shell%20Thin%20-%20placa%20delgada%20como%20ETABS%20y%20SAP2000.lisp)
+#: · [Shell-Thin: primero simbólico, luego numérico](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=41%20Shell%20Thin%20-%20simbolico%20y%20luego%20numerico.lisp)
+#: · [Shell-Thin: Jacobiano, funciones de forma y Gauss](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=42%20Shell%20Thin%20-%20Jacobiano%20funciones%20de%20forma%20y%20Gauss.lisp)
+#: · [La teoría del Discrete Kirchhoff (DKQ)](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=43%20Placa%20DK%20-%20teoria%20del%20Discrete%20Kirchhoff%20y%20Shell-Thin.lisp)
+#: · [M11, M22 y M12 por elementos finitos: el elemento MZC](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=44%20M11%20M22%20M12%20por%20elementos%20finitos%20-%20el%20elemento%20MZC.lisp)
+#: · [Losa rectangular BFS: lo que el motor SÍ puede deducir](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=39%20Losa%20rectangular%20BFS%20-%20lo%20que%20el%20motor%20SI%20puede%20deducir.lisp)
+#: · [La membrana en ETABS y SAP2000](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=64%20La%20membrana%20en%20ETABS%20y%20SAP2000%20-%20carga%20a%20las%20correas%20y%20masa%20del%20modal.lisp)
+#: · [Cáscara no lineal: Simo, Fox y Rifai](https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=11%20Cascara%20no%20lineal%20-%20Simo-Fox-Rifai.lisp)
 
 ## 5 · El análisis DINÁMICO
 

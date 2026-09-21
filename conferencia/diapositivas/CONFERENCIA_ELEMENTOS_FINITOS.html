@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elementos finitos: est&aacute;tico y din&aacute;mico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+<style>
+  :root{
+    --paper:#f4ecd8; --paper-dark:#e8dcc0; --ink:#1a2942; --ink-soft:#3d4f6f;
+    --ink-fade:#6a7a96; --gold:#b08d4f; --green:#2d6a4f; --red:#a23232;
+    --blue:#2c5e8e; --grid:rgba(26,41,66,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#0e1420;overflow:hidden}
+  body{font-family:'Newsreader',Georgia,serif;color:var(--ink)}
+
+  /* el escenario: una pantalla 16:9 que se escala sola */
+  #escena{position:fixed;inset:0;display:grid;place-items:center}
+  #hoja{
+    width:1600px;height:900px;background:var(--paper);position:relative;
+    box-shadow:0 30px 90px rgba(0,0,0,.55);
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                     linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;
+    transform-origin:center center;
+  }
+  .slide{display:none;position:absolute;inset:0;padding:64px 82px 88px}
+  .slide.on{display:block}
+
+  .kicker{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  h1{font-family:'Cormorant Garamond',serif;font-size:60px;font-weight:600;
+    line-height:1.06;margin-bottom:10px}
+  h1.chica{font-size:48px}
+  .sub{font-size:23px;color:var(--ink-soft);font-style:italic;margin-bottom:30px}
+  p{font-size:25px;line-height:1.5;margin-bottom:18px}
+  .lead{font-size:30px;line-height:1.42}
+  strong{color:var(--ink);font-weight:600}
+  em.g{color:var(--gold);font-style:normal;font-weight:600}
+  em.r{color:var(--red);font-style:normal;font-weight:600}
+  em.v{color:var(--green);font-style:normal;font-weight:600}
+
+  .caja{background:var(--paper-dark);border-left:6px solid var(--gold);
+    padding:24px 30px;margin:20px 0;font-size:25px;line-height:1.45}
+  .caja.roja{border-left-color:var(--red)}
+  .caja.verde{border-left-color:var(--green)}
+
+  .mate{text-align:center;margin:26px 0;font-size:30px}
+  .mate.gr{font-size:38px}
+
+  table{width:100%;border-collapse:collapse;font-size:22px;margin-top:14px}
+  th{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--gold);text-align:left;
+    padding:10px 14px;border-bottom:2px solid var(--gold)}
+  td{padding:11px 14px;border-bottom:1px solid rgba(26,41,66,.12);vertical-align:top}
+  td.n{text-align:right;font-family:'JetBrains Mono',monospace}
+  tr.destaca td{background:rgba(176,141,79,.18);font-weight:600}
+
+  code,pre{font-family:'JetBrains Mono',monospace}
+  pre{background:#16213a;color:#d8e3f2;padding:20px 24px;border-radius:6px;
+    font-size:18px;line-height:1.55;overflow:hidden;margin:16px 0}
+  pre b{color:#e8b84b}
+  code.i{background:rgba(26,41,66,.08);padding:2px 8px;border-radius:4px;font-size:.88em}
+
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:8px}
+  .col h3{font-family:'Cormorant Garamond',serif;font-size:32px;margin-bottom:12px}
+  .col.sano h3{color:var(--green)} .col.malo h3{color:var(--red)}
+
+  /* pie */
+  .pie{position:absolute;left:82px;right:82px;bottom:34px;display:flex;
+    justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.16em;
+    color:var(--ink-fade);text-transform:uppercase;
+    border-top:1px solid rgba(26,41,66,.16);padding-top:14px}
+  .marca{position:absolute;inset:0;display:grid;place-items:center;
+    font-family:'Cormorant Garamond',serif;font-size:96px;color:var(--ink);
+    opacity:.045;pointer-events:none;user-select:none}
+
+  /* portada */
+  .portada{display:grid;place-items:center;text-align:center;height:100%}
+  .portada h1{font-size:64px;line-height:1.05;margin-bottom:8px}
+  .franja{background:var(--ink);color:var(--paper);padding:18px 44px;
+    font-family:'Cormorant Garamond',serif;font-size:34px;margin:26px 0 22px}
+
+  /* dibujo del galpon */
+  svg .ln{stroke:var(--ink);stroke-width:3;fill:none}
+  svg .ln.mov{stroke:var(--blue);stroke-width:4}
+  svg .ln.gh{stroke:rgba(26,41,66,.2);stroke-width:2}
+
+  /* navegacion */
+  #nav{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    display:flex;gap:8px;align-items:center;background:rgba(14,20,32,.92);
+    padding:9px 14px;border-radius:30px;font-family:'JetBrains Mono',monospace;
+    font-size:13px;color:#cfd8e8;z-index:9}
+  #nav button{background:none;border:1px solid rgba(255,255,255,.28);color:#cfd8e8;
+    border-radius:16px;padding:5px 14px;cursor:pointer;font:inherit}
+  #nav button:hover{background:rgba(255,255,255,.12)}
+  #cnt{padding:0 8px;color:#e8b84b}
+</style>
+</head>
+<body>
+<div id="escena"><div id="hoja">
+
+<!-- 1 -->
+<section class="slide on">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="portada">
+    <div>
+      <div class="kicker">CEINCI-LAB · Conferencia</div>
+      <h1>Elementos finitos:<br>est&aacute;tico y din&aacute;mico</h1>
+      <div class="sub">de la funci&oacute;n de forma a la matriz de rigidez,<br>
+      y de la matriz de rigidez al an&aacute;lisis s&iacute;smico</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:.14em;
+                  color:var(--ink-soft);margin:14px 0 2px;text-transform:uppercase">
+        1 &middot; introducci&oacute;n &nbsp;&middot;&nbsp; 2 &middot; an&aacute;lisis est&aacute;tico &nbsp;&middot;&nbsp; 3 &middot; an&aacute;lisis din&aacute;mico
+      </div>
+      <div class="franja">Hekatan Struct · galpón curvo de 20 × 30 m</div>
+      <p style="font-size:22px;color:var(--ink-soft)">Ing. Jorge Burbano — <em class="g">Hekatan Engineers</em></p>
+      <p style="font-size:19px;color:var(--ink-fade)">21 de septiembre de 2026</p>
+    </div>
+  </div>
+</section>
+
+<!-- 1b -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 1 &middot; INTRODUCCI&Oacute;N A LOS ELEMENTOS FINITOS &middot; la cadena</div>
+  <h1 class="chica">La cadena es la misma en 1D y en 2D</h1>
+  <table style="font-size:21px">
+    <tr><th>Paso</th><th>1D &mdash; barra</th><th>2D &mdash; Q4</th></tr>
+    <tr><td><strong>1</strong> funciones de forma $N$</td>
+        <td>$N_1=\frac{1-\xi}{2}$ &mdash; 2 nudos</td>
+        <td>$N_i=\tfrac14(1+\xi\xi_i)(1+\eta\eta_i)$ &mdash; 4 nudos</td></tr>
+    <tr class="destaca"><td><strong>2</strong> jacobiano $J$</td>
+        <td><em class="v">escalar</em>: $J=L/2$</td>
+        <td><em class="r">matriz 2&times;2</em>: hacen falta $J^{-1}$ <em>y</em> $\det J$</td></tr>
+    <tr><td><strong>3</strong> matriz $B$</td>
+        <td>$B=\dfrac{dN}{d\xi}J^{-1}$ &mdash; $1\times 2$</td>
+        <td>$B=J^{-1}\dfrac{\partial N}{\partial \xi}$ &mdash; $3\times 8$</td></tr>
+    <tr><td><strong>4</strong> cuadratura de Gauss</td>
+        <td>$\sum_i w_i f(\xi_i)$</td>
+        <td>doble suma: $\sum_i\sum_j w_i w_j f(\xi_i,\eta_j)$</td></tr>
+    <tr><td><strong>5</strong> rigidez $K$</td>
+        <td>$\int B^T E B A dx$ &mdash; $2\times 2$</td>
+        <td>$\iint B^T \mathbf{D} B t \det J d\xi d\eta$ &mdash; $8\times 8$</td></tr>
+    <tr><td><strong>6</strong> resolver</td>
+        <td colspan="2" style="text-align:center">$\mathbf{K}\mathbf{u}=\mathbf{F}$ &mdash; igual en los dos</td></tr>
+  </table>
+  <div class="caja" style="margin-top:16px;font-size:22px">
+    <strong>Y esto es an&aacute;lisis LINEAL por tres hip&oacute;tesis a la vez:</strong>
+    material el&aacute;stico ($\mathbf{D}$ constante) &middot; peque&ntilde;os desplazamientos
+    ($B$ en la geometr&iacute;a inicial) &middot; equilibrio en la posici&oacute;n original.
+    Por eso $\mathbf{K}$ se arma <em class="g">una sola vez</em>.
+  </div>
+  <div class="pie"><span>Hekatan Struct</span><span>2 / 14</span></div>
+</section>
+
+<!-- G -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 1 &middot; INTRODUCCI&Oacute;N A LOS ELEMENTOS FINITOS &middot; la integral</div>
+  <h1 class="chica">Cuadratura de Gauss: mueve los puntos</h1>
+  <div class="dos" style="grid-template-columns:1fr 1.05fr;gap:28px">
+    <div class="col">
+      <div class="mate" style="font-size:26px;margin:6px 0 14px">
+        $$\int_{-1}^{1} f(\xi)\,d\xi \;\approx\; \sum_{i=1}^{n} w_i\,f(\xi_i)$$
+      </div>
+      <p style="font-size:20px">No se integra: se <strong>mide en unos puntos</strong> y se
+      suma con su peso. Con <em class="g">n</em> puntos sale <strong>exacta</strong> hasta
+      grado <em class="g">2n&minus;1</em>.</p>
+      <div style="margin:18px 0 8px">
+        <label style="font-family:'JetBrains Mono',monospace;font-size:17px;color:var(--gold)">
+          puntos&nbsp; n = <b id="gn">2</b>
+        </label><br>
+        <input id="gs" type="range" min="1" max="4" value="2" step="1"
+               style="width:100%;accent-color:#b08d4f;height:26px;cursor:pointer">
+      </div>
+      <table style="font-size:19px">
+        <tr><th>&xi;<sub>i</sub></th><th>w<sub>i</sub></th></tr>
+        <tbody id="gtab"></tbody>
+      </table>
+    </div>
+    <div class="col">
+      <svg id="gsvg" viewBox="0 0 560 330" style="width:100%;height:330px"></svg>
+      <div class="caja" id="gcaja" style="margin-top:8px;font-size:21px"></div>
+    </div>
+  </div>
+  <div class="pie"><span>Wilson, cap. 5 &mdash; integraci&oacute;n num&eacute;rica</span><span>3 / 14</span></div>
+</section>
+
+<!-- K -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 1 &middot; INTRODUCCI&Oacute;N A LOS ELEMENTOS FINITOS &middot; la rigidez</div>
+  <h1 class="chica">La rigidez local de una viga: solo cuatro n&uacute;meros</h1>
+  <div class="dos" style="grid-template-columns:1.15fr 1fr;gap:26px">
+    <div class="col">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:15px;line-height:1.75;
+                  background:#16213a;color:#d8e3f2;padding:16px 18px;border-radius:6px;
+                  white-space:pre">
+<span style="color:#8a9ab5">      u&#8321;      v&#8321;      &theta;&#8321;      u&#8322;      v&#8322;      &theta;&#8322;</span>
+<b style="color:#e8b84b">258133</b>      0       0 <b style="color:#e8b84b">-258133</b>      0       0
+     0   <b style="color:#5fd08a">840</b>  <b style="color:#4fa3e3">2522</b>       0   <b style="color:#5fd08a">-840</b>  <b style="color:#4fa3e3">2522</b>
+     0  <b style="color:#4fa3e3">2522</b> <b style="color:#e35b4f">10087</b>       0  <b style="color:#4fa3e3">-2522</b>  <b style="color:#e35b4f">5043</b>
+<b style="color:#e8b84b">-258133</b>      0       0  <b style="color:#e8b84b">258133</b>      0       0
+     0  <b style="color:#5fd08a">-840</b> <b style="color:#4fa3e3">-2522</b>       0   <b style="color:#5fd08a">840</b> <b style="color:#4fa3e3">-2522</b>
+     0  <b style="color:#4fa3e3">2522</b>  <b style="color:#e35b4f">5043</b>       0  <b style="color:#4fa3e3">-2522</b> <b style="color:#e35b4f">10087</b></div>
+      <p style="font-size:18px;margin-top:10px;color:var(--ink-soft)">
+        Columna CFT 250&times;250&times;8 del galp&oacute;n, L = 6 m. Unidades kN y m.</p>
+    </div>
+    <div class="col">
+      <table style="font-size:20px">
+        <tr><th>T&eacute;rmino</th><th>F&oacute;rmula</th><th style="text-align:right">Valor</th></tr>
+        <tr><td><em class="g">axial</em></td><td>$EA/L$</td><td class="n">258 133</td></tr>
+        <tr><td><em class="v">corte</em></td><td>$12EI/L^3$</td><td class="n">840</td></tr>
+        <tr><td style="color:#2c5e8e">acoplamiento</td><td>$6EI/L^2$</td><td class="n">2 522</td></tr>
+        <tr><td><em class="r">giro</em></td><td>$4EI/L$</td><td class="n">10 087</td></tr>
+        <tr><td>giro cruzado</td><td>$2EI/L$</td><td class="n">5 043</td></tr>
+      </table>
+      <div class="caja" style="font-size:21px;margin-top:14px">
+        <strong>Estirarla cuesta 307 veces m&aacute;s que doblarla.</strong> Por eso una
+        estructura se va de lado y casi no se acorta.
+      </div>
+      <p style="font-size:19px">Y los cuatro salen de la misma integral:
+      $\mathbf{K}=\int \mathbf{B}^{T}E\,\mathbf{B}\,dx$. El <strong>12</strong> y el
+      <strong>4</strong> no son inventados: son lo que da.</p>
+    </div>
+  </div>
+  <div class="pie"><span>Wilson, cap. 4 &mdash; elementos unidimensionales</span><span>4 / 14</span></div>
+</section>
+
+<!-- C -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 1 &middot; INTRODUCCI&Oacute;N A LOS ELEMENTOS FINITOS &middot; la c&aacute;scara</div>
+  <h1 class="chica">Una c&aacute;scara son dos cosas sumadas</h1>
+  <div class="dos" style="gap:30px">
+    <div class="col">
+      <h3 style="color:#2c5e8e">MEMBRANA &mdash; en su plano</h3>
+      <p style="font-size:20px">Estirar y cortar. Tres esfuerzos:
+      $F_{11}, F_{22}, F_{12}$ [kN/m].</p>
+      <div class="mate" style="font-size:22px">$$\mathbf{K}_m=\iint \mathbf{B}_m^{T}\,\mathbf{D}_m\,\mathbf{B}_m\,t\,\det J\,d\xi\,d\eta$$</div>
+      <p style="font-size:18.5px">Va con <strong>t</strong>. En Hekatan es el elemento de
+      <strong>Ibrahimbegovi&#263;, Taylor y Wilson (1990)</strong>: el giro normal entra en el
+      campo de desplazamientos.</p>
+    </div>
+    <div class="col">
+      <h3 style="color:#a23232">PLACA &mdash; fuera del plano</h3>
+      <p style="font-size:20px">Flectar y torcer. Cinco esfuerzos:
+      $M_{11}, M_{22}, M_{12}, V_{13}, V_{23}$.</p>
+      <div class="mate" style="font-size:22px">$$\mathbf{K}_b=\iint \mathbf{B}_b^{T}\,\mathbf{D}_b\,\mathbf{B}_b\,\det J\,d\xi\,d\eta$$</div>
+      <p style="font-size:18.5px">Va con <strong>t&sup3;</strong>. Delgada: <strong>DKQ</strong>
+      de Batoz &amp; Tahar. Gruesa: <strong>MITC4</strong> de Bathe &amp; Dvorkin, con cortante.</p>
+    </div>
+  </div>
+  <div class="caja" style="margin-top:14px;font-size:22px">
+    <strong>Y la c&aacute;scara es la suma:</strong>
+    $\mathbf{K}=\mathbf{K}_m+\mathbf{K}_b$ &mdash; por eso una <em class="g">membrana</em> es
+    una c&aacute;scara con $\mathbf{K}_b=\mathbf{0}$: el zinc del galp&oacute;n.
+  </div>
+  <div class="pie"><span>Wilson, cap. 9 y 10 &middot; Batoz &middot; Bathe</span><span>5 / 14</span></div>
+</section>
+
+<!-- E1 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 2 &middot; AN&Aacute;LISIS EST&Aacute;TICO &middot; el ensamblaje</div>
+  <h1 class="chica">De cada elemento a la estructura entera</h1>
+  <div class="dos" style="grid-template-columns:1fr 1fr;gap:30px">
+    <div class="col">
+      <p style="font-size:21px">Cada elemento trae su matriz en <strong>ejes propios</strong>.
+      Para sumarlas hay que llevarlas todas a los <strong>ejes de la estructura</strong>:</p>
+      <div class="mate" style="font-size:25px">$$\mathbf{K}_e^{glob}=\mathbf{T}^{T}\,\mathbf{K}_e^{loc}\,\mathbf{T}$$</div>
+      <p style="font-size:21px">Y despu&eacute;s se <strong>suman</strong>, cada una en los grados
+      de libertad de sus nudos:</p>
+      <div class="mate" style="font-size:25px">$$\mathbf{K}=\sum_e \mathbf{K}_e^{glob}
+      \qquad \mathbf{F}=\sum_e \mathbf{F}_e$$</div>
+      <p style="font-size:20px">Eso es el <em class="g">ensamblaje directo</em>. Dos barras que
+      comparten un nudo <strong>suman</strong> su rigidez ah&iacute;: por eso el nudo de la
+      esquina es m&aacute;s r&iacute;gido que el del centro del vano.</p>
+    </div>
+    <div class="col">
+      <h3 style="color:var(--gold)">Y los apoyos</h3>
+      <p style="font-size:20px">Un grado sujeto no se resuelve: <strong>se elimina</strong> del
+      sistema. No se pone un n&uacute;mero grande en la diagonal &mdash; eso ensucia la
+      soluci&oacute;n.</p>
+      <div class="caja verde" style="font-size:21px">
+        Y lo que queda es <strong>una sola ecuaci&oacute;n</strong>:
+        <div class="mate" style="font-size:30px;margin:12px 0">$$\mathbf{K}\,\mathbf{u}=\mathbf{F}$$</div>
+        Se invierte una vez y salen <strong>todos</strong> los desplazamientos. Con ellos,
+        hacia atr&aacute;s: $\boldsymbol\varepsilon=\mathbf{B}\mathbf{u}$,
+        $\boldsymbol\sigma=\mathbf{D}\boldsymbol\varepsilon$ y las fuerzas de cada barra.
+      </div>
+      <p style="font-size:19px"><strong>Y aqu&iacute; se comprueba:</strong> la suma de las
+      reacciones tiene que dar la carga aplicada. Si no da, el modelo est&aacute; mal, y eso no
+      lo avisa ning&uacute;n programa.</p>
+    </div>
+  </div>
+  <div class="pie"><span>Wilson, cap. 2 y 4 &middot; ensamblaje directo</span><span>6 / 14</span></div>
+</section>
+
+<!-- E2 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 2 &middot; AN&Aacute;LISIS EST&Aacute;TICO &middot; lo que los programas hacen sin decirlo</div>
+  <h1 class="chica">Tres cosas que ETABS descuenta y SAP2000 no</h1>
+  <table style="font-size:20px">
+    <tr><th>Qu&eacute;</th><th>ETABS</th><th>SAP2000</th><th style="text-align:right">Cu&aacute;nto vale</th></tr>
+    <tr class="destaca">
+      <td><strong>Brazo r&iacute;gido</strong> (<em>end offset</em>)</td>
+      <td>autom&aacute;tico, y <em class="r">no pesa</em> el tramo dentro de la columna</td>
+      <td>no lo pone</td>
+      <td class="n">&minus;5.6 % de masa<br>&minus;2.94 % de periodo</td></tr>
+    <tr>
+      <td><strong>Masa al nivel</strong> (<code class="i">LUMPATSTORIES</code>)</td>
+      <td>la sube al plano del piso</td>
+      <td>la deja en su nudo</td>
+      <td class="n">T&#8321; 1.134 vs 0.812 s<br>si la columna no va piso a piso</td></tr>
+    <tr>
+      <td><strong>Losa cosida a las vigas</strong> (<em>edge constraint</em>)</td>
+      <td>conecta <em class="v">todo nudo que toca</em></td>
+      <td>solo las 4 esquinas</td>
+      <td class="n">4.5 % en el galp&oacute;n<br>75 % en un mezanine</td></tr>
+  </table>
+  <div class="caja roja" style="margin-top:18px">
+    <strong>Ninguno est&aacute; equivocado.</strong> Son criterios de modelado distintos, por
+    defecto y sin avisar. Por eso dos personas con el mismo modelo obtienen n&uacute;meros
+    distintos &mdash; y por eso Hekatan Struct trae un par&aacute;metro
+    <em class="g">&laquo;Comparar con: ETABS / SAP2000&raquo;</em>: para reproducir a cualquiera
+    de los dos, a prop&oacute;sito.
+  </div>
+  <p style="font-size:19px;margin-top:12px;color:var(--ink-soft)">
+    Medido con el mismo modelo y la misma malla, nudo a nudo. El brazo r&iacute;gido son
+    <strong>1857.4 in&sup3; exactos</strong> en el Paz &amp; Leigh 6.3; con <code class="i">offsets = 0</code>,
+    Hekatan y ETABS coinciden al <strong>0.002 %</strong>.</p>
+  <div class="pie"><span>Medido por OAPI contra ETABS 22 y SAP2000 24</span><span>7 / 14</span></div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; el punto de partida</div>
+  <h1>El sismo no empuja: el suelo se mueve</h1>
+  <div class="sub">y por eso la fuerza la genera tu propia masa</div>
+  <div class="mate gr">$$\mathbf{M}\,\ddot{\mathbf u} \;+\; \mathbf{C}\,\dot{\mathbf u} \;+\; \mathbf{K}\,\mathbf u \;=\; -\,\mathbf{M}\,\mathbf r\,\ddot u_g(t)$$</div>
+  <div class="caja">
+    El lado derecho <strong>no es una carga que alguien aplica</strong>: es la aceleración
+    del suelo $\ddot u_g$ multiplicada por la masa.
+  </div>
+  <p class="lead" style="margin-top:22px">
+    <em class="r">Más masa = más sismo.</em> De ahí que en diseño sísmico se trabaje por
+    reducir peso, no por añadir sección.
+  </p>
+  <div class="pie"><span>Hekatan Struct</span><span>8 / 14</span></div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; los tres modos</div>
+  <h1 class="chica">Dos trasladan, el tercero gira</h1>
+  <div class="mate" style="margin:10px 0 2px">$$\left(\mathbf{K}-\omega^2\mathbf{M}\right)\boldsymbol\phi=\mathbf 0\qquad T=\frac{2\pi}{\omega}\qquad \boldsymbol\phi_i^T\mathbf M\boldsymbol\phi_j=0\;\;(i\neq j)$$</div>
+  <svg viewBox="0 0 1440 300" style="width:100%;height:230px;margin:0">
+    <!-- modo 1: traslacion -->
+    <g transform="translate(60,20)">
+      <path class="ln gh" d="M20 240 L20 120 Q180 40 340 120 L340 240"/>
+      <path class="ln mov" d="M20 240 L48 120 Q200 40 356 120 L340 240"/>
+      <line class="ln" x1="0" y1="240" x2="360" y2="240" stroke-width="2"/>
+      <text x="180" y="278" text-anchor="middle" font-size="22" fill="#2c5e8e">MODO 1 · traslada · T = 0.3311 s</text>
+    </g>
+    <!-- modo 2: traslacion en planta -->
+    <g transform="translate(520,20)">
+      <rect class="ln gh" x="60" y="60" width="240" height="160"/>
+      <rect class="ln mov" x="92" y="60" width="240" height="160"/>
+      <text x="196" y="278" text-anchor="middle" font-size="22" fill="#2c5e8e">MODO 2 · traslada · T = 0.3238 s</text>
+    </g>
+    <!-- modo 3: torsion -->
+    <g transform="translate(980,20)">
+      <rect class="ln gh" x="60" y="60" width="240" height="160"/>
+      <g transform="rotate(7 180 140)"><rect x="60" y="60" width="240" height="160"
+         style="stroke:#a23232;stroke-width:4;fill:none"/></g>
+      <path d="M180 140 m -46 0 a 46 46 0 1 1 30 43" style="stroke:#b08d4f;stroke-width:3.5;fill:none"/>
+      <text x="180" y="278" text-anchor="middle" font-size="22" fill="#a23232">MODO 3 · GIRA · T = 0.2794 s</text>
+    </g>
+  </svg>
+  <div class="caja">
+    <strong>El orden es el criterio.</strong> Si el modo que gira saliera <em class="r">primero</em>,
+    la estructura tendría problema de torsión. Aquí gira el <em class="v">tercero</em>.
+  </div>
+  <div class="pie"><span>Hekatan Struct · SAP2000 · ETABS</span><span>9 / 14</span></div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; participaci&oacute;n de masa</div>
+  <h1 class="chica">Por qué basta con el 90 %</h1>
+  <div class="mate">$$\Gamma_i=\boldsymbol\phi_i^T\mathbf M\,\mathbf r
+  \qquad\qquad M_{\text{ef},i}=\Gamma_i^{\,2}
+  \qquad\qquad \%M_i=\frac{M_{\text{ef},i}}{M_{\text{total}}}\times100$$</div>
+  <table>
+    <tr><th>Modo</th><th>T [s]</th><th>Qué hace</th><th style="text-align:right">Suma de masa</th></tr>
+    <tr class="destaca"><td>1</td><td class="n">0.3311</td><td>traslada en $U_y$</td><td class="n">99.7 %</td></tr>
+    <tr><td>2</td><td class="n">0.3238</td><td>traslada en $U_x$</td><td class="n">99.9 %</td></tr>
+    <tr><td>3</td><td class="n">0.2794</td><td><em class="r">gira &mdash; $R_z$</em></td><td class="n">&mdash;</td></tr>
+    <tr><td>4</td><td class="n">0.1725</td><td><em class="g">la cubierta bota &mdash; $U_z$ 38 %</em></td><td class="n">&mdash;</td></tr>
+  </table>
+  <div class="caja" style="margin-top:20px">
+    Los modos altos casi no tienen masa, así que casi no aportan fuerza.
+    <strong>Por eso se corta en el 90 %</strong> &mdash; aquí con dos modos ya se cumple.
+  </div>
+  <div class="pie"><span>Hekatan Struct</span><span>10 / 14</span></div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; de d&oacute;nde sale la masa</div>
+  <h1 class="chica">Lo que ETABS escribe si no tocas nada</h1>
+<pre>MASSSOURCE  "MsSrc1"   INCLUDEELEMENTS "Yes"   INCLUDEADDEDMASS "Yes"
+                       <b>INCLUDELOADS "No"</b>       INCLUDELATERALMASS "Yes"
+                       <b>INCLUDEVERTICALMASS "No"</b>  LUMPATSTORIES "Yes"  ISDEFAULT "Yes"</pre>
+  <div class="dos" style="margin-top:14px">
+    <div class="col">
+      <h3 style="color:var(--red)">INCLUDELOADS "No"</h3>
+      <p style="font-size:22px">La carga de cubierta <strong>no es masa</strong> si no la añades
+      al <em>Mass Source</em>. La estructura sale más ligera, y por tanto más
+      <strong>rápida</strong>: periodos cortos y falsos.</p>
+    </div>
+    <div class="col">
+      <h3 style="color:var(--red)">INCLUDEVERTICALMASS "No"</h3>
+      <p style="font-size:22px">ETABS no cuenta masa vertical. <strong>SAP2000 sí</strong>,
+      por defecto. Mismo modelo, dos programas, periodos distintos
+      &mdash; y ninguno está equivocado.</p>
+    </div>
+  </div>
+  <div class="pie"><span>Extraído del .e2k que escribe ETABS 22</span><span>11 / 14</span></div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; la cubierta</div>
+  <h1 class="chica">La membrana: sólo trabaja en su plano</h1>
+  <div class="dos">
+    <div class="col">
+      <table>
+        <tr><th>Esfuerzo</th><th>Membrana</th></tr>
+        <tr><td>$F_{11},F_{22}$ &mdash; axiles</td><td><em class="v">sí</em></td></tr>
+        <tr><td>$F_{12}$ &mdash; cortante en el plano</td><td><em class="v">sí</em></td></tr>
+        <tr><td>$M_{11},M_{22},M_{12}$</td><td><em class="r">NO</em></td></tr>
+        <tr><td>$V_{13},V_{23}$</td><td><em class="r">NO</em></td></tr>
+      </table>
+      <p style="font-size:21px;margin-top:14px">Y no es arbitrario:</p>
+      <div class="mate" style="font-size:23px;margin:8px 0">$$D=\frac{E\,t^{3}}{12(1-\nu^{2})}$$</div>
+      <p style="font-size:21px">El zinc de 0.8 mm tiene $D$ <strong>1 500 000 veces</strong>
+      menor que una losa de 20 cm. Va con $t^3$.</p>
+    </div>
+    <div class="col">
+      <h3>¿Y la carga a las correas?</h3>
+      <p style="font-size:22px">Sin flexión no la puede llevar por rigidez.
+      Así que <strong>no la calcula: la reparte</strong>.</p>
+      <pre style="font-size:17px">MODELINGTYPE   "Membrane"
+<b>ONEWAYLOADDIST "Yes"</b></pre>
+      <div class="caja verde" style="font-size:23px">
+        Por <strong>área tributaria</strong>, igual que a mano:
+        <div class="mate" style="font-size:27px;margin:10px 0">$$w = q\cdot s$$</div>
+      </div>
+      <p style="font-size:21px"><em class="r">Si la dejas como losa</em>, la chapa flecta
+      y se lleva carga que en obra no lleva: las correas salen descargadas de más.</p>
+    </div>
+  </div>
+  <div class="pie"><span>Hekatan Struct · ETABS · SAP2000</span><span>12 / 14</span></div>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; el galp&oacute;n no es un edificio</div>
+  <h1 class="chica">Sin losa no hay diafragma</h1>
+  <div class="dos">
+    <div class="col sano">
+      <h3>Edificio &mdash; diafragma rígido</h3>
+      <p style="font-size:22px">La losa obliga a todos los nudos de la planta a moverse
+      juntos: <strong>3 grados por piso</strong>.</p>
+      <div class="mate" style="font-size:24px">$$\mathbf{K}_E=\sum \mathbf{A}^T\,\mathbf{K}_L\,\mathbf{A}$$</div>
+      <p style="font-size:21px">con $\mathbf A=[\cos\alpha\;\;\operatorname{sen}\alpha\;\;r\,]$
+      y $\mathbf M=\operatorname{diag}(m,\,m,\,J)$.</p>
+    </div>
+    <div class="col malo">
+      <h3>Galpón &mdash; masas puntuales</h3>
+      <p style="font-size:22px">No hay losa. Cada nudo va por su cuenta:
+      <strong>masa en las tres direcciones</strong>.</p>
+      <div class="mate" style="font-size:24px">$$\mathbf M=\begin{bmatrix}\mathbf M_{HT}&&\\&\mathbf M_{HL}&\\&&\mathbf M_{V}\end{bmatrix}$$</div>
+      <p style="font-size:21px">Transversal, longitudinal y vertical &mdash; como en
+      <strong>Aguiar</strong>, estructuras de lámina delgada.</p>
+    </div>
+  </div>
+  <div class="caja roja" style="margin-top:18px">
+    <strong>Y por eso aquí la masa vertical importa.</strong> El arco de 20 m tiene modos
+    verticales de verdad &mdash; el modo 4, con $U_z$ del 38 %, es la cubierta botando.
+    ETABS, por defecto, no lo enseña.
+  </div>
+  <div class="pie"><span>Aguiar · CEINCI-ESPE</span><span>13 / 14</span></div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="marca">Hekatan Engineers</div>
+  <div class="kicker">para llevarse</div>
+  <h1 class="chica">Abierto, en el navegador, sin instalar nada</h1>
+  <table>
+    <tr><th>Qué</th><th>Dónde</th></tr>
+    <tr class="destaca"><td>El galpón curvo, con sus 12 modos</td>
+      <td><code class="i">giorgioburbanelli89.github.io/hekatan-struct-lineal/workspace/?m=95IbfMcEkc2xvBS&amp;modal=12</code></td></tr>
+    <tr><td>El modal explicado, hoja de cálculo</td>
+      <td><code class="i">…/hekatan-lisp/#ej=60 El analisis modal explicado…</code></td></tr>
+    <tr><td>La membrana en ETABS y SAP2000</td>
+      <td><code class="i">…/hekatan-lisp/#ej=64 La membrana en ETABS y SAP2000…</code></td></tr>
+  </table>
+  <div class="caja" style="margin-top:26px;font-size:27px">
+    Las hojas <strong>se abren, se editan y se recalculan</strong> en el navegador.
+    Quien quiera comprobar un número, lo comprueba.
+  </div>
+  <p class="lead" style="margin-top:26px;text-align:center">
+    <em class="g">Hekatan Engineers</em> &mdash; herramientas computacionales para ingeniería estructural
+  </p>
+  <div class="pie"><span>Gracias</span><span>14 / 14</span></div>
+</section>
+
+</div></div>
+
+<div id="nav">
+  <button id="ant">← anterior</button>
+  <span id="cnt">1 / 14</span>
+  <button id="sig">siguiente →</button>
+</div>
+
+<script>
+const hoja = document.getElementById('hoja');
+const slides = [...document.querySelectorAll('.slide')];
+const cnt = document.getElementById('cnt');
+let i = 0;
+
+function ver(n){
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle('on', k === i));
+  cnt.textContent = (i + 1) + ' / ' + slides.length;
+  location.hash = 'd' + (i + 1);
+}
+function escalar(){
+  const s = Math.min(window.innerWidth / 1600, (window.innerHeight - 70) / 900);
+  hoja.style.transform = 'scale(' + s + ')';
+}
+document.getElementById('sig').onclick = () => ver(i + 1);
+document.getElementById('ant').onclick = () => ver(i - 1);
+addEventListener('keydown', e => {
+  if (['ArrowRight',' ','PageDown','Enter'].includes(e.key)) { e.preventDefault(); ver(i + 1); }
+  if (['ArrowLeft','PageUp','Backspace'].includes(e.key))   { e.preventDefault(); ver(i - 1); }
+  if (e.key === 'Home') ver(0);
+  if (e.key === 'End')  ver(slides.length - 1);
+});
+addEventListener('resize', escalar);
+escalar();
+const h = parseInt((location.hash || '').replace('#d', ''), 10);
+ver(isNaN(h) ? 0 : h - 1);
+</script>
+
+<script>
+/* Cuadratura de Gauss en vivo: al mover el slider cambian los puntos, los pesos,
+   la grafica y el error contra el valor exacto. La funcion de prueba es una
+   cubica, para que se vea que con n = 2 ya es EXACTA (grado 2n-1 = 3). */
+(function () {
+  const PTS = {
+    1: { x: [0], w: [2] },
+    2: { x: [-0.5773502692, 0.5773502692], w: [1, 1] },
+    3: { x: [-0.7745966692, 0, 0.7745966692], w: [0.5555555556, 0.8888888889, 0.5555555556] },
+    4: { x: [-0.8611363116, -0.3399810436, 0.3399810436, 0.8611363116],
+         w: [0.3478548451, 0.6521451549, 0.6521451549, 0.3478548451] },
+  };
+  const f = (x) => 1 + 0.9 * x + 1.4 * x * x + 0.8 * x * x * x;  // cubica
+  const EXACTA = 2 + (2 / 3) * 1.4;   // integral de -1 a 1
+  const sl = document.getElementById("gs");
+  if (!sl) return;
+  const svg = document.getElementById("gsvg"), tab = document.getElementById("gtab");
+  const caja = document.getElementById("gcaja"), num = document.getElementById("gn");
+  const W = 560, H = 330, mx = 44, my = 30;
+  const X = (x) => mx + (x + 1) / 2 * (W - 2 * mx);
+  const Y = (y) => H - my - (y + 1.6) / 6.4 * (H - 2 * my);   // cabe f(1)=4.1
+
+  function pinta() {
+    const n = +sl.value, P = PTS[n];
+    num.textContent = n;
+    let ap = 0;
+    for (let i = 0; i < n; i++) ap += P.w[i] * f(P.x[i]);
+    let d = '<path d="';
+    for (let i = 0; i <= 120; i++) {
+      const x = -1 + 2 * i / 120;
+      d += (i ? "L" : "M") + X(x).toFixed(1) + " " + Y(f(x)).toFixed(1) + " ";
+    }
+    d += '" fill="none" stroke="#2c5e8e" stroke-width="3"/>';
+    let ejes = '<line x1="' + mx + '" y1="' + Y(0) + '" x2="' + (W - mx) + '" y2="' + Y(0) + '" stroke="#8a8a8a" stroke-width="1.4"/>';
+    ejes += '<text x="' + X(-1) + '" y="' + (H - 4) + '" font-size="15" fill="#6a7a96" text-anchor="middle">-1</text>';
+    ejes += '<text x="' + X(1) + '" y="' + (H - 4) + '" font-size="15" fill="#6a7a96" text-anchor="middle">+1</text>';
+    let pts = "", filas = "";
+    for (let i = 0; i < n; i++) {
+      const xi = P.x[i];
+      pts += '<line x1="' + X(xi) + '" y1="' + Y(0) + '" x2="' + X(xi) + '" y2="' + Y(f(xi)) + '" stroke="#b08d4f" stroke-width="2.4" stroke-dasharray="5 4"/>';
+      pts += '<circle cx="' + X(xi) + '" cy="' + Y(f(xi)) + '" r="' + (5 + P.w[i] * 5).toFixed(1) + '" fill="#b08d4f"/>';
+      filas += "<tr><td>" + (xi === 0 ? "0" : xi.toFixed(6)) + "</td><td>" + P.w[i].toFixed(6) + "</td></tr>";
+    }
+    svg.innerHTML = ejes + d + pts;
+    tab.innerHTML = filas;
+    const err = Math.abs(ap - EXACTA) / EXACTA * 100;
+    const exacta = err < 1e-6;   // no 1e-9: la coma flotante no llega
+    caja.innerHTML = "aproximada <b>" + ap.toFixed(6) + "</b> &nbsp;&middot;&nbsp; exacta <b>" +
+      EXACTA.toFixed(6) + "</b><br><span style=\"color:" + (exacta ? "#2d6a4f" : "#a23232") + "\">" +
+      (exacta ? "EXACTA &mdash; grado 2n&minus;1 = " + (2 * n - 1) + " basta para una c&uacute;bica"
+                  : "error " + err.toFixed(3) + " % &mdash; con n = " + n + " no alcanza") + "</span>";
+  }
+  sl.addEventListener("input", pinta);
+  pinta();
+})();
+</script>
+</body>
+</html>

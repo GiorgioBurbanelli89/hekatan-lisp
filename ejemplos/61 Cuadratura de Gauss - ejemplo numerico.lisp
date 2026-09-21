@@ -5,14 +5,14 @@
 
 ## 1 · Con letras: el cambio de variable
 
-#: Los puntos de Gauss están tabulados en el **tramo patrón**, de −1 a +1, en la coordenada natural ξ. Una integral real va de a a b, así que primero se lleva el tramo real al patrón con una recta. Sus dos números son el **centro** del tramo y su **semilongitud** —de dónde salen se deduce en la hoja 62:
-p = (a + b)/2
-q = (b - a)/2
-#: Y la recta que manda ξ = −1 a x = a, y ξ = +1 a x = b, es:
+#: Los puntos de Gauss están tabulados en el **tramo patrón**, de −1 a +1, en la coordenada natural ξ. Una integral real va de a a b, así que primero se lleva el tramo real al patrón con una **recta**, la que manda ξ = −1 a x = a y ξ = +1 a x = b:
 X = p + q*xi
+#: Sus dos números tienen nombre: p es el **centro** del tramo y q su **semilongitud**. De dónde salen se deduce en la hoja 62, y valen:
+p_c = (a + b)/2
+q_c = (b - a)/2
 #: El **jacobiano** es la pendiente de esa recta, y lo deriva el motor:
 J = Diff{p + q*xi @ xi}
-#: O sea J = q = (b − a)/2. Es el factor de estiramiento entre los dos tramos: un pedacito dξ del patrón mide J·dξ en el tramo real, y por eso la integral se multiplica por J.
+#: Sale J = q, o sea (b − a)/2. Es el factor de estiramiento entre los dos tramos: un pedacito dξ del patrón mide J·dξ en el tramo real, y por eso la integral se multiplica por J.
 
 ## 2 · Con letras: la fórmula, los dos puntos y los dos pesos
 

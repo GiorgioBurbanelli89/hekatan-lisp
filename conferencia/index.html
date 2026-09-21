@@ -44,12 +44,15 @@
   .item .des{font-size:16.5px;color:var(--ink-soft)}
   .item a{color:var(--ink);text-decoration:none;border-bottom:1.5px solid var(--gold)}
   .item a:hover{background:rgba(176,141,79,.2)}
-  .btn{font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:.1em;
-    text-transform:uppercase;background:var(--ink);color:var(--paper);
-    padding:9px 16px;text-decoration:none;border-radius:4px;white-space:nowrap;
-    align-self:center}
-  .btn:hover{background:var(--gold)}
-  .btn.claro{background:none;color:var(--ink);border:1px solid var(--ink)}
+  .item a.btn, a.btn{font-family:'JetBrains Mono',monospace;font-size:12.5px;
+    letter-spacing:.1em;text-transform:uppercase;
+    background:var(--ink) !important;color:var(--paper) !important;
+    padding:9px 16px;text-decoration:none;border:none;border-radius:4px;
+    white-space:nowrap;align-self:center;display:inline-block}
+  .item a.btn:hover, a.btn:hover{background:var(--gold) !important}
+  .item a.btn.claro, a.btn.claro{background:none !important;color:var(--ink) !important;
+    border:1px solid var(--ink)}
+  .item a.btn.claro:hover{background:var(--paper-dark) !important}
 
   .aviso{background:rgba(176,141,79,.16);border-left:5px solid var(--gold);
     padding:18px 24px;margin:26px 0;font-size:17.5px}
@@ -86,8 +89,8 @@
   <div class="item">
     <div class="ic">📽</div>
     <div class="txt">
-      <div class="tit">El análisis modal, en 8 pantallas</div>
-      <div class="des">El sismo · qué es un modo · los tres modos del galpón ·
+      <div class="tit">El análisis modal, en 9 pantallas</div>
+      <div class="des">La cadena 1D↔2D · el sismo · qué es un modo · los tres modos del galpón ·
         participación de masa · la masa que usa ETABS por defecto · la membrana ·
         el galpón sin diafragma.</div>
     </div>

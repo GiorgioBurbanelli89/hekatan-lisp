@@ -70,5 +70,6 @@
  "61 Cuadratura de Gauss - ejemplo numerico.lisp",
  "62 De donde sale el cambio de variable y el jacobiano.lisp",
  "63 La cuadratura de Gauss deducida con el motor.lisp",
- "64 La membrana en ETABS y SAP2000 - carga a las correas y masa del modal.lisp"
+ "64 La membrana en ETABS y SAP2000 - carga a las correas y masa del modal.lisp",
+ "65 El galpon por el metodo de las fuerzas - y el FEM da lo mismo.lisp"
 ]

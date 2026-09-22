@@ -55,6 +55,10 @@ MathJax = {
   .caja.roja{border-left-color:var(--red)}
   .caja.verde{border-left-color:var(--green)}
 
+  .term{font-size:17.5px;color:var(--ink-soft);text-align:center;
+    margin:-12px 0 16px;line-height:1.5}
+  .term b{color:var(--ink);font-weight:600}
+  .term .s{font-family:'JetBrains Mono',monospace;font-size:.92em}
   .mate{text-align:center;margin:26px 0;font-size:30px}
   .mate.gr{font-size:38px}
 
@@ -175,6 +179,7 @@ MathJax = {
       <div class="mate" style="font-size:26px;margin:6px 0 14px">
         $$\int_{-1}^{1} f(\xi)\,d\xi \;\approx\; \sum_{i=1}^{n} w_i\,f(\xi_i)$$
       </div>
+  <div class="term">donde <b>&int;</b> es la <b>integral</b> (el &aacute;rea bajo la curva), <b>&xi;<sub>i</sub></b> (xi) son los <b>puntos</b> donde se mide, <b>w<sub>i</sub></b> sus <b>pesos</b>, <b>n</b> cu&aacute;ntos puntos se usan y <b>f</b> la funci&oacute;n que se integra.</div>
       <p style="font-size:20px">No se integra: se <strong>mide en unos puntos</strong> y se
       suma con su peso. Con <em class="g">n</em> puntos sale <strong>exacta</strong> hasta
       grado <em class="g">2n&minus;1</em>.</p>
@@ -235,6 +240,7 @@ MathJax = {
       $\mathbf{K}=\int \mathbf{B}^{T}E\,\mathbf{B}\,dx$. El <strong>12</strong> y el
       <strong>4</strong> no son inventados: son lo que da.</p>
     </div>
+  <div class="term">donde <b>E</b> es el <b>m&oacute;dulo de elasticidad</b> del material, <b>A</b> el <b>&aacute;rea</b> de la secci&oacute;n, <b>I</b> su <b>inercia</b> (cu&aacute;nto se resiste a doblarse) y <b>L</b> la <b>longitud</b> de la barra.</div>
   </div>
   <div class="pie"><span>Wilson, cap. 4 &mdash; elementos unidimensionales</span><span>4 / 14</span></div>
 </section>
@@ -250,6 +256,7 @@ MathJax = {
       <p style="font-size:20px">Estirar y cortar. Tres esfuerzos:
       $F_{11}, F_{22}, F_{12}$ [kN/m].</p>
       <div class="mate" style="font-size:22px">$$\mathbf{K}_m=\iint \mathbf{B}_m^{T}\,\mathbf{D}_m\,\mathbf{B}_m\,t\,\det J\,d\xi\,d\eta$$</div>
+  <div class="term">donde <b>B<sub>m</sub></b> relaciona el <b>desplazamiento con la deformaci&oacute;n</b>, <b>D<sub>m</sub></b> la <b>deformaci&oacute;n con la tensi&oacute;n</b> (el material), <b>t</b> el <b>espesor</b> y <b>det J</b> el <b>jacobiano</b>: cu&aacute;nto se estira el elemento real respecto al cuadrado donde se integra. <b>&xi;, &eta;</b> (xi, eta) son las <b>coordenadas naturales</b>, de &minus;1 a +1.</div>
       <p style="font-size:18.5px">Va con <strong>t</strong>. En Hekatan es el elemento de
       <strong>Ibrahimbegovi&#263;, Taylor y Wilson (1990)</strong>: el giro normal entra en el
       campo de desplazamientos.</p>
@@ -259,6 +266,7 @@ MathJax = {
       <p style="font-size:20px">Flectar y torcer. Cinco esfuerzos:
       $M_{11}, M_{22}, M_{12}, V_{13}, V_{23}$.</p>
       <div class="mate" style="font-size:22px">$$\mathbf{K}_b=\iint \mathbf{B}_b^{T}\,\mathbf{D}_b\,\mathbf{B}_b\,\det J\,d\xi\,d\eta$$</div>
+  <div class="term">donde <b>B<sub>b</sub></b> y <b>D<sub>b</sub></b> son las mismas de arriba pero para <b>flexi&oacute;n</b>: <b>B<sub>b</sub></b> da la <b>curvatura</b> y <b>D<sub>b</sub></b> la lleva a <b>momento</b>. Aqu&iacute; el espesor ya va dentro de <b>D<sub>b</sub></b>, y por eso aparece elevado al <b>cubo</b>.</div>
       <p style="font-size:18.5px">Va con <strong>t&sup3;</strong>. Delgada: <strong>DKQ</strong>
       de Batoz &amp; Tahar. Gruesa: <strong>MITC4</strong> de Bathe &amp; Dvorkin, con cortante.</p>
     </div>
@@ -281,10 +289,12 @@ MathJax = {
       <p style="font-size:21px">Cada elemento trae su matriz en <strong>ejes propios</strong>.
       Para sumarlas hay que llevarlas todas a los <strong>ejes de la estructura</strong>:</p>
       <div class="mate" style="font-size:25px">$$\mathbf{K}_e^{glob}=\mathbf{T}^{T}\,\mathbf{K}_e^{loc}\,\mathbf{T}$$</div>
+  <div class="term">donde <b>T</b> es la <b>matriz de transformaci&oacute;n</b>: gira la matriz de los <b>ejes propios</b> de la barra a los <b>ejes de la estructura</b>. <b>T<sup>T</sup></b> es su <b>transpuesta</b>. El super&iacute;ndice <b>loc</b> es local y <b>glob</b> global.</div>
       <p style="font-size:21px">Y despu&eacute;s se <strong>suman</strong>, cada una en los grados
       de libertad de sus nudos:</p>
       <div class="mate" style="font-size:25px">$$\mathbf{K}=\sum_e \mathbf{K}_e^{glob}
       \qquad \mathbf{F}=\sum_e \mathbf{F}_e$$</div>
+  <div class="term">el s&iacute;mbolo <b>&Sigma;</b> (sigma) significa <b>sumar</b> sobre todos los elementos <b>e</b>. Cada matriz se suma en los grados de libertad de <b>sus</b> nudos.</div>
       <p style="font-size:20px">Eso es el <em class="g">ensamblaje directo</em>. Dos barras que
       comparten un nudo <strong>suman</strong> su rigidez ah&iacute;: por eso el nudo de la
       esquina es m&aacute;s r&iacute;gido que el del centro del vano.</p>
@@ -297,6 +307,7 @@ MathJax = {
       <div class="caja verde" style="font-size:21px">
         Y lo que queda es <strong>una sola ecuaci&oacute;n</strong>:
         <div class="mate" style="font-size:30px;margin:12px 0">$$\mathbf{K}\,\mathbf{u}=\mathbf{F}$$</div>
+  <div class="term">donde <b>K</b> es la <b>rigidez</b> de toda la estructura, <b>u</b> los <b>desplazamientos</b> que no conocemos y <b>F</b> las <b>cargas</b>. Y despu&eacute;s: <b>&epsilon;</b> (&eacute;psilon) es la <b>deformaci&oacute;n unitaria</b> y <b>&sigma;</b> (sigma) la <b>tensi&oacute;n</b>.</div>
         Se invierte una vez y salen <strong>todos</strong> los desplazamientos. Con ellos,
         hacia atr&aacute;s: $\boldsymbol\varepsilon=\mathbf{B}\mathbf{u}$,
         $\boldsymbol\sigma=\mathbf{D}\boldsymbol\varepsilon$ y las fuerzas de cada barra.
@@ -353,6 +364,7 @@ MathJax = {
   <h1>El sismo no empuja: el suelo se mueve</h1>
   <div class="sub">y por eso la fuerza la genera tu propia masa</div>
   <div class="mate gr">$$\mathbf{M}\,\ddot{\mathbf u} \;+\; \mathbf{C}\,\dot{\mathbf u} \;+\; \mathbf{K}\,\mathbf u \;=\; -\,\mathbf{M}\,\mathbf r\,\ddot u_g(t)$$</div>
+  <div class="term">donde <b>M</b> es la <b>masa</b>, <b>C</b> el <b>amortiguamiento</b>, <b>K</b> la <b>rigidez</b>, <b>u</b> el <b>desplazamiento</b> de cada nudo, <b>r</b> el <b>vector de influencia</b> (1 en los grados que el sismo mueve) y <b>&uuml;<sub>g</sub></b> la <b>aceleraci&oacute;n del suelo</b>. Los puntos sobre la letra son derivadas en el tiempo: <b>u&#775;</b> velocidad, <b>&uuml;</b> aceleraci&oacute;n.</div>
   <div class="caja">
     El lado derecho <strong>no es una carga que alguien aplica</strong>: es la aceleración
     del suelo $\ddot u_g$ multiplicada por la masa.
@@ -370,6 +382,7 @@ MathJax = {
   <div class="kicker">PARTE 3 &middot; AN&Aacute;LISIS DIN&Aacute;MICO &middot; los tres modos</div>
   <h1 class="chica">Dos trasladan, el tercero gira</h1>
   <div class="mate" style="margin:10px 0 2px">$$\left(\mathbf{K}-\omega^2\mathbf{M}\right)\boldsymbol\phi=\mathbf 0\qquad T=\frac{2\pi}{\omega}\qquad \boldsymbol\phi_i^T\mathbf M\boldsymbol\phi_j=0\;\;(i\neq j)$$</div>
+  <div class="term">donde <b>&omega;</b> (omega) es la <b>frecuencia natural</b> en radianes por segundo, <b>&phi;</b> (fi) es la <b>forma del modo</b> &mdash; c&oacute;mo se deforma, no cu&aacute;nto &mdash;, <b>T</b> el <b>periodo</b> en segundos (lo que tarda en ir y volver) y <b>&phi;<sup>T</sup></b> el vector <b>transpuesto</b>. La tercera dice que dos modos distintos son <b>ortogonales</b>: no se estorban.</div>
   <svg viewBox="0 0 1440 300" style="width:100%;height:230px;margin:0">
     <!-- modo 1: traslacion -->
     <g transform="translate(60,20)">
@@ -408,6 +421,7 @@ MathJax = {
   <div class="mate">$$\Gamma_i=\boldsymbol\phi_i^T\mathbf M\,\mathbf r
   \qquad\qquad M_{\text{ef},i}=\Gamma_i^{\,2}
   \qquad\qquad \%M_i=\frac{M_{\text{ef},i}}{M_{\text{total}}}\times100$$</div>
+  <div class="term">donde <b>&Gamma;<sub>i</sub></b> (gamma) es el <b>factor de participaci&oacute;n</b> del modo, <b>M<sub>ef,i</sub></b> la <b>masa efectiva</b> &mdash; cu&aacute;nta masa mueve ese modo &mdash;, <b>M<sub>total</sub></b> la masa de toda la estructura y <b>%M<sub>i</sub></b> el <b>porcentaje</b> que se compara con el 90 % de la norma.</div>
   <table>
     <tr><th>Modo</th><th>T [s]</th><th>Qué hace</th><th style="text-align:right">Suma de masa</th></tr>
     <tr class="destaca"><td>1</td><td class="n">0.3311</td><td>traslada en $U_y$</td><td class="n">99.7 %</td></tr>
@@ -494,6 +508,7 @@ MathJax = {
       <p style="font-size:22px">La losa obliga a todos los nudos de la planta a moverse
       juntos: <strong>3 grados por piso</strong>.</p>
       <div class="mate" style="font-size:24px">$$\mathbf{K}_E=\sum \mathbf{A}^T\,\mathbf{K}_L\,\mathbf{A}$$</div>
+  <div class="term">donde <b>K<sub>L</sub></b> es la <b>rigidez lateral</b> de cada p&oacute;rtico, <b>A</b> la <b>matriz de compatibilidad</b> (lleva los 3 grados del piso a cada p&oacute;rtico), <b>&alpha;</b> (alfa) el <b>&aacute;ngulo</b> del p&oacute;rtico en planta, <b>r</b> su <b>distancia al centro de masa</b> y <b>J</b> el <b>momento polar</b> de inercia de la planta.</div>
       <p style="font-size:21px">con $\mathbf A=[\cos\alpha\;\;\operatorname{sen}\alpha\;\;r\,]$
       y $\mathbf M=\operatorname{diag}(m,\,m,\,J)$.</p>
     </div>
@@ -502,6 +517,7 @@ MathJax = {
       <p style="font-size:22px">No hay losa. Cada nudo va por su cuenta:
       <strong>masa en las tres direcciones</strong>.</p>
       <div class="mate" style="font-size:24px">$$\mathbf M=\begin{bmatrix}\mathbf M_{HT}&&\\&\mathbf M_{HL}&\\&&\mathbf M_{V}\end{bmatrix}$$</div>
+  <div class="term">donde <b>M<sub>HT</sub></b> es la masa para el sismo <b>transversal</b>, <b>M<sub>HL</sub></b> para el <b>longitudinal</b> y <b>M<sub>V</sub></b> para el <b>vertical</b>. Van en <b>bloques por la diagonal</b> porque no se mezclan entre s&iacute;.</div>
       <p style="font-size:21px">Transversal, longitudinal y vertical &mdash; como en
       <strong>Aguiar</strong>, estructuras de lámina delgada.</p>
     </div>

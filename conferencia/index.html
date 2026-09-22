@@ -214,6 +214,44 @@
     <a class="btn" href="https://giorgioburbanelli89.github.io/hekatan-lisp/#ej=11%20Cascara%20no%20lineal%20-%20Simo-Fox-Rifai.lisp">abrir</a>
   </div>
 
+  <h2>Preguntas de la conferencia</h2>
+  <div class="h2sub">Lo que se pregunt&oacute; en la sala, respondido con el n&uacute;mero medido.
+    Si algo qued&oacute; sin responder, aparece aqu&iacute; en cuanto est&aacute; comprobado.</div>
+
+  <div class="item">
+    <div class="ic">&#10067;</div>
+    <div class="txt">
+      <div class="tit">&iquest;Por qu&eacute; ETABS y SAP2000 no dan los mismos periodos?</div>
+      <div class="des">Por tres criterios por defecto, no por el solver: ETABS <strong>no cuenta
+        la masa vertical</strong>, <strong>sube la masa al nivel de piso</strong>
+        (<code>LUMPATSTORIES</code>) y <strong>no pesa el brazo r&iacute;gido</strong>
+        (&minus;5.6 % de masa, &minus;2.94 % de periodo). SAP2000 no hace ninguna de las tres.
+        <strong>Ninguno est&aacute; equivocado.</strong></div>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="ic">&#10067;</div>
+    <div class="txt">
+      <div class="tit">&iquest;Por qu&eacute; la cubierta es membrana y no losa?</div>
+      <div class="des">Porque la chapa de 0.8 mm tiene una rigidez a flexi&oacute;n
+        <strong>1 500 000 veces menor</strong> que una losa de 20 cm: la flexi&oacute;n va con
+        el espesor al <strong>cubo</strong>. Poner su flexi&oacute;n a cero no quita nada que
+        existiera. El c&aacute;lculo est&aacute; en la hoja 64.</div>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="ic">&#10067;</div>
+    <div class="txt">
+      <div class="tit">&iquest;C&oacute;mo s&eacute; que estos n&uacute;meros son correctos?</div>
+      <div class="des">Cada caso est&aacute; contrastado contra <strong>otro programa</strong>
+        con la misma malla nudo a nudo: ETABS 22, SAP2000 24, SAFE 20 y OpenSees.
+        Y hay <strong>335 tests</strong> que fallan solos si alguien rompe algo.
+        Los n&uacute;meros, uno a uno, en la hoja 68.</div>
+    </div>
+  </div>
+
   <h2>Manuales</h2>
   <div class="h2sub">Para leer despu&eacute;s, o imprimir en papel.</div>
 

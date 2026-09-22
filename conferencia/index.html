@@ -221,6 +221,26 @@
   <div class="item">
     <div class="ic">&#10067;</div>
     <div class="txt">
+      <div class="tit">&iquest;Un elemento shell tiene nudos dentro? &iquest;Ah&iacute; se acumula masa?</div>
+      <div class="des"><strong>No.</strong> Un Q4 tiene <strong>4 nudos, en las esquinas</strong>,
+        y nada en el interior. Lo que hay dentro son los <strong>puntos de Gauss</strong> (2&times;2),
+        que <strong>no son nudos</strong>: no tienen grados de libertad, no acumulan masa y no
+        aparecen en <code>K&middot;u = F</code>. S&oacute;lo sirven para <strong>evaluar la
+        integral</strong> de la rigidez, y desaparecen.<br>
+        La masa del elemento, <code>m = &rho;&middot;t&middot;A</code>, se reparte a sus
+        <strong>4 esquinas</strong> (A/4 a cada una en un Q4 regular; por HRZ si es irregular).
+        Y un nudo <strong>acumula lo de todos sus vecinos</strong>: uno interior es esquina de
+        4 c&aacute;scaras, as&iacute; que recibe el &aacute;rea entera; uno de borde, la mitad; uno de
+        esquina, un cuarto. Por eso en una zapata el muelle de un nudo interior vale el doble
+        que el de un borde: <strong>no es el muelle, es el &aacute;rea que le toca</strong>.<br>
+        Para tener m&aacute;s puntos con masa <strong>no se meten nudos dentro</strong>: se malla
+        m&aacute;s fino, partiendo el elemento en m&aacute;s elementos.</div>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="ic">&#10067;</div>
+    <div class="txt">
       <div class="tit">&iquest;Por qu&eacute; ETABS y SAP2000 no dan los mismos periodos?</div>
       <div class="des">Por tres criterios por defecto, no por el solver: ETABS <strong>no cuenta
         la masa vertical</strong>, <strong>sube la masa al nivel de piso</strong>

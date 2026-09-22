@@ -750,8 +750,8 @@ namespace HekatanLisp
             int id = System.Threading.Interlocked.Increment(ref _gaussId);
             string q = "g" + id;
             var sb = new StringBuilder();
-            sb.Append("<div id=\"").Append(q).Append("\" style=\"margin:1.1em auto;max-width:880px;text-align:center\">");
-            sb.Append("<canvas class=\"cv\" width=\"1280\" height=\"730\" style=\"width:100%;height:auto\"></canvas>");
+            sb.Append("<div id=\"").Append(q).Append("\" style=\"margin:1.1em auto;max-width:1260px;text-align:center\">");
+            sb.Append("<canvas class=\"cv\" width=\"1400\" height=\"470\" style=\"width:100%;height:auto\"></canvas>");
             if (sist)
             {
                 // CUATRO barras para CUATRO incognitas: se ve que solo una combinacion
@@ -776,13 +776,16 @@ namespace HekatanLisp
             {
                 sb.Append(Fila("n", "puntos de Gauss &nbsp;n = <b class=\"vn\">2</b>", "1", "5", "2", "1", "5"));
                 sb.Append(Fila("g", "grado del polinomio &nbsp;p = <b class=\"vg\">3</b>", "0", "7", "3", "0", "7"));
+                if (vars)   // mover los rectángulos: 1.00 = donde los coloca Gauss
+                    sb.Append(Fila("d", "mover los puntos &nbsp;&times;<b class=\"vd\">1.00</b>",
+                                   "0", "170", "100", "0.00", "1.70"));
                 sb.Append("<div class=\"rd\"></div>");
             }
             sb.Append("<style>#").Append(q).Append(" input{display:block;width:100%}")
               .Append("#").Append(q).Append(" .ttl{color:var(--fg);font-size:1em;margin:.45em 0 .1em}")
               .Append("#").Append(q).Append(" .ext{display:flex;justify-content:space-between;color:var(--mut);font-size:.85em}")
-              .Append("#").Append(q).Append(" .rd{margin:.6em auto 0;max-width:640px;background:#1d2333;color:#e8ecf5;")
-              .Append("border-radius:9px;padding:.5em .8em;font:600 21px/1.5 Consolas,monospace;text-align:left}")
+              .Append("#").Append(q).Append(" .rd{margin:.6em auto 0;max-width:1150px;background:#1d2333;color:#e8ecf5;")
+              .Append("border-radius:9px;padding:.6em 1em;font:600 24px/1.4 Consolas,monospace;text-align:left}")
               .Append("#").Append(q).Append(" .ok{color:#7ee2a8}#").Append(q).Append(" .no{color:#ff9d7a}</style>");
             sb.Append("<script>")
               .Append(sist ? GaussJsSistema(q)
@@ -814,19 +817,19 @@ var css=getComputedStyle(document.documentElement);
 function col(n,d){var v=css.getPropertyValue(n).trim();return v||d;}
 var FG=col('--fg','#171310'),MUT=col('--mut','#544d3a'),AZ=col('--dib-azul','#1c5fbf'),
     NAR=col('--dib-nar','#d9480f'),VER=col('--dib-verde','#2b8a3e');
-var L=150,R=1180,T=40,B=560;                      // marco del dibujo en pixeles
+var L=150,R=1330,T=22,B=316;                      // marco del dibujo en pixeles
 function px(x){return L+(x+1.25)/2.5*(R-L);}          // xi (-1..1)  -> pixel
 function py(y,ymin,ymax){return B-(y-ymin)/(ymax-ymin)*(B-T);}
 function ejes(ymin,ymax,rot){
   X.clearRect(0,0,C.width,C.height);
-  X.strokeStyle=MUT;X.lineWidth=2;X.font='22px Segoe UI';X.fillStyle=MUT;X.textAlign='center';
+  X.strokeStyle=MUT;X.lineWidth=2.5;X.font='30px Segoe UI';X.fillStyle=MUT;X.textAlign='center';
   var y0=py(0,ymin,ymax);
   X.beginPath();X.moveTo(L,y0);X.lineTo(R,y0);X.stroke();
   X.beginPath();X.moveTo(L,T);X.lineTo(L,B);X.stroke();
   [-1,-0.5,0,0.5,1].forEach(function(t){
     X.beginPath();X.moveTo(px(t),y0-7);X.lineTo(px(t),y0+7);X.stroke();
     X.fillText(t.toFixed(1),px(t),y0+34);});
-  X.fillText(rot||'ξ',(L+R)/2,B+132);
+  X.fillText(rot||'ξ',(L+R)/2,B+120);
 }
 function curva(f,ymin,ymax){
   X.strokeStyle=AZ;X.lineWidth=4;X.beginPath();
@@ -862,8 +865,8 @@ function dib(){
     var yt=py(h,ymin,ymax), yb=py(0,ymin,ymax);
     X.fillRect(px(x0),yt,px(x1)-px(x0),yb-yt);
     X.strokeRect(px(x0),yt,px(x1)-px(x0),yb-yt);
-    X.beginPath();X.arc(px(xs[i]),yt,9,0,7);X.fillStyle=NAR;X.fill();
-    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
+    X.beginPath();X.arc(px(xs[i]),yt,12,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='28px Segoe UI';X.textAlign='center';
     X.fillText('w='+ws[i].toFixed(3),px(xs[i]),yb+70);
     X.fillText('ξ='+xs[i].toFixed(4),px(xs[i]),yb+96);
   }
@@ -893,8 +896,8 @@ function dib(){
     var yt=py(h,ymin,ymax),yb=py(0,ymin,ymax);
     X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
     X.fillRect(px(x0),yt,px(x1)-px(x0),yb-yt);X.strokeRect(px(x0),yt,px(x1)-px(x0),yb-yt);
-    X.beginPath();X.arc(px(xi),yt,9,0,7);X.fillStyle=NAR;X.fill();
-    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
+    X.beginPath();X.arc(px(xi),yt,12,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='28px Segoe UI';X.textAlign='center';
     X.fillText('ξ='+xi.toFixed(4),px(xi),yb+70);
   });
   curva(f,ymin,ymax);
@@ -914,46 +917,74 @@ sa.addEventListener('input',dib);sa.addEventListener('change',dib);dib();})();";
 
         /// <summary>#gauss(vars): la misma cuadratura, pero enseñando TODAS las variables de
         /// cada punto: dónde empieza y acaba su rectángulo, su peso, su altura y su aporte.</summary>
+        /// <summary>#gauss(vars): la cuadratura con TODAS sus variables a la vista —el ancho
+        /// de cada rectángulo (su peso), su altura (la función) y su aporte— y con los puntos
+        /// movibles, para ver que solo en el sitio de Gauss el número sale exacto.</summary>
         private static string GaussJsVars(string q) => "(function(){var c=document.getElementById('" + q + "');" +
             GaussTabla + GaussComun + @"
-var sn=c.querySelector('.sn'),sg=c.querySelector('.sg'),rd=c.querySelector('.rd'),
-    vn=c.querySelector('.vn'),vg=c.querySelector('.vg');
+var sn=c.querySelector('.sn'),sg=c.querySelector('.sg'),sd=c.querySelector('.sd'),
+    rd=c.querySelector('.rd'),vn=c.querySelector('.vn'),vg=c.querySelector('.vg'),
+    vd=c.querySelector('.vd');
+function cota(x0,x1,y,txt){            // la cota del ancho, con sus flechas y el numero
+  var a=px(x0), b=px(x1);
+  X.strokeStyle=VER;X.fillStyle=VER;X.lineWidth=3;
+  X.beginPath();X.moveTo(a,y);X.lineTo(b,y);X.stroke();
+  [[a,1],[b,-1]].forEach(function(p){
+    X.beginPath();X.moveTo(p[0],y);X.lineTo(p[0]+12*p[1],y-7);X.lineTo(p[0]+12*p[1],y+7);
+    X.closePath();X.fill();});
+  X.font='26px Segoe UI';X.textAlign='center';
+  X.fillText(txt,(a+b)/2,y-14);
+}
 function dib(){
-  var n=+sn.value, g=+sg.value; vn.textContent=n; vg.textContent=g;
+  var n=+sn.value, g=+sg.value, k=(sd? +sd.value/100 : 1);
+  vn.textContent=n; vg.textContent=g; if(vd) vd.textContent=k.toFixed(2);
   var f=function(t){return Math.pow((1+t)/2,g);};
-  var ex=2/(g+1), ap=0, xs=GX[n-1], ws=GW[n-1];
+  var ex=2/(g+1), ap=0, xs0=GX[n-1], ws=GW[n-1];
+  // los puntos, movidos por la barra: k = 1 es donde los pone Gauss
+  var xs=xs0.map(function(x){ return n===1 ? (k-1)*0.9 : x*k; });
   var ymin=-0.12,ymax=1.15;
   ejes(ymin,ymax); area(f,ymin,ymax);
-  var filas='<table style=""width:100%;border-collapse:collapse;font-size:20px"">'+
-    '<tr style=""color:#9fb0d0""><td>i</td><td>xi_i</td><td>w_i</td>'+
-    '<td>f(xi_i)</td><td>w_i*f</td><td>su rectángulo</td></tr>';
+  var filas='<table style=""width:100%;border-collapse:collapse;font-size:24px"">'+
+    '<tr style=""color:#9fb0d0""><td>i</td><td>xi_i</td><td>ancho w_i</td>'+
+    '<td>alto f(xi_i)</td><td>area w_i*f</td><td>su tramo</td></tr>';
+  // Cada punto representa un TRAMO del intervalo, de ancho igual a su peso. Los
+  // tramos van uno detrás de otro desde -1, así que cubren [-1, 1] y el dibujo
+  // nunca se sale del elemento (antes el rectángulo iba centrado en el punto y
+  // al moverlo sobrepasaba el +1).
+  var borde=-1;
   for(var i=0;i<n;i++){
-    var x0=xs[i]-ws[i]/2, x1=xs[i]+ws[i]/2, h=f(xs[i]), apo=ws[i]*h; ap+=apo;
+    var x0=borde, x1=borde+ws[i]; borde=x1;
+    var h=f(xs[i]), apo=ws[i]*h; ap+=apo;
     var yt=py(h,ymin,ymax), yb=py(0,ymin,ymax);
     X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
     X.fillRect(px(x0),yt,px(x1)-px(x0),yb-yt);
     X.strokeRect(px(x0),yt,px(x1)-px(x0),yb-yt);
-    X.beginPath();X.arc(px(xs[i]),yt,9,0,7);X.fillStyle=NAR;X.fill();
-    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
-    X.fillText((i+1)+'',px(xs[i]),yb+42);
-    X.fillText('xi='+xs[i].toFixed(4),px(xs[i]),yb+72);
-    X.fillText('w='+ws[i].toFixed(4),px(xs[i]),yb+98);
+    // el punto, sobre la curva, y su plomada hasta el eje
+    X.strokeStyle=NAR;X.lineWidth=2;X.setLineDash([7,6]);
+    X.beginPath();X.moveTo(px(xs[i]),yb);X.lineTo(px(xs[i]),yt);X.stroke();X.setLineDash([]);
+    X.beginPath();X.arc(px(xs[i]),yt,12,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='28px Segoe UI';X.textAlign='center';
+    X.fillText('xi='+xs[i].toFixed(4),px(xs[i]),yb+62);
+    cota(x0,x1,yb+96,'ancho = '+ws[i].toFixed(4));
     filas+='<tr><td>'+(i+1)+'</td><td>'+xs[i].toFixed(4)+'</td><td>'+ws[i].toFixed(4)+
-           '</td><td>'+h.toFixed(4)+'</td><td>'+apo.toFixed(4)+'</td><td>de '+x0.toFixed(3)+
+           '</td><td>'+h.toFixed(4)+'</td><td>'+apo.toFixed(4)+'</td><td>'+x0.toFixed(3)+
            ' a '+x1.toFixed(3)+'</td></tr>';
   }
   filas+='</table>';
   curva(f,ymin,ymax);
   var err=Math.abs(ap-ex), anchos=0;
   for(var j=0;j<n;j++) anchos+=ws[j];
+  var sitio=Math.abs(k-1)<0.005
+    ? '<span class=""ok"">los puntos están donde los pone Gauss</span>'
+    : '<span class=""no"">los has movido (x'+k.toFixed(2)+'): ya no es el sitio de Gauss</span>';
   rd.innerHTML='f(xi) = ((1+xi)/2)^'+g+filas+
-    'suma de los aportes = '+ap.toFixed(6)+' &nbsp; exacta = '+ex.toFixed(6)+
+    'suma de las areas = '+ap.toFixed(6)+' &nbsp; exacta = '+ex.toFixed(6)+
     ' &nbsp; error = '+err.toFixed(6)+' '+
-    (err<1e-9?'<span class=""ok"">EXACTO</span>':'<span class=""no"">no llega</span>')+
-    '<br>los anchos suman '+anchos.toFixed(4)+' = el ancho del intervalo';
+    (err<1e-9?'<span class=""ok"">EXACTO</span>':'<span class=""no"">no cuadra</span>')+
+    '<br>'+sitio+' &nbsp;·&nbsp; los anchos suman '+anchos.toFixed(4)+' = el ancho del intervalo';
 }
-sn.addEventListener('input',dib);sn.addEventListener('change',dib);
-sg.addEventListener('input',dib);sg.addEventListener('change',dib);dib();})();";
+[sn,sg,sd].forEach(function(e){ if(e){ e.addEventListener('input',dib); e.addEventListener('change',dib);} });
+dib();})();";
 
         /// <summary>#gauss(sistema): las CUATRO incógnitas de dos puntos —xi1, xi2, w1, w2—,
         /// una barra por incógnita, y las cuatro condiciones que deben cumplirse a la vez.</summary>
@@ -969,17 +1000,20 @@ function dib(){
   u1.textContent=w1.toFixed(2); u2.textContent=w2.toFixed(2);
   var ymin=-0.12,ymax=1.15, f=function(t){return t*t;};
   ejes(ymin,ymax); area(f,ymin,ymax);
-  var P=[[x1,w1],[x2,w2]];
+  var P=[[x1,w1],[x2,w2]], borde=-1;
   for(var i=0;i<2;i++){
     var xi=P[i][0], w=P[i][1], h=f(xi);
+    var a0=borde, a1=borde+w; borde=a1;      // su tramo, de ancho = su peso
     var yt=py(h,ymin,ymax), yb=py(0,ymin,ymax);
     X.fillStyle='rgba(217,72,15,.22)';X.strokeStyle=NAR;X.lineWidth=3;
-    X.fillRect(px(xi-w/2),yt,px(xi+w/2)-px(xi-w/2),yb-yt);
-    X.strokeRect(px(xi-w/2),yt,px(xi+w/2)-px(xi-w/2),yb-yt);
-    X.beginPath();X.arc(px(xi),yt,9,0,7);X.fillStyle=NAR;X.fill();
-    X.fillStyle=FG;X.font='20px Segoe UI';X.textAlign='center';
-    X.fillText('xi'+(i+1)+'='+xi.toFixed(3),px(xi),yb+72);
-    X.fillText('w'+(i+1)+'='+w.toFixed(2),px(xi),yb+98);
+    X.fillRect(px(a0),yt,px(a1)-px(a0),yb-yt);
+    X.strokeRect(px(a0),yt,px(a1)-px(a0),yb-yt);
+    X.strokeStyle=NAR;X.lineWidth=2;X.setLineDash([7,6]);
+    X.beginPath();X.moveTo(px(xi),yb);X.lineTo(px(xi),yt);X.stroke();X.setLineDash([]);
+    X.beginPath();X.arc(px(xi),yt,12,0,7);X.fillStyle=NAR;X.fill();
+    X.fillStyle=FG;X.font='28px Segoe UI';X.textAlign='center';
+    X.fillText('xi'+(i+1)+'='+xi.toFixed(3),px(xi),yb+62);
+    X.fillText('w'+(i+1)+'='+w.toFixed(2),px(xi),yb+108);
   }
   curva(f,ymin,ymax);
   var S=[w1+w2, w1*x1+w2*x2, w1*x1*x1+w2*x2*x2, w1*Math.pow(x1,3)+w2*Math.pow(x2,3)];

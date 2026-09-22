@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -1319,6 +1319,9 @@ table.hk-obs td:nth-child(3){min-width:22em;}
 .hk-obs-e{font-weight:600;}
 .m-var{font-style:italic;color:var(--var);font-size:105%;} .m-num{color:var(--num);}
 .m-op{color:var(--mut);padding:0 .08em;}
+.m-link{color:var(--var);text-decoration:none;border-bottom:1px solid currentColor;}
+.m-link:hover{background:rgba(127,127,127,.18);}
+@media print{.m-link{color:inherit;border-bottom:1px dotted currentColor;}}
 .m-fn{font-style:normal;font-weight:600;color:var(--fg);padding-right:.05em;}
 .m-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .15em;line-height:110%;}
 .m-frn{border-bottom:1pt solid currentColor;padding:0 .35em .5pt;}
@@ -1509,6 +1512,26 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             {
                 var v = varLookup?.Invoke(m.Groups[1].Value.Trim());
                 return string.IsNullOrEmpty(v) ? m.Value : "<span class=\"m-expr\">" + v + "</span>";
+            });
+            // markdown: [texto](url) → enlace. VA PRIMERO: una URL lleva _ y * y, si se
+            // procesa despues, la cursiva se come el enlace. Se admite http(s) y el #ej=
+            // de las hojas publicadas; cualquier otro esquema se deja como texto.
+            t = Regex.Replace(t, @"\[([^\]]+)\]\(([^)\s]+)\)", m =>
+            {
+                var txt = m.Groups[1].Value;
+                var url = m.Groups[2].Value;
+                var ok = url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                      || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                      || url.StartsWith("#");
+                if (!ok) return m.Value;
+                var u = url.Replace("&", "&amp;").Replace("\"", "&quot;");
+                return "<a class=\"m-link\" href=\"" + u + "\" target=\"_blank\" rel=\"noopener\">" + txt + "</a>";
+            });
+            // y una URL suelta tambien se enlaza sola
+            t = Regex.Replace(t, @"(?<![""'>=])https?://[^\s<)]+", m =>
+            {
+                var u = m.Value.Replace("&", "&amp;");
+                return "<a class=\"m-link\" href=\"" + u + "\" target=\"_blank\" rel=\"noopener\">" + m.Value + "</a>";
             });
             // markdown: **negrita** o __negrita__ ; *cursiva* o _cursiva_ (doble antes que simple)
             t = Regex.Replace(t, @"\*\*([^*]+)\*\*", "<b>$1</b>");

@@ -120,7 +120,8 @@ body{--slw:1600px;--slh:900px;}
   transform:translateY(26px) scale(.985);transition:opacity .34s ease, transform .34s ease;
   overflow:hidden;}
 .slide.on{opacity:1;pointer-events:auto;transform:none;}
-.slide.portada{display:flex;flex-direction:column;justify-content:center;text-align:center;}
+.slide.portada{display:flex;flex-direction:column;justify-content:flex-start;
+  padding-top:120px;text-align:center;}   /* centrada NO: el contenido alto se salía por arriba */
 
 /* ecuaciones y gráfica LADO A LADO: apiladas, la gráfica caía al borde inferior
    y no se leía nada desde la sala */
@@ -132,7 +133,7 @@ body{--slw:1600px;--slh:900px;}
 
 /* el contenido se encoge solo si no cabe (JS mide y pone --k) */
 .wrap{transform-origin:top left;}
-.slide.portada .wrap{transform-origin:top center;}
+.slide.portada .wrap{transform-origin:top center;width:100%;}
 
 /* tipografía de PROYECTOR: todo más grande que en la hoja */
 .slide .ws-fmt{font-size:30px;line-height:1.45;margin:.35em 0;}
@@ -193,7 +194,11 @@ JS = """
   function encajar(s){
     var w=s.querySelector('.wrap'); if(!w) return;
     w.style.transform='none';
-    var dispo=s.clientHeight-(s.querySelector('h2.tit')?s.querySelector('h2.tit').offsetHeight+26:0)-60;
+    // el alto que queda de VERDAD: lo que hay entre donde empieza el contenido y el
+    // borde de abajo. Así vale igual para la portada (con su padding) y para las
+    // páginas con título, sin descontar nada a mano.
+    var rs=s.getBoundingClientRect(), rw=w.getBoundingClientRect();
+    var dispo=s.clientHeight-(rw.top-rs.top)-50;   // 50 de holgura: con 34 se pasaba 3 px en pantallas chicas
     var alto=w.scrollHeight, ancho=w.scrollWidth, util=s.clientWidth-156;
     var k=Math.min(1, dispo/Math.max(1,alto), util/Math.max(1,ancho));
     if(k<1) w.style.transform='scale('+k.toFixed(4)+')';
@@ -290,7 +295,10 @@ def construir(html: str, logo_b64: str, titulo_pie: str) -> str:
              + "<span>Hekatan Engineers</span></div>")
 
     return (
-        "<!doctype html><html><head>" + head
+        "<!doctype html><html><head>"
+        + '<meta http-equiv="Cache-Control" content="no-store, must-revalidate">'
+        + '<meta http-equiv="Pragma" content="no-cache">'
+        + head
         + "<style>" + CSS + "</style></head><body>"
         + '<div id="agua">Hekatan Engineers</div>'
         + '<div id="deck"><div id="stage">' + "".join(out) + "</div></div>"

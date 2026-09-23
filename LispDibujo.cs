@@ -23,6 +23,19 @@ namespace HekatanLisp
     /// tienen tamaño de PAPEL fijo; la geometría va a escala 1:E (automática = la mayor escala
     /// normalizada que cabe en el ancho, o fija con escala = 1:50). Colores del tema (var(--…)).
     /// Compartido escritorio/web (web/HekatanLispWeb.csproj lo enlaza).
+    ///
+    /// Primitivas de CARGAS y DIAGRAMAS (23-sep-2026, hoja de la placa base):
+    ///   carga(x1, y1, x2, y2, q1, q2, "texto", "estilo", n = 9, sentido = 1)
+    ///       bloque de carga repartida (trapecio) sobre la cara p1→p2: q1, q2 = alto del bloque en
+    ///       unidades de dibujo, a la IZQUIERDA de p1→p2 si es positivo (misma regla que cota);
+    ///       las flechas apuntan a la cara (sentido = -1: salen de ella, p.ej. tracción).
+    ///   curva(xa, xb, expr_en_x, "estilo", base = y0, n = 64, var = x)
+    ///       y = f(x) en coordenadas del dibujo; con base = y0 se cierra contra esa recta y con
+    ///       "relleno" queda pintado: DIAGRAMA de momentos, cortantes o presiones.
+    ///   empotramiento(x1, y1, x2, y2, lado)
+    ///       apoyo empotrado: trazo grueso p1→p2 + rayado a 45° del lado 'lado' (+1 = izquierda).
+    ///   circulo(xv, yv, r) acepta VECTORES (un círculo por componente: pernos).
+    ///   estilo "denso": relleno más opaco (0.35) · "tenue": más claro (0.08).
     /// </summary>
     public static class LispDibujo
     {
@@ -218,6 +231,8 @@ namespace HekatanLisp
                     case "trazos": case "oculta": st.Dash = "2.2 1.2"; break;
                     case "puntos": st.Dash = "0.4 0.9"; break;
                     case "relleno": st.Fill = true; break;
+                    case "denso": st.Fill = true; st.FillOp = 0.35; break;
+                    case "tenue": st.Fill = true; st.FillOp = 0.08; break;
                     case "resalte": st.Fill = true; st.FillOp = 0.18; st.NoStroke = true; break;
                     case "sinborde": st.NoStroke = true; break;
                     case "negro": st.Col = "var(--fg)"; break;
@@ -322,7 +337,7 @@ namespace HekatanLisp
         static readonly HashSet<string> Known = new HashSet<string> {
             "linea","polilinea","poligono","rect","circulo","arco","flecha","flechamomento","texto","cota","cotas","cotasx","cotasy",
             "ejex","ejey","ejesx","ejesy","hueco","achurado","varilla","varillas","fila","estribo","seccion",
-            "leyenda","obs","observacion"
+            "leyenda","obs","observacion","carga","curva","empotramiento","empotre"
         };
 
         /// <summary>Dibuja el bloque. lookup = valores de la hoja (nombre → números).
@@ -419,6 +434,7 @@ namespace HekatanLisp
             int Order(Prim p) => p.Name switch
             {
                 "achurado" or "seccion" or "hueco" => 0,
+                "carga" or "curva" => 2,
                 "ejex" or "ejey" or "ejesx" or "ejesy" => 1,
                 "obs" => 9,
                 "texto" or "cota" or "cotas" or "cotasx" or "cotasy" => 5,
@@ -557,9 +573,32 @@ namespace HekatanLisp
                     break;
                 case "circulo": case "arco":
                 {
-                    double x = V(c, Pos(p, 0)), y = V(c, Pos(p, 1)), r = V(c, Pos(p, 2));
-                    Add(x - r, y - r); Add(x + r, y + r); break;
+                    var xs = Vals(c, Pos(p, 0)); var ys = Vals(c, Pos(p, 1)); double r = V(c, Pos(p, 2));
+                    for (int i = 0; i < Math.Max(xs.Length, ys.Length); i++)
+                    {
+                        double x = xs[Math.Min(i, xs.Length - 1)], y = ys[Math.Min(i, ys.Length - 1)];
+                        Add(x - r, y - r); Add(x + r, y + r);
+                    }
+                    break;
                 }
+                case "carga":
+                {
+                    double x1 = V(c, Pos(p, 0)), y1 = V(c, Pos(p, 1)), x2 = V(c, Pos(p, 2)), y2 = V(c, Pos(p, 3));
+                    double q1 = V(c, Pos(p, 4)), q2 = NumArg(c, p, 5, q1);
+                    var (nx, ny) = NormalIzq(x1, y1, x2, y2);
+                    Add(x1, y1); Add(x2, y2); Add(x1 + nx * q1, y1 + ny * q1); Add(x2 + nx * q2, y2 + ny * q2);
+                    break;
+                }
+                case "curva":
+                {
+                    var (xs, ys) = Curva(c, p);
+                    for (int i = 0; i < xs.Length; i++) if (!double.IsNaN(ys[i]) && !double.IsInfinity(ys[i])) Add(xs[i], ys[i]);
+                    var b = Named(p, "base"); if (b != null) { double y0 = V(c, b); Add(xs[0], y0); Add(xs[xs.Length - 1], y0); }
+                    break;
+                }
+                case "empotramiento": case "empotre":
+                    Add(V(c, Pos(p, 0)), V(c, Pos(p, 1))); Add(V(c, Pos(p, 2)), V(c, Pos(p, 3)));
+                    break;
                 case "texto":
                     Add(V(c, Pos(p, 0)), V(c, Pos(p, 1))); break;
                 case "cotas": case "cotasx":
@@ -651,13 +690,68 @@ namespace HekatanLisp
                     foreach (var (x, y, b, h) in Rects(c, p))
                         Poly(c, new[] { x, x + b, x + b, x }, new[] { y, y, y + h, y + h }, true, Style(StyS(p)));
                     break;
-                case "circulo":
+                case "circulo":   // circulo(x, y, r, estilo) — x, y pueden ser VECTORES (un círculo por componente)
                 {
-                    double x = V(c, Pos(p, 0)), y = V(c, Pos(p, 1)), r = V(c, Pos(p, 2));
+                    var xs = Vals(c, Pos(p, 0)); var ys = Vals(c, Pos(p, 1)); double r = V(c, Pos(p, 2));
                     var st = Style(StyS(p));
-                    c.Sb.Append("<circle cx=\"").Append(F(c.Px(x))).Append("\" cy=\"").Append(F(c.Py(y))).Append("\" r=\"").Append(F(r * c.K))
-                     .Append("\" style=\"").Append(StrokeCss(st)).Append(';').Append(FillCss(st)).Append("\"/>");
-                    c.Ext(c.Px(x - r), c.Py(y + r)); c.Ext(c.Px(x + r), c.Py(y - r));
+                    for (int i = 0; i < Math.Max(xs.Length, ys.Length); i++)
+                    {
+                        double x = xs[Math.Min(i, xs.Length - 1)], y = ys[Math.Min(i, ys.Length - 1)];
+                        c.Sb.Append("<circle cx=\"").Append(F(c.Px(x))).Append("\" cy=\"").Append(F(c.Py(y))).Append("\" r=\"").Append(F(r * c.K))
+                         .Append("\" style=\"").Append(StrokeCss(st)).Append(';').Append(FillCss(st)).Append("\"/>");
+                        c.Ext(c.Px(x - r), c.Py(y + r)); c.Ext(c.Px(x + r), c.Py(y - r));
+                    }
+                    break;
+                }
+                case "carga":   // carga(x1, y1, x2, y2, q1, q2, "texto", "estilo", n = 9, sentido = 1)
+                    DrawCarga(c, p);
+                    break;
+                case "curva":   // curva(xa, xb, expr, "estilo", base = y0, n = 64, var = x)
+                {
+                    var (xs, ys) = Curva(c, p);
+                    var st = Style(StyS(p) ?? "media");
+                    var b = Named(p, "base");
+                    // la curva se corta en los NaN (raíz de negativo…): cada tramo continuo por separado
+                    var tramos = new List<(List<double> x, List<double> y)>();
+                    var cx = new List<double>(); var cy = new List<double>();
+                    for (int i = 0; i < xs.Length; i++)
+                    {
+                        if (double.IsNaN(ys[i]) || double.IsInfinity(ys[i])) { if (cx.Count > 1) tramos.Add((cx, cy)); cx = new List<double>(); cy = new List<double>(); continue; }
+                        cx.Add(xs[i]); cy.Add(ys[i]);
+                    }
+                    if (cx.Count > 1) tramos.Add((cx, cy));
+                    foreach (var (tx, ty) in tramos)
+                    {
+                        if (b != null && st.Fill)
+                        {   // relleno contra la base, sin borde; el trazo de la curva va encima
+                            double y0 = V(c, b);
+                            var px = new List<double> { tx[0] }; px.AddRange(tx); px.Add(tx[tx.Count - 1]);
+                            var py = new List<double> { y0 }; py.AddRange(ty); py.Add(y0);
+                            Poly(c, px, py, true, new Sty { Col = st.Col, Fill = true, FillOp = st.FillOp, NoStroke = true });
+                            Line(c, tx[0], y0, tx[0], ty[0], new Sty { Col = st.Col, W = 0.18 });
+                            Line(c, tx[tx.Count - 1], y0, tx[tx.Count - 1], ty[ty.Count - 1], new Sty { Col = st.Col, W = 0.18 });
+                        }
+                        Poly(c, tx, ty, false, new Sty { Col = st.Col, W = st.W, Dash = st.Dash });
+                    }
+                    break;
+                }
+                case "empotramiento": case "empotre":   // empotramiento(x1, y1, x2, y2, lado)
+                {
+                    double x1 = V(c, Pos(p, 0)), y1 = V(c, Pos(p, 1)), x2 = V(c, Pos(p, 2)), y2 = V(c, Pos(p, 3));
+                    double lado = NumArg(c, p, 4, 1) < 0 ? -1 : 1;
+                    double a = c.Px(x1), b = c.Py(y1), d = c.Px(x2), e = c.Py(y2);
+                    double L = Math.Sqrt((d - a) * (d - a) + (e - b) * (e - b)); if (L < 1e-9) break;
+                    double ux = (d - a) / L, uy = (e - b) / L;
+                    // normal IZQUIERDA de p1→p2: en papel (y hacia abajo) es (uy, −ux)
+                    double nx = uy * lado, ny = -ux * lado;
+                    const double paso = 1.5, largo = 2.2;
+                    string css = "stroke:var(--fg);stroke-width:.2;stroke-linecap:round";
+                    for (double s0 = paso * 0.5; s0 <= L + 1e-9; s0 += paso)
+                    {
+                        double sx = a + ux * s0, sy = b + uy * s0;
+                        PLine(c, sx, sy, sx + (nx - ux) * largo * 0.7071, sy + (ny - uy) * largo * 0.7071, css);
+                    }
+                    PLine(c, a, b, d, e, "stroke:var(--fg);stroke-width:.6;stroke-linecap:round");
                     break;
                 }
                 case "arco":   // arco(xc, yc, r, a1, a2): de a1 a a2 grados, antihorario (y hacia arriba)
@@ -844,6 +938,77 @@ namespace HekatanLisp
                         Text(c, c.Px(x + b) + 2, (ay + by) / 2, "E Ø " + Num(dmm) + " mm", 2.2, "start", 0, "var(--dib-acero)");
                     break;
                 }
+            }
+        }
+
+        // normal IZQUIERDA (mundo, y hacia arriba) del segmento p1→p2, unitaria
+        static (double, double) NormalIzq(double x1, double y1, double x2, double y2)
+        {
+            double L = Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+            if (L < 1e-12) return (0, 1);
+            return (-(y2 - y1) / L, (x2 - x1) / L);
+        }
+
+        // muestras de curva(xa, xb, expr, …): la variable (x por defecto) es un VECTOR y el
+        // evaluador numérico ya opera componente a componente (sqrt, ^, max…)
+        static (double[], double[]) Curva(Ctx c, Prim p)
+        {
+            double xa = V(c, Pos(p, 0)), xb = V(c, Pos(p, 1));
+            var ea = Pos(p, 2); if (ea == null || ea.Str != null) throw new FormatException("curva: falta la expresión (sin comillas)");
+            int n = (int)Math.Round(NumNamed(c, p, "n", 64)); n = Math.Max(2, Math.Min(n, 2000));
+            string var = (Named(p, "var")?.Str ?? Named(p, "var")?.Raw ?? "x").Trim();
+            var xs = new double[n + 1];
+            for (int i = 0; i <= n; i++) xs[i] = xa + (xb - xa) * i / n;
+            LispConverter.N tree;
+            try { tree = LispConverter.ParseMath(LispConverter.MangleExpr(ea.Raw)); }
+            catch { throw new FormatException("no se puede leer «" + ea.Raw + "»"); }
+            string mv = LispConverter.MangleExpr(var).Trim();
+            var ys = Eval(tree, nm => nm == var || nm == mv ? xs : c.Look?.Invoke(nm));
+            if (ys.Length == 1) ys = Enumerable.Repeat(ys[0], n + 1).ToArray();   // constante
+            return (xs, ys);
+        }
+
+        // bloque de carga repartida (trapecio) con flechas hacia la cara cargada
+        static void DrawCarga(Ctx c, Prim p)
+        {
+            double x1 = V(c, Pos(p, 0)), y1 = V(c, Pos(p, 1)), x2 = V(c, Pos(p, 2)), y2 = V(c, Pos(p, 3));
+            double q1 = V(c, Pos(p, 4)), q2 = NumArg(c, p, 5, q1);
+            var strs = p.A.Where(a => a.Name == null && a.Str != null).Select(a => a.Str).ToList();
+            string txt = strs.Count > 0 ? strs[0] : null;
+            string sty = Named(p, "estilo")?.Str ?? (strs.Count > 1 ? strs[1] : "rojo");
+            var st = Style(sty);
+            if (st.Col == "var(--fg)") st.Col = "var(--dib-rojo)";
+            int n = (int)Math.Round(NumNamed(c, p, "n", 9)); n = Math.Max(2, Math.Min(n, 60));
+            double sentido = NumNamed(c, p, "sentido", 1) < 0 ? -1 : 1;
+            var (nx, ny) = NormalIzq(x1, y1, x2, y2);
+            double ox1 = x1 + nx * q1, oy1 = y1 + ny * q1, ox2 = x2 + nx * q2, oy2 = y2 + ny * q2;
+            // el bloque: relleno translúcido + borde exterior
+            Poly(c, new[] { x1, x2, ox2, ox1 }, new[] { y1, y2, oy2, oy1 }, true,
+                 new Sty { Col = st.Col, Fill = true, FillOp = st.Fill ? st.FillOp : 0.14, NoStroke = true });
+            var borde = new Sty { Col = st.Col, W = Math.Max(0.3, st.W) };
+            Line(c, ox1, oy1, ox2, oy2, borde);
+            if (Math.Abs(q1) > 1e-12) Line(c, x1, y1, ox1, oy1, new Sty { Col = st.Col, W = 0.18 });
+            if (Math.Abs(q2) > 1e-12) Line(c, x2, y2, ox2, oy2, new Sty { Col = st.Col, W = 0.18 });
+            // flechas: de la orilla del bloque a la cara (o al revés con sentido = -1)
+            var fl = new Sty { Col = st.Col, W = 0.3 };
+            double minQ = PuntaLargo(c) * 1.2;
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / (n - 1);
+                double bx = x1 + (x2 - x1) * t, by = y1 + (y2 - y1) * t;
+                double q = q1 + (q2 - q1) * t;
+                if (Math.Abs(q) < minQ) continue;                 // tan bajo que no cabe la punta
+                double ex = bx + nx * q, ey = by + ny * q;
+                if (sentido > 0) Punta(c, ex, ey, bx, by, fl, true); else Punta(c, bx, by, ex, ey, fl, true);
+            }
+            if (!string.IsNullOrEmpty(txt))
+            {   // rótulo por fuera del bloque, en el centro de la orilla, paralelo a la cara
+                double mx = (ox1 + ox2) / 2, my = (oy1 + oy2) / 2;
+                double qm = (q1 + q2) / 2, sg = qm >= 0 ? 1 : -1;
+                double pxm = c.Px(mx) + nx * sg * 2.6, pym = c.Py(my) - ny * sg * 2.6;
+                double ang = Math.Atan2(-(y2 - y1), x2 - x1) * 180 / Math.PI;
+                if (ang > 90) ang -= 180; else if (ang < -90) ang += 180;
+                Text(c, pxm, pym, Interp(c, txt), 2.5, "middle", ang, st.Col);
             }
         }
 

@@ -717,6 +717,8 @@ namespace HekatanLisp
         /// los identificadores que chocarían en LISP. Llena CaseMap para volver a dibujarlos
         /// como se escribieron. Solo toca líneas de matemática y los argumentos de #fplot/#surf/#map
         /// (la prosa #:, los comentarios ; y la etiqueta @@ quedan igual).</summary>
+        // [unidad] en medio de la línea: tras ) o número, y antes de ; o ' (la columna siguiente o la descripción)
+        static readonly Regex RxUnidadMedio = new Regex(@"([\)\d]\s*)\[([^\[\];,=]*[A-Za-z°][^\[\];,=]*)\](?=\s*[;'])");
         public static string PrepareNames(string text)
         {
             CaseMap.Clear(); _mangle.Clear();
@@ -724,6 +726,7 @@ namespace HekatanLisp
             var uniOrig = new Dictionary<string, string>(StringComparer.Ordinal);   // ascii → como se tecleó (Δu)
             var groups = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             var cuerpo = new string[lines.Length]; var cola = new string[lines.Length];
+            var unidMedio = new List<string>();
             for (int k = 0; k < lines.Length; k++)
             {
                 var ln = lines[k]; var t = ln.TrimStart();
@@ -740,6 +743,9 @@ namespace HekatanLisp
                 string body = at >= 0 ? ln.Substring(0, at) : ln, tail = at >= 0 ? ln.Substring(at) : "";
                 // la UNIDAD visible [kN] tampoco es matemática: sus letras no son nombres de la hoja
                 if (SepararUnidad(body.TrimEnd(), out var cuerpoSinU, out var uVis)) { tail = " [" + uVis + "] " + tail; body = cuerpoSinU; }
+                // y las unidades de las COLUMNAS de en medio  (a = dec(…) [N/mm] ; b = …): SepararUnidad solo ve
+                // la del final. Sin esto, con N y n en la hoja, «[N/mm]» salía «nhkq1/mm». Se tapan y se reponen al final.
+                body = RxUnidadMedio.Replace(body, m => { unidMedio.Add(m.Groups[2].Value); return m.Groups[1].Value + "[\u0001" + (unidMedio.Count - 1) + "]"; });
                 if (HasGreekUni(body))
                     body = RxIdentUni.Replace(body, m =>
                     {
@@ -785,6 +791,10 @@ namespace HekatanLisp
                 var body = _mangle.Count == 0 ? cuerpo[k] : RxIdent.Replace(cuerpo[k], m => _mangle.TryGetValue(m.Value, out var r) ? r : m.Value);
                 lines[k] = body + cola[k];
             }
+            if (unidMedio.Count > 0)
+                for (int k = 0; k < lines.Length; k++)
+                    if (lines[k].IndexOf('\u0001') >= 0)
+                        lines[k] = Regex.Replace(lines[k], @"\[\u0001(\d+)\]", m => "[" + unidMedio[int.Parse(m.Groups[1].Value)] + "]");
             return string.Join("\n", lines);
         }
 
@@ -2008,6 +2018,12 @@ document.addEventListener('mouseup',function(){
             if (n.Op == "fn")
             {
                 double a = (n.Items != null && n.Items.Count > 0) ? Eval(n.Items[0], var, x) : double.NaN;
+                // max/min de DOS argumentos (curvas por tramos: la placa base, Y ≥ m o Y < m)
+                if ((n.Atom == "max" || n.Atom == "min") && n.Items != null && n.Items.Count == 2)
+                {
+                    double b2 = Eval(n.Items[1], var, x);
+                    return n.Atom == "max" ? Math.Max(a, b2) : Math.Min(a, b2);
+                }
                 return n.Atom switch
                 {
                     "sqrt" => Math.Sqrt(a), "sin" => Math.Sin(a), "cos" => Math.Cos(a), "tan" => Math.Tan(a),

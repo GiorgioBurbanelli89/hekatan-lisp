@@ -1154,7 +1154,27 @@ dib();})();";
             return "`" + s.Replace("\r", "").Replace("\n", " · ").Trim() + "`";
         }
 
+        /// <summary>La HOJA puede fijar su operación con una línea  #modo auto  (o simplify / expand / memoria).
+        /// Una memoria de cálculo quiere ver las fórmulas COMO SE ESCRIBEN (m = (N − 0.95·d)/2), y el
+        /// modo por defecto (simplify) las reescribe (N/2 − 19·d/40). La línea queda en blanco para no
+        /// descuadrar los índices por línea; derivar/integrar/despejar mandan sobre la hoja.</summary>
         private List<string> ComputeResult(string text, string dvar)
+        {
+            var mm = System.Text.RegularExpressions.Regex.Match(text ?? "",
+                @"(?im)^[ \t]*#[ \t]*modo[ \t]*\(?[ \t]*(auto|simplify|expand|memoria)[ \t]*\)?[ \t]*\r?$");
+            if (!mm.Success || _op is "deriv" or "integ" or "despejar") return ComputeResultCore(text, dvar);
+            var prev = _op;
+            string modo = mm.Groups[1].Value.ToLowerInvariant();
+            // memoria = auto + SIN sustituir las definiciones anteriores: t_p = m·√(…) se lee con su m,
+            // no con (N − 0.95·d)/2 metida dentro (los valores van aparte, con dec(números))
+            _op = modo == "memoria" ? "auto" : modo;
+            _sinSustituir = modo == "memoria";
+            try { return ComputeResultCore(text.Remove(mm.Index, mm.Length), dvar); }
+            finally { _op = prev; _sinSustituir = false; }
+        }
+        private bool _sinSustituir;
+
+        private List<string> ComputeResultCore(string text, string dvar)
         {
             _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
@@ -1356,7 +1376,7 @@ dib();})();";
                 {
                     var app = (funcMap.Count > 0 || vecMap.Count > 0)
                               ? LispConverter.SubstFuncs(treeOf[i], funcMap, vecMap) : treeOf[i];  // f(3)→3²+1, v(2)→componente
-                    var sub = LispConverter.SubstLabels(app, prevLabels, labels[i], new HashSet<string>());
+                    var sub = _sinSustituir ? app : LispConverter.SubstLabels(app, prevLabels, labels[i], new HashSet<string>());
                     formOf[i] = barraOf[i] ?? LispConverter.ToLisp(sub);
                 }
                 catch { formOf[i] = barraOf[i]; }

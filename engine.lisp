@@ -1400,9 +1400,138 @@
       (let ((s 0)) (mapc (lambda (a b) (setf s (+ s (* a b)))) row col) s)   ; numerico nativo
       (simplify (reduce (lambda (acc pr) (list '+ acc (list '* (car pr) (cdr pr))))
                         (mapcar #'cons row col) :initial-value 0))))
+;; ---- NUMERICO GRANDE: MKL Intel (escritorio) o bucle nativo tipado (web) ----
+;; Igual que Hekatan Lab: una matriz de NUMEROS grande no se multiplica entrada por
+;; entrada con listas; se copia a un arreglo double-float plano y se llama a
+;; cblas_dgemm / LAPACKE_dgesv de MKL. Sin MKL (web = ECL->WASM, o la DLL no esta)
+;; se usa un bucle con tipos declarados, que el compilador vuelve codigo maquina.
+;; Matrices chicas o con fracciones/letras siguen por el camino EXACTO de siempre.
+(defparameter *hk-fast-min* 32768)          ; m*k*n desde donde conviene (32^3)
+(defparameter *hk-mkl* :sin-probar)         ; :sin-probar | t | nil
+(defun hk-mkl-candidatos ()
+  #+sbcl
+  (let ((rt (and sb-ext:*runtime-pathname* (directory-namestring sb-ext:*runtime-pathname*)))
+        (env (sb-ext:posix-getenv "HEKATAN_MKL")))
+    (remove nil
+            (list (and env (if (search ".dll" env) env (concatenate 'string env "/mkl_rt.3.dll")))
+                  (and rt (concatenate 'string rt "../mkl/mkl_rt.3.dll"))   ; <app>/sbcl -> <app>/mkl
+                  (and rt (concatenate 'string rt "mkl/mkl_rt.3.dll"))
+                  "C:/Program Files/Hekatan Lab/mkl/mkl_rt.3.dll")))
+  #-sbcl nil)
+(defun hk-mkl-p ()
+  "Carga MKL la primera vez que hace falta. NIL si no hay (se usa el bucle nativo)."
+  (when (eq *hk-mkl* :sin-probar)
+    (setf *hk-mkl* nil)
+    #+sbcl
+    (dolist (p (if (equal (sb-ext:posix-getenv "HEKATAN_MKL") "0") nil (hk-mkl-candidatos)))   ; 0 = apagada
+      (when (probe-file p)
+        (when (ignore-errors (sb-alien:load-shared-object p :dont-save t)
+                             (sb-sys:find-foreign-symbol-address "cblas_dgemm"))
+          (setf *hk-mkl* t) (return)))))
+  *hk-mkl*)
+(defun hk-mkl-fn (name)
+  #+sbcl (sb-sys:int-sap (sb-sys:find-foreign-symbol-address name))
+  #-sbcl (declare (ignore name)))
+
+(defun hk-num-rows-p (rows)
+  "¿Solo enteros y decimales? (fracciones exactas y letras -> camino exacto)."
+  (every (lambda (r) (every (lambda (x) (or (integerp x) (floatp x))) r)) rows))
+(defun hk-rows->d (rows m n)
+  (let ((a (make-array (* m n) :element-type 'double-float)) (i 0))
+    (dolist (r rows a)
+      (dolist (x r) (setf (aref a i) (float x 1d0)) (incf i)))
+    (unless (= i (* m n)) (error "matriz no rectangular"))
+    a))
+(defun hk-d->rows (c m n enteros)
+  "Vuelve a filas; si todo entraba ENTERO, el resultado sale entero (19, no 19.0)."
+  (loop for i below m collect
+    (loop for j below n collect
+      (let ((v (aref c (+ (* i n) j)))) (if enteros (round v) v)))))
+
+(defun hk-dgemm-nativo (a b m k n)
+  (declare (type (simple-array double-float (*)) a b) (type fixnum m k n)
+           (optimize (speed 3) (safety 0)))
+  (let ((c (make-array (* m n) :element-type 'double-float :initial-element 0d0)))
+    (dotimes (i m c)                                   ; orden i-p-j: recorre b por filas
+      (dotimes (p k)
+        (let ((aip (aref a (+ (* i k) p))) (bo (* p n)) (co (* i n)))
+          (declare (type double-float aip) (type fixnum bo co))
+          (dotimes (j n)
+            (incf (aref c (+ co j)) (* aip (aref b (+ bo j))))))))))
+(defun hk-dgemm (a b m k n)
+  "C(m x n) = A(m x k) · B(k x n), fila mayor. MKL si esta; si no, bucle nativo."
+  (if (hk-mkl-p)
+      #+sbcl
+      (let ((c (make-array (* m n) :element-type 'double-float :initial-element 0d0)))
+        (sb-sys:with-pinned-objects (a b c)
+          (sb-alien:alien-funcall
+           (sb-alien:sap-alien (hk-mkl-fn "cblas_dgemm")
+             (function sb-alien:void sb-alien:int sb-alien:int sb-alien:int sb-alien:int sb-alien:int sb-alien:int
+                       double-float sb-sys:system-area-pointer sb-alien:int sb-sys:system-area-pointer sb-alien:int
+                       double-float sb-sys:system-area-pointer sb-alien:int))
+           101 111 111 m n k 1d0 (sb-sys:vector-sap a) k (sb-sys:vector-sap b) n 0d0 (sb-sys:vector-sap c) n))
+        c)
+      #-sbcl nil
+      (hk-dgemm-nativo a b m k n)))
+
+(defun hk-dgesv-nativo (a b n nrhs)
+  "Resuelve A·X = B por Gauss con pivoteo parcial (double). NIL si es singular."
+  (declare (type (simple-array double-float (*)) a b) (type fixnum n nrhs)
+           (optimize (speed 3) (safety 0)))
+  (dotimes (c n b)
+    (let ((piv c) (mx (abs (aref a (+ (* c n) c)))))
+      (declare (type fixnum piv) (type double-float mx))
+      (loop for r fixnum from (1+ c) below n
+            do (let ((v (abs (aref a (+ (* r n) c))))) (when (> v mx) (setf mx v piv r))))
+      (when (< mx 1d-300) (return-from hk-dgesv-nativo nil))
+      (unless (= piv c)
+        (dotimes (j n) (rotatef (aref a (+ (* c n) j)) (aref a (+ (* piv n) j))))
+        (dotimes (j nrhs) (rotatef (aref b (+ (* c nrhs) j)) (aref b (+ (* piv nrhs) j)))))
+      (let ((d (aref a (+ (* c n) c))))
+        (loop for r fixnum from 0 below n unless (= r c)
+              do (let ((f (/ (aref a (+ (* r n) c)) d)))
+                   (declare (type double-float f))
+                   (unless (zerop f)
+                     (loop for j fixnum from c below n
+                           do (decf (aref a (+ (* r n) j)) (* f (aref a (+ (* c n) j)))))
+                     (dotimes (j nrhs)
+                       (decf (aref b (+ (* r nrhs) j)) (* f (aref b (+ (* c nrhs) j)))))))))))
+  (dotimes (r n b)
+    (let ((d (aref a (+ (* r n) r))))
+      (dotimes (j nrhs) (setf (aref b (+ (* r nrhs) j)) (/ (aref b (+ (* r nrhs) j)) d))))))
+(defun hk-dgesv (a b n nrhs)
+  "X de A·X = B (B se sobrescribe). MKL LAPACKE_dgesv si esta. NIL si A es singular."
+  (if (hk-mkl-p)
+      #+sbcl
+      (let ((ipiv (make-array n :element-type '(signed-byte 32) :initial-element 0)))
+        (sb-sys:with-pinned-objects (a b ipiv)
+          (let ((info (sb-alien:alien-funcall
+                       (sb-alien:sap-alien (hk-mkl-fn "LAPACKE_dgesv")
+                         (function sb-alien:int sb-alien:int sb-alien:int sb-alien:int
+                                   sb-sys:system-area-pointer sb-alien:int sb-sys:system-area-pointer
+                                   sb-sys:system-area-pointer sb-alien:int))
+                       101 n nrhs (sb-sys:vector-sap a) n (sb-sys:vector-sap ipiv) (sb-sys:vector-sap b) nrhs)))
+            (if (zerop info) b nil))))
+      #-sbcl nil
+      (hk-dgesv-nativo a b n nrhs)))
+
+(defun hk-minv-rapida (rows n)
+  "Inversa numerica en double (MKL o nativa). NIL si singular."
+  (let ((id (make-array (* n n) :element-type 'double-float :initial-element 0d0)))
+    (dotimes (i n) (setf (aref id (+ (* i n) i)) 1d0))
+    (let ((x (hk-dgesv (hk-rows->d rows n n) id n n)))
+      (and x (hk-d->rows x n n nil)))))
+
 (defun mmul (a b)
-  (let ((ra (to-rows a)) (cb (apply #'mapcar #'list (to-rows b))))
-    (from-rows (mapcar (lambda (row) (mapcar (lambda (col) (mdot row col)) cb)) ra))))
+  (let* ((rowsa (to-rows a)) (rowsb (to-rows b))
+         (m (length rowsa)) (k (length (car rowsa))) (n (length (car rowsb))))
+    (if (and (= k (length rowsb)) (>= (* m k n) *hk-fast-min*)
+             (hk-num-rows-p rowsa) (hk-num-rows-p rowsb))
+        (let ((ent (and (every (lambda (r) (every #'integerp r)) rowsa)
+                        (every (lambda (r) (every #'integerp r)) rowsb))))
+          (from-rows (hk-d->rows (hk-dgemm (hk-rows->d rowsa m k) (hk-rows->d rowsb k n) m k n) m n ent)))
+        (let ((cb (apply #'mapcar #'list rowsb)))
+          (from-rows (mapcar (lambda (row) (mapcar (lambda (col) (mdot row col)) cb)) rowsa))))))
 (defun mscale (s x)
   (from-rows (mapcar (lambda (row) (mapcar (lambda (e) (if (nums2 s e) (* s e) (simplify (list '* s e)))) row)) (to-rows x))))
 (defun madd (a b)
@@ -1533,8 +1662,14 @@
 ;; La inversa se ENRUTA segun lo que haya DENTRO: si todo son numeros, Gauss
 ;; exacto (fracciones limpias); si hay letras, adjunta/determinante. Asi
 ;; [a,b;b,a]^-1 sale en algebra y A·A^-1 da la identidad de verdad.
+;; GRANDE (n > 20) y solo enteros/decimales -> double por MKL: con racionales
+;; exactos una 100x100 de decimales no termina nunca. Las chicas no cambian (fracciones).
 (defun minv-auto (x)
-  (if (mat-numeric-p x) (minv x) (msinv x)))
+  (let* ((rows (to-rows x)) (n (length rows)))
+    (cond ((and (> n 20) (every (lambda (r) (= (length r) n)) rows) (hk-num-rows-p rows))
+           (let ((inv (hk-minv-rapida rows n))) (if inv (from-rows inv) x)))
+          ((mat-numeric-p x) (minv x))
+          (t (msinv x)))))
 
 ;; ---- los PASOS de la inversa, sueltos, para poder ENSENARLA ----
 ;; La inversa no es un boton: es det -> menores -> cofactores -> adjunta -> dividir.

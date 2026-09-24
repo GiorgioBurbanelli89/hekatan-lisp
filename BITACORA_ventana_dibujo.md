@@ -33,7 +33,9 @@ Diseño (reutiliza lo hecho en `BITACORA_autolisp_dibujo.md`):
 - Ejemplo 81: T dibujada → Green (A, centroide, Ix, Iy) rotulado sobre el dibujo; b, h, b_w, t_f leídos
   de los vértices; la fórmula de la T (Steiner) da e_I = 0. Escritorio y web iguales.
 - `5_copiar_a_wwwroot.sh` copia solo los ejemplos que están en git (la 68 de torsión no sale).
-- Sin regresión: test_autolisp 65/65, test_hoja_numerica OK, test_placas_bfs OK.
+- Sin regresión: test_autolisp 65/65, test_hoja_numerica OK, test_placas_bfs OK; HTML de b32966b vs ahora:
+  79 y 80 (las que usan #autolisp) idénticas, y las 40 primeras hojas de ejemplos/ idénticas (la corrida
+  entera, ~30 s por hoja, se cortó: el resto no pasa por el código tocado).
 
 ### ❌ No funcionó (y por qué)
 - El JS de la ventana metido tal cual en el HTML: la hoja PARTE el HTML por líneas y el JS salía como

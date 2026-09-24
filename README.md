@@ -134,7 +134,7 @@ El dibujo sale en SVG con encuadre automático, colores ACI y capas; con z se ve
 (Planta · Frente · Lateral · 3D). **Guardar**: `(guardar "x.dxf")` — el formato lo da la extensión: `.dxf` (R12),
 `.svg`, `.png`, `.pdf`, `.dwg` (acadrust; en escritorio necesita Node) — o los botones bajo cada dibujo, o
 Archivo → *Guardar dibujo como…*. Un programa LISP entero que dibuja (sin `#autolisp`) también se pinta.
-Ejemplos: 73 (derivada, tangente y área + zapata paramétrica) y 74 (cáscara alabeada 3D). Pruebas: `tests/autolisp/`.
+Ejemplos: 79 (derivada, tangente y área + zapata paramétrica) y 80 (cáscara alabeada 3D). Pruebas: `tests/autolisp/`.
 
 ---
 

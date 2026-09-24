@@ -48,12 +48,12 @@ que se sigue calculando.
   `tests/autolisp/verificar_formatos.py`: DWG abierto por AutoCAD 2027 con AUDIT «0 errors»; PDF y SVG mirados.
 - JUEZ AutoCAD (`tests/autolisp/juez_autocad.py`): el bloque AutoLISP puro → .lsp → accoreconsole
   (SECURELOAD 0, DXFOUT 16 decimales, rutas sin espacios en C:/Temp/hkal) → ezdxf, contra el volcado de
-  Hekatan, en orden: ej. 73 bloque 2: 6/6 entidades, Δmáx 1.6e-10 · ej. 74: 34/34 (13 3DFACE, POLYLINE 3D,
+  Hekatan, en orden: ej. 79 bloque 2: 6/6 entidades, Δmáx 1.6e-10 · ej. 80: 34/34 (13 3DFACE, POLYLINE 3D,
   10 TEXT, 6 LINE, 4 POINT), Δmáx 4.9e-10. **2/2 bloques iguales a AutoCAD.**
 - Pruebas `tests/autolisp/test_autolisp.lisp`: 65/65 en SBCL y 65/65 en el motor web (ECL→wasm, Node).
 - Regresión: las 180 hojas de ejemplos/ con el exe de antes (8c4b0b1) y el nuevo → mismo HTML
   (179 idénticas; `_gauss3` solo cambia un contador de id g1→g2). tests/numerico: 36/36 y 19/19.
-- Web: ECL AOT con 0 avisos (las 4 trampas de la memoria no aparecieron); ejemplos 73 y 74 en
+- Web: ECL AOT con 0 avisos (las 4 trampas de la memoria no aparecieron); ejemplos 79 y 80 en
   localhost:8766 se ven igual que en escritorio; los 5 botones descargan (DWG web: AUDIT 0 en AutoCAD).
 
 ### ❌ No funcionó (y por qué)

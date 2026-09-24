@@ -741,6 +741,9 @@ namespace HekatanLisp
                 if (t.Length == 0 || ((t[0] == '#' || t[0] == ';' || t[0] == '%') && !plotDir)) continue;
                 int at = ln.IndexOf("@@", StringComparison.Ordinal);
                 string body = at >= 0 ? ln.Substring(0, at) : ln, tail = at >= 0 ? ln.Substring(at) : "";
+                // la DESCRIPCIÓN ('texto al final) es prosa: sus letras no son nombres (con g y G en la hoja,
+                // «'rigidez G (kN/m)» salía «ghkq2»). Se aparta y vuelve intacta tras la unidad.
+                if (SepararDescripcion(body.TrimEnd(), out var sinDesc, out var descTxt)) { body = sinDesc; tail = " '" + descTxt + " " + tail; }
                 // la UNIDAD visible [kN] tampoco es matemática: sus letras no son nombres de la hoja
                 if (SepararUnidad(body.TrimEnd(), out var cuerpoSinU, out var uVis)) { tail = " [" + uVis + "] " + tail; body = cuerpoSinU; }
                 // y las unidades de las COLUMNAS de en medio  (a = dec(…) [N/mm] ; b = …): SepararUnidad solo ve
@@ -1502,7 +1505,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+                if (!EsTitulo(s0) && Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
                 // #tabla(…)/#table(…): directiva de TABLA (headers)(cols) — no es prosa, se procesa aparte.
                 if (Regex.IsMatch(s0, @"^#+\s*(?:tabla|table)\s*\(", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
@@ -1601,6 +1604,10 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // Va a la derecha de la linea, en texto normal. Solo dibujo.
         public const char DescSep = '\x05';
         static readonly Regex RxDescFinal = new Regex(@"^(?<cuerpo>.*?)\s+'(?<d>[^']*)$", RegexOptions.Compiled);
+        /// <summary>«# Elemento ShellMITC4 …», «# Cuadratura de Gauss»: '#', espacio, palabra, espacio y otra
+        /// palabra = TÍTULO, aunque la primera palabra sea el nombre de una directiva (elemento, gauss, punto…).
+        /// Las directivas van pegadas (#elemento(…)) o con paréntesis (#  fila(…)).</summary>
+        public static bool EsTitulo(string linea) => Regex.IsMatch(linea ?? "", @"^\s*#+[ \t]+\w+[ \t]+[^\s(]");
         public static bool SepararDescripcion(string linea, out string cuerpo, out string desc)
         {
             cuerpo = linea; desc = null;

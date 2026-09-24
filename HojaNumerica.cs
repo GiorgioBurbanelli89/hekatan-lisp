@@ -268,7 +268,7 @@ namespace HekatanLisp
             if (asg.Success)
             {
                 var n = asg.Groups[1].Value;
-                var e = new Tr(ctx).Expr(asg.Groups[2].Value);
+                var e = Valor(new Tr(ctx).Expr(asg.Groups[2].Value));
                 return "(setf " + Sym(n) + " " + e + ")" + (visible ? " (hn-out " + idx + " \"" + n + "\" " + Sym(n) + ")" : "");
             }
             var ia = RxIdxAsig.Match(t);
@@ -283,6 +283,12 @@ namespace HekatanLisp
             var ex = new Tr(ctx).Expr(t);
             return visible ? "(hn-out " + idx + " \"\" " + ex + ")" : ex;
         }
+
+        // SEMÁNTICA DE VALOR (MATLAB): «B = A» es una COPIA. Las matrices del motor son vectores de
+        // filas que hn-set modifica en sitio; si B = A solo copiara la referencia, B(i, j) = … cambiaría
+        // también A. Solo el nombre suelto comparte: A + 0, A', A(:, :), [A] … ya dan un arreglo nuevo.
+        static readonly Regex RxSoloNombre = new(@"^\|[^|]+\|$");
+        static string Valor(string e) => RxSoloNombre.IsMatch(e) ? "(hn-copy " + e + ")" : e;
 
         static string IdxAsig(string name, string args, string rhs, Tr tr)
         {
@@ -414,7 +420,7 @@ namespace HekatanLisp
             if (kw == "end") throw new FormatException("«end» sin bloque que cerrar");
             i++;
             var a = RxAsig.Match(s);
-            if (a.Success) return "(setf " + Sym(a.Groups[1].Value) + " " + tr.Expr(a.Groups[2].Value) + ")";
+            if (a.Success) return "(setf " + Sym(a.Groups[1].Value) + " " + Valor(tr.Expr(a.Groups[2].Value)) + ")";
             var ia = RxIdxAsig.Match(s);
             if (ia.Success) return IdxAsig(ia.Groups[1].Value, ia.Groups[2].Value, ia.Groups[3].Value, tr);
             return tr.Expr(s);   // expresión suelta: se evalúa (disp(x) imprime)
@@ -457,6 +463,9 @@ namespace HekatanLisp
             while (q < cuerpo.Count) forms.Add(Sentencia(cuerpo, ref q, fctx, new List<string>()));
             i = j + 1;
             var locals = fctx.Vars.Where(v => !ps.Contains(v)).Select(Sym).ToList();
+            // un argumento que la función cambia por índice se copia al entrar (MATLAB: paso por valor)
+            var cambiados = ps.Where(p => cuerpo.Any(c => Regex.IsMatch(c, @"^\s*" + Regex.Escape(p) + @"\s*\(.*\)\s*=(?!=)"))).ToList();
+            forms.InsertRange(0, cambiados.Select(p => "(setf " + Sym(p) + " (hn-copy " + Sym(p) + "))"));
             return "(defun " + USym(name) + " (" + string.Join(" ", ps.Select(Sym)) + ")\n  (let* (" +
                    string.Join(" ", locals.Select(l => "(" + l + " 0)")) + ")" +
                    (locals.Count > 0 ? " (declare (ignorable " + string.Join(" ", locals) + "))" : "") + "\n    " +

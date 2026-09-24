@@ -76,6 +76,10 @@ def prueba_basica(exe):
     S = [v for (n, txt, v) in vals.values() if n == "sigue"]
     chk(S and lit(S[0]) == 42, "la hoja sigue después del error")
     chk(not any(n == "oculta" for (n, _, _) in vals.values()), "#hide: la línea oculta no vuelve a la hoja")
+    uno = lambda nom: next((lit(v) for (n, txt, v) in vals.values() if n == nom), None)
+    chk(uno("m_11") == 1, "N = M; N(1, 1) = 100 no cambia M (copia, no alias)")
+    chk(uno("q_11") == 5, "dentro de una función: C = A; C(1, 1) = 0 no cambia A")
+    chk(uno("r_22") == 4 and uno("m_11b") == 1, "una función que cambia su argumento no cambia el de fuera")
     print(f"  tiempo: {t}")
     return fallos
 

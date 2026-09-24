@@ -50,6 +50,23 @@ e·E
 oculta = 99
 #show
 oculta + 1
+#: B = A es una COPIA (semántica de valor, como MATLAB)
+M = [1, 2; 3, 4]
+N = M
+N(1, 1) = 100
+m_11 = M(1, 1)
+function s = copia_local(A)
+  C = A
+  C(1, 1) = 0
+  s = A(1, 1)
+end
+q_11 = copia_local([5, 6; 7, 8])
+function y = pon_cero(X)
+  X(1, 1) = 0
+  y = X(2, 2)
+end
+r_22 = pon_cero(M)
+m_11b = M(1, 1)
 #: un error no tumba la hoja
 malo = zz + 1
 sigue = 42

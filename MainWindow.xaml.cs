@@ -73,6 +73,7 @@ namespace HekatanLisp
             Viewer.CoreWebView2.Profile.PreferredColorScheme =
                 _dark ? CoreWebView2PreferredColorScheme.Dark : CoreWebView2PreferredColorScheme.Light;
             _webReady = true;
+            InstalarDibujo();   // guardar dibujo: DWG con acadrust (Node), PNG desde la página
 
             Editor.TextChanged += (s, ev) =>
             {

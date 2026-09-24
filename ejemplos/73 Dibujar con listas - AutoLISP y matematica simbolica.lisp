@@ -17,7 +17,7 @@ x_0 = 2 'punto de la tangente
 (setq y_0 (nval f 'x x_0))
 (setq tg (simplify `(+ (* ,(round m_t) x) ,(round (- y_0 (* m_t x_0))))))    ; t(x) = m·x + b
 (vertical 0.45)
-(ejes -0.4 4.4 -3.5 8.6 :paso-x 1 :paso-y 2 :nombre-y "y")
+(ejes -0.4 4.4 -3.5 10.2 :paso-x 1 :paso-y 2 :nombre-y "y")
 ;; el área bajo la curva: un polígono hecho con los puntos de la fórmula (una lista)
 (setq borde (loop for i from 0 to 60 collect (let ((x (* 3 (/ i 60.0)))) (list x (nval f 'x x)))))
 (achurado (append '((0 0)) borde '((3 0))) :color "azul" :transparencia 0.82 :capa "AREA")
@@ -30,12 +30,14 @@ x_0 = 2 'punto de la tangente
 (setq d2f (derive-x df))                ; f''(x): máximo si es negativa
 (foreach xc (cdr crit)
   (punto (list xc (nval f 'x xc)) :color "azul")
-  (formula (list xc (+ (nval f 'x xc) (if (< (nval d2f 'x xc) 0) 0.7 -1.3)))
-           (format nil "(~a, ~a)" xc (round (nval f 'x xc))) :altura 0.2 :alinea "c"))
+  (if (< (nval d2f 'x xc) 0)                                 ; máximo: rótulo encima; mínimo: a la derecha
+      (formula (list (- xc 0.25) (+ (nval f 'x xc) 0.8)) (format nil "(~a, ~a)" xc (round (nval f 'x xc))) :altura 0.2 :alinea "c")
+      (formula (list (+ xc 0.18) (- (nval f 'x xc) 0.9)) (format nil "(~a, ~a)" xc (round (nval f 'x xc))) :altura 0.2)))
 (punto (list x_0 y_0) :color "verde")
-(formula '(2.62 7.2) (infix f) :nombre "f(x)" :altura 0.21 :color "azul")
-(formula '(2.62 5.9) (infix df) :nombre "f'(x)" :altura 0.21 :color "rojo")
-(formula '(2.62 4.6) tg :nombre "t(x)" :altura 0.21 :color "verde")
+;; los rótulos: la fórmula que dio el motor, escrita como en la hoja
+(formula '(0.2 9.6) (infix f) :nombre "f(x)" :altura 0.21 :color "azul")
+(formula '(0.2 8.5) (infix df) :nombre "f'(x)" :altura 0.21 :color "rojo")
+(formula '(2.7 9.6) tg :nombre "t(x)" :altura 0.21 :color "verde")
 (formula '(1.5 1.1) A_exacta :nombre "A" :altura 0.21 :alinea "c" :color "azul")
 #fin
 
@@ -44,19 +46,23 @@ e_A = (A_dibujo - A_exacta)/A_exacta 'error relativo del polígono
 
 ## 2. Lo AutoLISP: entmake, ssget, sslength
 
-#: El caso de partida, tal cual se escribe en AutoCAD. El punto sale de un cálculo; la cuenta de líneas, de leer el dibujo. Las cuatro líneas son UNA lista L_1 girada con **rotar**: la entidad es un dato que se transforma antes de dibujarlo.
-#autolisp("Del cálculo al dibujo y del dibujo al cálculo", ancho = 120, alto = 70, exporta = n S_m)
+#: El caso de partida, tal cual se escribe en AutoCAD. El punto sale de un cálculo; la cuenta de líneas, de leer el dibujo. Las cuatro líneas son UNA lista L_1 girada con una función de cuatro líneas (**subst** + **polar**): la entidad es un dato que se transforma antes de dibujarlo. Este bloque es AutoLISP puro: pegado en AutoCAD da el mismo dibujo.
+#autolisp("Del cálculo al dibujo y del dibujo al cálculo", ancho = 120, alto = 70, exporta = n S_m, autocad = si)
 ;; simbólico: cálculo
 (setq H 10.0  S 1.5)
 (setq pie (list (* H S) (- H)))         ; (15.0 -10.0)
 ;; dibujo con ese resultado simbólico
 (entmakex (list '(0 . "POINT") (cons 10 pie)))
 (setq L_1 (list '(0 . "LINE") '(8 . "RAYOS") '(62 . 5) '(10 0.0 0.0) (cons 11 (list H 0.0))))
-(foreach a '(0 -15 -30 -45) (entmake (rotar L_1 a)))
+;; girar = operar sobre la LISTA: subst cambia el par 11 por el punto girado con polar
+(defun gira (ent a / p q)
+  (setq p (cdr (assoc 10 ent)) q (cdr (assoc 11 ent)))
+  (subst (cons 11 (polar p (+ (angle p q) a) (distance p q))) (assoc 11 ent) ent))
+(foreach a '(0 -15 -30 -45) (entmake (gira L_1 (* pi (/ a 180.0)))))
 (entmake (list '(0 . "LINE") '(8 . "COTA") (cons 10 (list 0.0 (- H))) (cons 11 pie)))
 ;; simbólico: leer el valor del dibujo
 (setq n (sslength (ssget "_X" '((0 . "LINE")))))
-(princ (strcat "Hay " (itoa n) " líneas"))
+(princ (strcat "Hay " (itoa n) " lineas"))
 ;; y operar con lo leído: la suma de las pendientes de los rayos
 (setq ss (ssget "_X" '((0 . "LINE") (8 . "RAYOS"))) S_m 0.0 i 0)
 (repeat (sslength ss)
@@ -64,7 +70,7 @@ e_A = (A_dibujo - A_exacta)/A_exacta 'error relativo del polígono
         S_m (+ S_m (/ (- (caddr (assoc 11 e)) (caddr (assoc 10 e))) (- (cadr (assoc 11 e)) (cadr (assoc 10 e)))))
         i (1+ i)))
 (princ (strcat "\nSuma de pendientes: " (rtos S_m 2 4)))
-(princ (strcat "\nÁngulo del último rayo: " (angtos (angle (dxf 10 e) (dxf 11 e))) "°"))
+(princ (strcat "\nAngulo del ultimo rayo: " (angtos (angle (cdr (assoc 10 e)) (cdr (assoc 11 e))))))
 #fin
 
 #: El dibujo tiene @n líneas, y la suma de las pendientes leídas, S_m = −(tan 0° + tan 15° + tan 30° + tan 45°), vuelve a la hoja.
@@ -94,7 +100,7 @@ q_adm = 200 'presión admisible, kPa
 (cota (list (- (/ B 2)) (- (/ B 2))) (list (/ B 2) (- (/ B 2))) :dir "h" :sep (- (* 0.18 B)))
 (cota (list (/ B 2) (- (/ B 2))) (list (/ B 2) (/ B 2)) :dir "v" :sep (- (* 0.18 B)))
 (capa "TEXTO" :color 7)
-(texto (list 0 (+ (/ B 2) 0.1)) (strcat "Z-1   P = " (rtos P 2 0) " kN") :altura 0.09 :alinea "c")
+(texto (list (- (/ B 2)) (+ (/ B 2) 0.1)) (strcat "Z-1   P = " (rtos P 2 0) " kN") :altura 0.09)
 ;; la vuelta: leer del dibujo y verificar
 (setq zap (ssget "_X" '((0 . "LWPOLYLINE") (8 . "ZAPATA"))))
 (setq A_leida (area (ssname zap 0)))
@@ -105,6 +111,8 @@ q_adm = 200 'presión admisible, kPa
 (princ (strcat "\nq = P/A = " (rtos q_real 2 1) " kPa " (if (<= q_real q_adm) "≤" ">") " q_adm = " (rtos q_adm 2 0) " kPa"))
 (guardar "zapata Z-1.dxf")
 (guardar "zapata Z-1.pdf")
+(guardar "zapata Z-1.svg")
+(guardar "zapata Z-1.dwg")
 #fin
 
-#: Lo leído del dibujo vuelve a la hoja: con A = @A_leida m² la presión es @q_real kPa, menor que la admisible.
+#: Lo leído del dibujo (el área de la polilínea y la medida de la cota) vuelve a la hoja: con esa área la presión real queda por debajo de la admisible.

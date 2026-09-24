@@ -1021,7 +1021,11 @@ namespace HekatanLisp
                 foreach (var cn in usadas)
                 {
                     var cp = d.CapaDe(cn) ?? new Capa { Nombre = cn };
-                    string c = AciCss(Math.Abs(cp.Color), LispConverter.Dark); string da = Dash(cp.Tipo);
+                    // color de la capa; si es el de fábrica (7) y sus entidades llevan color propio, el de la primera
+                    int cc = Math.Abs(cp.Color);
+                    var pri = d.Ents.FirstOrDefault(x => string.Equals(x.CapaN, cn, StringComparison.OrdinalIgnoreCase));
+                    if (cc == 7 && pri != null && pri.Int(62, 256) != 256) cc = pri.Int(62, 256);
+                    string c = AciCss(cc, LispConverter.Dark); string da = Dash(pri?.Get(6) ?? cp.Tipo);
                     html.Append("<span class=\"hk-dib-li\"><svg width=\"26\" height=\"10\" viewBox=\"0 0 26 10\" style=\"vertical-align:middle\"><line x1=\"2\" y1=\"5\" x2=\"24\" y2=\"5\" style=\"stroke:")
                         .Append(c).Append(";stroke-width:1.6").Append(da != null ? ";stroke-dasharray:" + string.Join(" ", da.Split(' ').Select(x => F(double.Parse(x, Inv) * 2.2))) : "")
                         .Append("\"/></svg>").Append(Enc(cp.Nombre)).Append("</span>");
@@ -1526,8 +1530,104 @@ namespace HekatanLisp
             return HtmlBloque(sal, new Bloque(), guardar);
         }
 
+        // ================================ DWG (acadrust) ================================
+        /// <summary>Escritor de DWG que pone la app: escritorio = Node + acadrust-wasm (pkg-node);
+        /// web = null (lo hace la página con pkg-web). Recibe el JSON de DwgJson y devuelve los bytes.</summary>
+        public static Func<string, byte[]> EscritorDwg;
+        [ThreadStatic] static List<string> _avisosDwg;
+
+        /// <summary>El dibujo en el JSON de hekatan-dwg / acadrust-wasm (pares DXF, como entmake):
+        /// {"version":"AC1032","layers":[…],"entities":[[[0,"LINE"],[8,"capa"],[10,[x,y,z]],…]]}.
+        /// Tipos que acepta el escritor: POINT, LINE, CIRCLE, ARC, LWPOLYLINE, TEXT, MTEXT (ángulos en GRADOS).
+        /// Las cotas se explotan (LINE + TEXT + flechas LWPOLYLINE), el rayado va en LINE; 3DFACE,
+        /// POLYLINE 3D y rellenos llenos todavía no → se avisa.</summary>
+        public static string DwgJson(Dibujo d, Opc o, List<string> avisos)
+        {
+            o ??= new Opc();
+            var v = Encuadre(d, o.Ancho, o.Alto);
+            string J(string s) => System.Text.Json.JsonSerializer.Serialize(s ?? "");
+            string Pt(double[] p) => "[" + N(p[0]) + "," + N(p[1]) + "," + N(p.Length > 2 ? p[2] : 0) + "]";
+            var ents = new List<string>();
+            var sinDwg = new Dictionary<string, int>();
+            foreach (var e in d.Ents)
+            {
+                string capa = e.CapaN; int col = e.Int(62, 256);
+                string Com(string tipo) => "[0," + J(tipo) + "],[8," + J(capa) + "]" + (col != 256 ? ",[62," + col + "]" : "");
+                switch (e.Tipo)
+                {
+                    case "POINT": ents.Add("[" + Com("POINT") + ",[10," + Pt(e.Pt(10)) + "]]"); break;
+                    case "LINE": ents.Add("[" + Com("LINE") + ",[10," + Pt(e.Pt(10)) + "],[11," + Pt(e.Pt(11)) + "]]"); break;
+                    case "CIRCLE": ents.Add("[" + Com("CIRCLE") + ",[10," + Pt(e.Pt(10)) + "],[40," + N(e.Num(40, 0)) + "]]"); break;
+                    case "ARC":
+                        ents.Add("[" + Com("ARC") + ",[10," + Pt(e.Pt(10)) + "],[40," + N(e.Num(40, 0)) + "],[50," + N(e.Num(50, 0) * 180 / Math.PI) + "],[51," + N(e.Num(51, 0) * 180 / Math.PI) + "]]");
+                        break;
+                    case "LWPOLYLINE":
+                    {
+                        var sb = new StringBuilder("[" + Com("LWPOLYLINE") + ",[70," + (e.Int(70, 0) & 1) + "]");
+                        if (e.Num(43, 0) > 0) sb.Append(",[43,").Append(N(e.Num(43, 0))).Append(']');
+                        foreach (var p in e.D)
+                        {
+                            if (p.Key == 10) { var q = Ent.ParsePt(p.Value); sb.Append(",[10,[").Append(N(q[0])).Append(',').Append(N(q[1])).Append("]]"); }
+                            else if (p.Key == 42) sb.Append(",[42,").Append(p.Value).Append(']');
+                        }
+                        ents.Add(sb.Append(']').ToString());
+                        break;
+                    }
+                    case "POLYLINE":
+                    {
+                        var pts = e.Pts(1011);
+                        if ((e.Int(70, 0) & 8) != 0 || pts.Any(p => Math.Abs(p[2]) > 1e-12)) { sinDwg["POLYLINE 3D"] = sinDwg.GetValueOrDefault("POLYLINE 3D") + 1; break; }
+                        ents.Add("[" + Com("LWPOLYLINE") + ",[70," + (e.Int(70, 0) & 1) + "]" + string.Concat(pts.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
+                        break;
+                    }
+                    case "TEXT":
+                    {
+                        int h72 = e.Int(72, 0), v73 = e.Int(73, 0);
+                        string t = EsMat(e) ? RunsPlano(MathRuns(e.Get(1))) : TextoAcad(e.Get(1));
+                        var sb = new StringBuilder("[" + Com("TEXT") + ",[10," + Pt(e.Pt(10)) + "],[40," + N(e.Num(40, 2.5)) + "],[1," + J(t) + "]");
+                        if (Math.Abs(e.Num(50, 0)) > 1e-12) sb.Append(",[50,").Append(N(e.Num(50, 0) * 180 / Math.PI)).Append(']');
+                        if (h72 != 0 || v73 != 0) sb.Append(",[72,").Append(h72).Append("],[73,").Append(v73).Append("],[11,").Append(Pt(e.Pt(11) ?? e.Pt(10))).Append(']');
+                        ents.Add(sb.Append(']').ToString());
+                        break;
+                    }
+                    case "MTEXT":
+                        ents.Add("[" + Com("MTEXT") + ",[10," + Pt(e.Pt(10)) + "],[40," + N(e.Num(40, 2.5)) + "],[71," + e.Int(71, 1) + "],[1," + J(e.Get(1)) + "]]");
+                        break;
+                    case "DIMENSION":
+                    {
+                        var g = Cota(d, e, v); if (g == null) break;
+                        double[] W(double X, double Y) => new[] { (X - v.Pad) / v.K + v.X0, (v.Y1 - (Y - v.Pad) / v.K) / v.Kv, 0 };
+                        foreach (var (x1, y1, x2, y2) in g.Lineas) ents.Add("[" + Com("LINE") + ",[10," + Pt(W(x1, y1)) + "],[11," + Pt(W(x2, y2)) + "]]");
+                        foreach (var t in g.Flechas)
+                            ents.Add("[" + Com("LWPOLYLINE") + ",[70,1]" + string.Concat(new[] { W(t[0], t[1]), W(t[2], t[3]), W(t[4], t[5]) }.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
+                        var tp = W(g.Tx, g.Ty);
+                        ents.Add("[" + Com("TEXT") + ",[10," + Pt(tp) + "],[40," + N(g.TAlt / v.K) + "],[1," + J(g.Txt) + "],[50," + N(-g.TAng) + "],[72,1],[73,0],[11," + Pt(tp) + "]]");
+                        break;
+                    }
+                    case "HATCH":
+                        if (string.Equals(e.Get(2), "SOLID", StringComparison.OrdinalIgnoreCase))
+                        {   // relleno lleno: el DWG lleva su contorno (el relleno todavía no)
+                            foreach (var l in Lazos(e)) ents.Add("[" + Com("LWPOLYLINE") + ",[70,1]" + string.Concat(l.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
+                            sinDwg["relleno lleno (va su contorno)"] = sinDwg.GetValueOrDefault("relleno lleno (va su contorno)") + 1;
+                        }
+                        else foreach (var (a, b) in Rayado(e)) ents.Add("[" + Com("LINE") + ",[10," + Pt(a) + "],[11," + Pt(b) + "]]");
+                        break;
+                    case "SOLID":
+                    {
+                        var pts = new[] { e.Pt(10), e.Pt(11), e.Pt(13) ?? e.Pt(12), e.Pt(12) };
+                        ents.Add("[" + Com("LWPOLYLINE") + ",[70,1]" + string.Concat(pts.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
+                        break;
+                    }
+                    default: sinDwg[e.Tipo] = sinDwg.GetValueOrDefault(e.Tipo) + 1; break;
+                }
+            }
+            foreach (var kv in sinDwg) avisos?.Add(kv.Value + " " + kv.Key + " no van en el DWG todavía (el DXF sí los lleva)");
+            var capas = d.Capas.Select(c => "{\"name\":" + J(c.Nombre) + ",\"color\":" + Math.Abs(c.Color == 0 ? 7 : c.Color) + "}");
+            return "{\"version\":\"AC1032\",\"layers\":[" + string.Join(",", capas) + "],\"entities\":[" + string.Join(",", ents) + "]}";
+        }
+
         /// <summary>El último dibujo pintado (para «Guardar dibujo como…» del menú de escritorio).</summary>
-        public static Dibujo UltimoDibujo; public static Opc UltimaOpc;
+        public static Dibujo UltimoDibujo; public static Opc UltimaOpc; public static string UltimoId;
         static int _idDib;
         public static readonly string[] Formatos = { "dxf", "svg", "png", "pdf", "dwg" };
 
@@ -1541,7 +1641,9 @@ namespace HekatanLisp
                 case "svg": return Encoding.UTF8.GetBytes(SvgArchivo(d, o));
                 case "pdf": return PdfArchivo(d, o);
                 case "png": return null;
-                case "dwg": throw new NotSupportedException("DWG: pendiente (se enchufará write_dwg de hekatan-dwg / acadrust)");
+                case "dwg":
+                    if (EscritorDwg == null) throw new NotSupportedException("DWG: en la web se guarda con el botón DWG (acadrust en el navegador)");
+                    return EscritorDwg(DwgJson(d, o, null));
                 default: throw new NotSupportedException("formato no soportado: «" + ext + "» (usa .dxf .svg .png .pdf)");
             }
         }
@@ -1553,7 +1655,9 @@ namespace HekatanLisp
             "window.hkAlPng=function(id,pxmm){return new Promise(function(ok,mal){var box=document.getElementById(id);var w=parseFloat(box.getAttribute('data-w')),h=parseFloat(box.getAttribute('data-h'));" +
             "var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=Math.round(w*pxmm);c.height=Math.round(h*pxmm);var g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);ok(c.toDataURL('image/png'))};" +
             "img.onerror=function(e){mal(e)};img.src='data:image/svg+xml;base64,'+hkAlB64(id,'svg')})};" +
-            "window.hkAlGuardar=function(id,fmt,nom){if(fmt==='dwg'){alert('DWG: pendiente. Se enchufará write_dwg (hekatan-dwg / acadrust); por ahora guarda en DXF.');return}" +
+            "window.hkAlGuardar=function(id,fmt,nom){if(fmt==='dwg'){var js=hkAlB64(id,'dwg'),av=(document.getElementById(id+'-dwg')||{}).getAttribute('data-avisos')||'';" +
+            "if(window.chrome&&chrome.webview){chrome.webview.postMessage(JSON.stringify({hkDwg:js,nombre:nom+'.dwg'}));return}" +
+            "import(new URL('dwg/acadrust_wasm.js',document.baseURI).href).then(function(m){return m.default().then(function(){hkAlBajar(new Blob([m.write_dwg_bytes(js)],{type:'application/acad'}),nom+'.dwg');if(av)setTimeout(function(){alert(av)},300)})}).catch(function(e){alert('DWG: '+e)});return}" +
             "if(fmt==='png'){hkAlPng(id,11.811).then(function(u){hkAlBajar(new Blob([hkAlBytes(u.split(',')[1])],{type:'image/png'}),nom+'.png')});return}" +
             "var mime={dxf:'application/dxf',svg:'image/svg+xml',pdf:'application/pdf'}[fmt];hkAlBajar(new Blob([hkAlBytes(hkAlB64(id,fmt))],{type:mime}),nom+'.'+fmt)}}</script>";
 
@@ -1582,7 +1686,7 @@ namespace HekatanLisp
             {
                 var o = new Opc { Ancho = b.Ancho, Alto = b.Alto, Titulo = b.Titulo };
                 UltimoDibujo = sal.Dib; UltimaOpc = o;
-                string id = "hkal" + (++_idDib);
+                string id = "hkal" + (++_idDib); UltimoId = id;
                 var esc = Armar(sal.Dib, o, LispConverter.Dark);
                 h.Append("<div id=\"").Append(id).Append("\" data-w=\"").Append(F(esc.W)).Append("\" data-h=\"").Append(F(esc.H)).Append("\">");
                 h.Append(RenderSvg(sal.Dib, o));
@@ -1601,6 +1705,11 @@ namespace HekatanLisp
                     string b64;
                     try { b64 = Convert.ToBase64String(Archivo(sal.Dib, o, f)); } catch { continue; }
                     h.Append("<script type=\"text/plain\" id=\"").Append(id).Append('-').Append(f).Append("\">").Append(b64).Append("</script>");
+                }
+                {   // DWG: el JSON de acadrust (lo escribe la ventana o, en la web, el wasm de la página)
+                    var av = new List<string>();
+                    string dj = DwgJson(sal.Dib, o, av);
+                    h.Append("<script type=\"text/plain\" id=\"").Append(id).Append("-dwg\" data-avisos=\"").Append(Enc(string.Join("; ", av))).Append("\">").Append(dj.Replace("</", "<\\/")).Append("</script>");
                 }
                 h.Append(JsGuardar);
                 h.Append("<div class=\"hk-al-bar\"><span>Guardar dibujo como</span>");

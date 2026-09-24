@@ -4,7 +4,7 @@
 #: v₁ = ½·(x₂ + x₃ − x₁ − x₄) · v₂ = ½·(x₃ + x₄ − x₁ − x₂) · g₁ = v₁/|v₁| · g₃ = g₁ × v₂ /|g₁ × v₂| · g₂ = g₃ × g₁
 #: El bloque de abajo es **AutoLISP puro**: se puede pegar tal cual en AutoCAD (APPLOAD o (load "…")) y da el mismo dibujo. Las entidades son 3D de AutoCAD: POLYLINE 3D (70 = 8, vértices 70 = 32), 3DFACE, LINE y TEXT con z. El dibujo se gira con el ratón; los botones vuelven a planta, frente o lateral.
 
-#autolisp("ShellMITC4 alabeado: nudos, ejes locales g₁ g₂ g₃ y ejes globales", ancho = 150, alto = 115, exporta = g3x g3y g3z tetan)
+#autolisp("ShellMITC4 alabeado: nudos, ejes locales g₁ g₂ g₃ y ejes globales", ancho = 150, alto = 115, exporta = g3x g3y g3z tetan, autocad = si)
 ;;; ---------- vectores (AutoLISP puro) ----------
 (defun v+ (a b) (mapcar '+ a b))
 (defun v- (a b) (mapcar '- a b))

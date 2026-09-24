@@ -41,5 +41,10 @@
       <SbclFiles Include="C:\Program Files\Steel Bank Common Lisp\sbcl.core" />
     </ItemGroup>
     <Copy SourceFiles="@(SbclFiles)" DestinationFolder="$(OutDir)sbcl" SkipUnchangedFiles="true" />
+    <!-- DWG: el escritor de acadrust-wasm para Node (lo corre MainWindow.Dibujo.cs); si no está, el DWG avisa -->
+    <ItemGroup>
+      <DwgFiles Include="C:\Users\j-b-j\acadrust-wasm\pkg-node\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DwgFiles)" DestinationFolder="$(OutDir)dwg" SkipUnchangedFiles="true" Condition="'@(DwgFiles)' != ''" />
   </Target>
 </Project>

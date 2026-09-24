@@ -136,6 +136,7 @@
                 <MenuItem Header="Copiar como LISP ejecutable (portapapeles)" Click="OnExportLisp"/>
                 <Separator/>
                 <MenuItem Header="Exportar a PDF…  (para imprimir / LinkedIn)" Click="MenuPdf"/>
+                <MenuItem Header="Guardar dibujo como…  (DXF · SVG · PNG · PDF · DWG)" Click="MenuGuardarDibujo"/>
                 <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>
             </MenuItem>

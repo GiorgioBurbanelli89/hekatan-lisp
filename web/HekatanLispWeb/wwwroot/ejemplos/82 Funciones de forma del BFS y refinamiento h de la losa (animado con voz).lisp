@@ -226,23 +226,24 @@ e_w = round((w_c - w_N)/w_N·100, 5) [%] 'diferencia con Navier
 ## 6 · El error y su orden de convergencia
 #: Si el error se comporta como e ≈ C·hᵖ, entre dos mallas seguidas p = ln(e₁/e₂)/ln(h₁/h₂). El orden p sale de los números de la tabla, no se supone.
 #hide
-T = zeros(8, 7)
+T = zeros(8, 9)
 for k = 1:8
   n_k = 2·k
   e_wk = (w_s(k) - w_N)/w_N·100
-
   e_Mk = (M_s(k) - M_N)/M_N·100
   T(k, 1:5) = [n_k, a/n_k, g_s(k), w_s(k), e_wk]
-  T(k, 6) = e_Mk
+  T(k, 7:8) = [M_s(k), e_Mk]
   if k > 1
-    T(k, 7) = ln(T(k - 1, 5)/e_wk)/ln(T(k - 1, 2)/T(k, 2))
+    T(k, 6) = ln(T(k - 1, 5)/e_wk)/ln(T(k - 1, 2)/T(k, 2))
+    T(k, 9) = ln(T(k - 1, 8)/e_Mk)/ln(T(k - 1, 2)/T(k, 2))
   end
 end
 #show
-#: Columnas: n, h [m], grados de libertad, flecha central [mm], su error frente a Navier [%], error del momento Mx central [%] y el orden p de la flecha entre esa malla y la anterior:
+#: Columnas: n, h [m], grados de libertad, flecha central [mm], su error frente a Navier [%], orden p de la flecha (entre esa malla y la anterior), Mx central [kN·m/m], su error [%] y su orden p:
 T
-p_w = T(8, 7) 'orden de la flecha entre 14 × 14 y 16 × 16
-#: El orden de la flecha sale cercano a 4: al dividir h entre dos el error se divide entre unas dieciséis. La razón: la flecha se interpola con cúbicas completas en cada dirección, y el error de interpolación de un polinomio de grado 3 es del orden de h⁴. El momento sale de SEGUNDAS derivadas, que pierden dos órdenes: su error baja como h², bastante más despacio (la columna 6). Con una malla fina el error del momento todavía se nota cuando el de la flecha ya no.
+p_w = T(8, 6) 'orden de la flecha entre 14 × 14 y 16 × 16
+p_M = T(8, 9) 'orden del momento entre 14 × 14 y 16 × 16
+#: El orden de la flecha sale 4.01: al dividir h entre dos el error se divide entre unas dieciséis. La razón: dentro de cada elemento la flecha es un producto de cúbicas completas, y el error de interpolación con polinomios de grado 3 es del orden de h⁴. El momento sale de SEGUNDAS derivadas de esa flecha, y cada derivada pierde un orden: su error baja como h² (p = 2.04), bastante más despacio. Con una malla fina el error del momento todavía se nota cuando el de la flecha ya no.
 #voz: El orden de convergencia de la flecha sale cercano a cuatro: al partir el elemento por la mitad, el error se divide entre dieciséis. El momento, que sale de segundas derivadas, converge con orden dos.
 #: **Otro programa, misma malla nudo a nudo:** Calcpad (*Rectangular Slab FEA* con estos datos) da las flechas centrales de las 8 mallas (los HTML de Calcpad están en la carpeta de pruebas de las placas BFS):
 #val

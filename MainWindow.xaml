@@ -137,6 +137,7 @@
                 <Separator/>
                 <MenuItem Header="Exportar a PDF…  (para imprimir / LinkedIn)" Click="MenuPdf"/>
                 <MenuItem Header="Guardar dibujo como…  (DXF · SVG · PNG · PDF · DWG)" Click="MenuGuardarDibujo"/>
+                <MenuItem Header="Compartir enlace web…  (Hekatan LISP web)" Click="MenuCompartirWeb"/>
                 <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>
             </MenuItem>
@@ -183,6 +184,8 @@
                        FontFamily="Roboto" FontSize="15" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="14,0,0,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button x:Name="BtnCompartir" Style="{StaticResource ModeBtn}" Content="🔗 Compartir" Click="MenuCompartirWeb"
+                        ToolTip="Crea el enlace de Hekatan LISP web con esta hoja (se abre en cualquier navegador, sin instalar): lo copia y lo abre"/>
                 <Button x:Name="BtnRun" Style="{StaticResource ModeBtn}" Content="▶ Ejecutar" Click="OnRun"
                         Foreground="{DynamicResource ThemeAccentGold}" ToolTip="Ejecuta ahora (F5). Útil si AutoRun está apagado."/>
                 <CheckBox x:Name="ChkAutoRun" Content="AutoRun" IsChecked="True" Foreground="{DynamicResource ThemeText}"

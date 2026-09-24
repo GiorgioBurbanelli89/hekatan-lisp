@@ -109,6 +109,35 @@ Los nombres distinguen mayúsculas (`e` ≠ `E`). Ejemplo completo: `ejemplos/71
 
 ---
 
+## Dibujo AutoLISP — `#autolisp` … `#fin` (2D y 3D)
+
+**El código es la lista de datos**: una entidad es una lista DXF de LISP, `((0 . "LINE") (8 . "0") (10 0 0) (11 3 4))`,
+que se arma con `list`/`cons`/`mapcar`, se transforma y se pone en el dibujo con `entmake`; `ssget`/`entget` la leen
+de vuelta para seguir calculando. Semántica real de AutoCAD: el bloque AutoLISP puro corre igual en AutoCAD 2027
+(juez: `tests/autolisp/juez_autocad.py`, accoreconsole, entidad a entidad, x y z a 1e-9).
+
+```
+#autolisp("Título", ancho = 160, alto = 110, vert = 1, exporta = n A, nuevo = no)
+(entmake (list '(0 . "LINE") '(10 0 0) (cons 11 (polar '(0 0) (/ pi 6) 5))))
+(setq n (sslength (ssget "_X" '((0 . "LINE")))))
+#fin
+```
+
+| Nivel | Funciones |
+|---|---|
+| AutoLISP (portable) | `entmake` `entmakex` `entget` `entmod` `entdel` `entlast` `entnext` `entupd` `handent` · `ssget "_X"` (filtros, comodines, `-4`) `sslength` `ssname` `ssadd` `ssdel` `ssmemb` · `tblsearch` `getvar` `setvar` · `polar` `distance` `angle` `inters` · `strcat` `itoa` `atoi` `atof` `rtos` `angtos` `strlen` `substr` `strcase` `wcmatch` `fix` · `repeat` `foreach` `while` · `(defun f (a / locales) …)`, `'(lambda …)`, `(princ)` |
+| Entidades | POINT, LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE 2D/3D (+VERTEX, SEQEND), 3DFACE, TEXT, MTEXT, SOLID, HATCH, DIMENSION; capas con `(0 . "LAYER")` |
+| Capa simple (español) | `punto` `linea` `circulo` `arco` (grados) `poli` `rect` `texto` `formula` (rótulo con la matemática de la hoja) `cota` `achurado` `curva` `curva-par` `ejes` `capa` · 3D: `poli3` `cara3` `flecha3` `vista` · listas: `desplazar` `rotar` `escalar` · medir: `longitud` `area` `vertices` `dxf` · `vertical` `guardar` |
+
+Las definiciones de la hoja de arriba (`L = 6`, `f(x) = x^2`) llegan al bloque; las de `exporta` vuelven como `n = …`.
+El dibujo sale en SVG con encuadre automático, colores ACI y capas; con z se ve en 3D y se gira con el ratón
+(Planta · Frente · Lateral · 3D). **Guardar**: `(guardar "x.dxf")` — el formato lo da la extensión: `.dxf` (R12),
+`.svg`, `.png`, `.pdf`, `.dwg` (acadrust; en escritorio necesita Node) — o los botones bajo cada dibujo, o
+Archivo → *Guardar dibujo como…*. Un programa LISP entero que dibuja (sin `#autolisp`) también se pinta.
+Ejemplos: 79 (derivada, tangente y área + zapata paramétrica) y 80 (cáscara alabeada 3D). Pruebas: `tests/autolisp/`.
+
+---
+
 ## Las cuatro vistas
 
 **Izquierda (cómo escribes):** `matemática` · `expr LISP` (`(setf name forma)`) · `LISP ▶` (script ejecutable) · `Hekatan Lab` (código MATLAB).

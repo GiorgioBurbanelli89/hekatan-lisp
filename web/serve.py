@@ -8,7 +8,7 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
 class Handler(http.server.SimpleHTTPRequestHandler):
     extensions_map = {
         **http.server.SimpleHTTPRequestHandler.extensions_map,
-        ".js": "text/javascript", ".wasm": "application/wasm",
+        ".js": "text/javascript", ".mjs": "text/javascript", ".wasm": "application/wasm",
         ".json": "application/json", ".lisp": "text/plain; charset=utf-8",
         ".html": "text/html; charset=utf-8", ".css": "text/css",
         ".dat": "application/octet-stream", ".ttf": "font/ttf", ".png": "image/png",

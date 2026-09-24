@@ -1351,6 +1351,16 @@ table.ws-table sub{font-size:.72em;} table.ws-table sup{font-size:.72em;}
 .hk-dib-ley{display:flex;flex-wrap:wrap;gap:.2em 1.3em;font-family:'Segoe UI',sans-serif;font-size:9.5pt;color:var(--fg);margin:.35em 0 .2em;}
 .hk-dib-li{display:inline-flex;align-items:center;gap:.35em;}
 .hk-dib-err{color:var(--dib-rojo);font-family:'Segoe UI',sans-serif;font-size:9.5pt;margin:.3em 0;}
+/* DIBUJO AUTOLISP (#autolisp … #fin): salida del programa (como la línea de órdenes) + dibujo + guardar */
+.hk-al{margin:.5em 0 1em;}
+.hk-al-out{margin:.3em 0 .6em;padding:.45em .8em;border-left:2px solid var(--sep);background:transparent;color:var(--mut);font-family:Consolas,'Cascadia Code',monospace;font-size:9.5pt;line-height:1.45;white-space:pre-wrap;}
+.hk-al-errl{color:var(--dib-rojo);}
+.hk-al-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.35em;margin:.35em 0 .2em;font-family:'Segoe UI',sans-serif;font-size:8.5pt;color:var(--mut);}
+.hk-al-bar span{margin-right:.3em;}
+.hk-al-bar button{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--sep);border-radius:3px;padding:.05em .6em;cursor:pointer;}
+.hk-al-bar button:hover{border-color:var(--var);color:var(--var);}
+.hk-al-nota{font-family:'Segoe UI',sans-serif;font-size:8.5pt;color:var(--mut);text-align:center;}
+@media print{.hk-al-bar{display:none;}}
 table.hk-obs td{white-space:normal;vertical-align:top;}
 table.hk-obs td:nth-child(3){min-width:22em;}
 .hk-obs-n{display:inline-block;width:1.7em;height:1.7em;line-height:1.7em;border-radius:50%;color:#fff;text-align:center;font-weight:700;font-size:.88em;}

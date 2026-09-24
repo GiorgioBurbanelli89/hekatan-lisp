@@ -67,6 +67,17 @@ namespace HekatanLisp
                     string url = r.GetProperty("datos").GetString();
                     File.WriteAllBytes(ruta.GetString(), Convert.FromBase64String(url.Substring(url.IndexOf(',') + 1)));
                 }
+                else if (r.TryGetProperty("hkCad", out var qc))       // la ventana de dibujo de #dibujar (LispCad.js)
+                {
+                    string que = qc.GetString();
+                    if (que == "abrir") AmpliarResultado(true);
+                    else if (que == "cerrar") AmpliarResultado(false);
+                    else if (que == "guardar")
+                    {
+                        AmpliarResultado(false);
+                        EscribirDibujoEnHoja(r.GetProperty("nombre").GetString(), r.GetProperty("cuerpo").GetString());
+                    }
+                }
                 else if (r.TryGetProperty("hkDwg", out var js))       // botón DWG de la página
                 {
                     string nombre = r.TryGetProperty("nombre", out var n) ? n.GetString() : "dibujo.dwg";
@@ -77,6 +88,46 @@ namespace HekatanLisp
                 }
             }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "Guardar dibujo", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        }
+
+        // ---------- #dibujar: la ventana de dibujo vive en la página (LispCad.js); aquí, el lado de la app ----------
+        GridLength _colEd; double _colEdMin; bool _ampliado;
+        /// <summary>Mientras la ventana de dibujo está abierta, el resultado ocupa todo el ancho (se oculta el editor).</summary>
+        void AmpliarResultado(bool on)
+        {
+            if (on && !_ampliado)
+            {
+                _colEd = EditorCol.Width; _colEdMin = EditorCol.MinWidth;
+                EditorCol.MinWidth = 0; EditorCol.Width = new GridLength(0); SplitCol.Width = new GridLength(0);
+                _ampliado = true;
+            }
+            else if (!on && _ampliado)
+            {
+                EditorCol.MinWidth = _colEdMin; EditorCol.Width = _colEd; SplitCol.Width = new GridLength(6);
+                _ampliado = false;
+            }
+        }
+
+        /// <summary>«Guardar en la hoja»: el bloque #dibujar(nombre) … #fin del EDITOR pasa a tener las listas DXF
+        /// (entmake) que escribió la ventana; solo se reemplaza el tramo que cambia (Ctrl+Z del editor lo deshace).</summary>
+        void EscribirDibujoEnHoja(string nombre, string cuerpo)
+        {
+            string ed = Editor.Text ?? "", src = SourceText();
+            if (src != ed)   // el editor muestra una forma derivada (LISP, Hekatan Lab): se cambia el original
+            {
+                _lispBackup = LispAutoLisp.EscribirDibujo(src, nombre, cuerpo);
+                ShowResult();
+                return;
+            }
+            string nuevo = LispAutoLisp.EscribirDibujo(ed, nombre, cuerpo);
+            int a = 0, n0 = ed.Length, n1 = nuevo.Length;
+            while (a < n0 && a < n1 && ed[a] == nuevo[a]) a++;
+            int z = 0;
+            while (z < n0 - a && z < n1 - a && ed[n0 - 1 - z] == nuevo[n1 - 1 - z]) z++;
+            Editor.Document.Replace(a, n0 - a - z, nuevo.Substring(a, n1 - a - z));
+            _debounce.Stop();          // sin esperar al AutoRun: la hoja se recalcula ya
+            ShowResult();
+            AutoSaveTemp();
         }
 
         string CarpetaDibujos()

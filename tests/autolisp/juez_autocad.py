@@ -26,10 +26,10 @@ def bloques(ruta):
     """Bloques #autolisp(…autocad = si…) … #fin del ejemplo: (titulo, código)."""
     out, cur, tit = [], None, None
     for l in open(ruta, encoding="utf-8").read().split("\n"):
-        m = re.match(r"^\s*#\s*autolisp\s*\((.*)\)\s*$", l, re.I)
-        if m:
-            cur = [] if re.search(r"autocad\s*=\s*si", m.group(1), re.I) else None
-            tit = m.group(1)
+        m = re.match(r"^\s*#\s*(autolisp|dibujar)\s*\((.*)\)\s*$", l, re.I)
+        if m:   # #dibujar = datos que escribe la ventana (entmake puro): se juzga siempre
+            cur = [] if m.group(1).lower() == "dibujar" or re.search(r"autocad\s*=\s*si", m.group(2), re.I) else None
+            tit = m.group(2)
             continue
         if re.match(r"^\s*#\s*fin\s*$", l, re.I):
             if cur is not None: out.append((tit, "\n".join(cur)))

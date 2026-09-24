@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -19,6 +19,9 @@ namespace HekatanLisp
     ///   #autolisp("Título", ancho = 160, alto = 110, vert = 1, exporta = n A, nuevo = no)
     ///   (setq H 10.0) … código LISP / AutoLISP …
     ///   #fin
+    ///   #dibujar(nombre, ancho = 110, alto = 90, ud = m, cuadricula = 0.05)   ← la VENTANA de dibujo (LispCad.js)
+    ///   (entmake '((0 . "LINE") (8 . "0") (10 0.0 0.0 0.0) (11 1.0 0.0 0.0)))  … lo escribe la ventana al guardar
+    ///   #fin
     /// Las definiciones de la hoja que van ANTES (L = 6, f(x) = x^2) llegan como (setq …); los nombres
     /// de «exporta» vuelven a la hoja como líneas «n = valor» justo después del dibujo.
     /// </summary>
@@ -27,7 +30,7 @@ namespace HekatanLisp
         static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         const char FS = '\u001c', US = '\u001f';
 
-        public static readonly Regex RxInicio = new Regex(@"^\s*#\s*autolisp\s*(?:\((?<a>.*)\))?\s*$", RegexOptions.IgnoreCase);
+        public static readonly Regex RxInicio = new Regex(@"^\s*#(?:\s*(?<k>autolisp)|(?<k>dibujar))\b\s*(?:\((?<a>.*)\))?\s*$", RegexOptions.IgnoreCase);
         static readonly Regex RxFin = new Regex(@"^\s*#\s*(?:fin\s*autolisp|finautolisp|fin)\s*$", RegexOptions.IgnoreCase);
         public static readonly Regex RxMarca = new Regex(@"^\s*#\s*autolispout\s*\(\s*(\d+)\s*\)\s*$", RegexOptions.IgnoreCase);
         static readonly Regex RxUsaDibujo = new Regex(
@@ -1400,14 +1403,21 @@ namespace HekatanLisp
         // ================================ la hoja ================================
         public sealed class Bloque
         {
-            public string Titulo; public double Ancho = 160, Alto = 115, Vert = 1; public bool Nuevo = true;
+            public string Titulo; public double Ancho = 160, Alto = 115, Vert = 1; public bool Nuevo = true, NuevoDado;
+            /// <summary>#dibujar: bloque de DATOS que edita la ventana (LispCad.js); Nombre la identifica en la hoja.</summary>
+            public bool Editable; public string Nombre, Ud = "m"; public double Rejilla;
             public List<string> Exporta = new List<string>(); public List<string> Codigo = new List<string>();
             public List<string> Contexto = new List<string>();
         }
-        static Bloque Cabecera(string a)
+        static Bloque Cabecera(string a, bool dibujar = false)
         {
-            var b = new Bloque();
+            var b = new Bloque { Editable = dibujar };
             a ??= "";
+            if (dibujar)
+            {
+                b.Nombre = NombreDibujar(a);
+                b.Titulo = b.Nombre; b.Ancho = 110; b.Alto = 90;
+            }
             var mt = Regex.Match(a, "^\\s*\"([^\"]*)\"");
             if (mt.Success) b.Titulo = mt.Groups[1].Value;
             var me = Regex.Match(a, @"exporta\s*=\s*(\[[^\]]*\]|[^,]*)", RegexOptions.IgnoreCase);
@@ -1424,7 +1434,9 @@ namespace HekatanLisp
                     case "ancho": if (num > 0) b.Ancho = num; break;
                     case "alto": if (num > 0) b.Alto = num; break;
                     case "vert": case "exagerar": if (num > 0) b.Vert = num; break;
-                    case "nuevo": b.Nuevo = !(val.StartsWith("no", StringComparison.OrdinalIgnoreCase) || val == "0" || val.Equals("false", StringComparison.OrdinalIgnoreCase)); break;
+                    case "ud": case "unidad": case "unidades": if (dibujar) b.Ud = val; break;
+                    case "cuadricula": case "cuadrícula": case "rejilla": case "grid": if (num > 0) b.Rejilla = num; break;
+                    case "nuevo": b.NuevoDado = true; b.Nuevo = !(val.StartsWith("no", StringComparison.OrdinalIgnoreCase) || val == "0" || val.Equals("false", StringComparison.OrdinalIgnoreCase)); break;
                 }
             }
             return b;
@@ -1486,9 +1498,19 @@ namespace HekatanLisp
             {
                 var m = RxInicio.Match(src[i]);
                 if (!m.Success) { salida.Add(src[i]); ctx.Add(src[i]); continue; }
-                var b = Cabecera(m.Groups["a"].Success ? m.Groups["a"].Value : "");
+                bool dib = m.Groups["k"].Value.Equals("dibujar", StringComparison.OrdinalIgnoreCase);
+                var b = Cabecera(m.Groups["a"].Success ? m.Groups["a"].Value : "", dib);
+                // un #autolisp justo después de un #dibujar sigue sobre ESE dibujo (lee lo dibujado), salvo nuevo = si
+                if (!dib && !b.NuevoDado && bloques.Count > 0 && bloques[bloques.Count - 1].Editable) b.Nuevo = false;
                 b.Contexto = ctx; ctx = new List<string>();
                 int j = i + 1;
+                if (dib)
+                {
+                    int fin = FinDibujar(src, i);
+                    if (fin > i) { for (j = i + 1; j < fin; j++) b.Codigo.Add(src[j]); j = fin; }
+                    else j = i;          // sin #fin: el bloque está vacío (la ventana lo creará)
+                }
+                else
                 for (; j < src.Length; j++)
                 {
                     if (RxFin.IsMatch(src[j])) break;
@@ -1762,7 +1784,128 @@ namespace HekatanLisp
                 }
                 h.Append("</div>");
             }
+            if (b.Editable)   // #dibujar: los datos del dibujo + la ventana (LispCad.js) + el botón que la abre
+            {
+                string idc = "hkdib" + (++_idDib);
+                if (sal.Dib == null || sal.Dib.Ents.Count == 0)
+                    h.Append("<div class=\"hk-dib hk-al-dib\"><div class=\"hk-dib-tit\">").Append(Enc(b.Titulo)).Append("</div>")
+                     .Append("<div class=\"hk-cad-vacio\" style=\"border:1px dashed var(--sep);border-radius:4px;height:110px;display:flex;align-items:center;justify-content:center;")
+                     .Append("font-family:'Segoe UI',sans-serif;font-size:9.5pt;color:var(--mut)\">(dibujo vacío: pulsa ✏ Dibujar)</div></div>");
+                h.Append("<script type=\"application/json\" id=\"").Append(idc).Append("-cad\">").Append(CadJson(sal.Dib, b).Replace("</", "<\\/")).Append("</script>");
+                h.Append(JsCad);
+                h.Append("<div class=\"hk-al-bar\"><button type=\"button\" class=\"hk-cad-btn\" onclick=\"hkCadAbrir('").Append(idc)
+                 .Append("')\" title=\"Abre la ventana de dibujo; al guardar, el dibujo se escribe en la hoja como listas DXF (entmake)\">✏ Dibujar / Editar «")
+                 .Append(Enc(b.Nombre)).Append("»</button></div>");
+            }
             return h.Append("</div>").ToString();
+        }
+
+        // ================================ #dibujar: la ventana de dibujo ================================
+        /// <summary>El nombre de un #dibujar(nombre, …): el primer argumento (con o sin comillas); «dibujo» si no hay.</summary>
+        public static string NombreDibujar(string a)
+        {
+            var m = Regex.Match(a ?? "", "^\\s*\"?([^\",=]*?)\"?\\s*(?:,|$)");
+            var n = m.Success ? m.Groups[1].Value.Trim() : "";
+            return n.Length == 0 ? "dibujo" : n;
+        }
+
+        /// <summary>#dibujar en la línea i: índice de su #fin, o -1 si no lo tiene (entonces el bloque está vacío).
+        /// El cuerpo son líneas LISP (empiezan con «(», «)» o «;», en blanco o sangradas): la primera que no lo es corta.</summary>
+        public static int FinDibujar(IList<string> src, int i)
+        {
+            for (int j = i + 1; j < src.Count; j++)
+            {
+                var t = src[j];
+                if (RxFin.IsMatch(t)) return j;
+                var s = t.TrimStart();
+                if (s.Length == 0 || s[0] == '(' || s[0] == ')' || s[0] == ';' || char.IsWhiteSpace(t[0])) continue;
+                return -1;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// GUARDAR de la ventana: pone CUERPO (las líneas (entmake '(…)) que escribió LispCad.js) dentro del bloque
+        /// #dibujar(NOMBRE) … #fin de la hoja, en lugar de lo que había; si el bloque no tenía #fin, se lo pone; si no
+        /// existe, lo añade al final. Respeta los saltos de línea de la hoja (\r\n o \n).
+        /// </summary>
+        public static string EscribirDibujo(string hoja, string nombre, string cuerpo)
+        {
+            hoja ??= "";
+            string nl = hoja.Contains("\r\n") ? "\r\n" : "\n";
+            var src = hoja.Replace("\r\n", "\n").Split('\n').ToList();
+            var body = (cuerpo ?? "").Replace("\r\n", "\n").TrimEnd('\n').Split('\n').Where(l => !RxFin.IsMatch(l)).ToList();
+            for (int i = 0; i < src.Count; i++)
+            {
+                var m = RxInicio.Match(src[i]);
+                if (!m.Success || !m.Groups["k"].Value.Equals("dibujar", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!NombreDibujar(m.Groups["a"].Success ? m.Groups["a"].Value : "").Equals(nombre ?? "dibujo", StringComparison.Ordinal)) continue;
+                int fin = FinDibujar(src, i);
+                if (fin > i) src.RemoveRange(i + 1, fin - i - 1); else src.Insert(i + 1, "#fin");
+                src.InsertRange(i + 1, body);
+                return string.Join(nl, src);
+            }
+            if (src.Count > 0 && src[src.Count - 1].Trim().Length > 0) src.Add("");
+            src.Add("#dibujar(" + (nombre ?? "dibujo") + ")"); src.AddRange(body); src.Add("#fin");
+            return string.Join(nl, src);
+        }
+
+        static bool CodigoPunto(int c) => (c >= 10 && c <= 18) || c == 210 || c == 1011;
+        static bool CodigoTexto(int c) => (c >= 0 && c <= 9) || c == 100 || c == 102 || (c >= 300 && c <= 309) || (c >= 1000 && c <= 1009);
+        static string JNum(double v) => double.IsNaN(v) || double.IsInfinity(v) ? "0" : v.ToString("R", Inv);
+
+        /// <summary>Los datos que abre la ventana: nombre, unidad, rejilla, paleta ACI del tema, capas y entidades
+        /// como pares DXF [[0,"LINE"],[8,"0"],[10,[x,y,z]],…] (lo mismo que devolvería entget).</summary>
+        static string CadJson(Dibujo d, Bloque b)
+        {
+            var sb = new StringBuilder("{\"nombre\":").Append(JsonStr(b.Nombre ?? "dibujo")).Append(",\"ud\":").Append(JsonStr(b.Ud ?? "m"))
+                .Append(",\"rejilla\":").Append(JNum(b.Rejilla)).Append(",\"pal\":{");
+            for (int c = 1; c <= 255; c++) { if (c > 1) sb.Append(','); sb.Append('"').Append(c).Append("\":").Append(JsonStr(AciCss(c, LispConverter.Dark))); }
+            sb.Append("},\"capas\":[");
+            var capas = d?.Capas != null && d.Capas.Count > 0 ? d.Capas : new List<Capa> { new Capa() };
+            sb.Append(string.Join(",", capas.Select(c => "{\"n\":" + JsonStr(c.Nombre) + ",\"c\":" + Math.Abs(c.Color == 0 ? 7 : c.Color) + ",\"tipo\":" + JsonStr(c.Tipo ?? "CONTINUOUS") + "}")));
+            sb.Append("],\"ents\":[");
+            bool pe = true;
+            foreach (var e in d?.Ents ?? new List<Ent>())
+            {
+                if (!pe) sb.Append(','); pe = false;
+                sb.Append('[');
+                bool pp = true;
+                foreach (var kv in e.D)
+                {
+                    if (kv.Key == 5) continue;
+                    if (!pp) sb.Append(','); pp = false;
+                    sb.Append('[').Append(kv.Key).Append(',');
+                    if (CodigoPunto(kv.Key)) { var p = Ent.ParsePt(kv.Value); sb.Append('[').Append(JNum(p[0])).Append(',').Append(JNum(p[1])).Append(',').Append(JNum(p[2])).Append(']'); }
+                    else if (!CodigoTexto(kv.Key) && double.TryParse(kv.Value, NumberStyles.Float, Inv, out var v)) sb.Append(JNum(v));
+                    else sb.Append(JsonStr(kv.Value));
+                    sb.Append(']');
+                }
+                sb.Append(']');
+            }
+            return sb.Append("]}").ToString();
+        }
+
+        static string _jsCad;
+        /// <summary>LispCad.js (recurso incrustado en el escritorio y en la web): la ventana de dibujo, como
+        /// &lt;script&gt; de UNA línea (la hoja parte el HTML por líneas): el código va en base64 (UTF-8) y se evalúa una vez.</summary>
+        static string JsCad
+        {
+            get
+            {
+                if (_jsCad != null) return _jsCad;
+                string b64;
+                try
+                {
+                    using var st = typeof(LispAutoLisp).Assembly.GetManifestResourceStream("LispCad.js");
+                    if (st == null) return _jsCad = "<script>console.warn('LispCad.js no está incrustado')</script>";
+                    using var ms = new System.IO.MemoryStream(); st.CopyTo(ms);
+                    b64 = Convert.ToBase64String(ms.ToArray());
+                }
+                catch (Exception ex) { return _jsCad = "<script>console.warn(" + JsonStr("LispCad.js: " + ex.Message) + ")</script>"; }
+                return _jsCad = "<script>(function(){if(window.hkCad)return;var b=atob('" + b64 + "'),u=new Uint8Array(b.length);" +
+                    "for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);(0,eval)(new TextDecoder().decode(u))})()</script>";
+            }
         }
     }
 }

@@ -1459,7 +1459,7 @@ dib();})();";
             // DIBUJO AutoLISP: los bloques #autolisp … #fin se ejecutan ANTES que nada (son LISP, no
             // matemática: si no, un (setq …) convertía la hoja entera en programa) y dejan su marcador.
             _alHtml = null;
-            if (LispAutoLisp.RxInicio.IsMatch(text) || System.Text.RegularExpressions.Regex.IsMatch(text, @"(?im)^\s*#\s*autolisp\b"))
+            if (LispAutoLisp.RxInicio.IsMatch(text) || System.Text.RegularExpressions.Regex.IsMatch(text, @"(?im)^\s*#(\s*autolisp|dibujar)\b"))
                 text = LispAutoLisp.Plegar(text, CorrerAutoLisp, GuardarDibujo, out _alHtml);
             // (antes esta regex llevaba un RETROCESO (0x08) literal donde iba \b: no casaba nunca y
             //  los bloques for/if de una hoja se pintaban como texto, sin ejecutarse)

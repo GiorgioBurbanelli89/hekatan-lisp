@@ -31,6 +31,8 @@
     </None>
     <!-- resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran) -->
     <EmbeddedResource Include="Lisp.xshd" />
+    <!-- la ventana de dibujo de #dibujar (JS que va dentro de la página del resultado) -->
+    <EmbeddedResource Include="LispCad.js" LogicalName="LispCad.js" />
   </ItemGroup>
 
   <!-- Empaquetar SBCL dentro del app (autocontenido, no necesita SBCL instalado).

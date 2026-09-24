@@ -48,6 +48,8 @@ namespace HekatanLisp
         [JSExport] public static bool IsProgram(string t) => LooksLikeLisp(t) && IsLispProgram(t);
         [JSExport] public static string FullLisp(string t, string op) { _app._op = op; return _app.BuildFullLisp(t); }
         [JSExport] public static string HekatanLab(string t, string op) { _app._op = op; return _app.BuildRealMatlab(t); }
+        /// <summary>«Guardar en la hoja» de la ventana de dibujo: el bloque #dibujar(nombre) … #fin con lo dibujado.</summary>
+        [JSExport] public static string EscribirDibujo(string t, string nombre, string cuerpo) => LispAutoLisp.EscribirDibujo(t, nombre, cuerpo);
     }
 
     /// <summary>Puente al motor LISP (ECL en hlisp.wasm), cargado por main.js.</summary>

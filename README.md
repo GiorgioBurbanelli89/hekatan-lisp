@@ -136,6 +136,35 @@ El dibujo sale en SVG con encuadre automático, colores ACI y capas; con z se ve
 Archivo → *Guardar dibujo como…*. Un programa LISP entero que dibuja (sin `#autolisp`) también se pinta.
 Ejemplos: 79 (derivada, tangente y área + zapata paramétrica) y 80 (cáscara alabeada 3D). Pruebas: `tests/autolisp/`.
 
+### Ventana de dibujo — `#dibujar(nombre)` … `#fin`
+
+```
+#dibujar(seccion, ancho = 100, alto = 95, ud = m, cuadricula = 0.025)
+(entmake '((0 . "LWPOLYLINE") (100 . "AcDbEntity") (8 . "SECCION") (100 . "AcDbPolyline") (90 . 4) (70 . 1) (10 0.0 0.0) …))
+#fin
+#autolisp("Lo dibujado, leído", exporta = A)
+(setq A (area (ssname (ssget "_X" '((0 . "LWPOLYLINE"))) 0)))
+#fin
+```
+
+En el resultado sale el dibujo con el botón **✏ Dibujar / Editar**, que abre una ventana CAD dentro de la misma página
+(escritorio y web: el mismo `LispCad.js`). **💾 Guardar en la hoja** escribe lo dibujado entre `#dibujar` y `#fin`,
+una entidad por línea, como `(entmake '(…))` de AutoLISP (se puede pegar en AutoCAD: `tests/autolisp/juez_autocad.py`
+también juzga estos bloques), y recalcula. Un `#autolisp` justo después sigue sobre ese mismo dibujo (`nuevo = no`
+implícito): `ssget`, `entget`, `area`, `vertices`… y `exporta` devuelven los valores a la hoja. Sin `#fin`, el bloque
+está vacío y la ventana lo crea. La ventana reescribe el bloque entero: el cálculo va en el `#autolisp` de abajo.
+
+| | |
+|---|---|
+| Órdenes (línea de órdenes, alias de AutoCAD) | `L` línea · `PL` polilínea (`C` cierra, `D`/`U` deshace el tramo) · `REC` · `C` círculo (`D` diámetro) · `A` arco (3 puntos o `C` centro-inicio-fin) · `PO` punto · `T`/`DT` texto · `DIM`/`DLI` cota (`H`/`V`/`A`) · `DAL` alineada · `M` mover · `E` borrar (designar: clic, ventana, captura, `TODO`, `U`ltimo) · `U` deshacer · `REDO` · `LA` capa · `COL` color · `REJ` rejilla · `Z` zoom |
+| Coordenadas | `x,y` · `@dx,dy` · `@d<ángulo` · `d<ángulo` · un número solo = distancia en la dirección del cursor |
+| Teclas | Intro / Espacio / clic derecho = Intro · Intro vacío repite · Esc cancela · F3 refent · F7 rejilla · F8 orto · F9 forzcursor · Ctrl+Z / Ctrl+Y · Supr borra lo designado |
+| Ratón | rueda = zoom en el cursor · arrastre con la rueda (o Mayús + arrastre) = encuadre · doble clic con la rueda = extensión |
+| Enganche | OSNAP (apertura 10 px: final, medio, centro, intersección, perpendicular, punto) manda sobre ORTO y sobre la rejilla, como AutoCAD |
+
+Ejemplo: 81 (una T dibujada → área, centroide e inercia por Green, rotulados; la fórmula de la T da lo mismo).
+Pruebas: `tests/dibujar/` (web con Playwright, escritorio con `--ctl`).
+
 ---
 
 ## Las cuatro vistas

@@ -336,6 +336,31 @@ function setSolo(on) {
   $('btn-solo').title = on ? 'Volver al editor (Esc)' : 'Ver solo el resultado, a pantalla completa (Esc para volver)';
 }
 $('btn-solo').onclick = () => setSolo(!document.body.classList.contains('solo'));
+
+// ---------- ventana de dibujo de #dibujar (LispCad.js, dentro del iframe del resultado) ----------
+//   abrir → el resultado a pantalla completa · guardar → el bloque #dibujar(nombre) … #fin del editor
+//   recibe las listas DXF (entmake) y la hoja se recalcula · cerrar → vuelve como estaba
+let soloAntesDeDibujar = null;
+addEventListener('message', e => {
+  const m = e.data;
+  if (!m || typeof m !== 'object' || !m.hkCad || e.source !== $('render').contentWindow) return;
+  if (m.hkCad === 'abrir') { if (soloAntesDeDibujar === null) soloAntesDeDibujar = document.body.classList.contains('solo'); setSolo(true); return; }
+  if (soloAntesDeDibujar !== null) { setSolo(soloAntesDeDibujar); soloAntesDeDibujar = null; }
+  if (m.hkCad !== 'guardar') return;
+  if (sourceText() !== ed.value) {       // el editor mostraba una forma derivada: se vuelve al original
+    const t = sourceText(); syntaxLisp = synFull = transliterated = false; lispBackup = null; highlightSyntax();
+    $('lbl-in').textContent = 'escribes: texto plano'; ed.value = t;
+  }
+  const viejo = ed.value, nuevo = W.EscribirDibujo(viejo, m.nombre, m.cuerpo);
+  let a = 0, z = 0;                      // solo el tramo que cambia (el deshacer del navegador lo recupera)
+  while (a < viejo.length && a < nuevo.length && viejo[a] === nuevo[a]) a++;
+  while (z < viejo.length - a && z < nuevo.length - a && viejo[viejo.length - 1 - z] === nuevo[nuevo.length - 1 - z]) z++;
+  ed.focus(); ed.setSelectionRange(a, viejo.length - z);
+  if (!document.execCommand || !document.execCommand('insertText', false, nuevo.slice(a, nuevo.length - z))) ed.setRangeText(nuevo.slice(a, nuevo.length - z), a, viejo.length - z, 'end');
+  if (ed.value !== nuevo) ed.value = nuevo;
+  pintarEditor(); guardarLocal('hlisp-autosave', ed.value);
+  clearTimeout(pendiente); showResult();
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.body.classList.contains('solo') && !$('modal').classList.contains('on')) setSolo(false);
 });

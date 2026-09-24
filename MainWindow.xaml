@@ -114,9 +114,9 @@
             <RowDefinition Height="Auto"/>   <!-- 5 calculadora (keypad, solo bajo el editor) -->
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="220"/>   <!-- 0 editor + keypad -->
-            <ColumnDefinition Width="6"/>                  <!-- 1 divisor arrastrable -->
-            <ColumnDefinition Width="*" MinWidth="220"/>   <!-- 2 resultado (altura completa) -->
+            <ColumnDefinition x:Name="EditorCol" Width="*" MinWidth="220"/>   <!-- 0 editor + keypad -->
+            <ColumnDefinition x:Name="SplitCol" Width="6"/>                    <!-- 1 divisor arrastrable -->
+            <ColumnDefinition x:Name="WebCol" Width="*" MinWidth="220"/>      <!-- 2 resultado (altura completa) -->
         </Grid.ColumnDefinitions>
 
         <!-- ============ barra de menus ============ -->
@@ -385,7 +385,7 @@
                        Background="{DynamicResource ThemeWindowBg}" Foreground="{DynamicResource ThemeText}"/>
         <wv:WebView2 x:Name="Viewer" Grid.Row="4" Grid.RowSpan="2" Grid.Column="2" Visibility="Collapsed"/>
         <!-- divisor arrastrable (como Hekatan Lab): agranda editor o resultado -->
-        <GridSplitter Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Width="6"
+        <GridSplitter x:Name="MainSplitter" Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Width="6"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                       Background="{DynamicResource ThemeButtonBorder}"
                       ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" Cursor="SizeWE"

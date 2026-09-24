@@ -85,3 +85,16 @@ números que Calcpad (oráculo: `calcpad-examples/Rectangular Slab FEA.html`).
 - ✅ `tests/numerico/test_hn_runtime.lisp` (SBCL, sin la app): 36/36.
 - ✅ `tests/numerico/test_hoja_numerica.py`: hoja básica 19/19 + losa contra Calcpad
   (849 valores, 0 distintos a 4 decimales, 5 gráficas, 0 errores).
+
+### Tarea aparte: divisor arrastrable y Ctrl + rueda (como Hekatan Lab 6dc944d / 83d1b3e)
+- ✅ El divisor YA era arrastrable en LISP (GridSplitter Width=6 en columna de 6 px,
+  PreviousAndNext, SizeWE). Medido con --ctl «layout» + ratón real: editor 550 → 350 DIP,
+  resultado 550 → 750 (300 px físicos a 150 %).
+- ❌ Primer intento de arrastre «no movía nada»: bajo el divisor estaba una consola
+  PowerShell a pantalla completa, capa transparente, por encima de la app (WindowFromPoint
+  lo dijo). No era la app. El test ahora pone su ventana SIEMPRE ENCIMA y comprueba con
+  WindowFromPoint que el punto es de la app antes de apretar; si no, no toca el ratón.
+- ✅ Ctrl + rueda sobre el editor: ahora ±2 pt entre 6 y 40 (antes ±1.5 entre 8 y 48),
+  igual que Lab. Real: 15 → 19 → 15 pt. Ops --ctl nuevas «zoom» y «layout».
+- ⏳ Entrada sintética algo inestable: de 3 corridas, 2 TODO OK y 1 con la rueda
+  perdida (el ratón tiene que moverse sobre el editor antes; el test ya lo hace).

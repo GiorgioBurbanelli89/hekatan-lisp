@@ -395,6 +395,24 @@ namespace HekatanLisp
         // ================================ SVG ================================
         static string F(double v) => Math.Round(v, 3).ToString("0.###", Inv);
         static string Enc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+        /// <summary>Cadena JSON a mano: en la web (WASM recortado) JsonSerializer no tiene reflexión.</summary>
+        static string JsonStr(string s)
+        {
+            var sb = new StringBuilder("\"");
+            foreach (char c in s ?? "")
+            {
+                switch (c)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default: if (c < 32) sb.Append("\\u").Append(((int)c).ToString("x4")); else sb.Append(c); break;
+                }
+            }
+            return sb.Append('"').ToString();
+        }
 
         public sealed class Opc { public double Ancho = 160, Alto = 115; public string Titulo; }
 
@@ -938,7 +956,7 @@ namespace HekatanLisp
         /// <summary>Datos de la escena 3D para la página (JSON): la página la vuelve a proyectar al girar.</summary>
         static string Json3D(List<P3> L3, double az, double el, double W, double H, double pad, double k0)
         {
-            string J(string s) => System.Text.Json.JsonSerializer.Serialize(s ?? "");
+            string J(string s) => JsonStr(s);
             var sb = new StringBuilder();
             sb.Append("{\"az\":").Append(F(az)).Append(",\"el\":").Append(F(el)).Append(",\"W\":").Append(F(W)).Append(",\"H\":").Append(F(H))
               .Append(",\"pad\":").Append(F(pad)).Append(",\"k0\":").Append(k0.ToString("R", Inv)).Append(",\"it\":[");
@@ -1545,7 +1563,7 @@ namespace HekatanLisp
         {
             o ??= new Opc();
             var v = Encuadre(d, o.Ancho, o.Alto);
-            string J(string s) => System.Text.Json.JsonSerializer.Serialize(s ?? "");
+            string J(string s) => JsonStr(s);
             string Pt(double[] p) => "[" + N(p[0]) + "," + N(p[1]) + "," + N(p.Length > 2 ? p[2] : 0) + "]";
             var ents = new List<string>();
             var sinDwg = new Dictionary<string, int>();
@@ -1657,7 +1675,7 @@ namespace HekatanLisp
             "img.onerror=function(e){mal(e)};img.src='data:image/svg+xml;base64,'+hkAlB64(id,'svg')})};" +
             "window.hkAlGuardar=function(id,fmt,nom){if(fmt==='dwg'){var js=hkAlB64(id,'dwg'),av=(document.getElementById(id+'-dwg')||{}).getAttribute('data-avisos')||'';" +
             "if(window.chrome&&chrome.webview){chrome.webview.postMessage(JSON.stringify({hkDwg:js,nombre:nom+'.dwg'}));return}" +
-            "import(new URL('dwg/acadrust_wasm.js',document.baseURI).href).then(function(m){return m.default().then(function(){hkAlBajar(new Blob([m.write_dwg_bytes(js)],{type:'application/acad'}),nom+'.dwg');if(av)setTimeout(function(){alert(av)},300)})}).catch(function(e){alert('DWG: '+e)});return}" +
+            "import(new URL('dwg/acadrust_wasm.mjs',document.baseURI).href).then(function(m){return m.default().then(function(){hkAlBajar(new Blob([m.write_dwg_bytes(js)],{type:'application/acad'}),nom+'.dwg');if(av)setTimeout(function(){alert(av)},300)})}).catch(function(e){alert('DWG: '+e)});return}" +
             "if(fmt==='png'){hkAlPng(id,11.811).then(function(u){hkAlBajar(new Blob([hkAlBytes(u.split(',')[1])],{type:'image/png'}),nom+'.png')});return}" +
             "var mime={dxf:'application/dxf',svg:'image/svg+xml',pdf:'application/pdf'}[fmt];hkAlBajar(new Blob([hkAlBytes(hkAlB64(id,fmt))],{type:mime}),nom+'.'+fmt)}}</script>";
 
@@ -1733,7 +1751,7 @@ namespace HekatanLisp
                         {
                             string ruta = guardar(fn, null);
                             h.Append("<script>(function(){function go(){if(!(window.chrome&&chrome.webview&&window.hkAlPng))return;hkAlPng('").Append(id)
-                             .Append("',11.811).then(function(u){chrome.webview.postMessage(JSON.stringify({hkGuardarPng:").Append(System.Text.Json.JsonSerializer.Serialize(ruta))
+                             .Append("',11.811).then(function(u){chrome.webview.postMessage(JSON.stringify({hkGuardarPng:").Append(JsonStr(ruta))
                              .Append(",datos:u}))})}if(document.readyState==='complete')go();else window.addEventListener('load',go)})();</script>");
                             nota = "guardado en " + Enc(ruta);
                         }

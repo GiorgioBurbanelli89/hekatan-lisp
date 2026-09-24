@@ -197,7 +197,10 @@ namespace HekatanLisp
             string t = e.Tipo;
             switch (t)
             {
-                case "POINT": case "LINE": case "SOLID":
+                case "POLYLINE":
+                    foreach (var p in e.Pts(1011)) yield return p;
+                    break;
+                case "POINT": case "LINE": case "SOLID": case "3DFACE":
                     foreach (var c in new[] { 10, 11, 12, 13 }) { var p = e.Pt(c); if (p != null) yield return p; }
                     break;
                 case "CIRCLE":
@@ -601,6 +604,13 @@ namespace HekatanLisp
                         break;
                     }
                     case "ARC": L.Add(Trazo(Pap(ArcoPuntos(e, 24)), false)); break;
+                    case "POLYLINE": { var pts = e.Pts(1011); if (pts.Count > 1) L.Add(Trazo(Pap(pts), (e.Int(70, 0) & 1) == 1)); break; }
+                    case "3DFACE":
+                    {
+                        var pr = new Prim { K = "path", Fill = css, FillOp = 0.25, Stroke = css, W = 0.18, Cerrado = true };
+                        pr.Sub.Add(Pap(new[] { e.Pt(10), e.Pt(11), e.Pt(12), e.Pt(13) ?? e.Pt(12) })); L.Add(pr);
+                        break;
+                    }
                     case "LWPOLYLINE":
                     {
                         var pts = PoliPuntos(e, out bool cer);
@@ -754,11 +764,245 @@ namespace HekatanLisp
         };
         static string ColorReal(string css, bool oscuro) => css != null && VarsTema.TryGetValue(css, out var t) ? (oscuro ? t.oscuro : t.claro) : css;
 
+        // ================================ 3D ================================
+        /// <summary>¿Se dibuja en 3D? HKVISTA = 1 (vista "3d"), o automático (-1) si hay z ≠ 0,
+        /// 3DFACE o POLYLINE 3D (70 bit 8).</summary>
+        public static bool Es3D(Dibujo d)
+        {
+            int m = (int)d.Var("HKVISTA", -1);
+            if (m == 0) return false;
+            if (m == 1) return true;
+            foreach (var e in d.Ents)
+            {
+                if (e.Tipo == "3DFACE") return true;
+                if (e.Tipo == "POLYLINE" && (e.Int(70, 0) & 8) != 0) return true;
+                foreach (var p in e.D)
+                    if (p.Key >= 10 && p.Key <= 18 || p.Key == 1011)
+                    { var q = Ent.ParsePt(p.Value); if (q != null && Math.Abs(q[2]) > 1e-12) return true; }
+            }
+            return false;
+        }
+        sealed class P3
+        {
+            public string K;                  // "s" trazo · "f" cara · "p" punto · "t" texto
+            public List<double[]> P = new List<double[]>();
+            public string St, Fi, Da; public double W = 0.25, Fo = 1, Dy, H; public bool C, Serif; public string A = "start"; public List<Run> Runs;
+        }
+        static double[] Proy(double[] p, double az, double el)
+        {
+            double a = az * Math.PI / 180, e = el * Math.PI / 180, ca = Math.Cos(a), sa = Math.Sin(a), ce = Math.Cos(e), se = Math.Sin(e);
+            double x = p[0], y = p[1], z = p.Length > 2 ? p[2] : 0;
+            return new[] { -x * sa + y * ca, -x * se * ca - y * se * sa + z * ce, x * ce * ca + y * ce * sa + z * se };
+        }
+        static double[] Normal(List<double[]> p)
+        {
+            double[] a = p[0], b = p[1], c = p[2];
+            double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+            double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, n = Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            return n < 1e-300 ? new double[] { 0, 0, 1 } : new[] { nx / n, ny / n, nz / n };
+        }
+        static List<P3> Prims3D(Dibujo d, bool oscuro)
+        {
+            var L = new List<P3>();
+            double Z(double[] p) => p != null && p.Length > 2 ? p[2] : 0;
+            List<double[]> ConZ(IEnumerable<double[]> pts, double z) => pts.Select(p => new[] { p[0], p[1], z }).ToList();
+            foreach (var e in d.Ents)
+            {
+                var (col, tipo, w, off) = Estilo(d, e);
+                if (off) continue;
+                string css = AciCss(col, oscuro), da = Dash(tipo);
+                P3 S(List<double[]> pts, bool c = false) => new P3 { K = "s", P = pts, St = css, W = w, Da = da, C = c };
+                double alfa = 1; int t440 = e.Int(440, -1); if (t440 >= 0 && (t440 >> 24) == 2) alfa = (t440 & 0xFF) / 255.0;
+                switch (e.Tipo)
+                {
+                    case "POINT": { var p = e.Pt(10); if (p != null) L.Add(new P3 { K = "p", P = { p }, Fi = css }); break; }
+                    case "LINE": { var a = e.Pt(10); var b = e.Pt(11); if (a != null && b != null) L.Add(S(new List<double[]> { a, b })); break; }
+                    case "CIRCLE":
+                    {
+                        var c = e.Pt(10); double r = e.Num(40, 0); if (c == null) break;
+                        var pts = new List<double[]>(); for (int i = 0; i < 72; i++) { double t = 2 * Math.PI * i / 72; pts.Add(new[] { c[0] + r * Math.Cos(t), c[1] + r * Math.Sin(t), c[2] }); }
+                        L.Add(S(pts, true)); break;
+                    }
+                    case "ARC": L.Add(S(ConZ(ArcoPuntos(e, 24), Z(e.Pt(10))))); break;
+                    case "LWPOLYLINE": { var pts = PoliPuntos(e, out bool cer); L.Add(S(ConZ(pts, e.Num(38, 0)), cer)); break; }
+                    case "POLYLINE": { var pts = e.Pts(1011); if (pts.Count > 1) L.Add(S(pts, (e.Int(70, 0) & 1) == 1)); break; }
+                    case "3DFACE":
+                    {
+                        var pts = new List<double[]> { e.Pt(10), e.Pt(11), e.Pt(12) }; var p4 = e.Pt(13);
+                        if (p4 != null && (Math.Abs(p4[0] - pts[2][0]) + Math.Abs(p4[1] - pts[2][1]) + Math.Abs(p4[2] - pts[2][2])) > 1e-12) pts.Add(p4);
+                        L.Add(new P3 { K = "f", P = pts, Fi = css, St = css, Fo = t440 >= 0 ? alfa : 0.3, C = true });
+                        break;
+                    }
+                    case "SOLID":
+                    {
+                        var a = e.Pt(10); var b = e.Pt(11); var c = e.Pt(12); var dd = e.Pt(13) ?? c;
+                        if (a != null && b != null && c != null) L.Add(new P3 { K = "f", P = { a, b, dd, c }, Fi = css, Fo = alfa, C = true });
+                        break;
+                    }
+                    case "HATCH":
+                        if (string.Equals(e.Get(2), "SOLID", StringComparison.OrdinalIgnoreCase))
+                            foreach (var l in Lazos(e)) L.Add(new P3 { K = "f", P = l, Fi = css, Fo = alfa, C = true });
+                        else foreach (var (a, b) in Rayado(e)) L.Add(new P3 { K = "s", P = { new[] { a[0], a[1], 0.0 }, new[] { b[0], b[1], 0.0 } }, St = css, W = 0.16 });
+                        break;
+                    case "TEXT": case "MTEXT":
+                    {
+                        int h72 = e.Int(72, 0), v73 = e.Int(73, 0);
+                        var q = e.Tipo == "TEXT" && (h72 != 0 || v73 != 0) ? (e.Pt(11) ?? e.Pt(10)) : e.Pt(10);
+                        if (q == null) break;
+                        double h = e.Num(40, 2.5);
+                        bool mat = EsMat(e);
+                        string txt = e.Tipo == "MTEXT" ? string.Join(" ", LineasMtext(e.Get(1))) : e.Get(1);
+                        L.Add(new P3
+                        {
+                            K = "t", P = { q }, Fi = css, H = h * (mat ? 1.08 : 1), Serif = mat,
+                            A = h72 == 1 || h72 == 4 ? "middle" : h72 == 2 ? "end" : "start",
+                            Dy = h72 == 4 || v73 == 2 ? 0.35 : v73 == 3 ? 0.75 : v73 == 1 ? -0.2 : 0,
+                            Runs = mat ? MathRuns(txt) : new List<Run> { new Run { T = TextoAcad(txt) } },
+                        });
+                        break;
+                    }
+                    case "DIMENSION":
+                    {
+                        // cota ALINEADA en el espacio: la línea pasa por 10, paralela a 13→14
+                        var p1 = e.Pt(13); var p2 = e.Pt(14); var p0 = e.Pt(10) ?? p2; if (p1 == null || p2 == null) break;
+                        var dv = new[] { p0[0] - p2[0], p0[1] - p2[1], p0[2] - p2[2] };
+                        var q1 = new[] { p1[0] + dv[0], p1[1] + dv[1], p1[2] + dv[2] }; var q2 = p0;
+                        string fino = css;
+                        L.Add(new P3 { K = "s", P = { p1, q1 }, St = fino, W = 0.18 });
+                        L.Add(new P3 { K = "s", P = { p2, q2 }, St = fino, W = 0.18 });
+                        L.Add(new P3 { K = "s", P = { q1, q2 }, St = fino, W = 0.18 });
+                        L.Add(new P3 { K = "p", P = { q1 }, Fi = css }); L.Add(new P3 { K = "p", P = { q2 }, Fi = css });
+                        L.Add(new P3 { K = "t", P = { new[] { (q1[0] + q2[0]) / 2, (q1[1] + q2[1]) / 2, (q1[2] + q2[2]) / 2 } }, Fi = css, H = -d.Var("DIMTXT", 2.5), A = "middle", Dy = -0.3,
+                                       Runs = new List<Run> { new Run { T = Medida(d, e) } } });
+                        break;
+                    }
+                }
+            }
+            return L;
+        }
+        /// <summary>La escena 3D proyectada (az, el) y encajada en W×H mm, ordenada de atrás hacia delante.
+        /// Es el MISMO algoritmo que hace la página al girar (JsVista3D): la primera imagen coincide.</summary>
+        static List<Prim> Proyectar(List<P3> L3, double az, double el, double W, double H, double pad, ref double k0)
+        {
+            var q = L3.Select(it => it.P.Select(p => Proy(p, az, el)).ToList()).ToList();
+            double xm = double.MaxValue, xM = double.MinValue, ym = double.MaxValue, yM = double.MinValue;
+            foreach (var l in q) foreach (var v in l) { xm = Math.Min(xm, v[0]); xM = Math.Max(xM, v[0]); ym = Math.Min(ym, v[1]); yM = Math.Max(yM, v[1]); }
+            if (xm > xM) { xm = ym = 0; xM = yM = 1; }
+            double wx = Math.Max(xM - xm, 1e-9), wy = Math.Max(yM - ym, 1e-9);
+            double K = Math.Min((W - 2 * pad) / wx, (H - 2 * pad) / wy), ox = (W - wx * K) / 2, oy = (H - wy * K) / 2;
+            if (k0 <= 0) k0 = K;
+            double kk = k0;
+            double X(double[] v) => ox + (v[0] - xm) * K; double Y(double[] v) => oy + (yM - v[1]) * K;
+            double a = az * Math.PI / 180, e = el * Math.PI / 180;
+            var cv = new[] { Math.Cos(e) * Math.Cos(a), Math.Cos(e) * Math.Sin(a), Math.Sin(e) };
+            var orden = Enumerable.Range(0, L3.Count).OrderBy(i => q[i].Average(v => v[2])).ToList();
+            var res = new List<Prim>();
+            foreach (var i in orden)
+            {
+                var it = L3[i]; var pts = q[i].Select(v => new[] { X(v), Y(v) }).ToList();
+                switch (it.K)
+                {
+                    case "p": res.Add(new Prim { K = "ell", Cx = pts[0][0], Cy = pts[0][1], Rx = 0.65, Ry = 0.65, Fill = it.Fi }); break;
+                    case "t":
+                    {
+                        double h = it.H < 0 ? -it.H : it.H * kk;   // H < 0: tamaño de papel (cotas)
+                        res.Add(new Prim { K = "text", X = pts[0][0], Y = pts[0][1] + it.Dy * h, Size = h, Anchor = it.A, Fill = it.Fi, Serif = it.Serif, Runs = it.Runs });
+                        break;
+                    }
+                    case "f":
+                    {
+                        var n = Normal(it.P); double lum = Math.Abs(n[0] * cv[0] + n[1] * cv[1] + n[2] * cv[2]);
+                        var f1 = new Prim { K = "path", Fill = it.Fi, FillOp = it.Fo, Cerrado = true }; f1.Sub.Add(pts); res.Add(f1);
+                        var f2 = new Prim { K = "path", Fill = "#000000", FillOp = Math.Round((1 - lum) * 0.35 * it.Fo, 3), Cerrado = true, Stroke = it.St, W = 0.18 }; f2.Sub.Add(pts); res.Add(f2);
+                        break;
+                    }
+                    default:
+                    { var s = new Prim { K = "path", Stroke = it.St, W = it.W, Dash = it.Da, Cerrado = it.C }; s.Sub.Add(pts); res.Add(s); break; }
+                }
+            }
+            return res;
+        }
+        static string TspansDe(List<Run> runs, double size)
+        {
+            var sb = new StringBuilder(); int sh = 0;
+            foreach (var r in runs)
+            {
+                double hacia = (r.Sh > 0 ? -0.38 : r.Sh < 0 ? 0.22 : 0) * size, desde = (sh > 0 ? -0.38 : sh < 0 ? 0.22 : 0) * size, dy = hacia - desde;
+                sb.Append("<tspan").Append(Math.Abs(dy) > 1e-9 ? " dy=\"" + F(dy) + "\"" : "")
+                  .Append(r.Sh != 0 ? " style=\"font-size:" + F(size * 0.72) + "px" + (r.It ? ";font-style:italic" : "") + "\"" : r.It ? " style=\"font-style:italic\"" : "")
+                  .Append('>').Append(Enc(r.T)).Append("</tspan>");
+                sh = r.Sh;
+            }
+            return sb.ToString();
+        }
+        /// <summary>Datos de la escena 3D para la página (JSON): la página la vuelve a proyectar al girar.</summary>
+        static string Json3D(List<P3> L3, double az, double el, double W, double H, double pad, double k0)
+        {
+            string J(string s) => System.Text.Json.JsonSerializer.Serialize(s ?? "");
+            var sb = new StringBuilder();
+            sb.Append("{\"az\":").Append(F(az)).Append(",\"el\":").Append(F(el)).Append(",\"W\":").Append(F(W)).Append(",\"H\":").Append(F(H))
+              .Append(",\"pad\":").Append(F(pad)).Append(",\"k0\":").Append(k0.ToString("R", Inv)).Append(",\"it\":[");
+            for (int i = 0; i < L3.Count; i++)
+            {
+                var it = L3[i]; if (i > 0) sb.Append(',');
+                sb.Append("{\"k\":\"").Append(it.K).Append("\",\"p\":[").Append(string.Join(",", it.P.Select(p => "[" + p[0].ToString("R", Inv) + "," + p[1].ToString("R", Inv) + "," + (p.Length > 2 ? p[2] : 0).ToString("R", Inv) + "]"))).Append(']');
+                if (it.St != null) sb.Append(",\"st\":").Append(J(it.St));
+                if (it.Fi != null) sb.Append(",\"fi\":").Append(J(it.Fi));
+                if (it.Da != null) sb.Append(",\"da\":").Append(J(it.Da));
+                sb.Append(",\"w\":").Append(F(it.W)).Append(",\"fo\":").Append(F(it.Fo)).Append(",\"c\":").Append(it.C ? "1" : "0");
+                if (it.K == "t")
+                {
+                    double size = it.H < 0 ? -it.H : it.H * k0;
+                    sb.Append(",\"h\":").Append(F(it.H)).Append(",\"dy\":").Append(F(it.Dy)).Append(",\"a\":\"").Append(it.A).Append("\",\"sf\":").Append(it.Serif ? "1" : "0")
+                      .Append(",\"html\":").Append(J(TspansDe(it.Runs, size)));
+                }
+                sb.Append('}');
+            }
+            return sb.Append("]}").ToString();
+        }
+        // la página: proyecta, ordena (pintor) y dibuja; arrastrar = girar; botones de vista
+        const string JsVista3D = "<script>if(!window.hkAl3d){window.hkAl3d=function(id,az,el){var box=document.getElementById(id);var D=box.__d||(box.__d=JSON.parse(box.querySelector('script.hk3d').textContent));" +
+            "if(az!==undefined){D.az=az;D.el=el}var svg=box.querySelector('svg.hk-dib-svg');var A=D.az*Math.PI/180,E=D.el*Math.PI/180,ca=Math.cos(A),sa=Math.sin(A),ce=Math.cos(E),se=Math.sin(E);" +
+            "function pr(p){var x=p[0],y=p[1],z=p[2]||0;return[-x*sa+y*ca,-x*se*ca-y*se*sa+z*ce,x*ce*ca+y*ce*sa+z*se]}" +
+            "var xm=1e300,xM=-1e300,ym=1e300,yM=-1e300,L=D.it.map(function(it){var q=it.p.map(pr),s=0;q.forEach(function(v){xm=Math.min(xm,v[0]);xM=Math.max(xM,v[0]);ym=Math.min(ym,v[1]);yM=Math.max(yM,v[1]);s+=v[2]});return{it:it,q:q,d:s/q.length}});" +
+            "var wx=Math.max(xM-xm,1e-9),wy=Math.max(yM-ym,1e-9),P=D.pad,K=Math.min((D.W-2*P)/wx,(D.H-2*P)/wy),ox=(D.W-wx*K)/2,oy=(D.H-wy*K)/2;function X(v){return(ox+(v[0]-xm)*K).toFixed(3)}function Y(v){return(oy+(yM-v[1])*K).toFixed(3)}" +
+            "L.sort(function(a,b){return a.d-b.d});var cv=[ce*ca,ce*sa,se],s='';" +
+            "L.forEach(function(o){var it=o.it,q=o.q;if(it.k==='t'){var h=it.h<0?-it.h:it.h*D.k0;s+='<text x=\"'+X(q[0])+'\" y=\"'+(parseFloat(Y(q[0]))+it.dy*h).toFixed(3)+'\" text-anchor=\"'+it.a+'\" style=\"font-family:'+(it.sf?\"Georgia,'Times New Roman',Times,serif\":\"'Segoe UI','Open Sans',system-ui,sans-serif\")+';font-size:'+(+h.toFixed(3))+'px;fill:'+it.fi+'\">'+it.html+'</text>';return}" +
+            "if(it.k==='p'){s+='<ellipse cx=\"'+X(q[0])+'\" cy=\"'+Y(q[0])+'\" rx=\"0.65\" ry=\"0.65\" style=\"fill:'+it.fi+'\"/>';return}" +
+            "var d='';q.forEach(function(v,i){d+=(i?'L':'M')+X(v)+' '+Y(v)});if(it.c)d+='Z';" +
+            "if(it.k==='f'){var p=it.p,u=[p[1][0]-p[0][0],p[1][1]-p[0][1],p[1][2]-p[0][2]],w=[p[2][0]-p[0][0],p[2][1]-p[0][1],p[2][2]-p[0][2]],n=[u[1]*w[2]-u[2]*w[1],u[2]*w[0]-u[0]*w[2],u[0]*w[1]-u[1]*w[0]],nn=Math.hypot(n[0],n[1],n[2])||1,lum=Math.abs((n[0]*cv[0]+n[1]*cv[1]+n[2]*cv[2])/nn);" +
+            "s+='<path d=\"'+d+'\" style=\"fill:'+it.fi+(it.fo<1?';fill-opacity:'+it.fo:'')+';stroke:none\"/><path d=\"'+d+'\" style=\"fill:#000000;fill-opacity:'+(+((1-lum)*0.35*it.fo).toFixed(3))+(it.st?';stroke:'+it.st+';stroke-width:0.18;stroke-linecap:round;stroke-linejoin:round':';stroke:none')+'\"/>';return}" +
+            "s+='<path d=\"'+d+'\" style=\"fill:none;stroke:'+it.st+';stroke-width:'+it.w+(it.da?';stroke-dasharray:'+it.da:'')+';stroke-linecap:round;stroke-linejoin:round\"/>'});svg.innerHTML=s};" +
+            "window.hkAl3dIni=function(id){var box=document.getElementById(id),svg=box.querySelector('svg.hk-dib-svg'),x0,y0,az0,el0,dn=false;svg.style.cursor='grab';svg.style.touchAction='none';" +
+            "svg.addEventListener('pointerdown',function(ev){var D=box.__d||(box.__d=JSON.parse(box.querySelector('script.hk3d').textContent));dn=true;x0=ev.clientX;y0=ev.clientY;az0=D.az;el0=D.el;svg.setPointerCapture(ev.pointerId);svg.style.cursor='grabbing'});" +
+            "svg.addEventListener('pointermove',function(ev){if(!dn)return;var el=Math.max(-90,Math.min(90,el0+(ev.clientY-y0)*0.5));hkAl3d(id,az0-(ev.clientX-x0)*0.5,el)});" +
+            "svg.addEventListener('pointerup',function(){dn=false;svg.style.cursor='grab'})}}</script>";
+
+        /// <summary>La escena lista para pintar (2D o 3D): primitivas de papel, tamaño y, en 3D, los datos para girarla.</summary>
+        sealed class Escena { public List<Prim> L; public double W, H, Kv = 1; public string Json; public double Az, El; }
+        static Escena Armar(Dibujo d, Opc o, bool oscuro)
+        {
+            if (!Es3D(d))
+            {
+                var v = Encuadre(d, o.Ancho, o.Alto);
+                return new Escena { L = Primitivas(d, v, oscuro), W = v.W, H = v.H, Kv = v.Kv };
+            }
+            double az = d.Var("HKAZ", -60), el = d.Var("HKEL", 25), pad = 6, k0 = 0;
+            var L3 = Prims3D(d, oscuro);
+            // el tamaño del papel: el de la vista inicial encajada en ancho × alto
+            var q = L3.SelectMany(it => it.P).Select(p => Proy(p, az, el)).ToList();
+            double wx = q.Count > 0 ? Math.Max(q.Max(v => v[0]) - q.Min(v => v[0]), 1e-9) : 1, wy = q.Count > 0 ? Math.Max(q.Max(v => v[1]) - q.Min(v => v[1]), 1e-9) : 1;
+            double K = Math.Min((o.Ancho - 2 * pad) / wx, (o.Alto - 2 * pad) / wy);
+            double W = wx * K + 2 * pad, H = wy * K + 2 * pad;
+            var L = Proyectar(L3, az, el, W, H, pad, ref k0);
+            return new Escena { L = L, W = W, H = H, Json = Json3D(L3, az, el, W, H, pad, k0), Az = az, El = el };
+        }
+
         public static string RenderSvg(Dibujo d, Opc o)
         {
             o ??= new Opc();
-            var v = Encuadre(d, o.Ancho, o.Alto);
-            var L = Primitivas(d, v, LispConverter.Dark);
+            var esc = Armar(d, o, LispConverter.Dark);
+            var L = esc.L;
             var html = new StringBuilder();
             html.Append("<div class=\"hk-dib hk-al-dib\">");
             string tit = !string.IsNullOrWhiteSpace(o.Titulo) ? o.Titulo : d.Titulo;
@@ -766,9 +1010,9 @@ namespace HekatanLisp
             if (!string.IsNullOrWhiteSpace(tit)) html.Append("<b>").Append(LispConverter.FormatInlineText(tit, _ => null)).Append("</b> · ");
             int n = d.Ents.Count;
             html.Append("<span class=\"hk-dib-esc\">").Append(n).Append(n == 1 ? " entidad" : " entidades")
-                .Append(v.Kv != 1 ? " · escala vertical ×" + F(v.Kv) : "").Append("</span></div>");
-            html.Append("<svg class=\"hk-dib-svg\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ").Append(F(v.W)).Append(' ').Append(F(v.H))
-                .Append("\" width=\"").Append(F(v.W)).Append("mm\" height=\"").Append(F(v.H)).Append("mm\" style=\"max-width:100%;height:auto\">")
+                .Append(esc.Kv != 1 ? " · escala vertical ×" + F(esc.Kv) : "").Append(esc.Json != null ? " · vista 3D: arrastra para girar" : "").Append("</span></div>");
+            html.Append("<svg class=\"hk-dib-svg\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ").Append(F(esc.W)).Append(' ').Append(F(esc.H))
+                .Append("\" width=\"").Append(F(esc.W)).Append("mm\" height=\"").Append(F(esc.H)).Append("mm\" style=\"max-width:100%;height:auto\">")
                 .Append(SvgDe(L)).Append("</svg>");
             var usadas = d.Ents.Select(e => e.CapaN).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (usadas.Count > 1 || (usadas.Count == 1 && usadas[0] != "0"))
@@ -792,8 +1036,8 @@ namespace HekatanLisp
         public static string SvgArchivo(Dibujo d, Opc o, bool oscuro = false)
         {
             o ??= new Opc();
-            var v = Encuadre(d, o.Ancho, o.Alto);
-            var L = Primitivas(d, v, oscuro);
+            var esc = Armar(d, o, oscuro); var L = esc.L;
+            var v = new Vista { W = esc.W, H = esc.H };
             foreach (var p in L) { p.Fill = ColorReal(p.Fill, oscuro); p.Stroke = ColorReal(p.Stroke, oscuro); }
             string bg = oscuro ? "#000000" : "#ffffff";
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + F(v.W) + " " + F(v.H) +
@@ -847,8 +1091,8 @@ namespace HekatanLisp
         public static byte[] PdfArchivo(Dibujo d, Opc o)
         {
             o ??= new Opc();
-            var v = Encuadre(d, o.Ancho, o.Alto);
-            var L = Primitivas(d, v, false);
+            var esc = Armar(d, o, false); var L = esc.L;
+            var v = new Vista { W = esc.W, H = esc.H };
             const double s = 72.0 / 25.4;                       // mm → pt
             double W = v.W * s, H = v.H * s;
             double X(double x) => x * s; double Y(double y) => (v.H - y) * s;
@@ -1186,8 +1430,8 @@ namespace HekatanLisp
                     {
                         nums[name] = val;
                         string L(double x) => x.ToString("0.0###############", Inv) + "d0";
-                        return val.Length == 1 ? "(setq " + name + " " + L(val[0]) + ")"
-                                               : "(setq " + name + " '(" + string.Join(" ", val.Select(L)) + "))";
+                        return val.Length == 1 ? "(hk-al-ctx '" + name + " " + L(val[0]) + ")"
+                                               : "(hk-al-ctx '" + name + " '(" + string.Join(" ", val.Select(L)) + "))";
                     }
                 }
                 catch { }
@@ -1195,7 +1439,7 @@ namespace HekatanLisp
             try
             {
                 var lf = LispConverter.MathToLisp(rhs);
-                if (!string.IsNullOrWhiteSpace(lf) && Balanceado(lf)) return "(setq " + name + " '" + lf + ")";
+                if (!string.IsNullOrWhiteSpace(lf) && Balanceado(lf)) return "(hk-al-ctx '" + name + " '" + lf + ")";
             }
             catch { }
             return null;
@@ -1339,9 +1583,17 @@ namespace HekatanLisp
                 var o = new Opc { Ancho = b.Ancho, Alto = b.Alto, Titulo = b.Titulo };
                 UltimoDibujo = sal.Dib; UltimaOpc = o;
                 string id = "hkal" + (++_idDib);
-                var v = Encuadre(sal.Dib, o.Ancho, o.Alto);
-                h.Append("<div id=\"").Append(id).Append("\" data-w=\"").Append(F(v.W)).Append("\" data-h=\"").Append(F(v.H)).Append("\">");
+                var esc = Armar(sal.Dib, o, LispConverter.Dark);
+                h.Append("<div id=\"").Append(id).Append("\" data-w=\"").Append(F(esc.W)).Append("\" data-h=\"").Append(F(esc.H)).Append("\">");
                 h.Append(RenderSvg(sal.Dib, o));
+                if (esc.Json != null)   // 3D: los datos, el guion que gira y los botones de vista
+                {
+                    h.Append("<script type=\"application/json\" class=\"hk3d\">").Append(esc.Json).Append("</script>").Append(JsVista3D)
+                     .Append("<div class=\"hk-al-bar\"><span>Vista</span>");
+                    foreach (var (nv, az, el) in new[] { ("Planta", -90.0, 90.0), ("Frente", -90.0, 0.0), ("Lateral", 0.0, 0.0), ("3D", esc.Az, esc.El) })
+                        h.Append("<button type=\"button\" onclick=\"hkAl3d('").Append(id).Append("',").Append(F(az)).Append(',').Append(F(el)).Append(")\">").Append(nv).Append("</button>");
+                    h.Append("</div><script>hkAl3dIni('").Append(id).Append("')</script>");
+                }
                 string nom = NombreBase(!string.IsNullOrWhiteSpace(b.Titulo) ? b.Titulo : sal.Dib.Titulo);
                 // los archivos, embebidos (base64) para que los botones funcionen igual en escritorio y web
                 foreach (var f in new[] { "dxf", "svg", "pdf" })

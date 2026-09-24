@@ -2617,12 +2617,14 @@
 (defvar *hk-al-sysvars* nil)
 (defvar *hk-al-guardar* nil)
 (defparameter *hk-al-tipos*
-  '("POINT" "LINE" "CIRCLE" "ARC" "LWPOLYLINE" "TEXT" "MTEXT" "SOLID" "HATCH" "DIMENSION"))
+  '("POINT" "LINE" "CIRCLE" "ARC" "LWPOLYLINE" "TEXT" "MTEXT" "SOLID" "HATCH" "DIMENSION"
+    "3DFACE" "POLYLINE" "VERTEX" "SEQEND"))
+(defvar *hk-al-pend* nil)   ; POLYLINE abierta: (cabecera vértice…) hasta el SEQEND
 (defparameter +hk-al-pi+ (float pi 1d0))
 
 (defstruct (hk-ename (:constructor hk-mk-ename (id))) id)
 (defmethod print-object ((e hk-ename) s) (format s "<Entity name: ~(~x~)>" (hk-ename-id e)))
-(defstruct (hk-ent (:constructor hk-mk-ent (ename datos))) ename datos (borrada nil))
+(defstruct (hk-ent (:constructor hk-mk-ent (ename datos))) ename datos (borrada nil) (sub nil))
 (defstruct (hk-ssel (:constructor hk-mk-ssel (id items))) id items)
 (defmethod print-object ((x hk-ssel) s) (format s "<Selection set: ~a>" (hk-ssel-id x)))
 
@@ -2630,7 +2632,7 @@
   (list (cons "CLAYER" "0") (cons "LUPREC" 4) (cons "LUNITS" 2) (cons "AUNITS" 0) (cons "AUPREC" 0)
         (cons "TEXTSIZE" 2.5d0) (cons "DIMSCALE" 0d0) (cons "DIMTXT" 2.5d0) (cons "DIMASZ" 2.5d0)
         (cons "DIMDEC" 2) (cons "DIMEXO" 0.625d0) (cons "DIMEXE" 1.25d0) (cons "DIMGAP" 0.625d0)
-        (cons "HKVERT" 1d0)))
+        (cons "HKVERT" 1d0) (cons "HKVISTA" -1) (cons "HKAZ" -60d0) (cons "HKEL" 25d0)))
 
 (defun hk-al-capa-lista (nombre color tipo grosor)
   (list (cons 0 "LAYER") (cons 2 nombre) (cons 70 0) (cons 62 color) (cons 6 tipo) (cons 370 grosor)))
@@ -2639,7 +2641,7 @@
   "Dibujo nuevo (como abrir un DWG vacío): sin entidades, capa 0, variables de sistema de fábrica."
   (setf *hk-al-db* (make-array 16 :adjustable t :fill-pointer 0)
         *hk-al-capas* (list (hk-al-capa-lista "0" 7 "CONTINUOUS" -3))
-        *hk-al-nss* 0
+        *hk-al-nss* 0 *hk-al-pend* nil
         *hk-al-sysvars* (hk-al-sysvars-defecto)
         *hk-al-guardar* nil)
   t)
@@ -2752,6 +2754,13 @@
             ((string= tp "HATCH")
              (when (< (count 10 geo :key #'car) 3) (return-from norm nil))
              (unless (tiene 2) (setf geo (append (list (cons 2 "SOLID") (cons 70 1)) geo))))
+            ((string= tp "3DFACE")
+             (when (falta 10 11 12) (return-from norm nil))
+             (unless (tiene 13) (setf geo (append geo (list (cons 13 (cdr (tiene 12))))))))
+            ((string= tp "POLYLINE")
+             (unless (tiene 10) (setf geo (cons (cons 10 (list 0d0 0d0 0d0)) geo)))
+             (unless (tiene 70) (setf geo (append geo (list (cons 70 0))))))
+            ((string= tp "VERTEX") (when (falta 10) (return-from norm nil)))
             ((string= tp "DIMENSION")
              (when (falta 13 14) (return-from norm nil))
              (unless (tiene 10) (setf geo (cons (cons 10 (cdr (tiene 14))) geo)))
@@ -2769,22 +2778,38 @@
       (when (and (>= i 0) (< i (fill-pointer *hk-al-db*))) (aref *hk-al-db* i)))))
 (defun hk-al-viva (e) (let ((x (hk-al-ent e))) (and x (not (hk-ent-borrada x)) x)))
 
+(defun hk-al-meter (d sub)
+  (let* ((id (+ *hk-al-base* (fill-pointer *hk-al-db*))) (e (hk-mk-ename id)))
+    (setf (cdr (assoc 5 d)) (format nil "~X" id))
+    (let ((x (hk-mk-ent e d))) (setf (hk-ent-sub x) sub) (vector-push-extend x *hk-al-db*))
+    e))
 (defun hk-al-crear (lst)
+  "Como entmake de AutoCAD. POLYLINE es COMPLEJA: la cabecera y cada VERTEX quedan pendientes
+y entran al dibujo recién con el SEQEND (cabecera, vértices y SEQEND como subentidades)."
   (let ((tp (and (listp lst) (every #'consp lst) (cdr (assoc 0 lst)))))
-    (if (and (stringp tp) (string-equal tp "LAYER"))
-        (and (hk-al-capa-desde-lista lst) :capa)
-        (let* ((id (+ *hk-al-base* (fill-pointer *hk-al-db*))) (d (hk-al-norm lst id)))
-          (when d
-            (let ((e (hk-mk-ename id)))
-              (vector-push-extend (hk-mk-ent e d) *hk-al-db*)
-              e))))))
+    (cond
+      ((and (stringp tp) (string-equal tp "LAYER")) (and (hk-al-capa-desde-lista lst) :capa))
+      ((and (stringp tp) (string-equal tp "POLYLINE"))
+       (let ((d (hk-al-norm lst 0))) (when d (setf *hk-al-pend* (list d)) :pend)))
+      ((and (stringp tp) (string-equal tp "VERTEX"))
+       (when *hk-al-pend*
+         (let ((d (hk-al-norm lst 0 (cdr (assoc 8 (car *hk-al-pend*))))))
+           (when d (setf *hk-al-pend* (append *hk-al-pend* (list d))) :pend))))
+      ((and (stringp tp) (string-equal tp "SEQEND"))
+       (when *hk-al-pend*
+         (let* ((todo *hk-al-pend*) (cab (hk-al-meter (car todo) nil)))
+           (dolist (v (cdr todo)) (hk-al-meter v t))
+           (hk-al-meter (hk-al-norm (list (cons 0 "SEQEND") (cons 8 (cdr (assoc 8 (car todo))))) 0) t)
+           (setf *hk-al-pend* nil)
+           cab)))
+      (t (let ((d (hk-al-norm lst 0))) (when d (hk-al-meter d nil)))))))
 
 (defun entmake (&optional lst)
   "Crea la entidad descrita por la lista DXF. Devuelve la lista, o NIL si no es válida."
   (and (hk-al-crear lst) lst))
 (defun entmakex (&optional lst)
   "Como entmake, pero devuelve el nombre de la entidad (ename)."
-  (let ((r (hk-al-crear lst))) (if (eq r :capa) t r)))
+  (let ((r (hk-al-crear lst))) (if (member r '(:capa :pend)) t r)))
 (defun entget (e &optional apps)
   (declare (ignore apps))
   (let ((x (hk-al-viva e))) (when x (cons (cons -1 e) (copy-tree (hk-ent-datos x))))))
@@ -2799,14 +2824,23 @@
                              (hk-ename-id e) (cdr (assoc 8 viejo)))))
           (when d (setf (hk-ent-datos x) d) lst))))))
 (defun entupd (e) (and (hk-al-viva e) e))
+(defun hk-al-subs (e)
+  "Las subentidades (VERTEX…, SEQEND) que siguen a la cabecera E."
+  (let ((i (1+ (- (hk-ename-id e) *hk-al-base*))) (r nil))
+    (loop while (and (< i (fill-pointer *hk-al-db*)) (hk-ent-sub (aref *hk-al-db* i)))
+          do (push (aref *hk-al-db* i) r) (incf i))
+    (nreverse r)))
 (defun entdel (e)
   "Borra la entidad; si ya estaba borrada la recupera (como AutoCAD). Devuelve el ename."
   (let ((x (hk-al-ent e)))
-    (when x (setf (hk-ent-borrada x) (not (hk-ent-borrada x))) e)))
+    (when (and x (not (hk-ent-sub x)))
+      (setf (hk-ent-borrada x) (not (hk-ent-borrada x)))
+      (dolist (s (hk-al-subs e)) (setf (hk-ent-borrada s) (hk-ent-borrada x)))
+      e)))
 (defun entlast ()
   (loop for i from (1- (fill-pointer *hk-al-db*)) downto 0
         for x = (aref *hk-al-db* i)
-        unless (hk-ent-borrada x) do (return (hk-ent-ename x))))
+        unless (or (hk-ent-borrada x) (hk-ent-sub x)) do (return (hk-ent-ename x))))
 (defun entnext (&optional e)
   (let ((desde (if e (1+ (- (hk-ename-id e) *hk-al-base*)) 0)))
     (loop for i from desde below (fill-pointer *hk-al-db*)
@@ -2928,7 +2962,7 @@ Los modos que piden elegir en pantalla devuelven NIL (en una hoja no hay pantall
   (when (and (stringp modo) (member (string-upcase (string-left-trim "_" modo)) '("X" "A") :test #'string=))
     (let ((items nil) (f (if (listp p2) p2 nil)))
       (loop for x across *hk-al-db*
-            unless (hk-ent-borrada x)
+            unless (or (hk-ent-borrada x) (hk-ent-sub x))
               do (when (hk-al-filtro-ok (hk-ent-datos x) f) (push (hk-ent-ename x) items)))
       (when items (hk-mk-ssel (incf *hk-al-nss*) (nreverse items))))))
 (defun sslength (ss)
@@ -3040,6 +3074,10 @@ Los modos que piden elegir en pantalla devuelven NIL (en una hoja no hay pantall
   "(princ) sin argumentos → (values); (defun f (a / b c) …) → variables locales con let."
   (cond ((atom f) f)
         ((equal f '(princ)) '(values))
+        ;; AutoLISP: (mapcar '(lambda (x) …) l) — la lambda citada es una función (y ve las variables
+        ;; de alrededor, que AutoLISP tiene de alcance dinámico): en CL, (function (lambda …)).
+        ((and (eq (car f) 'quote) (consp (cadr f)) (eq (car (cadr f)) 'lambda))
+         (list 'function (hk-al-forma (cadr f))))
         ((and (eq (car f) 'defun) (consp (cdr f)) (listp (third f)) (member '/ (third f)))
          (let* ((ll (third f)) (k (position '/ ll)))
            (list* 'defun (second f) (subseq ll 0 k)
@@ -3087,24 +3125,38 @@ Los modos que piden elegir en pantalla devuelven NIL (en una hoja no hay pantall
   (let ((fs (code-char 28)) (us (code-char 31)))
     (fresh-line)
     (format t "~cB~c~a~%" fs us (hk-al-esc (or titulo "")))
-    (dolist (v '("DIMSCALE" "DIMTXT" "DIMASZ" "DIMDEC" "DIMEXO" "DIMEXE" "DIMGAP" "HKVERT" "LUPREC"))
+    (dolist (v '("DIMSCALE" "DIMTXT" "DIMASZ" "DIMDEC" "DIMEXO" "DIMEXE" "DIMGAP" "HKVERT" "LUPREC" "HKVISTA" "HKAZ" "HKEL"))
       (format t "~cV~c~a~c~a~%" fs us v us (hk-al-val (getvar v))))
     (dolist (c *hk-al-capas*)
       (format t "~cL~c~a~c~d~c~a~c~d~%" fs us (hk-al-esc (cdr (assoc 2 c))) us (cdr (assoc 62 c))
               us (cdr (assoc 6 c)) us (cdr (assoc 370 c))))
     (loop for x across *hk-al-db*
-          unless (hk-ent-borrada x)
+          unless (or (hk-ent-borrada x) (hk-ent-sub x))
             do (write-char fs) (write-char #\E)
                (dolist (p (hk-ent-datos x))
                  (format t "~c~d=~a" us (car p) (hk-al-val (cdr p))))
+               (when (string= (cdr (assoc 0 (hk-ent-datos x))) "POLYLINE")
+                 (dolist (v (hk-al-subs (hk-ent-ename x)))
+                   (let ((d (hk-ent-datos v)))
+                     (when (string= (cdr (assoc 0 d)) "VERTEX")
+                       (format t "~c1011=~a~c1042=~a" us (hk-al-val (cdr (assoc 10 d))) us (hk-al-val (or (cdr (assoc 42 d)) 0)))))))
                (terpri))
     (dolist (g (reverse *hk-al-guardar*)) (format t "~cS~c~a~%" fs us (hk-al-esc g)))
     (format t "~cZ~%" fs))
   (values))
 (defun hk-al-exporta (nombre valor)
-  "Devuelve a la hoja un número calculado aquí (línea «nombre = valor» tras el dibujo)."
-  (format t "~&~cX~c~a~c~a~%" (code-char 28) (code-char 31) nombre (code-char 31)
-          (if (realp valor) (hk-al-num valor) ""))
+  "Devuelve a la hoja un número calculado aquí (línea «nombre = valor» tras el dibujo).
+Una forma simbólica constante del motor ((/ 39 4)) se evalúa; se redondea a 6 decimales."
+  (let ((v (cond ((realp valor) valor)
+                 ((consp valor) (ignore-errors (nval valor 'x 0)))
+                 (t nil))))
+    (format t "~&~cX~c~a~c~a~%" (code-char 28) (code-char 31) nombre (code-char 31)
+            (if (realp v) (hk-al-num (/ (fround (* (hk-al-d v) 1d6)) 1d6)) "")))
+  (values))
+(defun hk-al-ctx (s v)
+  "Una definición de la hoja que llega al LISP. Los nombres de Common Lisp (tan, error, t…) no se tocan."
+  (unless (or (eq (symbol-package s) (find-package "COMMON-LISP")) (constantp s))
+    (setf (symbol-value s) v))
   (values))
 
 ;;;; ===================== CAPA SIMPLE (en español, para matemáticas) =====================
@@ -3295,7 +3347,7 @@ una lambda, o una expresión simbólica de la hoja ((* x x), (derive-x …))."
   (let* ((cl (getvar "CLAYER"))
          (xmin (hk-al-d xmin)) (xmax (hk-al-d xmax)) (ymin (hk-al-d ymin)) (ymax (hk-al-d ymax))
          (kv (hk-al-d (or (getvar "HKVERT") 1)))
-         (h (or altura (* 0.028 (max (- xmax xmin) (/ (- ymax ymin) kv)))))
+         (h (or altura (* 0.026 (max (- xmax xmin) (* (- ymax ymin) kv)))))
          (y0 (if (<= ymin 0 ymax) 0d0 ymin)) (x0 (if (<= xmin 0 xmax) 0d0 xmin))
          (px (or paso-x (hk-al-paso (- xmax xmin)))) (py (or paso-y (hk-al-paso (- ymax ymin))))
          (tk (* 0.5 h)) (n 0))
@@ -3335,6 +3387,50 @@ Lo escribe la app (escritorio: junto a la hoja; web: botón de descarga)."
 (defun guardar-dxf (nombre)
   (guardar (if (search "." nombre) nombre (concatenate 'string nombre ".dxf"))))
 
+;; ---- 3D: polilínea 3D (POLYLINE 70 = 8), caras (3DFACE), flechas; la vista (planta / 3D girable) ----
+(defun poli3 (pts &key cerrada color capa tipo grosor)
+  "Polilínea 3D por PTS ((x y z) …): POLYLINE (70 = 8) + VERTEX (70 = 32) + SEQEND, como en AutoCAD."
+  (let* ((pr (hk-al-props color capa tipo grosor)) (cp (assoc 8 pr)))
+    (entmake (append (list (cons 0 "POLYLINE")) pr
+                     (list (cons 66 1) (cons 10 (list 0 0 0)) (cons 70 (if cerrada 9 8)))))
+    (dolist (p pts) (entmake (list (cons 0 "VERTEX") cp (cons 10 p) (cons 70 32))))
+    (entmake (list (cons 0 "SEQEND") cp))
+    (entget (entlast))))
+(defun cara3 (pts &key color capa)
+  "Cara 3D (3DFACE) de 3 o 4 vértices."
+  (hk-al-hacer "3DFACE" (hk-al-props color capa nil nil)
+               (list (cons 10 (first pts)) (cons 11 (second pts)) (cons 12 (third pts))
+                     (cons 13 (or (fourth pts) (third pts))))))
+(defun hk-al-perp (u)
+  "Un vector unitario perpendicular a U."
+  (let* ((a (if (< (abs (first u)) 0.9) '(1d0 0d0 0d0) '(0d0 1d0 0d0)))
+         (c (list (- (* (second u) (third a)) (* (third u) (second a)))
+                  (- (* (third u) (first a)) (* (first u) (third a)))
+                  (- (* (first u) (second a)) (* (second u) (first a)))))
+         (n (sqrt (reduce #'+ (mapcar #'* c c)))))
+    (mapcar (lambda (x) (/ x n)) c)))
+(defun flecha3 (p q &key color capa grosor punta)
+  "Flecha 3D de P a Q: LINE + punta de dos 3DFACE cruzadas (se ve desde cualquier lado)."
+  (let* ((p (hk-al-pt p 3)) (q (hk-al-pt q 3))
+         (d (mapcar #'- q p)) (l (sqrt (reduce #'+ (mapcar #'* d d)))) (u (mapcar (lambda (x) (/ x l)) d))
+         (a (or punta (* 0.14 l))) (w (* 0.3 a))
+         (n1 (hk-al-perp u))
+         (n2 (list (- (* (second u) (third n1)) (* (third u) (second n1)))
+                   (- (* (third u) (first n1)) (* (first u) (third n1)))
+                   (- (* (first u) (second n1)) (* (second u) (first n1)))))
+         (b (mapcar (lambda (qi ui) (- qi (* a ui))) q u)))
+    (flet ((mas (v k s) (mapcar (lambda (bi vi) (+ bi (* s k vi))) b v)))
+      (linea p b :color color :capa capa :grosor grosor)
+      (cara3 (list q (mas n1 w 1) (mas n1 w -1)) :color color :capa capa)
+      (cara3 (list q (mas n2 w 1) (mas n2 w -1)) :color color :capa capa))))
+(defun vista (modo &key az el)
+  "Cómo se ve el dibujo: \"planta\" o \"3d\" (girable con el ratón). AZ, EL en grados (de fábrica -60, 25)."
+  (let ((m (string-downcase (string modo))))
+    (setvar "HKVISTA" (if (string= m "planta") 0 1))
+    (when az (setvar "HKAZ" (hk-al-d az)))
+    (when el (setvar "HKEL" (hk-al-d el)))
+    m))
+
 ;; ---- transformar LISTAS (no tocan el dibujo: se devuelve otra lista para entmake / entmod) ----
 (defun hk-al-mapa-puntos (ent fn)
   (mapcar (lambda (p) (if (and (integerp (car p)) (<= 10 (car p) 18) (hk-al-ptp (cdr p)))
@@ -3358,10 +3454,14 @@ Lo escribe la app (escritorio: junto a la hoja; web: botón de descarga)."
 (defun vertices (ent)
   "Los puntos de una polilínea (o de un HATCH) leída del dibujo."
   (let ((d (if (hk-ename-p ent) (entget ent) ent)))
+    (cond ((string-equal (cdr (assoc 0 d)) "POLYLINE")
+           (loop for v in (hk-al-subs (cdr (assoc -1 d)))
+                 when (string= (cdr (assoc 0 (hk-ent-datos v))) "VERTEX") collect (cdr (assoc 10 (hk-ent-datos v)))))
+          (t
     (if (string-equal (cdr (assoc 0 d)) "HATCH")
         (let ((tras (member 93 d :key #'car)))
           (loop for p in (cdr tras) while (/= (car p) 97) when (= (car p) 10) collect (cdr p)))
-        (loop for p in d when (eql (car p) 10) collect (cdr p)))))
+        (loop for p in d when (eql (car p) 10) collect (cdr p)))))))
 (defun hk-al-bulges (d)
   (let ((r nil) (vio nil))
     (dolist (p d) (cond ((eql (car p) 10) (when vio (push 0d0 r)) (setf vio t))
@@ -3376,6 +3476,9 @@ Lo escribe la app (escritorio: junto a la hoja; web: botón de descarga)."
            (let ((da (- (cdr (assoc 51 d)) (cdr (assoc 50 d)))))
              (when (< da 0) (incf da (* 2 +hk-al-pi+)))
              (* (cdr (assoc 40 d)) da)))
+          ((string-equal tp "POLYLINE")
+           (let* ((v (vertices d)) (n (length v)) (cerr (logtest 1 (or (cdr (assoc 70 d)) 0))) (s 0d0))
+             (dotimes (i (if cerr n (1- n)) s) (incf s (distance (nth i v) (nth (mod (1+ i) n) v))))))
           ((string-equal tp "LWPOLYLINE")
            (let* ((v (vertices d)) (bs (hk-al-bulges d)) (n (length v))
                   (cerr (logtest 1 (or (cdr (assoc 70 d)) 0))) (s 0d0))

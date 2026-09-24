@@ -98,3 +98,15 @@ números que Calcpad (oráculo: `calcpad-examples/Rectangular Slab FEA.html`).
   igual que Lab. Real: 15 → 19 → 15 pt. Ops --ctl nuevas «zoom» y «layout».
 - ⏳ Entrada sintética algo inestable: de 3 corridas, 2 TODO OK y 1 con la rueda
   perdida (el ratón tiene que moverse sobre el editor antes; el test ya lo hace).
+
+### Cierre
+- ✅ Motor portable a ECL (web): `hn-fmt` usaba `sb-ext:` sin `#+sbcl` y habría roto
+  el horneado de hlisp.wasm. El C# de la web compila (0 errores, solo compilación).
+- ⏳ Web: falta rehornear `hlisp.wasm` con el engine.lisp nuevo para que `#numerico`
+  corra en el navegador.
+- ⏳ Siguiente motor: `$Plot` numérico (#fplot evaluado por el programa, como #map):
+  es lo que más ejemplos de Calcpad bloquea (≈ 90 de 298). Después: `$Root/$Find`
+  (≈ 14), `#def` (≈ 44; hoy se expande a mano), dibujos SVG con valores, `?` entradas.
+- Tiempo de la losa (una corrida): 0.66–0.69 s en la app (traducir + compilar el
+  programa en SBCL + calcular); cálculo puro 0.23 s (integrales, ensamblaje 140×140,
+  Cholesky, momentos, 4 rejillas de mapa).

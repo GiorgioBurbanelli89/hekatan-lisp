@@ -1631,9 +1631,9 @@ namespace HekatanLisp
 
         /// <summary>El dibujo en el JSON de hekatan-dwg / acadrust-wasm (pares DXF, como entmake):
         /// {"version":"AC1032","layers":[…],"entities":[[[0,"LINE"],[8,"capa"],[10,[x,y,z]],…]]}.
-        /// Tipos que acepta el escritor: POINT, LINE, CIRCLE, ARC, LWPOLYLINE, TEXT, MTEXT (ángulos en GRADOS).
-        /// Las cotas se explotan (LINE + TEXT + flechas LWPOLYLINE), el rayado va en LINE; 3DFACE,
-        /// POLYLINE 3D y rellenos llenos todavía no → se avisa.</summary>
+        /// Tipos que acepta el escritor (acadrust nuevo, hekatan-dwg/src/escribir.rs): POINT, LINE, CIRCLE, ARC,
+        /// LWPOLYLINE, TEXT, MTEXT (ángulos en GRADOS), 3DFACE, POLYLINE 3D, SOLID y HATCH lleno.
+        /// Las cotas se explotan (LINE + TEXT + flechas LWPOLYLINE) y el rayado con patrón va en LINE.</summary>
         public static string DwgJson(Dibujo d, Opc o, List<string> avisos)
         {
             o ??= new Opc();
@@ -1669,7 +1669,12 @@ namespace HekatanLisp
                     case "POLYLINE":
                     {
                         var pts = e.Pts(1011);
-                        if ((e.Int(70, 0) & 8) != 0 || pts.Any(p => Math.Abs(p[2]) > 1e-12)) { sinDwg["POLYLINE 3D"] = sinDwg.GetValueOrDefault("POLYLINE 3D") + 1; break; }
+                        if ((e.Int(70, 0) & 8) != 0 || pts.Any(p => Math.Abs(p[2]) > 1e-12))
+                        {   // POLYLINE 3D, forma compacta del JSON (los vértices como 10 seguidos)
+                            if (pts.Count < 2) break;
+                            ents.Add("[" + Com("POLYLINE") + ",[70," + ((e.Int(70, 0) & 1) | 8) + "]" + string.Concat(pts.Select(q => ",[10," + Pt(q) + "]")) + "]");
+                            break;
+                        }
                         ents.Add("[" + Com("LWPOLYLINE") + ",[70," + (e.Int(70, 0) & 1) + "]" + string.Concat(pts.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
                         break;
                     }
@@ -1699,16 +1704,19 @@ namespace HekatanLisp
                     }
                     case "HATCH":
                         if (string.Equals(e.Get(2), "SOLID", StringComparison.OrdinalIgnoreCase))
-                        {   // relleno lleno: el DWG lleva su contorno (el relleno todavía no)
-                            foreach (var l in Lazos(e)) ents.Add("[" + Com("LWPOLYLINE") + ",[70,1]" + string.Concat(l.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
-                            sinDwg["relleno lleno (va su contorno)"] = sinDwg.GetValueOrDefault("relleno lleno (va su contorno)") + 1;
+                        {   // relleno lleno: HATCH SOLID de verdad (cada contorno: [92,1] y sus vértices)
+                            var lz = Lazos(e); if (lz.Count == 0) break;
+                            ents.Add("[" + Com("HATCH") + ",[2,\"SOLID\"]" + string.Concat(lz.Select(l => ",[92,1]" + string.Concat(l.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")))) + "]");
                         }
                         else foreach (var (a, b) in Rayado(e)) ents.Add("[" + Com("LINE") + ",[10," + Pt(a) + "],[11," + Pt(b) + "]]");
                         break;
                     case "SOLID":
-                    {
-                        var pts = new[] { e.Pt(10), e.Pt(11), e.Pt(13) ?? e.Pt(12), e.Pt(12) };
-                        ents.Add("[" + Com("LWPOLYLINE") + ",[70,1]" + string.Concat(pts.Select(q => ",[10,[" + N(q[0]) + "," + N(q[1]) + "]]")) + "]");
+                    case "3DFACE":
+                    {   // mismos códigos que DXF: 10 11 12 13 (sin 13 → triángulo); 3DFACE 70 = aristas invisibles
+                        if (e.Pt(10) == null || e.Pt(11) == null || e.Pt(12) == null) break;
+                        var sb = new StringBuilder("[" + Com(e.Tipo) + ",[10," + Pt(e.Pt(10)) + "],[11," + Pt(e.Pt(11)) + "],[12," + Pt(e.Pt(12)) + "],[13," + Pt(e.Pt(13) ?? e.Pt(12)) + "]");
+                        if (e.Tipo == "3DFACE" && (e.Int(70, 0) & 15) != 0) sb.Append(",[70,").Append(e.Int(70, 0) & 15).Append(']');
+                        ents.Add(sb.Append(']').ToString());
                         break;
                     }
                     default: sinDwg[e.Tipo] = sinDwg.GetValueOrDefault(e.Tipo) + 1; break;

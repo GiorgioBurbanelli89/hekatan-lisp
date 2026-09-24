@@ -9,6 +9,9 @@ Limit{((x + h)^3 - x^3)/h @ h = 0}
 ## 2 · Límites de la forma 0/0
 Limit{sin(x)/x @ x = 0}
 Limit{(x^2 - 1)/(x - 1) @ x = 1}
+Limit{(1 - cos(x))/x^2 @ x = 0}
+#: Hacia el infinito manda el término de mayor grado:
+Limit{(3*x^2 + 1)/(x^2 + 5) @ x = inf}
 
 ## 3 · Sumatorias
 Sum{i @ i = 1 : 100}
@@ -21,5 +24,7 @@ Sum{i @ i = 1 : n}
 Taylor{sin(x) @ x = 0 : 7}
 Taylor{exp(x) @ x = 0 : 4}
 Taylor{cos(x) @ x = 0 : 6}
+Taylor{ln(1 + x) @ x = 0 : 4}
+Taylor{1/(1 - x) @ x = 0 : 4}
 #: Cerca de 0 el polinomio de grado 7 y el seno no se distinguen; lejos, se separan:
 #fplot(sin(x), T_7 = x - x^3/6 + x^5/120 - x^7/5040, [-4 4])

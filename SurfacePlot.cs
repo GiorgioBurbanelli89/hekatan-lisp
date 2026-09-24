@@ -59,6 +59,43 @@ namespace HekatanLisp
             return (Z, zmin, zmax);
         }
 
+        /// <summary>#anim surf: UN lienzo con todos los cuadros (data-frames). Así el giro con el ratón se
+        /// conserva de un cuadro al siguiente. escalaComun: la misma escala z en todos (se VE crecer la
+        /// amplitud); si no, cada cuadro ocupa toda la altura (funciones de tamaños muy distintos).
+        /// zr devuelve el [zmin, zmax] REAL de cada cuadro (para el rótulo).</summary>
+        public static string SurfaceCanvasFrames(List<LispConverter.N> fs, string vx, string vy,
+                                                 double xa, double xb, double ya, double yb, int id, bool escalaComun,
+                                                 out List<(double lo, double hi)> zr)
+        {
+            const int nn = 32;
+            var inv = CultureInfo.InvariantCulture;
+            var muestras = fs.Select(f => Sample(f, vx, vy, xa, xb, ya, yb, nn)).ToList();
+            zr = muestras.Select(m => (m.zmin, m.zmax)).ToList();
+            double gmin = muestras.Min(m => m.zmin), gmax = muestras.Max(m => m.zmax);
+            string Arr(double[,] Z)
+            {
+                var sb = new System.Text.StringBuilder("[");
+                for (int j = 0; j <= nn; j++)
+                    for (int i = 0; i <= nn; i++)
+                    {
+                        if (i + j > 0) sb.Append(',');
+                        sb.Append(Math.Round(Z[i, j], 4).ToString("0.####", inv));
+                    }
+                return sb.Append(']').ToString();
+            }
+            string F(double v) => v.ToString("0.######", inv);
+            var fr = "[" + string.Join(",", muestras.Select(m => Arr(m.Z))) + "]";
+            var zrs = "[" + string.Join(",", muestras.Select(m => escalaComun ? "[" + F(gmin) + "," + F(gmax) + "]"
+                                                                                : "[" + F(m.zmin) + "," + F(m.zmax) + "]")) + "]";
+            double z0 = escalaComun ? gmin : muestras[0].zmin, z1 = escalaComun ? gmax : muestras[0].zmax;
+            return "<canvas class=\"hk-surf\" width=\"560\" height=\"420\" style=\"max-width:100%;touch-action:none;cursor:grab\""
+                 + " data-id=\"" + id + "\" data-nn=\"" + nn + "\""
+                 + " data-xa=\"" + F(xa) + "\" data-xb=\"" + F(xb) + "\" data-ya=\"" + F(ya) + "\" data-yb=\"" + F(yb) + "\""
+                 + " data-vx=\"" + System.Net.WebUtility.HtmlEncode(vx) + "\" data-vy=\"" + System.Net.WebUtility.HtmlEncode(vy) + "\""
+                 + " data-zmin=\"" + F(z0) + "\" data-zmax=\"" + F(z1) + "\""
+                 + " data-z='" + Arr(muestras[0].Z) + "' data-frames='" + fr + "' data-zr='" + zrs + "'></canvas>";
+        }
+
         // ---- <canvas> ORBITABLE: la malla la calcula C# una vez; el JS la rota con el mouse ----
         // El script hkSurfOrbit (una sola vez en la página) proyecta y gira; aquí solo va el canvas + datos.
         public static string SurfaceCanvas(LispConverter.N f, string vx, string vy,
@@ -110,6 +147,10 @@ namespace HekatanLisp
        var p0=proj(i,j,Z(i,j)),p1=proj(i+1,j,Z(i+1,j)),p2=proj(i+1,j+1,Z(i+1,j+1)),p3=proj(i,j+1,Z(i,j+1));
        ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.lineTo(p3[0],p3[1]);ctx.closePath();
        ctx.fillStyle=jetr((zc-zmin)/rng);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.stroke();}}
+   // #anim surf: varios cuadros en el MISMO lienzo; el reproductor llama cv.hkFrame(k)
+   if(cv.dataset.frames){var FR=JSON.parse(cv.dataset.frames),ZR=JSON.parse(cv.dataset.zr||'[]');
+     cv.hkFrame=function(k){if(!FR[k])return;z=FR[k];if(ZR[k]){zmin=ZR[k][0];zmax=ZR[k][1];}rng=(zmax-zmin)||1;cv.dataset.frame=k;draw();};
+     if(cv.dataset.frame&&+cv.dataset.frame>0)cv.hkFrame(+cv.dataset.frame);}
    draw();cv.style.cursor='grab';
    // ---- HOVER: el nudo mas cercano al cursor, con su x, y, z (17-sep-2026, Jorge) ----
    var xa=+cv.dataset.xa,xb=+cv.dataset.xb,ya=+cv.dataset.ya,yb=+cv.dataset.yb;

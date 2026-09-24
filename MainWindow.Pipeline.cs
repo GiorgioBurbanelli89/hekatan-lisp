@@ -500,6 +500,8 @@ namespace HekatanLisp
                 catch { }
             }
             int surfId = 0;
+            var vecesG = new Dictionary<string, int>(); var vecesM = new Dictionary<string, int>();   // n.º de aparición de cada #map/#malla (ClaveNum)
+            int Vez(Dictionary<string, int> d, string k) { d[k] = d.TryGetValue(k, out var c) ? c + 1 : 0; return d[k]; }
             bool enFila = false; int idxFila = -1;   // #fila … #finfila: gráficas lado a lado
             void CerrarFila()
             {
@@ -533,7 +535,7 @@ namespace HekatanLisp
                 bool isDiag = kw is "diag" or "vmd";
                 if (kw is "anim" or "animar" or "animacion")
                 {
-                    try { outList.Add(AnimHtml(rest, byName, fns, inv)); } catch { outList.Add(""); }
+                    try { var ah = AnimHtml(rest, byName, fns, inv, dark); if (ah.Contains("hk-surf") || ah.Contains("data-mh")) anySurf = true; else if (System.Text.RegularExpressions.Regex.IsMatch(rest, @"^\s*(surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) anySurf = true; outList.Add(ah); } catch { outList.Add(""); }
                     continue;
                 }
                 // #slider: lo MISMO que #anim, pero el cuadro lo elige el usuario con una barra.
@@ -642,7 +644,7 @@ namespace HekatanLisp
                 {
                     // hoja numérica: #malla(x_j, y_j, e_j, s_j) con los datos del modelo
                     var pmz = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
-                    if (pmz.Success && _numMeshes != null && _numMeshes.TryGetValue(pmz.Groups[1].Value.Trim(), out var mdat))
+                    if (pmz.Success && _numMeshes != null && _numMeshes.TryGetValue(ClaveNum(pmz.Groups[1].Value.Trim(), Vez(vecesM, pmz.Groups[1].Value.Trim())), out var mdat))
                     {
                         try
                         {
@@ -676,7 +678,7 @@ namespace HekatanLisp
                     if (!pm.Success) { outList.Add(""); continue; }
                     // hoja numérica: la rejilla ya la calculó el motor numérico (funciones de la hoja,
                     // spline de una matriz de resultados…) — aquí solo se pinta
-                    if (isMap && _numGrids != null && _numGrids.TryGetValue(pm.Groups[1].Value.Trim(), out var rej))
+                    if (isMap && _numGrids != null && _numGrids.TryGetValue(ClaveNum(pm.Groups[1].Value.Trim(), Vez(vecesG, pm.Groups[1].Value.Trim())), out var rej))
                     {
                         try
                         {
@@ -734,51 +736,115 @@ namespace HekatanLisp
         }
 
         // #anim fplot(u = expr(x,n), [0 1]), n = 1:8   → la MISMA gráfica para cada valor del
-        // parámetro, una tras otra (animación CSS pura: sin JS, funciona igual en la web y en la
-        // app local). Pasar el ratón por encima la PAUSA. Paso opcional: n = 1:2:15.
+        // parámetro, una tras otra, con ▶/⏸, barra de cuadro, subtítulo y voz (LispAnim.Player).
+        // También #anim surf(…) y #anim map(…); con surf/map y SIN parámetro, si la expresión es una
+        // matriz o un vector de la hoja, se anima componente a componente. {k} dentro de la
+        // expresión arma nombres: surf(N_{k}, …), k = 1:16 → N_1, N_2 …
         private static int _animId;
+        private static readonly System.Text.RegularExpressions.Regex RxAnimKind = new System.Text.RegularExpressions.Regex(
+            @"^(fplot|plot|ezplot|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)?\s*\((.*)\)\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
         private static string AnimHtml(string rest, Dictionary<string, LispConverter.N> byName,
-                                       List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv)
+                                       List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv,
+                                       bool dark = false, int surfId = 0)
         {
-            var R = System.Text.RegularExpressions.Regex.Match((rest ?? "").Trim(),
+            string plot = (rest ?? "").Trim(), par = null;
+            List<double> vals = null;
+            var R = System.Text.RegularExpressions.Regex.Match(plot,
                 @"^(.*),\s*([A-Za-z]\w*)\s*=\s*(-?[\d.]+)\s*:\s*(-?[\d.]+)\s*(?::\s*(-?[\d.]+))?\s*$",
                 System.Text.RegularExpressions.RegexOptions.Singleline);
-            if (!R.Success) return "";
-            string plot = R.Groups[1].Value.Trim(), par = R.Groups[2].Value;
-            double a = double.Parse(R.Groups[3].Value, inv), b = double.Parse(R.Groups[4].Value, inv), st = 1;
-            if (R.Groups[5].Success) { st = b; b = double.Parse(R.Groups[5].Value, inv); }
-            if (st <= 0 || b < a) return "";
-            // se admite "fplot(...)" o directamente "(...)"
-            plot = System.Text.RegularExpressions.Regex.Replace(plot, @"^(?:fplot|plot|ezplot)\s*(?=\()", "",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            var vals = new List<double>();
-            for (double v = a; v <= b + st * 1e-9 && vals.Count < 60; v += st) vals.Add(v);
-            if (vals.Count == 0) return "";
-            int id = System.Threading.Interlocked.Increment(ref _animId);
-            double dt = 1.2, T = dt * vals.Count;
-            string P(double v) => v.ToString("0.####", inv);
-            double on = 100.0 / vals.Count;
-            var sb = new StringBuilder();
-            sb.Append("<style>@keyframes hkan").Append(id).Append("{0%{opacity:1}")
-              .Append(P(on - 0.01)).Append("%{opacity:1}").Append(P(on)).Append("%{opacity:0}100%{opacity:0}}")
-              .Append(".hkan").Append(id).Append(":hover .hkfr{animation-play-state:paused}</style>");
-            sb.Append("<div class=\"hkan").Append(id).Append("\" style=\"display:grid;margin:1.1em 0\" title=\"ratón encima = pausa\">");
-            for (int i = 0; i < vals.Count; i++)
+            if (R.Success)
             {
-                string sv = P(vals[i]);
-                string sub = System.Text.RegularExpressions.Regex.Replace(plot,
-                    @"(?<![\w.])" + System.Text.RegularExpressions.Regex.Escape(par) + @"(?![\w(])", "(" + sv + ")");
-                sb.Append("<div class=\"hkfr\" style=\"grid-area:1/1;opacity:").Append(i == 0 ? "1" : "0")
-                  .Append(";animation:hkan").Append(id).Append(' ').Append(P(T)).Append("s linear infinite;animation-delay:")
-                  .Append(P(i * dt)).Append("s;text-align:center\">")
-                  .Append(OneFplotHtml(sub, byName, fns, inv))
-                  .Append("<div style=\"color:var(--fg);font-size:1em;margin-top:.2em\"><i>")
-                  .Append(System.Net.WebUtility.HtmlEncode(par)).Append("</i> = ").Append(sv)
-                  .Append("  <span style=\"color:var(--mut);font-size:.85em\">(").Append(i + 1).Append('/').Append(vals.Count)
-                  .Append(")</span></div></div>");
+                plot = R.Groups[1].Value.Trim(); par = R.Groups[2].Value;
+                vals = LispAnim.Valores(R.Groups[3].Value, R.Groups[4].Value, R.Groups[5].Success ? R.Groups[5].Value : null);
+                if (vals.Count == 0) return "";
             }
-            sb.Append("</div>");
-            return sb.ToString();
+            var mk = RxAnimKind.Match(plot);
+            if (!mk.Success) return "";
+            string kind = (mk.Groups[1].Success ? mk.Groups[1].Value : "fplot").ToLowerInvariant();
+            bool isSurf = kind is "surf" or "superficie" or "plot3d" or "mesh";
+            bool isMap = kind is "map" or "mapa" or "heatmap" or "contour" or "contourf";
+            string inside = mk.Groups[2].Value;
+            int id = System.Threading.Interlocked.Increment(ref _animId);
+            string Sub(string txt, double v)
+            {
+                string sv = LispAnim.P(v);
+                txt = txt.Replace("{" + par + "}", sv);
+                return System.Text.RegularExpressions.Regex.Replace(txt,
+                    @"(?<![\w.])" + System.Text.RegularExpressions.Regex.Escape(par) + @"(?![\w(])", "(" + sv + ")");
+            }
+            // ---- gráficas de x (fplot): un SVG por cuadro ----
+            if (!isSurf && !isMap)
+            {
+                if (vals == null) return "";
+                var frames = vals.Select(v => OneFplotHtml("(" + Sub(inside, v) + ")", byName, fns, inv)).ToList();
+                return LispAnim.Player(frames, vals.Select(v => par + " = " + LispAnim.P(v)).ToList(), par, null, 1.2, "hkan" + id);
+            }
+            // ---- superficies y mapas: las funciones de cada cuadro ----
+            var specs = new List<(LispConverter.N f, string lbl)>();
+            double xa = 0, xb = 1, ya = 0, yb = 1;
+            if (vals != null)
+                foreach (var v in vals)
+                {
+                    var (f, _, a1, b1, a2, b2) = ParseSurfArgs(Sub(inside, v), byName, inv);
+                    if (f == null) return "";
+                    xa = a1; xb = b1; ya = a2; yb = b2;
+                    specs.Add((f, par + " = " + LispAnim.P(v)));
+                }
+            else
+            {
+                // sin parámetro: la expresión es una matriz/vector → un cuadro por componente
+                var (f, spec, a1, b1, a2, b2) = ParseSurfArgs(inside, byName, inv);
+                xa = a1; xb = b1; ya = a2; yb = b2;
+                var fr0 = f;
+                if (fr0 != null && fr0.Op != "vec" && fr0.Op != "mat" && fr0.Items == null && byName.TryGetValue(spec ?? "", out var t0)) fr0 = t0;
+                if (fr0 == null || (fr0.Op != "vec" && fr0.Op != "mat")) return "";
+                string nom = spec ?? "N";
+                if (fr0.Op == "mat")
+                    for (int r = 0; r < fr0.Items.Count; r++)
+                        for (int c = 0; c < (fr0.Items[r].Items?.Count ?? 0); c++)
+                            specs.Add((fr0.Items[r].Items[c], nom + "(" + (r + 1) + ", " + (c + 1) + ")"));
+                else
+                    for (int c = 0; c < fr0.Items.Count; c++) specs.Add((fr0.Items[c], nom + "(" + (c + 1) + ")"));
+                par = "";
+            }
+            if (specs.Count == 0) return "";
+            // ejes: x e y si están; si no, ξ/η (xi, eta); si no, los primeros nombres sin valor en la hoja
+            var todos = new List<string>();
+            foreach (var s in specs) foreach (var v in LispConverter.VarsOf(s.f)) if (!todos.Contains(v)) todos.Add(v);
+            var ejes = new List<string>();
+            foreach (var pref in new[] { "x", "y", "xi", "eta" }) if (todos.Contains(pref) && ejes.Count < 2) ejes.Add(pref);
+            foreach (var v in todos) if (!ejes.Contains(v) && ValorDeNombre(v, byName, 0) == null && ejes.Count < 2) ejes.Add(v);
+            string vx = ejes.Count > 0 ? ejes[0] : "x", vy = ejes.Count > 1 ? ejes[1] : "y";
+            var fs = new List<LispConverter.N>();
+            foreach (var s in specs)
+            {
+                var faltan = new List<string>();
+                var fr = ResolverNombres(s.f, byName, new HashSet<string>(ejes), faltan);
+                if (faltan.Count > 0) return AvisoGrafica("#anim", faltan);
+                fs.Add(fr);
+            }
+            var labels = specs.Select(s => s.lbl).ToList();
+            if (isSurf)
+            {
+                // con parámetro: escala z COMÚN (se ve crecer o cambiar la amplitud); por componente:
+                // cada función con su propia escala (las de giro son mucho más bajas que las de flecha);
+                // lo mismo si el parámetro arma NOMBRES (N_{k}: funciones distintas, no una amplitud)
+                string cv = SurfacePlot.SurfaceCanvasFrames(fs, vx, vy, xa, xb, ya, yb, 900 + id, vals != null && !inside.Contains("{" + par + "}"), out var zr);
+                for (int k = 0; k < labels.Count; k++)
+                    labels[k] += "   ·   z de " + LispAnim.P(Math.Round(zr[k].lo, 4)) + " a " + LispAnim.P(Math.Round(zr[k].hi, 4));
+                string Eje(string v) => System.Net.WebUtility.HtmlEncode(v switch { "xi" => "ξ", "eta" => "η", "zeta" => "ζ", _ => LispConverter.OriginalName(v) ?? v });
+                return LispAnim.Player(null, labels, par, null, 1.4, "hkan" + id,
+                    lienzo: cv + "<div style=\"color:var(--mut);font-size:.85em\">" + Eje(vx) + " → , " + Eje(vy) + " ↗ · arrastra para girar</div>");
+            }
+            var mapas = new List<string>();
+            foreach (var f in fs)
+            {
+                string b64 = SurfacePlot.MapPng(f, vx, vy, xa, xb, ya, yb, dark, false, 0);
+                string img = "<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">";
+                mapas.Add(SurfacePlot.MapHover(f, vx, vy, xa, xb, ya, yb, img));
+            }
+            return LispAnim.Player(mapas, labels, par, null, 1.4, "hkan" + id);
         }
 
         private static int _sliderId;
@@ -1249,6 +1315,7 @@ dib();})();";
         private List<List<string>> _numBlocks;
         private static Dictionary<string, HojaNumerica.Rejilla> _numGrids;   // #map de la hoja numérica: texto → rejilla
         private static Dictionary<string, HojaNumerica.MallaDatos> _numMeshes;   // #malla(x, y, e, s) → datos del modelo
+        private static string ClaveNum(string texto, int vez) => texto + "\u0001" + vez;
         private const string NumOculta = "\u0002hkoculta";                   // línea #hide: no se dibuja
 
         /// <summary>Hoja numérica: cada bloque for/while/if/function (y su forma Calcpad) se pliega en
@@ -1429,6 +1496,8 @@ dib();})();";
         {
             _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
+            // #anim(n = a:b) … #finanim: el bloque se repite por cuadro ANTES que nada (LispAnim.cs)
+            text = LispAnim.ExpandirBloques(text);
             // un PROGRAMA LISP corre con SU texto: PrepareNames es para la matemática de la hoja y
             // renombraba también dentro de las cadenas "…" del programa («La» → «lahkq6»).
             string textoPrograma = text;
@@ -1564,6 +1633,7 @@ dib();})();";
                 if (dibujos[i] != null) continue;     // #dibujo: bloque de dibujo, no es expresión
                 var s = lines[i].TrimStart();
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
+                               LispAnim.RxVoz.IsMatch(s) || s.StartsWith("#hkan") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
                                    @"^(?!#+[ \t]+\w+[ \t]+[^\s(])#\s*(autolispout|anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
@@ -1630,12 +1700,24 @@ dib();})();";
                     progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = lines[i], Visible = !oculta });
                 }
                 _numRes = HojaNumerica.Ejecutar(progLines, _numBlocks ?? new List<List<string>>());
+                // clave = texto + nº de aparición: el MISMO #map(…) escrito varias veces (p. ej. en cada
+                // cuadro de un #anim(n = …) … #finanim) da una rejilla distinta cada vez
                 _numGrids = new Dictionary<string, HojaNumerica.Rejilla>();
+                var vecesG = new Dictionary<string, int>();
                 foreach (var pl in progLines)
-                    if (pl.Mapa != null && _numRes.Mapa.TryGetValue(pl.Idx, out var g)) _numGrids[pl.Mapa.Trim()] = g;
+                    if (pl.Mapa != null)
+                    {
+                        string kt = pl.Mapa.Trim(); vecesG[kt] = vecesG.TryGetValue(kt, out var c0) ? c0 + 1 : 0;
+                        if (_numRes.Mapa.TryGetValue(pl.Idx, out var g)) _numGrids[ClaveNum(kt, vecesG[kt])] = g;
+                    }
                 _numMeshes = new Dictionary<string, HojaNumerica.MallaDatos>();
+                var vecesM = new Dictionary<string, int>();
                 foreach (var pl in progLines)
-                    if (pl.Malla != null && _numRes.Malla.TryGetValue(pl.Idx, out var md)) _numMeshes[pl.Malla.Trim()] = md;
+                    if (pl.Malla != null)
+                    {
+                        string kt = pl.Malla.Trim(); vecesM[kt] = vecesM.TryGetValue(kt, out var c0) ? c0 + 1 : 0;
+                        if (_numRes.Malla.TryGetValue(pl.Idx, out var md)) _numMeshes[ClaveNum(kt, vecesM[kt])] = md;
+                    }
                 if (Environment.GetEnvironmentVariable("HK_NUM_DEBUG") is string dbg && dbg.Length > 0)
                     try
                     {
@@ -1666,6 +1748,11 @@ dib();})();";
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var tspec = ParseTablaDirective(lines[i]);
                 if (tspec != null) { isTabla[i] = true; tablaSpecOf[i] = tspec; continue; }
+                {   // #voz: narración · #hkanfr/#hkanfin: marcas de cuadro de un bloque animado (LispAnim.cs)
+                    var mv = LispAnim.RxVoz.Match(lines[i]);
+                    if (mv.Success) { textOf[i] = ("voz", LispAnim.ParDeVoz(lines, i), mv.Groups[1].Value.Trim()); continue; }
+                    if (LispAnim.RxMarca.IsMatch(lines[i])) { textOf[i] = ("hkmark", "", lines[i]); continue; }
+                }
                 var td = LispConverter.TextDirective(lines[i]);
                 if (td != null) { textOf[i] = td; continue; }
                 CollectFuncDefs(lines[i], funcMap);   // registra  f(x)=…  para poder aplicar f(3) después
@@ -1735,6 +1822,8 @@ dib();})();";
             }
             bool hasVar = !string.IsNullOrWhiteSpace(dvar);   // dvar = variable de la parcial (∂/∂), o null = auto
             var results = LispEngine.EvalOp(forms, _op, dvar);
+            if (Environment.GetEnvironmentVariable("HK_FORMS_DEBUG") is string fdbg && fdbg.Length > 0)
+                try { System.IO.File.WriteAllText(fdbg, string.Join("\n", forms.Select((f, k) => f + "\n  => " + (k < results.Count ? results[k] : "?")))); } catch { }
             var resOf = new string[lines.Length];
             for (int k = 0; k < idx.Count; k++) resOf[idx[k]] = k < results.Count ? results[k].Trim() : "";
             // Integral INDEFINIDA ( Integral{f @ x} sin límites ) → añade la constante  + C  (rigor matemático).
@@ -1805,10 +1894,14 @@ dib();})();";
                 {
                     var (kind, align, raw2) = textOf[i].Value;
                     int iTxt = i;
+                    if (kind == "hkmark") { display.Add(LispConverter.TxtLine("table", "left", LispAnim.MarcaHtml(LispAnim.RxMarca.Match(raw2)))); continue; }
+                    if (kind == "voz" && !string.IsNullOrEmpty(align))   // {k} de la voz: lo pone el reproductor, cuadro a cuadro
+                        raw2 = raw2.Replace("{" + align + "}", "⟦" + align + "⟧");
                     string html = LispConverter.FormatInlineText(raw2,
                         name => _numMode ? NumInline(name, iTxt) : LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
                         name => vecMap.TryGetValue(name, out var vt) && vt.Op == "vec");   // @v → flecha solo si v es VECTOR
                     if (kind == "table") html = RebuildManualTable(html);   // tabla de TEXTO: rearma <table> ya con cada celda formateada
+                    if (kind == "voz") { display.Add(LispConverter.TxtLine("table", "left", LispAnim.VozHtml(html, align != null))); continue; }
                     display.Add(LispConverter.TxtLine(kind, align, html));
                     continue;
                 }
@@ -1905,7 +1998,9 @@ dib();})();";
                         // definición (la cadena de d/dx[d/dx[…]]), que llena la integral de
                         // operadores y la parte en varias líneas. treeOf conserva el símbolo B.
                         string opF = treeOf[i] != null ? LispConverter.ToLisp(treeOf[i]) : formOf[i];
-                        bool refsVec = opF != formOf[i] && (ReferencesVecVar(opF, vecMap) || HasNumFn(formOf[i]));   // ceil/max…: n = ⌈As/Ab⌉, con símbolos
+                        // hoja numérica: la operación simbólica se enseña con los NOMBRES (N₁ = H₁·G₁), no con
+                        // cada nombre sustituido por su definición (ejemplo 82: salía la C⁻¹ entera en cada línea)
+                        bool refsVec = opF != formOf[i] && (_numMode || ReferencesVecVar(opF, vecMap) || HasNumFn(formOf[i]));   // ceil/max…: n = ⌈As/Ab⌉, con símbolos
                         display.Add(lbl + " = " + (refsVec ? opF : formOf[i]) + " = " + r);
                     }
                     // un NÚMERO escrito por el usuario (q = 13.48, x0 = -0.15) es un DATO: se muestra tal

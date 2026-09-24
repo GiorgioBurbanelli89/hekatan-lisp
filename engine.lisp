@@ -1782,8 +1782,10 @@
     ;; generico y devolvian la forma SIN evaluar (el producto quedaba escrito). El
     ;; algebra de matrices ya simplifica cada entrada al operar, asi que basta con
     ;; evaluar dentro; si lo de dentro resulta escalar, se simplifica como escalar.
+    ;; (el convertidor escribe el argumento CITADO: (expand* '(* …)). Sin desenvolver la cita,
+    ;;  meval devolvía la forma tal cual y Expand{[1 ξ ξ² ξ³]·C⁻¹} quedaba sin calcular.)
     ((member (car e) '(expand* factor simplify simplif clean))
-     (let ((v (scalarize (meval (second e)))))
+     (let ((v (scalarize (meval (let ((a (second e))) (if (and (consp a) (eq (car a) 'quote)) (second a) a))))))
        (if (matp v) v (simplify v))))
     ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
     ;; despejar dentro de una expr con matrices (autovalores: Despejar{det(K-λM)=0 @ λ}).

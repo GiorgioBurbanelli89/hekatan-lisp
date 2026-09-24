@@ -303,12 +303,11 @@ namespace HekatanLisp
             foreach (var a0 in SplitTop(inside))
             {
                 var a = a0.Trim(); if (a.Length == 0) continue;
-                var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
+                var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*([^\s,\[\]]+)[\s,]+([^\s,\[\]]+)\s*\]$");
                 if (rng.Success)
                 {
-                    double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out var lo);
-                    double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out var hi);
-                    ranges.Add((lo, hi)); continue;
+                    var lo = ValorDeTexto(rng.Groups[1].Value, byName); var hi = ValorDeTexto(rng.Groups[2].Value, byName);
+                    if (lo != null && hi != null) { ranges.Add((lo.Value, hi.Value)); continue; }
                 }
                 if (f == null) { spec = a; if (!byName.TryGetValue(a, out f)) { try { f = LispConverter.ParseMath(a); } catch { } } }
             }
@@ -317,6 +316,66 @@ namespace HekatanLisp
             if (ranges.Count >= 2) { ya = ranges[1].lo; yb = ranges[1].hi; }
             return (f, spec, xa, xb, ya, yb);
         }
+
+        // ---- NOMBRES de la hoja dentro de #surf / #map / #fplot ----
+        // Antes: `#surf(-w_0*sin(pi*x/a)*sin(pi*y/b), …)` evaluaba w_0, a y b como 0 (y además
+        // tomaba «w_0» y «a» como los ejes) → superficie PLANA sin aviso. Ahora cada nombre que en
+        // la hoja vale un NÚMERO se sustituye por ese número (siguiendo definiciones encadenadas),
+        // como ya hacía #dibujo; los ejes (x, y o los que queden libres) no se tocan.
+        private static double? ValorDeNombre(string name, Dictionary<string, LispConverter.N> byName, int depth)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            if (double.TryParse(name, System.Globalization.NumberStyles.Float, inv, out var d)) return d;
+            if (name == "pi" || name == "π") return Math.PI;
+            if (name == "e") return Math.E;
+            if (depth > 12 || byName == null) return null;
+            foreach (var k in new[] { name, LispConverter.MangleExpr(name) })
+                if (k != null && byName.TryGetValue(k, out var t))
+                {
+                    var r = ResolverNombres(t, byName, null, null, depth + 1);
+                    if (LispConverter.VarsOf(r).Count == 0) { var v = SurfacePlot.Eval(r, new Dictionary<string, double>()); if (!double.IsNaN(v) && !double.IsInfinity(v)) return v; }
+                    return null;
+                }
+            return null;
+        }
+        private static LispConverter.N ResolverNombres(LispConverter.N f, Dictionary<string, LispConverter.N> byName,
+                                                       ISet<string> ejes, List<string> faltan, int depth = 0)
+        {
+            if (f == null) return null;
+            if (f.IsAtom)
+            {
+                var a = f.Atom ?? "";
+                if (a.Length == 0 || char.IsDigit(a[0]) || a[0] == '-' || a[0] == '.' || a == "pi" || a == "e" || (ejes != null && ejes.Contains(a))) return f;
+                var v = ValorDeNombre(a, byName, depth);
+                if (v != null) return LispConverter.N.Leaf(v.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+                if (faltan != null && !faltan.Contains(a)) faltan.Add(a);
+                return f;
+            }
+            return new LispConverter.N
+            {
+                Op = f.Op, Atom = f.Atom,
+                A = ResolverNombres(f.A, byName, ejes, faltan, depth), B = ResolverNombres(f.B, byName, ejes, faltan, depth),
+                Items = f.Items?.Select(it => ResolverNombres(it, byName, ejes, faltan, depth)).ToList()
+            };
+        }
+        /// <summary>Un extremo de rango: número, nombre de la hoja (a) o expresión corta (a/2).</summary>
+        private static double? ValorDeTexto(string s, Dictionary<string, LispConverter.N> byName)
+        {
+            s = (s ?? "").Trim();
+            var v = ValorDeNombre(s, byName, 0);
+            if (v != null) return v;
+            try
+            {
+                var t = ResolverNombres(LispConverter.ParseMath(s), byName, null, null);
+                if (t != null && LispConverter.VarsOf(t).Count == 0) return SurfacePlot.Eval(t, new Dictionary<string, double>());
+            }
+            catch { }
+            return null;
+        }
+        private static string AvisoGrafica(string que, IEnumerable<string> faltan) =>
+            "<div style=\"color:#c0392b;margin:.4em 0\">⚠ " + System.Net.WebUtility.HtmlEncode(que) + ": no tiene valor numérico en la hoja: <b>" +
+            System.Net.WebUtility.HtmlEncode(string.Join(", ", faltan.Select(LispConverter.OriginalName))) + "</b> (defínelo antes, o úsalo como eje x, y)</div>";
 
         // UN #fplot (o ;grafica) → su SVG. rest = lo que sigue a la palabra clave.
         private static string OneFplotHtml(string rest, Dictionary<string, LispConverter.N> byName,
@@ -335,8 +394,12 @@ namespace HekatanLisp
                     // PUNTOS sueltos:  SAP2000 = [x1 y1; x2 y2]  (datos encima de las curvas)
                     var dm = System.Text.RegularExpressions.Regex.Match(a, @"^([A-Za-z][\w']*)\s*=\s*\[([^\[\]]*)\]$");
                     if (dm.Success && TryPuntos(dm.Groups[2].Value, inv, out var pxs, out var pys)) { dots.Add((dm.Groups[1].Value, pxs, pys)); continue; }
-                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\]$");
-                    if (rng.Success) { double.TryParse(rng.Groups[1].Value, System.Globalization.NumberStyles.Any, inv, out lo); double.TryParse(rng.Groups[2].Value, System.Globalization.NumberStyles.Any, inv, out hi); continue; }
+                    var rng = System.Text.RegularExpressions.Regex.Match(a, @"^\[\s*([^\s,\[\]]+)[\s,]+([^\s,\[\]]+)\s*\]$");
+                    if (rng.Success)   // [0 2] o con nombres de la hoja: [0 a/3]
+                    {
+                        var rlo = ValorDeTexto(rng.Groups[1].Value, byName); var rhi = ValorDeTexto(rng.Groups[2].Value, byName);
+                        if (rlo != null && rhi != null) { lo = rlo.Value; hi = rhi.Value; continue; }
+                    }
                     AddFn(sel, byName, a);
                 }
             }
@@ -366,6 +429,13 @@ namespace HekatanLisp
             }
             if (sel.Count == 0 && dots.Count == 0) sel = new List<(string, LispConverter.N)>(fns);   // sin argumentos → todas
             if (sel.Count == 0 && dots.Count == 0) return "";
+            // nombres de la hoja con valor (a, E, w_0…) → su número; el eje (forzado, x, o el libre) no
+            var protegidos = new HashSet<string>();
+            if (forcedVar != null) protegidos.Add(forcedVar);
+            foreach (var (_, t0) in sel)
+                foreach (var v in LispConverter.VarsOf(t0))
+                    if (v == "x" || ValorDeNombre(v, byName, 0) == null) protegidos.Add(v);
+            sel = sel.Select(p => (p.Item1, ResolverNombres(p.Item2, byName, protegidos, null))).ToList();
             string var = forcedVar ?? (sel.Count > 0 ? LispConverter.FreeVar(sel[0].Item2) : "x");
             return LispConverter.PlotSvg(var, lo, hi, sel, dots) ?? "";
         }
@@ -414,7 +484,10 @@ namespace HekatanLisp
                 // `N_1(xi) = …` también es una definición: el motor la devuelve como
                 // `(N_1 xi) = …` (la llamada en LISP). El nombre es N_1; sin esto
                 // #fplot no la encontraba y dibujaba la recta y = ξ.
-                var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(),
+                // la línea trae detrás su descripción/unidad tras un separador de control (DescSep…):
+                // «a = 6␅largo de la losa» daba el átomo «6largo» y a no valía 6 en las gráficas
+                int corte = raw.IndexOfAny(new[] { LispConverter.DescSep, '\x06', '\x1f' });
+                var m = System.Text.RegularExpressions.Regex.Match((corte >= 0 ? raw.Substring(0, corte) : raw).Trim(),
                     @"^(?:\(([A-Za-z][\w']*)\s[^()]*\)|([A-Za-z][\w']*)(?:\s*\([^()=]*\))?)\s*=\s*(?![=])(.+)$");
                 if (!m.Success) continue;
                 var nom = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
@@ -573,7 +646,7 @@ namespace HekatanLisp
                     {
                         try
                         {
-                            string b64m = SurfacePlot.MeshPngData(mdat.X, mdat.Y, mdat.Elem, mdat.Apoyos, dark);
+                            string b64m = SurfacePlot.MeshPngData(mdat.X, mdat.Y, mdat.Elem, mdat.Apoyos, dark, mdat.Restr);
                             outList.Add(PlotWrap("<img src=\"data:image/png;base64," + b64m + "\" style=\"max-width:100%\">",
                                                  "malla del modelo: nudos, elementos y apoyos"));
                         }
@@ -620,8 +693,14 @@ namespace HekatanLisp
                     }
                     var (f, spec, xa, xb, ya, yb) = ParseSurfArgs(pm.Groups[1].Value, byName, inv);
                     if (f == null) { outList.Add(""); continue; }
-                    var vs = LispConverter.VarsOf(f);
-                    string vx = vs.Count > 0 ? vs[0] : "x", vy = vs.Count > 1 ? vs[1] : "y";
+                    var vs0 = LispConverter.VarsOf(f);
+                    // ejes: x e y si están; si no, los nombres que NO tienen valor en la hoja
+                    var ejes = vs0.Where(v => v == "x" || v == "y").ToList();
+                    if (ejes.Count < 2) foreach (var v in vs0) if (!ejes.Contains(v) && ValorDeNombre(v, byName, 0) == null && ejes.Count < 2) ejes.Add(v);
+                    var faltanS = new List<string>();
+                    f = ResolverNombres(f, byName, new HashSet<string>(ejes), faltanS);
+                    if (faltanS.Count > 0) { outList.Add(AvisoGrafica("#" + kw, faltanS)); continue; }
+                    string vx = ejes.Count > 0 ? ejes[0] : "x", vy = ejes.Count > 1 ? ejes[1] : "y";
                     string enc = System.Net.WebUtility.HtmlEncode(spec ?? "");
                     try
                     {
@@ -1192,6 +1271,29 @@ dib();})();";
             return f != null && f != v ? f + " = " + v : v;
         }
 
+        /// <summary>@nombre / @{nombre} en el TEXTO de una hoja numérica (párrafos y tablas #|…|): el valor
+        /// que el programa dio a esa variable en la última línea visible ANTES de este texto (si no hay,
+        /// la primera después). Antes buscaba en el pipeline simbólico, que en #numerico está vacío,
+        /// y el texto salía con «@{w_c}» literal.</summary>
+        private string NumInline(string name, int linea)
+        {
+            if (_numRes == null || string.IsNullOrWhiteSpace(name)) return null;
+            name = name.Trim();
+            string mang = LispConverter.MangleExpr(name);
+            int mejor = -1;
+            foreach (var kv in _numRes.Nombre)
+            {
+                if (kv.Value != name && kv.Value != mang) continue;
+                if (!_numRes.Valor.ContainsKey(kv.Key)) continue;
+                bool antes = kv.Key < linea, mejorAntes = mejor >= 0 && mejor < linea;
+                if (mejor < 0 || (antes && (!mejorAntes || kv.Key > mejor)) || (!antes && !mejorAntes && kv.Key < mejor)) mejor = kv.Key;
+            }
+            if (mejor < 0) return null;
+            var v = HojaNumerica.FormatoLiteral(_numRes.Valor[mejor]);
+            try { return LispConverter.ToHtml(LispConverter.ParseLisp(v)); }
+            catch { return System.Net.WebUtility.HtmlEncode(v); }
+        }
+
         /// <summary>El bloque en la hoja: el código plegable (como Calcpad lo esconde con #hide, pero a
         /// un clic), lo que imprimió con disp(…) y, si falló, por qué.</summary>
         private string BloqueHtml(int k, int linea)
@@ -1655,8 +1757,9 @@ dib();})();";
                 if (textOf[i] != null)   // texto formateado (directiva ;): sustituye {Var} por su valor (math)
                 {
                     var (kind, align, raw2) = textOf[i].Value;
+                    int iTxt = i;
                     string html = LispConverter.FormatInlineText(raw2,
-                        name => LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
+                        name => _numMode ? NumInline(name, iTxt) : LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
                         name => vecMap.TryGetValue(name, out var vt) && vt.Op == "vec");   // @v → flecha solo si v es VECTOR
                     if (kind == "table") html = RebuildManualTable(html);   // tabla de TEXTO: rearma <table> ya con cada celda formateada
                     display.Add(LispConverter.TxtLine(kind, align, html));

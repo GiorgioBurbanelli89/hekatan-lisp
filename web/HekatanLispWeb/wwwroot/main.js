@@ -117,7 +117,21 @@ function sourceText() {                 // SourceText(): el ORIGINAL, no el deri
   const derivado = ts.startsWith(';;;; Script LISP') || ts.startsWith('% Hekatan Lab') || ts.startsWith('% =====');
   return derivado && lispBackup != null ? lispBackup : t;
 }
+// El cálculo corre en el hilo de la página: sin esto, una hoja de 1–3 s (mallas grandes) dejaba el
+// panel quieto sin decir nada. Se pinta «calculando…» y se calcula en el cuadro siguiente.
+let calcGen = 0;
 function showResult() {
+  const g = ++calcGen;
+  let b = $('hk-calc');
+  if (!b) {
+    b = document.createElement('div'); b.id = 'hk-calc'; b.textContent = 'calculando…';
+    b.style.cssText = 'position:fixed;top:64px;right:18px;z-index:99;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;display:none';
+    document.body.appendChild(b);
+  }
+  b.style.display = 'block';
+  setTimeout(() => { if (g !== calcGen) return; try { calcularYMostrar(); } finally { if (g === calcGen) b.style.display = 'none'; } }, 30);
+}
+function calcularYMostrar() {
   const text = sourceText();
   let out;
   try { out = W.Compute(text, op, $('txt-var').value.trim(), view, dark); }

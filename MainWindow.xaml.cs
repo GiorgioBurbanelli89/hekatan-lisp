@@ -242,7 +242,24 @@ namespace HekatanLisp
             Viewer.Visibility = IsRenderView ? Visibility.Visible : Visibility.Collapsed;
 
             // el cálculo pesado (SBCL) fuera del hilo de UI
-            var forms = await System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
+            var calc = System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
+            // Si tarda (hojas con mallas grandes: 1–3 s), un aviso «calculando…» sobre lo que se ve;
+            // antes el panel se quedaba quieto (o en blanco) sin decir nada. Lo borra la página nueva.
+            if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
+            {
+                var avisa = System.Threading.Tasks.Task.Delay(350);
+                if (await System.Threading.Tasks.Task.WhenAny(calc, avisa) == avisa && gen == _showGen)
+                {
+                    try
+                    {
+                        _ = Viewer.ExecuteScriptAsync("(function(){var d=document.getElementById('hk-calc');if(!d){d=document.createElement('div');d.id='hk-calc';" +
+                            "d.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;opacity:.92';" +
+                            "(document.body||document.documentElement).appendChild(d);}d.textContent='calculando…';})();");
+                    }
+                    catch { }
+                }
+            }
+            var forms = await calc;
             if (gen != _showGen) return;                   // llegó algo más nuevo → descarta este
 
             if (IsRenderView)

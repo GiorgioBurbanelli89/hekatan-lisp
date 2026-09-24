@@ -228,11 +228,20 @@ namespace HekatanLisp
             if (EngineCore() != null)
                 code = System.Text.RegularExpressions.Regex.Replace(
                     code, @"(?im)^\s*\(load\s+""[^""]*engine\.lisp""\)\s*$", "");
+            // HK_LISP_TRACE=archivo: apunta cada llamada al motor (código, tiempo, si cayó al
+            // proceso-por-eval). Para cazar esperas largas que no se ven desde la ventana.
+            var traza = Environment.GetEnvironmentVariable("HK_LISP_TRACE");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            void Traza(string como)
+            {
+                if (string.IsNullOrEmpty(traza)) return;
+                try { File.AppendAllText(traza, $"=== {DateTime.Now:HH:mm:ss.fff} {como} {sw.Elapsed.TotalSeconds:0.000} s, {code.Length} car.\n{(code.Length > 4000 ? code.Substring(0, 4000) + "\n…" : code)}\n"); } catch { }
+            }
             // 1) SERVIDOR PERSISTENTE (rápido: sin arranque). Solo con core horneado.
             if (EngineCore() != null)
             {
-                try { var r = RunServer(code); if (r != null) return r; }
-                catch { KillServer(); }   // si algo falla, reinicia y cae a proceso-por-eval
+                try { var r = RunServer(code); if (r != null) { Traza("servidor"); return r; } }
+                catch (Exception ex) { KillServer(); Traza("servidor FALLÓ (" + ex.Message + ")"); }   // si algo falla, reinicia y cae a proceso-por-eval
             }
             // 2) fallback: proceso-por-eval (como antes)
             return RunOnce(code);

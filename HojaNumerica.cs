@@ -37,7 +37,7 @@ namespace HekatanLisp
         }
 
         public sealed class Rejilla { public double Xa, Xb, Ya, Yb; public int N; public double[,] Z; }
-        public sealed class MallaDatos { public double[] X, Y; public int[][] Elem; public int[] Apoyos; }
+        public sealed class MallaDatos { public double[] X, Y; public int[][] Elem; public int[] Apoyos; public int[][] Restr; }
 
         public sealed class Resultado
         {
@@ -165,7 +165,7 @@ namespace HekatanLisp
                     {
                         var tr = new Tr(ctx);
                         var args = PartirNivel0(Normaliza(ln.Malla), ',').Select(a => tr.Expr(a)).ToList();
-                        if (args.Count < 3) throw new FormatException("#malla(x, y, elementos, apoyos): faltan datos");
+                        if (args.Count < 3) throw new FormatException("#malla(x, y, elementos, apoyos[, restricciones]): faltan datos");
                         code = "(hn-emit " + ln.Idx + " \"#mesh\" (format nil \"~{~a~^;~}\" (mapcar #'hn-lit (list " + string.Join(" ", args) + "))))";
                     }
                     else code = TraduceLinea(Normaliza(ln.Texto).Trim(), ctx, ln.Idx, ln.Visible);
@@ -754,6 +754,14 @@ namespace HekatanLisp
                     var el = ps.Length > 2 ? Regex.Matches(ps[2], @"\(vector ([^()]*)\)").Select(m => Nums(m.Groups[1].Value).Select(v => (int)Math.Round(v)).ToArray()).ToArray() : new int[0][];
                     md.Elem = el;
                     md.Apoyos = ps.Length > 3 ? Nums(ps[3]).Select(v => (int)Math.Round(v)).ToArray() : new int[0];
+                    // 5.º dato opcional: qué grados de libertad fija cada apoyo (una fila por apoyo: 1 = fijo),
+                    // p. ej. [w θx θy ψ] en la placa. El dibujo distingue apoyo puntual, borde apoyado y empotramiento.
+                    if (ps.Length > 4)
+                    {
+                        var filas = Regex.Matches(ps[4], @"\(vector ([^()]*)\)").Select(m => Nums(m.Groups[1].Value).Select(v => (int)Math.Round(v)).ToArray()).ToArray();
+                        if (filas.Length == 0) filas = Nums(ps[4]).Select(v => new[] { (int)Math.Round(v) }).ToArray();   // un código por apoyo
+                        if (filas.Length == md.Apoyos.Length) md.Restr = filas;
+                    }
                     if (md.X.Length == md.Y.Length && md.X.Length > 0) res.Malla[idx] = md;
                 }
                 else if (tag == "#grid")

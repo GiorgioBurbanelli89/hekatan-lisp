@@ -15,7 +15,7 @@ sigma_EF = Expand{((a + h) - (a + h)^2/2 - (a - a^2/2))/h}
 #: Es una CONSTANTE en cada elemento: la tensión del elemento finito es una escalera, no una recta.
 
 ## 3 · La animación: el desplazamiento
-#: Parábola exacta (azul) contra el elemento finito (naranja). Con 1 elemento es una sola recta; al refinar, los tramos rectos abrazan la parábola. Pasa el ratón por encima para pausar.
+#: Parábola exacta (azul) contra el elemento finito (naranja). Con 1 elemento es una sola recta; al refinar, los tramos rectos abrazan la parábola. Con ⏸ se detiene, y la barra elige el cuadro.
 #anim fplot(u = x - x^2/2, u_EF = floor(n*x)/n - (floor(n*x)/n)^2/2 + (1 - floor(n*x)/n - 1/(2*n))*(x - floor(n*x)/n), [0 0.999]), n = 1:8
 h = 1/n
 #: En los nudos coinciden siempre. Entre nudos, el error más grande está en el centro de cada elemento y vale:

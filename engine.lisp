@@ -784,6 +784,19 @@
           ((and (eq (car e) 'cos) (eq (second e) v)) (list 'sin v))               ; ∫cos =  sin
           ((and (eq (car e) 'exp) (eq (second e) v)) (list 'exp v))               ; ∫e^v = e^v
           ((and (eq (car e) '/) (eql (second e) 1) (eq (third e) v)) (list 'log v)) ; ∫1/v = ln v
+          ((and (eq (car e) '/) (numberp (second e)) (eq (third e) v))              ; ∫c/v = c·ln v
+           (simplify (list '* (second e) (list 'log v))))
+          ;; regla de la potencia con exponente cualquiera (n ≠ -1): ∫v^n dv = v^(n+1)/(n+1)
+          ((and (eq (car e) 'expt) (eq (second e) v) (numberp (third e)) (/= (third e) -1))
+           (let ((m (+ (third e) 1))) (simplify (list '/ (list 'expt v m) m))))
+          ;; c/v^n = c·v^(-n):  ∫ = c·v^(1-n)/(1-n)   (n ≠ 1; n = 1 es el logaritmo de arriba)
+          ((and (eq (car e) '/) (numberp (second e)) (consp (third e)) (eq (car (third e)) 'expt)
+                (eq (second (third e)) v) (numberp (third (third e))) (/= (third (third e)) 1))
+           (let ((m (- 1 (third (third e)))))
+             (if (< m 0)    ; exponente negativo: se escribe como fracción, −c/(|m|·v^|m|)
+                 (let ((k (- m)))
+                   (simplify (list '/ (- (second e)) (if (= k 1) v (list '* k (list 'expt v k))))))
+                 (simplify (list '/ (list '* (second e) (list 'expt v m)) m)))))
           ((and (eq (car e) '*) (numberp (second e)))                 ; c*f
            (let ((r (elem-integ (third e) v))) (if (eq r :fail) :fail (simplify (list '* (second e) r)))))
           ((and (eq (car e) '*) (numberp (third e)))                  ; f*c
@@ -967,6 +980,11 @@
         (setf acc (list '+ acc (list '/ (list '* c (list 'expt var k)) (fct k)))))
       (setf term (eval-consts (simplify (derive-x term)))))
     (simplify acc)))
+
+;; Taylor{ f @ x = 0 : n } de la hoja: mismo orden que los demas operadores (f v a b).
+;; Solo alrededor de 0 (a = 0); con otro a devuelve la notacion, no un resultado falso.
+(defun taylor-op (e var a n)
+  (if (and (numberp a) (zerop a) (integerp n)) (taylor e n var) (list 'taylor-op e var a n)))
 
 ;; LIMITE:  sustitucion directa; 0/0 -> L'Hopital; var->infinito -> comparar grados.
 (defun infinityp (a) (and (symbolp a) (member a '(inf infinity infty +inf oo))))
@@ -1208,7 +1226,7 @@
 ;;;; simbólico, y SIMPLIFICA la combinación (+ - * / expt).
 (defparameter *op-calls*
   '(partial derive-x deriv-steps factor expand* integ-var integ-x area-under slope-at
-    suma producto-op root-op find-op sup-op inf-op repeat-op limite despejar dec
+    suma producto-op root-op find-op sup-op inf-op repeat-op limite taylor-op despejar dec
     qshow qval))
 
 ;; dec como FUNCION, para que `evops` la aplique en el camino ESCALAR (el de
@@ -1764,8 +1782,10 @@
     ;; generico y devolvian la forma SIN evaluar (el producto quedaba escrito). El
     ;; algebra de matrices ya simplifica cada entrada al operar, asi que basta con
     ;; evaluar dentro; si lo de dentro resulta escalar, se simplifica como escalar.
+    ;; (el convertidor escribe el argumento CITADO: (expand* '(* …)). Sin desenvolver la cita,
+    ;;  meval devolvía la forma tal cual y Expand{[1 ξ ξ² ξ³]·C⁻¹} quedaba sin calcular.)
     ((member (car e) '(expand* factor simplify simplif clean))
-     (let ((v (scalarize (meval (second e)))))
+     (let ((v (scalarize (meval (let ((a (second e))) (if (and (consp a) (eq (car a) 'quote)) (second a) a))))))
        (if (matp v) v (simplify v))))
     ((eq (car e) 'cross) (mcross (meval (second e)) (meval (third e))))
     ;; despejar dentro de una expr con matrices (autovalores: Despejar{det(K-λM)=0 @ λ}).

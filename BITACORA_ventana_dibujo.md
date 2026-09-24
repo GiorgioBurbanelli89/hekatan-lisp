@@ -89,3 +89,14 @@ Diseño (reutiliza lo hecho en `BITACORA_autolisp_dibujo.md`):
 - La barra de herramientas ya ocupa dos filas: agrupar (menús) si crece más.
 - En escritorio la prueba usa eventos del DOM, no el ratón del sistema (el ratón real se probó en web).
 - Publicar la web: lo decide Jorge (compilada y probada en local, sin publicar).
+
+## 24-sep: fallos del motor anotados en el port de ShellMITC4 (commit 7799425)
+- ✅ `B = A` en `#numerico` compartía la matriz (hn-set cambia en sitio): ahora `X = Y` copia (hn-copy) y el
+  argumento que una función cambia por índice se copia al entrar (valor, como MATLAB). Prueba en tests/numerico
+  (fallaba antes, pasa ahora). Ejemplo 72 sin el rodeo `B(:, :)`: K 24×24 = OpenSees (1.9e-10, lo que imprime la hoja).
+- ✅ `# Elemento …`, `# Cuadratura de Gauss …` eran directivas: '#', espacio, palabra, espacio, otra palabra = título.
+  Las hojas 55-58 recuperan su título (antes salía un deslizador de Gauss en su lugar).
+- ✅ «'rigidez G (kN/m)» salía «ghkq2»: la descripción se aparta antes de renombrar (64, 67, 72, 78 corregidas).
+- ⏳ Dividir por 0 sigue dando error (MATLAB/C++: ±Inf/NaN): toca hn/1, el formato de salida (hoy NaN/Inf → «0»)
+  y el lector C#, y el ECL de la web. No se hizo.
+- ⏳ `%` como comentario al final de una línea de `#numerico` da «carácter no válido».

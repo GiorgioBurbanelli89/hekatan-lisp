@@ -3103,8 +3103,8 @@ Los modos que piden elegir en pantalla devuelven NIL (en una hoja no hay pantall
   (values))
 
 ;; ---------- volcado para la app (la app lo convierte en SVG y en .dxf) ----------
-(defun hk-al-num (x)
-  (let* ((s (format nil "~,9F" (hk-al-d x)))
+(defun hk-al-num (x &optional (nd 9))
+  (let* ((s (format nil "~,vF" nd (hk-al-d x)))
          (s (string-right-trim "0" s)))
     (when (and (> (length s) 0) (char= (char s (1- (length s))) #\.)) (setf s (subseq s 0 (1- (length s)))))
     (when (and (> (length s) 0) (char= (char s 0) #\.)) (setf s (concatenate 'string "0" s)))
@@ -3146,12 +3146,18 @@ Los modos que piden elegir en pantalla devuelven NIL (en una hoja no hay pantall
   (values))
 (defun hk-al-exporta (nombre valor)
   "Devuelve a la hoja un número calculado aquí (línea «nombre = valor» tras el dibujo).
-Una forma simbólica constante del motor ((/ 39 4)) se evalúa; se redondea a 6 decimales."
+Una forma simbólica constante del motor ((/ 39 4)) se evalúa. Se redondea a 6 decimales; si |v| < 0.1,
+a 10 cifras significativas (una inercia en m⁴ de 0.0065671875 no puede quedar en 0.006567)."
   (let ((v (cond ((realp valor) valor)
                  ((consp valor) (ignore-errors (nval valor 'x 0)))
                  (t nil))))
     (format t "~&~cX~c~a~c~a~%" (code-char 28) (code-char 31) nombre (code-char 31)
-            (if (realp v) (hk-al-num (/ (fround (* (hk-al-d v) 1d6)) 1d6)) "")))
+            (if (realp v)
+                (let* ((d (hk-al-d v)) (a (abs d))
+                       (nd (if (or (>= a 0.1d0) (< a 1d-300)) 6 (min 17 (- 9 (floor (log a 10))))))
+                       (k (expt 10d0 nd)))
+                  (hk-al-num (/ (fround (* d k)) k) nd))
+                "")))
   (values))
 (defun hk-al-ctx (s v)
   "Una definición de la hoja que llega al LISP. Los nombres de Common Lisp (tan, error, t…) no se tocan."

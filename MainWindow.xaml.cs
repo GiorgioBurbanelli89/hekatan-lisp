@@ -852,8 +852,12 @@ namespace HekatanLisp
                 if (Directory.Exists(EjemplosDir))
                     foreach (var f in System.Linq.Enumerable.OrderBy(Directory.GetFiles(EjemplosDir, "*.lisp"), x => x))
                     {
+                        // «_nombre.lisp» son hojas de prueba (las leen los guiones de Hekatan School),
+                        // no ejemplos para practicar: no van al menú
+                        if (Path.GetFileName(f).StartsWith("_")) continue;
                         var path = f;
-                        var mi = new MenuItem { Header = Path.GetFileNameWithoutExtension(f) };
+                        // el '_' de un Header de WPF es la tecla de acceso (se come la letra): se dobla
+                        var mi = new MenuItem { Header = Path.GetFileNameWithoutExtension(f).Replace("_", "__") };
                         mi.Click += (s, e) => CargarArchivo(path);
                         MnuEjemplos.Items.Add(mi);
                     }

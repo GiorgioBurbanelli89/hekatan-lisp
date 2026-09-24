@@ -78,7 +78,7 @@
      (list '* (list '- 0 (list 'sin (second e))) (deriv (second e) x)))
     ((eq (car e) 'exp)                     ; (e^u)' = e^u * u'
      (list '* (list 'exp (second e)) (deriv (second e) x)))
-    ((eq (car e) 'log)                     ; (ln u)' = u'/u
+    ((member (car e) '(log ln))            ; (ln u)' = u'/u   (ln y log son el logaritmo natural)
      (list '/ (deriv (second e) x) (second e)))
     (t (error "no se derivar: ~a" e))))
 
@@ -783,9 +783,9 @@
           ((and (eq (car e) 'sin) (eq (second e) v)) (list '- 0 (list 'cos v)))   ; ∫sin = -cos
           ((and (eq (car e) 'cos) (eq (second e) v)) (list 'sin v))               ; ∫cos =  sin
           ((and (eq (car e) 'exp) (eq (second e) v)) (list 'exp v))               ; ∫e^v = e^v
-          ((and (eq (car e) '/) (eql (second e) 1) (eq (third e) v)) (list 'log v)) ; ∫1/v = ln v
+          ((and (eq (car e) '/) (eql (second e) 1) (eq (third e) v)) (list 'ln v)) ; ∫1/v = ln v (se escribe ln: log es base 10 en Calcpad)
           ((and (eq (car e) '/) (numberp (second e)) (eq (third e) v))              ; ∫c/v = c·ln v
-           (simplify (list '* (second e) (list 'log v))))
+           (simplify (list '* (second e) (list 'ln v))))
           ;; regla de la potencia con exponente cualquiera (n ≠ -1): ∫v^n dv = v^(n+1)/(n+1)
           ((and (eq (car e) 'expt) (eq (second e) v) (numberp (third e)) (/= (third e) -1))
            (let ((m (+ (third e) 1))) (simplify (list '/ (list 'expt v m) m))))
@@ -911,13 +911,23 @@
 ;; reglas: evalua funciones en puntos conocidos ( (sin 0)->0, (cos 0)->1, (exp 0)->1 ... )
 (defun eval-consts (e)
   (if (atom e) e
-      (let* ((f (car e)) (a (and (cdr e) (eval-consts (second e)))))
+      ;; el argumento se evalúa y, si queda una suma de números (1 + 0 tras sustituir), se reduce:
+      ;; si no, log(1 + 0) no se reconocía como log(1) = 0 (serie de Taylor de ln(1 + x))
+      (let* ((f (car e))
+             (a (and (cdr e) (let* ((z (eval-consts (second e))) (r (ignore-errors (simplify z))))
+                               (if (numberp r) r z)))))
         (cond
           ((and (eq f 'sin) (eql a 0)) 0)
+          ;; múltiplos de π (∫₀^π sin x dx = 1 − cos π = 2)
+          ((and (eq f 'sin) (member a '(pi (* 2 pi)) :test #'equal)) 0)
+          ((and (eq f 'cos) (eq a 'pi)) -1)
+          ((and (eq f 'cos) (equal a '(* 2 pi))) 1)
+          ((and (eq f 'sin) (equal a '(/ pi 2))) 1)
+          ((and (eq f 'cos) (equal a '(/ pi 2))) 0)
           ((and (eq f 'cos) (eql a 0)) 1)
           ((and (eq f 'tan) (eql a 0)) 0)
           ((and (eq f 'exp) (eql a 0)) 1)
-          ((and (eq f 'log) (eql a 1)) 0)
+          ((and (member f '(log ln)) (eql a 1)) 0)
           ((and (eq f 'sqrt) (eql a 0)) 0)
           ((and (eq f 'sqrt) (eql a 1)) 1)
           (t (cons f (mapcar #'eval-consts (cdr e))))))))
@@ -973,13 +983,20 @@
 ;; SERIE DE TAYLOR alrededor de 0 hasta grado n:  sum f^(k)(0)/k! x^k
 (defun fct (n) (if (<= n 1) 1 (* n (fct (1- n)))))
 (defun taylor (e n &optional (var 'x))
-  "Serie de Taylor de e alrededor de 0, hasta grado n. Usa las derivadas del motor."
-  (let ((term e) (acc 0))
+  "Serie de Taylor de e alrededor de 0, hasta grado n. Usa las derivadas del motor.
+   Se arma en potencias CRECIENTES (1 + x + x²/2 + …), como se lee una serie: simplify
+   reordenaba los términos (x⁵/120 + x − x⁷/5040 − x³/6)."
+  (let ((term e) (acc nil))
     (dotimes (k (1+ n))
       (let ((c (simplify (eval-consts (subst-var term var 0)))))
-        (setf acc (list '+ acc (list '/ (list '* c (list 'expt var k)) (fct k)))))
+        (unless (eql c 0)
+          (let* ((neg (and (numberp c) (< c 0)))
+                 (m (simplify (list '/ (list '* (if neg (- c) c) (list 'expt var k)) (fct k)))))
+            (setf acc (cond ((null acc) (if neg (list '- 0 m) m))
+                            (neg (list '- acc m))
+                            (t (list '+ acc m)))))))
       (setf term (eval-consts (simplify (derive-x term)))))
-    (simplify acc)))
+    (or acc 0)))
 
 ;; Taylor{ f @ x = 0 : n } de la hoja: mismo orden que los demas operadores (f v a b).
 ;; Solo alrededor de 0 (a = 0); con otro a devuelve la notacion, no un resultado falso.
@@ -1148,7 +1165,24 @@
                    (let* ((bigf (poly->expr (poly-integ (car r) var)))
                           (defint (simplify (list '- (subst-var bigf var b) (subst-var bigf var a)))))
                      (simplify (list '/ defint (poly->expr (cdr r)))))
-                   '?))))))))
+                   (area-no-polinomica f var a b)))))))))
+
+(defun area-no-polinomica (f var a b)
+  "∫ₐᵇ f que no es polinomio: con primitiva ELEMENTAL (1/x, sin, cos, exp, xⁿ…) → Barrow exacto,
+   F(b) − F(a) (∫₁² dx/x = ln 2); si no la hay y los límites son números → Simpson con 400
+   tramos (numérico, como el $Area de Calcpad). Si nada aplica, '? (no se inventa un valor)."
+  (let ((bigf (elem-integ f var)))
+    (cond ((not (eq bigf :fail))
+           (simplify (eval-consts (list '- (subst-var bigf var b) (subst-var bigf var a)))))
+          ((and (realp a) (realp b))
+           (or (ignore-errors
+                (let* ((n 400) (h (/ (- b a) n 1d0)) (s 0d0))
+                  (loop for i from 0 to n
+                        do (incf s (* (cond ((or (= i 0) (= i n)) 1) ((oddp i) 4) (t 2))
+                                      (nval f var (+ a (* i h))))))
+                  (* s (/ h 3))))
+               '?))
+          (t '?))))
 
 ;; $product{f @ i = a : b}  y  $root{f @ x}
 (defun producto-op (f var a b)
@@ -1177,7 +1211,7 @@
            (/ (/ (n (first as)) (n (second as))))
            (expt (expt (n (first as)) (n (second as))))
            (sqrt (sqrt (n (first as)))) (sin (sin (n (first as)))) (cos (cos (n (first as))))
-           (tan (tan (n (first as)))) (exp (exp (n (first as)))) (log (log (n (first as))))
+           (tan (tan (n (first as)))) (exp (exp (n (first as)))) ((log ln) (log (n (first as))))
            (abs (abs (n (first as))))
            (t (error "op ~a" op))))))
     (t (error "?"))))
@@ -1360,7 +1394,7 @@
              (+ (apply #'+ a)) (- (apply #'- a)) (* (apply #'* a)) (/ (apply #'/ a))
              (expt (expt (first a) (second a))) (sqrt (sqrt (first a)))
              (sin (sin (first a))) (cos (cos (first a))) (tan (tan (first a)))
-             (exp (exp (first a))) (log (log (first a))) (abs (abs (first a)))
+             (exp (exp (first a))) ((log ln) (log (first a))) (abs (abs (first a)))
              (t (error "neval: op ~a" (car e))))))
         (t (error "neval: ~a" e))))
 ;; nevala matriz simbolica -> matriz de numeros (array 2D double-float)

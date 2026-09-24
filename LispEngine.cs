@@ -145,7 +145,7 @@ namespace HekatanLisp
         // nombres de las llamadas de operación del motor (para detectarlas dentro de una expresión)
         static readonly string[] OpCallNames = {
             "area-under","slope-at","suma","producto-op","root-op","find-op","sup-op","inf-op","repeat-op",
-            "partial","derive-x","deriv-steps","integ-var","integ-x","factor","expand*","limite","despejar","dec"
+            "partial","derive-x","deriv-steps","integ-var","integ-x","factor","expand*","limite","taylor-op","despejar","dec"
         };
         // redondeo y extremos NUMERICOS (engine.lisp: num-fn). Van por evops (escalar) o meval (vector).
         static readonly string[] NumFnNames = { "ceil", "floor", "round", "max", "min" };

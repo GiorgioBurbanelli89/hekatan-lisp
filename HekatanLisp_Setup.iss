@@ -30,7 +30,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Todo el output: exe, DLLs, engine.lisp, sbcl\ (motor embebido) y runtimes\
-Source: "{#MyOut}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; las hojas «_*.lisp» de ejemplos/ son pruebas (Hekatan School las lee del repo): no se instalan
+Source: "{#MyOut}\*"; DestDir: "{app}"; Excludes: "ejemplos\_*.lisp"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

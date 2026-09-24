@@ -376,10 +376,12 @@ namespace HekatanLisp
             string Kw(string name, string inside) =>
                 "<span class=\"m-cond\">" + name + "</span><span class=\"m-op\">{</span>" + inside + "<span class=\"m-op\">}</span>";
             string dx = " <span class=\"m-fn\">d</span><span class=\"m-var\">" + v + "</span>";
+            // ∫ (x + 1) dx: una SUMA como integrando va entre paréntesis (si no se lee x + ∫1 dx)
+            string fi = (n.Items != null && n.Items.Count > 0 && n.Items[0] != null && (n.Items[0].Op == "+" || n.Items[0].Op == "-")) ? Paren(f) : f;
             return n.Atom switch
             {
-                "area" => IntSym(a, b ?? "", "&hairsp;" + f + dx),
-                "integral" => b != null ? IntSym(a, b, "&hairsp;" + f + dx) : IntSym("", "", "&hairsp;" + f + dx),
+                "area" => IntSym(a, b ?? "", "&hairsp;" + fi + dx),
+                "integral" => b != null ? IntSym(a, b, "&hairsp;" + fi + dx) : IntSym("", "", "&hairsp;" + fi + dx),
                 "sum" => Nary("Σ", idx, b ?? "", "&hairsp;" + f),
                 "product" => Nary("∏", idx, b ?? "", "&hairsp;" + f),
                 "lim" or "limit" or "limite" =>

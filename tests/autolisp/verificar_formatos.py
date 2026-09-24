@@ -22,7 +22,7 @@ if os.path.exists(base + ".dwg"):
     out = TMP + "/v_dwg.dxf"
     if os.path.exists(out): os.remove(out)
     open(TMP + "/v.scr", "w").write(f"FILEDIA\n0\n_.AUDIT\nN\n_.DXFOUT\n{out}\n16\n_.QUIT\nY\n\n")
-    r = subprocess.run([ACAD, "/i", TMP.replace("/", "\\") + "\\v.dwg", "/s", TMP.replace("/", "\\") + "\\v.scr"], capture_output=True, timeout=600)
+    r = subprocess.run([ACAD, "/i", TMP.replace("/", "\\") + "\\v.dwg", "/s", TMP.replace("/", "\\") + "\\v.scr"], capture_output=True, timeout=600, cwd=TMP)
     log = r.stdout.decode("utf-16-le", "ignore")
     aud = [l.strip() for l in log.replace("\r", "").split("\n") if "errors found" in l.lower() or "errores" in l.lower()]
     if os.path.exists(out):

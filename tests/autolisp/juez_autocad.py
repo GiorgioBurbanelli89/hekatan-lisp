@@ -105,7 +105,7 @@ def acad(code, n, exe):
     if os.path.exists(dxf): os.remove(dxf)
     open(scr, "w", encoding="ascii").write(
         f'SECURELOAD\n0\nFILEDIA\n0\n(load "{lsp}")\n_.DXFOUT\n{dxf}\n16\n_.QUIT\nY\n\n')
-    r = subprocess.run([exe, "/s", scr.replace("/", "\\")], capture_output=True, timeout=600)
+    r = subprocess.run([exe, "/s", scr.replace("/", "\\")], capture_output=True, timeout=600, cwd=TMP)
     log = r.stdout.decode("utf-16-le", "ignore") if r.stdout[:2] != b"" else ""
     if not os.path.exists(dxf):
         raise RuntimeError("AutoCAD no escribió el DXF:\n" + log[-2000:])

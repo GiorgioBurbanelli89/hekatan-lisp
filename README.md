@@ -109,6 +109,33 @@ Los nombres distinguen mayúsculas (`e` ≠ `E`). Ejemplo completo: `ejemplos/71
 
 ---
 
+## Animación y voz — `#anim` · `#voz`
+
+Los cuadros los calcula el motor de antemano (uno por valor del parámetro); la página solo enseña uno y esconde
+los demás. Cada animación lleva **▶/⏸**, **barra de cuadro**, rótulo (`n = 3 (3/8)`), **subtítulo** y el botón
+**🔊** (narración con la Web Speech API: `speechSynthesis`, voz `es-ES` o la primera `es-*`; igual en el escritorio,
+WebView2, y en el navegador). Sin voz en español el 🔊 no aparece y la animación sigue sola. Al imprimir (PDF) y en
+`--shot` queda el **cuadro 1** con su texto. Mismo código en escritorio y web (`LispAnim.cs`).
+
+| Escribes | Hace |
+|---|---|
+| `#anim fplot(u = x^n, [0 1]), n = 1:8` | una gráfica de x por valor (paso opcional: `n = 1:2:15`) |
+| `#anim surf(A*sin(pi*x)*sin(pi*y), [0 1], [0 1]), A = 0.25:0.25:1` | superficie en UN lienzo que se gira con el ratón (el giro se conserva); escala z común: se ve crecer la amplitud |
+| `#anim surf(N_{k}, [0 1], [0 1]), k = 1:16` | `{k}` arma nombres de la hoja (N_1 … N_16); cada función con su escala z (el rótulo da su mínimo y máximo) |
+| `#anim surf(M, [0 1], [0 1])` | M matriz o vector de la hoja: un cuadro por componente, M(1, 1), M(1, 2)… |
+| `#anim map(sin(k*pi*x)*sin(pi*y), [0 1], [0 1]), k = 1:3` | mapa de color |
+| `#anim(n = 2:2:16)` … `#finanim` | **bloque**: todo lo de dentro (`#dibujo`, `#autolisp`, `#surf`, `#map`, `#malla`, fórmulas, texto, bucles de `#numerico`) se repite y se calcula una vez por valor; cada repetición es un cuadro |
+| `#anim(j = 1:5)` + `#dibujo(…)` … `#fin` | forma corta: el bloque de dibujo (o `#autolisp`) que sigue |
+| `#voz: texto` | narración. Pegada a una animación (líneas seguidas justo después): **una por cuadro**, en orden; si hay una sola, vale para todos. Dentro de un bloque `#anim(…)`: la de cada cuadro. Suelta: párrafo con su 🔊 |
+
+Dentro de un bloque, el parámetro se sustituye como **palabra suelta** en fórmulas, directivas y líneas de
+`#dibujo`/`#autolisp`, y como `{n}` (o `@{n}`) en el texto y en `#voz`. Por eso el parámetro no debe llamarse como
+un argumento con nombre del bloque (`ud = m`, `n = 13` en `carga(…)`): elige otra letra. En `#voz` también
+valen `@{var}` (el valor de ese cuadro, p. ej. el error de cada malla). Ejemplos: 47 (fplot) y 82 (funciones de forma
+del BFS y refinamiento h, con voz). Pruebas: `tests/animacion/` (escritorio con `--ctl`, web con Playwright).
+
+---
+
 ## Dibujo AutoLISP — `#autolisp` … `#fin` (2D y 3D)
 
 **El código es la lista de datos**: una entidad es una lista DXF de LISP, `((0 . "LINE") (8 . "0") (10 0 0) (11 3 4))`,

@@ -65,11 +65,22 @@ def compara(nombre, cp, hk, res):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--exe", default=EXE); a = ap.parse_args()
     fallos = 0
-    for num in ("73", "74", "75", "76", "77", "78"):
+    for num in ("73", "74", "75", "76", "77", "78", "82"):
         hoja = next(os.path.join(EJ, f) for f in os.listdir(EJ) if f.startswith(num + " "))
         vals, errs, t, graf = corre(os.path.abspath(a.exe), hoja)
         res = []
-        if num in CASOS:
+        if num == "82":
+            # refinamiento h animado: 8 mallas (2 × 2 … 16 × 16), flecha y Mx del centro; y la serie de
+            # Navier que suma la hoja frente a la de navier_levy.py (a 1e-8 en α y β)
+            from navier_levy import navier_uniforme
+            T = lit(vals["T"])
+            for k, n in enumerate(range(2, 17, 2)):
+                o = oraculo(os.path.join(AQUI, "calcpad", f"78_conv_{n}.html"))
+                res += [(f"w_c {n}x{n}", o["w_c"], T[k][3]), (f"Mx_c {n}x{n}", o["Mx_c"], T[k][6])]
+            al, be, _ = navier_uniforme(1.0)
+            res += [("alfa_N x1e4", al * 1e4, float(vals["@α_N"]) * 1e4), ("beta_N x1e3", be * 1e3, float(vals["@β_N"]) * 1e3)]
+            print(f"      orden p: flecha {float(vals['@p_w']):.4f}, momento {float(vals['@p_M']):.4f}")
+        elif num in CASOS:
             o = oraculo(os.path.join(AQUI, "calcpad", CASOS[num] + ".html"))
             for nom in ("W_z", "Mx", "My"):
                 compara(nom, o[nom], lit(vals["transpose(" + nom + ")"]), res)

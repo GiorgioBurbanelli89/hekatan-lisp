@@ -138,7 +138,13 @@ namespace HekatanLisp
                 ShowResult();
 
             if (_ctl != null) StartCtl();
-            if (_shot != null) { await Task.Delay(700); await CaptureAndExit(_shot); }
+            // --shot espera el CÁLCULO (como --pdf): una hoja larga (ejemplo 82, ~5 s) salía «calculando…»
+            //  (el TextChanged del editor relanza el cálculo tras el debounce: se espera también ese)
+            if (_shot != null)
+            {
+                for (int k = 0; k < 3; k++) { try { if (_showTask != null) await _showTask; } catch { } await Task.Delay(k == 0 ? 700 : 400); }
+                await CaptureAndExit(_shot);
+            }
             if (_pdf != null)
             {   // espera el CÁLCULO (hojas largas tardan más de 1 s: salía el PDF de la hoja anterior/vacía)
                 try { if (_showTask != null) await _showTask; } catch { }
@@ -284,6 +290,7 @@ namespace HekatanLisp
                     foreach (var ph in plots)
                         html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>",
                             ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
+                    html = LispAnim.PostProcesar(html);   // #anim(n = a:b) … #finanim: los cuadros en su reproductor
                     if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + "</body>");   // orbit + hover de mapas, una vez
                 }
                 _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)

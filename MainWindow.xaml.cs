@@ -641,6 +641,11 @@ namespace HekatanLisp
                             EditorCol.ActualWidth, MainSplitter.ActualWidth, WebCol.ActualWidth,
                             (int)p0.X, (int)p0.Y, (int)p1.X, (int)p1.Y, (int)pe.X, (int)pe.Y, Editor.FontSize);
                     }
+                // zoom del RESULTADO (como Ctrl+rueda sobre él): {"op":"webzoom","factor":1.3}. Se queda
+                // entre recálculos (es del WebView2, no de la página). Para grabar vídeos legibles a 1280×720.
+                case "webzoom":
+                    try { Viewer.ZoomFactor = doc.RootElement.GetProperty("factor").GetDouble(); } catch { }
+                    return "{\"ok\":true}";
                 case "hashl":
                     return System.Text.Json.JsonSerializer.Serialize(new { hl = Editor.SyntaxHighlighting?.Name });
                 case "quit":

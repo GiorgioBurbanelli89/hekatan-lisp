@@ -1105,7 +1105,23 @@ namespace HekatanLisp
                 baseN = name.Substring(0, i); sub = name.Substring(i);
             }
             if (sub.Length > 0 && !(baseN.Length > 0 && char.IsLetter(baseN[0]))) { baseN = name; sub = ""; }
+            // primas con TOKEN (Φprime_1a → Φ′₁ₐ, Φpprime_1a → Φ″₁ₐ), igual que en VarHtml: una función
+            // derivada se llama como la variable derivada. Antes el nombre de la FUNCIÓN no lo deshacía
+            // y la definición  Φprime_1a(ξ) = …  salía «Φprime₁ₐ».
+            string primas = "";
+            for (bool sigue = true; sigue; )
+            {
+                sigue = false;
+                foreach (var (tk, np) in new[] { ("tprime", 3), ("pprime", 2), ("prime", 1) })
+                {
+                    if (baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
+                    { baseN = baseN.Substring(0, baseN.Length - tk.Length); primas = string.Concat(Enumerable.Repeat("&prime;", np)) + primas; sigue = true; break; }
+                    if (sub.Length > tk.Length && sub.EndsWith(tk, StringComparison.Ordinal))
+                    { sub = sub.Substring(0, sub.Length - tk.Length); primas = string.Concat(Enumerable.Repeat("&prime;", np)) + primas; sigue = true; break; }
+                }
+            }
             var h = "<span class=\"m-fn\">" + GreekSym(baseN) + "</span>";
+            if (primas.Length > 0) h += "<sup class=\"m-sup\">" + primas + "</sup>";
             if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
             return h;
         }
@@ -1114,6 +1130,18 @@ namespace HekatanLisp
         // GRANDE (>9 col ó >11 filas): índices de fila/columna en los bordes y el centro
         //   COLAPSADO con … ⋮ ⋱ (como el MathCanvas de Hekatan Calc y como NumPy/MATLAB).
         //   Chica: cuadrícula simple, sin índices.
+        // Un número (también negativo, o 1.5·10²⁰ de la hoja numérica) NO pide separador de columnas:
+        // el separador es para distinguir EXPRESIONES. Antes un solo −0.41 ponía rayas en toda la matriz.
+        static bool EsNumeroSimple(N c)
+        {
+            if (c.IsAtom) return true;
+            if (c.Op == "neg" && c.A != null) return EsNumeroSimple(c.A);
+            if ((c.Op == "^" || c.Op == "expt") && c.A != null && c.B != null && c.A.IsAtom && c.A.Atom == "10") return EsNumeroSimple(c.B);
+            if (c.Op == "*" && c.A != null && c.B != null && c.A.IsAtom && double.TryParse(c.A.Atom, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                return EsNumeroSimple(c.B);
+            return false;
+        }
+
         static string GridHtml(List<List<N>> rows, bool bars = false)
         {
             // bars = true → delimitadores de DETERMINANTE (barras verticales |…|) en vez de
@@ -1129,7 +1157,7 @@ namespace HekatanLisp
             {
                 // separador vertical entre columnas si los elementos son SIMBÓLICOS (expresiones),
                 // como Hekatan Lab: distingue dónde termina cada elemento. Números/variables solos, no.
-                bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !c.IsAtom));
+                bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !EsNumeroSimple(c)));
                 var sc = new StringBuilder();
                 foreach (var row in rows)
                 {
@@ -1197,7 +1225,7 @@ namespace HekatanLisp
         {
             bool showCol = ncols > 1, showRow = nrows > 1;
             // separador vertical entre columnas de DATOS si la matriz es simbólica (como Hekatan Lab).
-            bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !c.IsAtom));
+            bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !EsNumeroSimple(c)));
             int brkCol   = showRow ? 2 : 1;
             int dataCol0 = brkCol + 1;
             int brkRCol  = dataCol0 + cols.Count;

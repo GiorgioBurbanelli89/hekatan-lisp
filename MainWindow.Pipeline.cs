@@ -567,6 +567,19 @@ namespace HekatanLisp
                 }
                 else if (kw is "malla" or "mallado")
                 {
+                    // hoja numérica: #malla(x_j, y_j, e_j, s_j) con los datos del modelo
+                    var pmz = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (pmz.Success && _numMeshes != null && _numMeshes.TryGetValue(pmz.Groups[1].Value.Trim(), out var mdat))
+                    {
+                        try
+                        {
+                            string b64m = SurfacePlot.MeshPngData(mdat.X, mdat.Y, mdat.Elem, mdat.Apoyos, dark);
+                            outList.Add(PlotWrap("<img src=\"data:image/png;base64," + b64m + "\" style=\"max-width:100%\">",
+                                                 "malla del modelo: nudos, elementos y apoyos"));
+                        }
+                        catch { outList.Add(""); }
+                        continue;
+                    }
                     // #malla(nx, ny, [xa xb], [ya yb])  — la rejilla de elementos finitos
                     var mg = System.Text.RegularExpressions.Regex.Match(rest,
                         @"^\(\s*(\d+)\s*,\s*(\d+)\s*,\s*\[([^\]]*)\]\s*,\s*\[([^\]]*)\]\s*\)\s*$");
@@ -588,6 +601,23 @@ namespace HekatanLisp
                 {
                     var pm = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
                     if (!pm.Success) { outList.Add(""); continue; }
+                    // hoja numérica: la rejilla ya la calculó el motor numérico (funciones de la hoja,
+                    // spline de una matriz de resultados…) — aquí solo se pinta
+                    if (isMap && _numGrids != null && _numGrids.TryGetValue(pm.Groups[1].Value.Trim(), out var rej))
+                    {
+                        try
+                        {
+                            string b64 = SurfacePlot.MapPngGrid(rej.Z, rej.N, rej.Xa, rej.Xb, rej.Ya, rej.Yb, dark, isCont, isCont ? 12 : 0);
+                            anySurf = true;
+                            string img = "<img style=\"max-width:100%;height:auto\" src=\"data:image/png;base64," + b64 + "\">";
+                            string spec0 = System.Net.WebUtility.HtmlEncode(SplitTop(pm.Groups[1].Value).FirstOrDefault()?.Trim() ?? "");
+                            outList.Add(PlotWrap(SurfacePlot.MapHoverGrid(rej.Z, rej.N, "x", "y", rej.Xa, rej.Xb, rej.Ya, rej.Yb, img,
+                                                                           SurfacePlot.AltoProporcional(rej.Xa, rej.Xb, rej.Ya, rej.Yb)),
+                                                 "mapa de  " + spec0 + "  (planta)"));
+                        }
+                        catch { outList.Add(""); }
+                        continue;
+                    }
                     var (f, spec, xa, xb, ya, yb) = ParseSurfArgs(pm.Groups[1].Value, byName, inv);
                     if (f == null) { outList.Add(""); continue; }
                     var vs = LispConverter.VarsOf(f);
@@ -1102,6 +1132,90 @@ dib();})();";
         /// guarda para pintarla en ese sitio. El resto de la hoja sigue su camino de
         /// siempre, linea a linea.
         /// </summary>
+        // ------------------------- HOJA NUMÉRICA (#numerico) -------------------------
+        private static readonly System.Text.RegularExpressions.Regex RxNumerico = new System.Text.RegularExpressions.Regex(
+            @"(?im)^[ \t]*#[ \t]*(numerico|numérico|numeric|calcpad)[ \t]*\r?$");
+        private static readonly System.Text.RegularExpressions.Regex RxMarcaBloque = new System.Text.RegularExpressions.Regex(
+            @"^\s*#hkbloque:(\d+)\s*$");
+        private static readonly System.Text.RegularExpressions.Regex RxVis = new System.Text.RegularExpressions.Regex(
+            @"^\s*#\s*(hide|show|noc|equ|val|ocultar|mostrar|formula|valor)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        private bool _numMode;
+        private HojaNumerica.Resultado _numRes;
+        private List<List<string>> _numBlocks;
+        private static Dictionary<string, HojaNumerica.Rejilla> _numGrids;   // #map de la hoja numérica: texto → rejilla
+        private static Dictionary<string, HojaNumerica.MallaDatos> _numMeshes;   // #malla(x, y, e, s) → datos del modelo
+        private const string NumOculta = "\u0002hkoculta";                   // línea #hide: no se dibuja
+
+        /// <summary>Hoja numérica: cada bloque for/while/if/function (y su forma Calcpad) se pliega en
+        /// UNA línea marcador «#hkbloque:k». Su texto (ya con los nombres preparados) va a <paramref name="bloques"/>;
+        /// NO se ejecuta aquí: lo corre HojaNumerica junto con el resto de la hoja, en orden.</summary>
+        private static string PlegarNumerico(string text, out List<List<string>> bloques)
+        {
+            bloques = new List<List<string>>();
+            var src = text.Replace("\r", "").Split('\n');
+            var salida = new List<string>();
+            for (int i = 0; i < src.Length; i++)
+            {
+                if (!HojaNumerica.AbreBloque(src[i])) { salida.Add(src[i]); continue; }
+                var cuerpo = new List<string>();
+                int nivel = 0, j = i;
+                for (; j < src.Length; j++)
+                {
+                    if (HojaNumerica.AbreBloque(src[j])) nivel++;
+                    else if (HojaNumerica.CierraBloque(src[j])) nivel--;
+                    cuerpo.Add(src[j]);
+                    if (nivel == 0) break;
+                }
+                i = j;
+                salida.Add("#hkbloque:" + bloques.Count);
+                bloques.Add(cuerpo);
+            }
+            return string.Join("\n", salida);
+        }
+
+        /// <summary>Una línea de la hoja numérica: «nombre = fórmula = valor» con el valor que dio el
+        /// programa (doble precisión, números como los muestra Calcpad). null = no es numérica.</summary>
+        private string NumDisplay(int i, string texto, string lbl, LispConverter.N tree, char modo)
+        {
+            if (_numRes == null) return null;
+            var enc = new Func<string, string>(System.Net.WebUtility.HtmlEncode);
+            if (_numRes.Error.TryGetValue(i, out var err))
+                return LispConverter.TxtLine("p", "left", "<span style=\"color:#c0392b\">⚠ <code>" + enc((texto ?? "").Trim()) + "</code> → " + enc(err) + "</span>");
+            if (modo == 'n') return tree == null ? null : (lbl != null ? lbl + " = " : "") + LispConverter.ToLisp(tree);
+            if (!_numRes.Valor.TryGetValue(i, out var v)) return null;
+            v = HojaNumerica.FormatoLiteral(v);
+            string f = null;
+            try { f = tree != null ? LispConverter.ToLisp(tree) : null; } catch { }
+            bool trivial = f == null || f == v || f == lbl || modo == 'v' ||
+                           System.Text.RegularExpressions.Regex.IsMatch(f, @"^-?[\d.]+(e-?\d+)?$");
+            if (lbl != null) return trivial ? lbl + " = " + v : lbl + " = " + f + " = " + v;
+            return f != null && f != v ? f + " = " + v : v;
+        }
+
+        /// <summary>El bloque en la hoja: el código plegable (como Calcpad lo esconde con #hide, pero a
+        /// un clic), lo que imprimió con disp(…) y, si falló, por qué.</summary>
+        private string BloqueHtml(int k, int linea)
+        {
+            var enc = new Func<string, string>(System.Net.WebUtility.HtmlEncode);
+            var src = _numBlocks != null && k < _numBlocks.Count ? _numBlocks[k] : new List<string>();
+            string primera = src.Count > 0 ? src[0].Trim() : "";
+            // los nombres preparados (nu, ehkq1…) vuelven a como se escribieron (ν, E)
+            string Orig(string s) => System.Text.RegularExpressions.Regex.Replace(s, @"[A-Za-z_]\w*", m => LispConverter.OriginalName(m.Value) is string o && o != m.Value && !o.Contains(' ') ? o : m.Value);
+            var sb = new StringBuilder();
+            sb.Append("<details class=\"hk-bloque\" style=\"margin:.35em 0;border-left:3px solid var(--acc,#b08a2e);padding:.1em .6em;background:rgba(127,127,127,.06)\">");
+            sb.Append("<summary style=\"cursor:pointer;font-family:Consolas,monospace;font-size:.9em;color:var(--mut)\">")
+              .Append(enc(Orig(primera))).Append(src.Count > 1 ? "  … (" + src.Count + " líneas)" : "").Append("</summary>");
+            sb.Append("<pre style=\"margin:.3em 0;font:12.5px/1.45 Consolas,monospace;white-space:pre\">");
+            foreach (var l in src) sb.Append(enc(Orig(l))).Append("&#10;");   // sin saltos reales: la hoja se parte por líneas
+            sb.Append("</pre></details>");
+            if (_numRes != null && _numRes.Salida.TryGetValue(linea, out var outs))
+                foreach (var o in outs)
+                    sb.Append("<div style=\"font-family:Consolas,monospace\">").Append(enc(HojaNumerica.FormatoLiteral(o))).Append("</div>");
+            if (_numRes != null && _numRes.Error.TryGetValue(linea, out var err))
+                sb.Append("<div style=\"color:#c0392b\">⚠ ").Append(enc(err)).Append("</div>");
+            return sb.ToString();
+        }
+
         private string PlegarBloques(string text, out Dictionary<int, string> salidas)
         {
             salidas = new Dictionary<int, string>();
@@ -1158,7 +1272,16 @@ dib();})();";
         /// Una memoria de cálculo quiere ver las fórmulas COMO SE ESCRIBEN (m = (N − 0.95·d)/2), y el
         /// modo por defecto (simplify) las reescribe (N/2 − 19·d/40). La línea queda en blanco para no
         /// descuadrar los índices por línea; derivar/integrar/despejar mandan sobre la hoja.</summary>
+        // UN cálculo a la vez. ComputeResult corre en Task.Run y usa campos de la ventana (_op,
+        // _sinSustituir, _srcPrepared, _numRes…): dos a la vez (AutoRun mientras aún calcula, o
+        // --html, que calculaba al abrir Y al exportar) se pisaban. Visto en la hoja 69: con
+        // #modo memoria salía unas veces sustituida y otras no, según quién terminara último.
+        private readonly object _computeLock = new object();
         private List<string> ComputeResult(string text, string dvar)
+        {
+            lock (_computeLock) return ComputeResultUno(text, dvar);
+        }
+        private List<string> ComputeResultUno(string text, string dvar)
         {
             var mm = System.Text.RegularExpressions.Regex.Match(text ?? "",
                 @"(?im)^[ \t]*#[ \t]*modo[ \t]*\(?[ \t]*(auto|simplify|expand|memoria)[ \t]*\)?[ \t]*\r?$");
@@ -1189,13 +1312,29 @@ dib();})();";
             // cambia el numero de lineas, y de aqui para abajo todo el pipeline
             // trabaja con arrays indexados por linea. Plegar despues los descuadra
             // (probado el 21-sep-2026: salia el CSS volcado como contenido).
+            // HOJA NUMÉRICA (#numerico): toda la hoja es UN programa con estado (como Calcpad).
+            // Aquí los nombres se preparan ANTES de plegar, para que los bloques usen los mismos
+            // nombres que la hoja (ν → nu, E/e distintos…); el plegado deja una línea marcador.
+            _numMode = RxNumerico.IsMatch(text);
+            _numRes = null; _numBlocks = null; _numGrids = null; _numMeshes = null;
+            if (_numMode)
+            {
+                text = RxNumerico.Replace(text, "");
+                // palabras de bloque de Calcpad (#for … #loop) → MATLAB, antes de preparar nombres
+                text = string.Join("\n", text.Replace("\r", "").Split('\n').Select(HojaNumerica.PalabraCalcpad));
+                text = LispConverter.PrepareNames(text);
+                text = PlegarNumerico(text, out _numBlocks);
+                _srcPrepared = text;
+            }
+            else
+            {
+            // (antes esta regex llevaba un RETROCESO (0x08) literal donde iba \b: no casaba nunca y
+            //  los bloques for/if de una hoja se pintaban como texto, sin ejecutarse)
             if (!LooksLikeLisp(text) &&
-                System.Text.RegularExpressions.Regex.IsMatch(text, @"(^|
-)\s*(for|while|if|function)"))
+                System.Text.RegularExpressions.Regex.IsMatch(text, @"(?m)^\s*(for|while|if|function)\b"))
             {
                 bool hayHoja = System.Text.RegularExpressions.Regex.IsMatch(
-                    text, @"(^|
-)\s*(#[:#>|<]|#\s*(dibujo|map|mapa|fplot|surf|tabla|graf))",
+                    text, @"(?m)^\s*(#[:#>|<]|#\s*(dibujo|map|mapa|fplot|surf|tabla|graf))",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (!hayHoja)
                 {
@@ -1204,11 +1343,10 @@ dib();})();";
                     catch (Exception ex) { return new List<string> { "...  (" + ex.Message + ")" }; }
                 }
                 text = PlegarBloques(text, out _salidasProg);
-
             }
-
             text = LispConverter.PrepareNames(text);
             _srcPrepared = text;
+            }
 
             // Programas: LISP (defun/loop/let) o matemática imperativa (for/while) → EJECUTAR.
             if (LooksLikeLisp(text) && IsLispProgram(text))
@@ -1304,6 +1442,74 @@ dib();})();";
                 // UNIDAD visible al final:  P_1 = 35 [kN]  → se quita ANTES de calcular y se dibuja después
                 if (LispConverter.SepararUnidad(lines[i].TrimEnd(), out var sinUnidad, out var unidadVis)) { lines[i] = sinUnidad; unitOf[i] = unidadVis; }
             }
+            // HOJA NUMÉRICA: visibilidad (#hide/#show) y modo de ecuación (#noc/#equ/#val) de Calcpad,
+            // y el PROGRAMA: todas las líneas de cálculo + los bloques, en orden, de una vez en SBCL.
+            var numOculta = new bool[lines.Length];   // no se dibuja (#hide, o la propia directiva)
+            var numModo = new char[lines.Length];     // 'e' fórmula = valor · 'n' solo fórmula · 'v' solo valor
+            var numBloque = new int[lines.Length];    // ≥0: marcador de bloque
+            if (_numMode)
+            {
+                bool oculta = false; char modo = 'e';
+                var progLines = new List<HojaNumerica.Linea>();
+                var rxMap = new System.Text.RegularExpressions.Regex(@"^\s*#\s*(map|mapa|heatmap|contourf?)\s*\((.*)\)\s*$",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    numBloque[i] = -1;
+                    var s = lines[i].Trim();
+                    var vm = RxVis.Match(s);
+                    if (vm.Success)
+                    {
+                        switch (vm.Groups[1].Value.ToLowerInvariant())
+                        {
+                            case "hide": case "ocultar": oculta = true; break;
+                            case "show": case "mostrar": oculta = false; break;
+                            case "noc": case "formula": modo = 'n'; break;
+                            case "equ": modo = 'e'; break;
+                            case "val": case "valor": modo = 'v'; break;
+                        }
+                        lines[i] = ""; numOculta[i] = true; continue;
+                    }
+                    numModo[i] = modo;
+                    var mb = RxMarcaBloque.Match(s);
+                    if (mb.Success)
+                    {
+                        numBloque[i] = int.Parse(mb.Groups[1].Value);
+                        numOculta[i] = oculta;
+                        progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Bloque = numBloque[i], Visible = !oculta });
+                        continue;
+                    }
+                    var mz = System.Text.RegularExpressions.Regex.Match(lines[i], @"^\s*#\s*(malla|mallado)\s*\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (mz.Success && !System.Text.RegularExpressions.Regex.IsMatch(mz.Groups[2].Value, @"^\s*\d+\s*,"))
+                    { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Malla = mz.Groups[2].Value, Visible = true }); continue; }
+                    var mm = rxMap.Match(lines[i]);
+                    if (mm.Success) { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Mapa = mm.Groups[2].Value, Visible = true }); continue; }
+                    if (s.Length == 0 || s.StartsWith("#") || s.StartsWith(";") || s.StartsWith("%")) continue;   // texto
+                    numOculta[i] = oculta;
+                    if (modo == 'n') continue;                 // #noc: se dibuja, no se calcula (Calcpad)
+                    progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = lines[i], Visible = !oculta });
+                }
+                _numRes = HojaNumerica.Ejecutar(progLines, _numBlocks ?? new List<List<string>>());
+                _numGrids = new Dictionary<string, HojaNumerica.Rejilla>();
+                foreach (var pl in progLines)
+                    if (pl.Mapa != null && _numRes.Mapa.TryGetValue(pl.Idx, out var g)) _numGrids[pl.Mapa.Trim()] = g;
+                _numMeshes = new Dictionary<string, HojaNumerica.MallaDatos>();
+                foreach (var pl in progLines)
+                    if (pl.Malla != null && _numRes.Malla.TryGetValue(pl.Idx, out var md)) _numMeshes[pl.Malla.Trim()] = md;
+                if (Environment.GetEnvironmentVariable("HK_NUM_DEBUG") is string dbg && dbg.Length > 0)
+                    try
+                    {
+                        System.IO.File.WriteAllText(dbg, ";; " + _numRes.Segundos.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) +
+                            " s total, " + _numRes.SegundosMotor.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) +
+                            " s calculo\n" + _numRes.Programa + "\n;; ---- valores ----\n" +
+                            string.Join("\n", _numRes.Valor.OrderBy(kv => kv.Key).Select(kv => ";; " + kv.Key + " [" +
+                                LispConverter.OriginalName(_numRes.Nombre.TryGetValue(kv.Key, out var nm) ? nm : "") + "] " +
+                                System.Text.RegularExpressions.Regex.Replace((lines[kv.Key] ?? "").Trim(), @"[A-Za-z_]\w*", mo => LispConverter.OriginalName(mo.Value)) +
+                                " => " + kv.Value)) +
+                            "\n;; ---- errores ----\n" + string.Join("\n", _numRes.Error.Select(kv => ";; " + kv.Key + " " + kv.Value)));
+                    }
+                    catch { }
+            }
             var isPlot = new bool[lines.Length];   // línea = directiva de gráfica → marca su POSICIÓN en el documento
             var isTabla = new bool[lines.Length];   // línea = #tabla(…)(…) de RESULTADOS calculados
             var tablaSpecOf = new TablaSpec[lines.Length];
@@ -1311,6 +1517,7 @@ dib();})();";
             for (int i = 0; i < lines.Length; i++)
             {
                 if (isTic[i] || isToc[i]) continue;   // tic/toc: no se parsean como expresión
+                if (_numMode && (numBloque[i] >= 0 || (numOculta[i] && !RxAnyPlot.IsMatch(lines[i])))) continue;   // hoja numérica: bloque u oculta
                 if (dibujos[i] != null) continue;     // #dibujo: se dibuja en el display (necesita los resultados)
                 if (manualTables[i] != null) { textOf[i] = ("table", "left", manualTables[i]); continue; }   // tabla de TEXTO (#|…|)
                 var exprText = lines[i];
@@ -1372,6 +1579,8 @@ dib();})();";
             for (int i = 0; i < lines.Length; i++)
             {
                 if (treeOf[i] == null) continue;
+                // hoja numérica: lo calculado por el programa (o #noc) no pasa por el motor simbólico
+                if (_numMode && (numOculta[i] || numModo[i] == 'n' || (_numRes != null && _numRes.Calculada.Contains(i)))) continue;
                 try
                 {
                     var app = (funcMap.Count > 0 || vecMap.Count > 0)
@@ -1421,6 +1630,14 @@ dib();})();";
                     continue;
                 }
                 if (isPlot[i]) { display.Add(LispConverter.PlotSlot); continue; }   // gráfica: hueco en su posición
+                if (_numMode)
+                {
+                    bool conError = _numRes != null && _numRes.Error.ContainsKey(i);
+                    if (numBloque[i] >= 0) { display.Add(numOculta[i] && !conError ? NumOculta : LispConverter.TxtLine("table", "left", BloqueHtml(numBloque[i], i))); continue; }
+                    if (numOculta[i] && !conError) { display.Add(NumOculta); continue; }
+                    var nd = NumDisplay(i, lines[i], labels[i], treeOf[i], numModo[i]);
+                    if (nd != null) { display.Add(nd); continue; }
+                }
                 if (dibujos[i] != null)   // #dibujo … #fin: SVG técnico con los valores YA calculados de la hoja
                 {
                     string svg;
@@ -1601,6 +1818,7 @@ dib();})();";
             var merged = new List<string>();
             for (int i = 0; i < display.Count; i++)
             {
+                if (display[i].StartsWith(NumOculta, StringComparison.Ordinal)) continue;   // #hide
                 bool cont = i < contLine.Count && contLine[i];
                 if (cont && merged.Count > 0 && Mergeable(display[i]) && Mergeable(merged[merged.Count - 1]))
                     merged[merged.Count - 1] += LispConverter.SbsSep + display[i];

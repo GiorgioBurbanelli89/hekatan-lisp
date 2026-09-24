@@ -85,6 +85,30 @@ Los **vectores llevan flecha** (`v` → **v⃗**). La operación se muestra comp
 
 ---
 
+## Hoja numérica — `#numerico` (como Calcpad)
+
+Con una línea `#numerico` la hoja entera es **un programa con estado**: bucles, matrices grandes,
+ensamblaje y solución, como en Calcpad. Las variables que un bucle modifica las leen las líneas
+siguientes. Cada línea se muestra `nombre = fórmula = valor` (doble precisión, formato de Calcpad).
+
+| Escribes | Hace |
+|---|---|
+| `for i = 1:n` · `while c` · `if … elseif … else` · `end` | bloques (sintaxis MATLAB) |
+| `#for i = 1 : n` … `#loop` · `#if` … `#else if` … `#end if` | lo mismo, con las palabras de Calcpad |
+| `A(i, j) = x` · `K(g, g) = K(g, g) + K_e` · `M(:, j)` · `a:b:c` | índices, rangos, asignación indexada |
+| `A'` · `A*B` · `A` · `.*` `./` `.^` · `[a, b; c, d]` | álgebra de matrices |
+| `f(x, y) = …` · `g = @(x) …` · `function y = f(a) … end` | funciones |
+| `zeros` `eye` `size` `sum` `max` `round` `row` `col` `submatrix` `slice` `extract` `take` `add` | biblioteca (MATLAB y Calcpad) |
+| `lsolve(A, b)` · `clsolve(A, b)` (Cholesky) · `inv` · `det` | sistemas |
+| `integral(f, a, b)` · `integral2(f, a, b, c, d)` · `spline(u, v, M)` | integrales (también de matrices) e interpolación de Calcpad |
+| `#hide` / `#show` · `#noc` / `#equ` / `#val` | visibilidad y modo de ecuación de Calcpad |
+| `#map(f(x, y), [xa xb], [ya yb])` · `#malla(x_j, y_j, e_j, s_j)` | mapa de color y malla del modelo |
+
+Los nombres distinguen mayúsculas (`e` ≠ `E`). Ejemplo completo: `ejemplos/71 Losa rectangular por elementos finitos (Rectangular Slab FEA de Calcpad).lisp`
+(849 números de Calcpad, iguales a 4 decimales). Pruebas: `tests/numerico/`.
+
+---
+
 ## Las cuatro vistas
 
 **Izquierda (cómo escribes):** `matemática` · `expr LISP` (`(setf name forma)`) · `LISP ▶` (script ejecutable) · `Hekatan Lab` (código MATLAB).

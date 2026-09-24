@@ -622,8 +622,11 @@ namespace HekatanLisp
         {
             try
             {
-                ShowResult();                        // fuerza el pipeline: SBCL → RenderPage → gráficas
+                // Si al abrir la hoja ya se lanzó el cálculo (AutoRun), se ESPERA ese; lanzar otro
+                // hacía correr la hoja dos veces (el doble de tiempo) y a la vez.
+                if (_showTask == null || (_showTask.IsCompleted && _lastHtml == null)) ShowResult();
                 try { await _showTask; } catch { }   // espera a que el cálculo/render termine
+                if (_lastHtml == null) { ShowResult(); try { await _showTask; } catch { } }
                 File.WriteAllText(path, _lastHtml ?? "");
             }
             catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }

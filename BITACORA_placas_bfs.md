@@ -63,3 +63,17 @@ solución publicada (Timoshenko & Woinowsky-Krieger, Navier/Lévy).
   12 niveles) antes de dibujar; ejes = x, y (o los que queden libres); rangos con nombres `[0 a]`,
   `[0 a/3]` en #surf, #map y #fplot; si queda un nombre sin valor → aviso en rojo, no un dibujo plano.
   Se corta la descripción (DescSep) al leer los valores. demo_dibujo: cúpula de 6.844 mm (PNG visto).
+
+### Tiempos (medidos)
+- Escritorio (AutoRun por --ctl, incluye el retardo de 280 ms): 71 2.1 s · 73 1.6 · 74 2.4 · 75 1.6 ·
+  76 1.6 · 77 1.9 · 78 1.3 s. Headless --html: 0.4–0.8 s de cálculo.
+- Web local (puppeteer, recarga + arranque .NET/ECL incluidos): 71 16.8 s · 73 24.6 · 74 21.0 ·
+  75 21.7 · 76 15.5 · 77 31.3 · 78 24.2 s. Mismos números que el escritorio (74 visto en PNG).
+- ✅ Regresión 89 hojas (motor HEAD vs nuevo, texto del HTML): 81 iguales; 2 solo cambian el tic/toc;
+  6 son las nuevas (antes con @{…} literal). Motor LISP (engine.lisp) NO se tocó → hlisp.wasm sirve igual.
+
+### Pendiente
+- ⏳ La desaparición de la app de Jorge (05:00) no se reprodujo; ahora quedaría en errores.log.
+- ⏳ Gráfica de convergencia (#fplot numérico en #numerico): la 78 da la tabla, no la curva.
+- ⏳ Mapas simbólicos (#map fuera de #numerico) no respetan la proporción a × b (los numéricos sí).
+- ⏳ Web: wwwroot/ejemplos.json y las copias de los ejemplos quedan sin commitear (como las 55–72).

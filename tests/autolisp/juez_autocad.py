@@ -11,7 +11,7 @@ Uso: python tests/autolisp/juez_autocad.py [--acad RUTA] [ejemplo.lisp …]
 Trampas de accoreconsole (memoria reference_dxf_a_dwg_accoreconsole): rutas SIN espacios (C:/Temp/hkal),
 SECURELOAD 0 para cargar un .lsp propio, línea en blanco al final del .scr.
 """
-import argparse, glob, os, re, subprocess, sys
+import argparse, glob, math, os, re, subprocess, sys
 import ezdxf
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -79,9 +79,25 @@ def geo_hk(d):
     elif t == "POLYLINE": P = [pt(v) for v in g.get(1011, [])]
     elif t == "LWPOLYLINE": P = [pt(v) for v in g[10]]
     elif t in ("CIRCLE", "ARC"): P = [pt(g[10][0]), [float(g[40][0]), 0, 0]]
-    elif t == "DIMENSION": P = [pt(g[13][0]), pt(g[14][0])]
+    elif t == "DIMENSION":   # por tipo (70 & 7): lineal 13 14 · diámetro/radio 10 15 · angular de 3 puntos 10 13 14 15
+        k = int(g.get(70, ["0"])[0]) & 7
+        P = [pt(g[c][0]) for c in COTA.get(k, (13, 14))]
+        if k == 5: P = angular(*P)
     else: P = []
     return t, capa, P
+
+
+COTA = {3: (10, 15), 4: (10, 15), 5: (10, 13, 14, 15)}
+ATR = {10: "defpoint", 13: "defpoint2", 14: "defpoint3", 15: "defpoint4"}
+
+
+def angular(d, p1, p2, v):
+    """Angular de 3 puntos: AutoCAD deja el RADIO del arco y el SECTOR, pero corre el punto 10 por el arco
+    (donde pone el texto). Se comparan el vértice, los dos lados, el radio y el ángulo medido."""
+    an = lambda p: math.atan2(p[1] - v[1], p[0] - v[0]) % (2 * math.pi)
+    a1, a2, ad = an(p1), an(p2), an(d)
+    m = (a2 - a1) % (2 * math.pi) if (ad - a1) % (2 * math.pi) <= (a2 - a1) % (2 * math.pi) else (a1 - a2) % (2 * math.pi)
+    return [p1, p2, v, [math.dist(d[:2], v[:2]), m, 0.0]]
 
 
 def geo_acad(e):
@@ -93,7 +109,9 @@ def geo_acad(e):
     elif t == "POLYLINE": P = [list(v.dxf.location) for v in e.vertices]
     elif t == "LWPOLYLINE": P = [[p[0], p[1], 0.0] for p in e.get_points("xy")]
     elif t in ("CIRCLE", "ARC"): P = [list(e.dxf.center), [e.dxf.radius, 0, 0]]
-    elif t == "DIMENSION": P = [list(e.dxf.defpoint2), list(e.dxf.defpoint3)]
+    elif t == "DIMENSION":
+        P = [list(e.dxf.get(ATR[c])) for c in COTA.get(e.dxf.dimtype & 7, (13, 14))]
+        if e.dxf.dimtype & 7 == 5: P = angular(*P)
     else: P = []
     return t, capa, [[float(c) for c in p] for p in P]
 
@@ -132,8 +150,11 @@ def main():
             for i, (x, y) in enumerate(zip(hk, ac)):
                 if x[0] != y[0] or x[1].upper() != y[1].upper() or len(x[2]) != len(y[2]):
                     malos += 1; print(f"   ✗ #{i}: Hekatan {x[0]}/{x[1]}/{len(x[2])} pts · AutoCAD {y[0]}/{y[1]}/{len(y[2])} pts"); continue
+                de = 0.0
                 for p, q in zip(x[2], y[2]):
-                    dmax = max(dmax, max(abs(u - v) for u, v in zip(p, q)))
+                    de = max(de, max(abs(u - v) for u, v in zip(p, q)))
+                if de > TOL: print(f"   ✗ #{i} {x[0]}: Hekatan {x[2]}"); print(f"        AutoCAD {y[2]}")
+                dmax = max(dmax, de)
             tipos = {}
             for x in hk: tipos[x[0]] = tipos.get(x[0], 0) + 1
             print(f"   tipos: {tipos}")

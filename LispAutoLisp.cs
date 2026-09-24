@@ -222,7 +222,7 @@ namespace HekatanLisp
                     foreach (var l in Lazos(e)) foreach (var p in l) yield return p;
                     break;
                 case "DIMENSION":
-                    foreach (var c in new[] { 10, 13, 14 }) { var p = e.Pt(c); if (p != null) yield return p; }
+                    foreach (var c in new[] { 10, 13, 14, 15 }) { var p = e.Pt(c); if (p != null) yield return p; }
                     break;
                 case "TEXT": case "MTEXT":
                 {
@@ -422,8 +422,11 @@ namespace HekatanLisp
         /// <summary>Formato de la medida de una cota: DIMDEC decimales (punto).</summary>
         static string Medida(Dibujo d, Ent e)
         {
-            int dec = (int)d.Var("DIMDEC", 2);
+            int dec = (int)d.Var("DIMDEC", 2), k = e.Int(70, 0) & 7;
             string val = e.Num(42, 0).ToString("F" + Math.Max(0, Math.Min(8, dec)), Inv);
+            // angular: 42 va en radianes y se escribe en grados con DIMADEC (0 por defecto); radio R…, diámetro Ø…
+            if (k == 2 || k == 5) val = Math.Round(e.Num(42, 0) * 180 / Math.PI, Math.Max(0, Math.Min(8, (int)d.Var("DIMADEC", 0)))).ToString(Inv) + "°";
+            else if (k == 4) val = "R" + val; else if (k == 3) val = "Ø" + val;
             string t = e.Get(1);
             if (string.IsNullOrEmpty(t) || t == "<>") return val;
             return TextoAcad(t.Replace("<>", val));
@@ -436,8 +439,57 @@ namespace HekatanLisp
             public List<double[]> Flechas = new();   // triángulos: x1,y1,x2,y2,x3,y3
             public double Tx, Ty, TAng, TAlt; public string Txt;
         }
+        /// <summary>Cotas de radio (4), diámetro (3) y angular de 3 puntos (5), en papel, como las dibuja la ventana
+        /// (LispCad.js): radio = de 10 (centro) a 15; diámetro = de 10 a 15; angular = vértice 15, lados por 13 y 14,
+        /// arco por 10 (el sector de los dos lados donde cae 10).</summary>
+        static CotaGeo CotaCurva(Dibujo d, Ent e, Vista v, int k)
+        {
+            double ds = d.Var("DIMSCALE", 0), f = ds > 0 ? ds * v.K : 1;
+            double txt = d.Var("DIMTXT", 2.5) * f, asz = d.Var("DIMASZ", 2.5) * f, gap = d.Var("DIMGAP", 0.625) * f;
+            var g = new CotaGeo { TAlt = txt, Txt = Medida(d, e) };
+            void Flecha(double tx, double ty, double dirx, double diry)   // punta en (tx,ty), cuerpo hacia dir
+            {
+                double l = Math.Sqrt(dirx * dirx + diry * diry); if (l < 1e-12) return; dirx /= l; diry /= l;
+                double bx = tx + dirx * asz, by = ty + diry * asz, w = asz / 6;
+                g.Flechas.Add(new[] { tx, ty, bx - diry * w, by + dirx * w, bx + diry * w, by - dirx * w });
+            }
+            if (k == 3 || k == 4)
+            {
+                var a = e.Pt(10); var b = e.Pt(15); if (a == null || b == null) return null;
+                double X1 = v.X(a[0]), Y1 = v.Y(a[1]), X2 = v.X(b[0]), Y2 = v.Y(b[1]);
+                g.Lineas.Add((X1, Y1, X2, Y2));
+                Flecha(X2, Y2, X1 - X2, Y1 - Y2); if (k == 3) Flecha(X1, Y1, X2 - X1, Y2 - Y1);
+                double ang = Math.Atan2(Y2 - Y1, X2 - X1) * 180 / Math.PI;
+                if (ang > 90.001) ang -= 180; else if (ang <= -90.001) ang += 180;
+                double ar = ang * Math.PI / 180;
+                g.TAng = ang; g.Tx = (X1 + X2) / 2 + Math.Sin(ar) * gap; g.Ty = (Y1 + Y2) / 2 - Math.Cos(ar) * gap;
+                return g;
+            }
+            var V = e.Pt(15); var P1 = e.Pt(13); var P2 = e.Pt(14); var D = e.Pt(10);
+            if (V == null || P1 == null || P2 == null || D == null) return null;
+            double Ang(double[] p) { double t = Math.Atan2(p[1] - V[1], p[0] - V[0]); return t < 0 ? t + 2 * Math.PI : t; }
+            double Norm(double t) { t %= 2 * Math.PI; return t < 0 ? t + 2 * Math.PI : t; }
+            double a1 = Ang(P1), a2 = Ang(P2), ad = Ang(D), t0, dt, R = Math.Sqrt((D[0] - V[0]) * (D[0] - V[0]) + (D[1] - V[1]) * (D[1] - V[1]));
+            if (Norm(ad - a1) <= Norm(a2 - a1)) { t0 = a1; dt = Norm(a2 - a1); } else { t0 = a2; dt = Norm(a1 - a2); }
+            double PX(double t) => v.X(V[0] + R * Math.Cos(t)); double PY(double t) => v.Y(V[1] + R * Math.Sin(t));
+            int n = Math.Max(8, (int)Math.Ceiling(dt / (Math.PI / 36)));
+            for (int i = 0; i < n; i++) g.Lineas.Add((PX(t0 + dt * i / n), PY(t0 + dt * i / n), PX(t0 + dt * (i + 1) / n), PY(t0 + dt * (i + 1) / n)));
+            foreach (var (p, t) in new[] { (P1, a1), (P2, a2) })   // línea de referencia hasta el arco si el lado es más corto
+            {
+                double r0 = Math.Sqrt((p[0] - V[0]) * (p[0] - V[0]) + (p[1] - V[1]) * (p[1] - V[1]));
+                if (r0 < R) g.Lineas.Add((v.X(p[0]), v.Y(p[1]), PX(t), PY(t)));
+            }
+            double e1 = 1e-3 * Math.Max(dt, 1e-3);
+            Flecha(PX(t0), PY(t0), PX(t0 + e1) - PX(t0), PY(t0 + e1) - PY(t0));
+            Flecha(PX(t0 + dt), PY(t0 + dt), PX(t0 + dt - e1) - PX(t0 + dt), PY(t0 + dt - e1) - PY(t0 + dt));
+            double tm = t0 + dt / 2, Rp = Math.Sqrt(Math.Pow(PX(tm) - v.X(V[0]), 2) + Math.Pow(PY(tm) - v.Y(V[1]), 2)), sc = Rp > 1e-9 ? (Rp + gap + txt * 0.6) / Rp : 1;
+            g.Tx = v.X(V[0]) + (PX(tm) - v.X(V[0])) * sc; g.Ty = v.Y(V[1]) + (PY(tm) - v.Y(V[1])) * sc + txt * 0.35; g.TAng = 0;
+            return g;
+        }
         static CotaGeo Cota(Dibujo d, Ent e, Vista v)
         {
+            int kc = e.Int(70, 0) & 7;
+            if (kc == 3 || kc == 4 || kc == 5) return CotaCurva(d, e, v, kc);
             var p1 = e.Pt(13); var p2 = e.Pt(14); var p0 = e.Pt(10) ?? p2;
             if (p1 == null || p2 == null) return null;
             double ds = d.Var("DIMSCALE", 0), f = ds > 0 ? ds * v.K : 1;   // DIMSCALE 0 = tamaños de papel
@@ -885,6 +937,7 @@ namespace HekatanLisp
                     case "DIMENSION":
                     {
                         // cota ALINEADA en el espacio: la línea pasa por 10, paralela a 13→14
+                        if ((e.Int(70, 0) & 7) is 2 or 3 or 4 or 5) break;   // radio, diámetro y angular: solo en planta
                         var p1 = e.Pt(13); var p2 = e.Pt(14); var p0 = e.Pt(10) ?? p2; if (p1 == null || p2 == null) break;
                         var dv = new[] { p0[0] - p2[0], p0[1] - p2[1], p0[2] - p2[2] };
                         var q1 = new[] { p1[0] + dv[0], p1[1] + dv[1], p1[2] + dv[2] }; var q2 = p0;

@@ -2690,6 +2690,16 @@
 
 ;; ---------- medida de una cota (código 42) ----------
 (defun hk-al-medida-cota (geo)
+  (case (logand (or (cdr (assoc 70 geo)) 0) 7)
+    ((3 4) (let ((a (cdr (assoc 10 geo))) (b (cdr (assoc 15 geo))))   ; radio y diámetro: de 10 a 15
+             (return-from hk-al-medida-cota
+               (sqrt (+ (expt (- (first b) (first a)) 2) (expt (- (second b) (second a)) 2))))))
+    (5 (let* ((v (cdr (assoc 15 geo))) (d (cdr (assoc 10 geo)))      ; angular: el sector de 13 y 14 donde cae 10
+              (an (lambda (p) (mod (atan (- (second p) (second v)) (- (first p) (first v))) (* 2 +hk-al-pi+))))
+              (a1 (funcall an (cdr (assoc 13 geo)))) (a2 (funcall an (cdr (assoc 14 geo)))) (ad (funcall an d))
+              (dos-pi (* 2 +hk-al-pi+)))
+         (return-from hk-al-medida-cota
+           (if (<= (mod (- ad a1) dos-pi) (mod (- a2 a1) dos-pi)) (mod (- a2 a1) dos-pi) (mod (- a1 a2) dos-pi))))))
   (let* ((p1 (cdr (assoc 13 geo))) (p2 (cdr (assoc 14 geo)))
          (dx (- (first p2) (first p1))) (dy (- (second p2) (second p1)))
          (tipo (logand (or (cdr (assoc 70 geo)) 0) 7)))
@@ -2761,6 +2771,14 @@
              (unless (tiene 10) (setf geo (cons (cons 10 (list 0d0 0d0 0d0)) geo)))
              (unless (tiene 70) (setf geo (append geo (list (cons 70 0))))))
             ((string= tp "VERTEX") (when (falta 10) (return-from norm nil)))
+            ((and (string= tp "DIMENSION") (member (logand (or (cdr (tiene 70)) 0) 7) '(3 4 5)))
+             ;; radio (4) y diámetro (3): 10 y 15; angular de 3 puntos (5): 10 (arco), 13, 14 y 15 (vértice).
+             ;; 42 = la medida, como la guarda AutoCAD (en la angular, en radianes).
+             (let ((k (logand (cdr (tiene 70)) 7)))
+               (when (or (falta 10 15) (and (= k 5) (falta 13 14))) (return-from norm nil))
+               (unless (tiene 1) (setf geo (append geo (list (cons 1 "")))))
+               (setf geo (remove 42 geo :key #'car))
+               (setf geo (append geo (list (cons 42 (hk-al-medida-cota geo)))))))
             ((string= tp "DIMENSION")
              (when (falta 13 14) (return-from norm nil))
              (unless (tiene 10) (setf geo (cons (cons 10 (cdr (tiene 14))) geo)))

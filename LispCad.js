@@ -33,9 +33,13 @@
   //   LINE a b · POINT p · CIRCLE c r · ARC c r a1 a2 (rad) · LWPOLYLINE pts bul cerr · TEXT p h s rot
   //   DIMENSION p1 p2 d rot alin txt · RAW tipo (lo demás: se dibuja su contorno y se guarda tal cual)
   var GEO = { LINE: [10, 11], POINT: [10], CIRCLE: [10, 40], ARC: [10, 40, 50, 51], TEXT: [10, 40, 1, 50],
-    DIMENSION: [10, 13, 14, 70, 1, 50, 42], LWPOLYLINE: [10, 42, 70, 90] };
+    DIMENSION: [10, 13, 14, 15, 70, 1, 50, 40, 42], LWPOLYLINE: [10, 42, 70, 90] };
+  // tipo de cota (código 70 & 7): 0 girada · 1 alineada · 3 diámetro · 4 radio · 5 angular de 3 puntos.
+  // La angular de 2 líneas (2) y la de coordenadas (6) se guardan tal cual (RAW).
+  function tipoCota(P) { for (var i = 0; i < P.length; i++) if (P[i][0] === 70) return (+P[i][1]) & 7; return 0; }
   function desdePares(P) {
     var t = String(P[0][1]).toUpperCase(), e = { t: t, capa: '0', color: 256, x: [] }, g = {}, pts = [], bul = [];
+    var kc = t === 'DIMENSION' ? tipoCota(P) : 0;
     if (t === 'POLYLINE') {           // la POLYLINE 2D se edita como LWPOLYLINE
       e.t = 'LWPOLYLINE'; e.cerr = 0;
       P.forEach(function (p) {
@@ -46,6 +50,7 @@
       e.pts = pts; e.bul = bul; return e;
     }
     var geo = GEO[t];
+    if (t === 'DIMENSION' && (kc === 2 || kc > 5)) geo = null;
     if (!geo) { e.t = 'RAW'; e.tipo = t; }
     P.forEach(function (p) {
       var c = p[0], v = p[1];
@@ -68,7 +73,11 @@
       case 'ARC': e.c = pt2(g[10]); e.r = +g[40]; e.a1 = +g[50]; e.a2 = +g[51]; break;
       case 'TEXT': e.p = pt2(g[10]); e.h = +(g[40] || 2.5); e.s = String(g[1] == null ? '' : g[1]); e.rot = +(g[50] || 0); break;
       case 'DIMENSION':
-        e.p1 = pt2(g[13]); e.p2 = pt2(g[14]); e.d = g[10] ? pt2(g[10]) : e.p2.slice(); e.txt = String(g[1] == null ? '' : g[1]);
+        e.txt = String(g[1] == null ? '' : g[1]);
+        if (kc === 5) { e.k = 'ang'; e.d = pt2(g[10]); e.p1 = pt2(g[13]); e.p2 = pt2(g[14]); e.v = pt2(g[15]); break; }
+        if (kc === 4) { e.k = 'rad'; e.c = pt2(g[10]); e.p = pt2(g[15]); e.L = +(g[40] || 0); break; }
+        if (kc === 3) { e.k = 'dia'; e.p1 = pt2(g[10]); e.p2 = pt2(g[15]); e.L = +(g[40] || 0); break; }
+        e.p1 = pt2(g[13]); e.p2 = pt2(g[14]); e.d = g[10] ? pt2(g[10]) : e.p2.slice();
         e.alin = ((+(g[70] || 32)) & 7) === 1; e.rot = +(g[50] || 0); break;
       case 'LWPOLYLINE': e.pts = pts; e.bul = bul; e.cerr = e.cerr || 0; break;
     }
@@ -95,6 +104,9 @@
         e.pts.forEach(function (p, i) { P.push([10, [p[0], p[1]]]); if (e.bul[i]) P.push([42, e.bul[i]]); });
         return P;
       case 'DIMENSION':
+        if (e.k === 'ang') { P.push([100, 'AcDbDimension'], [10, p3(e.d)], [70, 37], [1, e.txt || ''], [100, 'AcDb3PointAngularDimension'], [13, p3(e.p1)], [14, p3(e.p2)], [15, p3(e.v)]); break; }
+        if (e.k === 'rad') { P.push([100, 'AcDbDimension'], [10, p3(e.c)], [70, 36], [1, e.txt || ''], [100, 'AcDbRadialDimension'], [15, p3(e.p)], [40, e.L || 0]); break; }
+        if (e.k === 'dia') { P.push([100, 'AcDbDimension'], [10, p3(e.p1)], [70, 35], [1, e.txt || ''], [100, 'AcDbDiametricDimension'], [15, p3(e.p2)], [40, e.L || 0]); break; }
         P.push([100, 'AcDbDimension'], [10, p3(e.d)], [70, e.alin ? 33 : 32], [1, e.txt || ''],
                [100, 'AcDbAlignedDimension'], [13, p3(e.p1)], [14, p3(e.p2)]);
         if (!e.alin) P.push([50, e.rot || 0], [100, 'AcDbRotatedDimension']);
@@ -172,9 +184,32 @@
   }
   function trasladar(e, v) {
     function m(p) { p[0] += v[0]; p[1] += v[1]; }
-    ['a', 'b', 'p', 'c', 'd', 'p1', 'p2'].forEach(function (k) { if (esPt(e[k])) m(e[k]); });
+    ['a', 'b', 'p', 'c', 'd', 'p1', 'p2', 'v'].forEach(function (k) { if (esPt(e[k])) m(e[k]); });
     if (e.pts) e.pts.forEach(m);
     e.x.forEach(function (p) { if (((p[0] >= 10 && p[0] <= 18) || p[0] === 1011) && esPt(p[1])) { p[1] = p[1].slice(); m(p[1]); } });
+  }
+  // GIRAR, ESCALA y SIMETRÍA: f lleva cada punto; rot = giro (rad), esc = factor; alfa = ángulo de la línea de
+  // simetría (solo en SIMETRÍA). El texto se refleja con MIRRTEXT = 0 (por defecto en AutoCAD): cambia de sitio
+  // pero se sigue leyendo al derecho.
+  function transformar(e, f, rot, esc, alfa) {
+    var esp = alfa !== undefined;
+    function m(p) { var q = f(p); p[0] = q[0]; p[1] = q[1]; }
+    function giro(t) { t = norm(t); return t > 2 * Math.PI - 1e-12 ? 0 : t; }
+    if (e.t === 'TEXT' && esp) {
+      var w = e.h * 0.6 * Math.max(1, e.s.length), fin = [e.p[0] + w * Math.cos(e.rot), e.p[1] + w * Math.sin(e.rot)];
+      var dA = giro(2 * alfa - e.rot), dB = giro(dA + Math.PI);
+      var dif = function (x) { var t = Math.abs(norm(x - e.rot)); return Math.min(t, 2 * Math.PI - t); };
+      if (dif(dA) <= dif(dB)) { e.p = f(e.p); e.rot = dA; } else { e.p = f(fin); e.rot = dB; }
+    }
+    ['a', 'b', 'p', 'c', 'd', 'p1', 'p2', 'v'].forEach(function (k) { if (esPt(e[k]) && !(e.t === 'TEXT' && esp)) m(e[k]); });
+    if (e.pts) e.pts.forEach(m);
+    e.x.forEach(function (p) { if (((p[0] >= 10 && p[0] <= 18) || p[0] === 1011) && esPt(p[1])) p[1] = f(p[1]); });
+    if (e.t === 'CIRCLE' || e.t === 'ARC') e.r *= esc;
+    if (e.t === 'ARC') { if (esp) { var a1 = giro(2 * alfa - e.a2); e.a2 = giro(2 * alfa - e.a1); e.a1 = a1; } else { e.a1 = giro(e.a1 + rot); e.a2 = giro(e.a2 + rot); } }
+    if (e.t === 'LWPOLYLINE' && esp) e.bul = e.bul.map(function (b) { return b ? -b : 0; });
+    if (e.t === 'TEXT') { e.h *= esc; if (!esp) e.rot = giro(e.rot + rot); }
+    if (e.t === 'DIMENSION' && !e.k && !e.alin) e.rot = giro(esp ? 2 * alfa - e.rot : e.rot + rot);
+    if (e.t === 'DIMENSION' && e.L) e.L *= esc;
   }
 
   // segmentos, arcos y puntos notables (para OSNAP, designar y encuadre)
@@ -184,7 +219,7 @@
     else if (e.t === 'LWPOLYLINE') {
       var n = e.pts.length;
       for (var i = 0; i < (e.cerr ? n : n - 1); i++) if (!e.bul[i]) r.push([e.pts[i], e.pts[(i + 1) % n]]);
-    } else if (e.t === 'DIMENSION') { var g = cotaGeo(e); r.push([g.q1, g.q2]); }
+    } else if (e.t === 'DIMENSION') { if (!e.k) { var g = cotaGeo(e); r.push([g.q1, g.q2]); } }
     else if (e.t === 'RAW') { var q = e.x.filter(function (p) { return p[0] === 10 && esPt(p[1]); }).map(function (p) { return pt2(p[1]); }); for (var j = 0; j + 1 < q.length; j++) r.push([q[j], q[j + 1]]); if (q.length > 2) r.push([q[q.length - 1], q[0]]); }
     return r;
   }
@@ -213,7 +248,7 @@
       segs(e).forEach(function (s) { r.push([[(s[0][0] + s[1][0]) / 2, (s[0][1] + s[1][1]) / 2], 'medio']); });
     } else if (e.t === 'POINT') r.push([e.p, 'nodo']);
     else if (e.t === 'TEXT') r.push([e.p, 'nodo']);
-    else if (e.t === 'DIMENSION') r.push([e.p1, 'nodo'], [e.p2, 'nodo']);
+    else if (e.t === 'DIMENSION') { if (!e.k) r.push([e.p1, 'nodo'], [e.p2, 'nodo']); }
     arcos(e).forEach(function (a) {
       r.push([a.c, 'centro']);
       if (!a.full) {
@@ -255,7 +290,11 @@
     else if (e.t === 'LWPOLYLINE') P = e.pts;
     else if (e.t === 'POINT') P = [e.p];
     else if (e.t === 'TEXT') { var w = e.h * 0.6 * Math.max(1, e.s.length); P = [e.p, [e.p[0] + w * Math.cos(e.rot) - e.h * Math.sin(e.rot), e.p[1] + w * Math.sin(e.rot) + e.h * Math.cos(e.rot)]]; }
-    else if (e.t === 'DIMENSION') { var g = cotaGeo(e); P = [e.p1, e.p2, g.q1, g.q2]; }
+    else if (e.t === 'DIMENSION') {
+      if (e.k === 'ang') { var R = dist(e.v, e.d); P = [e.p1, e.p2, e.d, [e.v[0] - R, e.v[1] - R], [e.v[0] + R, e.v[1] + R]]; }
+      else if (e.k === 'rad') P = [e.c, e.p]; else if (e.k === 'dia') P = [e.p1, e.p2];
+      else { var g = cotaGeo(e); P = [e.p1, e.p2, g.q1, g.q2]; }
+    }
     else if (e.t === 'RAW') P = e.x.filter(function (p) { return p[0] >= 10 && p[0] <= 18 && esPt(p[1]); }).map(function (p) { return p[1]; });
     arcos(e).forEach(function (a) { P = P.concat([[a.c[0] - a.r, a.c[1] - a.r], [a.c[0] + a.r, a.c[1] + a.r]]); });
     if (!P.length) return null;
@@ -289,6 +328,16 @@
       var b = caja(e); return b && w[0] >= b[0] - tol && w[0] <= b[2] + tol && w[1] >= b[1] - tol && w[1] <= b[3] + tol;
     });
     cerca.forEach(function (e) { notables(e).forEach(function (n) { if (S.modos[n[1]]) prueba(n[0], n[1]); }); });
+    // CUADRANTE: 0°, 90°, 180°, 270° del círculo (en un arco, los que caen dentro)
+    if (S.modos.cuad) cerca.forEach(function (e) { arcos(e).forEach(function (a) {
+      for (var k = 0; k < 4; k++) { var t = k * Math.PI / 2; if (enArco(a, t)) prueba([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], 'cuad'); }
+    }); });
+    // TANGENTE (desde el punto anterior): los dos puntos donde la recta desde la base toca el círculo
+    if (S.modos.tan && base) cerca.forEach(function (e) { arcos(e).forEach(function (a) {
+      var d = dist(a.c, base); if (d <= a.r + 1e-12) return;
+      var b0 = ang(a.c, base), be = Math.acos(a.r / d);
+      [b0 + be, b0 - be].forEach(function (t) { if (enArco(a, norm(t))) prueba([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], 'tan'); });
+    }); });
     if (S.modos.inter) {
       var S1 = [], A1 = [];
       cerca.forEach(function (e) { if (e.t !== 'DIMENSION') { segs(e).forEach(function (s) { S1.push(s); }); arcos(e).forEach(function (a) { A1.push(a); }); } });
@@ -307,15 +356,27 @@
         arcos(e).forEach(function (a) { var t = ang(a.c, base); if (enArco(a, t)) prueba([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], 'perp'); });
       });
     }
-    var ORD = { fin: 0, inter: 1, medio: 2, centro: 3, nodo: 4, perp: 5 };
+    var ORD = { fin: 0, inter: 1, medio: 2, centro: 3, cuad: 4, nodo: 5, tan: 6, perp: 7 };
     cand.forEach(function (c) { if (!best || c.d < best.d - 0.5 || (Math.abs(c.d - best.d) <= 0.5 && ORD[c.modo] < ORD[best.modo])) best = c; });
     return best;
   }
   function cursor(q) {
     var req = S.req, base = req && req.base;
     S.snap = S.osnapOn && req && (req.t === 'punto' || req.t === 'numero') ? osnap(q, base) : null;
+    S.pol = null;
     if (S.snap) return S.snap.p.slice();
     var p = aMundo(q);
+    // RASTREO POLAR (F10): cerca (≤ apertura) de un rayo a k·incremento desde el punto anterior, el cursor va
+    // SOBRE el rayo (como AutoCAD: OSNAP > polar; polar y orto se excluyen). Con Forzc la distancia va a
+    // múltiplos de la rejilla (el «PolarSnap» de AutoCAD).
+    if (S.polar && base && !(req && req.sinOrto) && req && (req.t === 'punto' || req.t === 'numero')) {
+      var inc = S.polarAng * Math.PI / 180, a = ang(base, p), ap = Math.round(a / inc) * inc, d = dist(base, p);
+      if (d * S.v.k > 4 && Math.cos(a - ap) > 0 && Math.abs(Math.sin(a - ap)) * d * S.v.k <= APERTURA) {
+        var L = d * Math.cos(a - ap); if (S.forzc) L = Math.round(L / S.rej) * S.rej;
+        S.pol = { ang: norm(ap), L: L };
+        return limpio([base[0] + L * Math.cos(ap), base[1] + L * Math.sin(ap)]);
+      }
+    }
     if (S.forzc) p = limpio([Math.round(p[0] / S.rej) * S.rej, Math.round(p[1] / S.rej) * S.rej]);
     if (S.orto && base && !(req && req.sinOrto)) {
       if (Math.abs(p[0] - base[0]) >= Math.abs(p[1] - base[1])) p = [p[0], base[1]]; else p = [base[0], p[1]];
@@ -352,6 +413,7 @@
         g.font = (mat ? 'italic ' : '') + Math.max(1, e.h * S.v.k).toFixed(1) + 'px ' + (mat ? '"Times New Roman",serif' : '"Segoe UI",Arial,sans-serif');
         g.textBaseline = 'alphabetic'; g.fillText(e.s, 0, 0); g.restore(); break;
       case 'DIMENSION':
+        if (e.k) { trazarCota(g, e); break; }
         var G = cotaGeo(e), a1 = aPant(G.q1), a2 = aPant(G.q2), b1 = aPant(e.p1), b2 = aPant(e.p2);
         g.lineWidth = 0.9; g.beginPath(); g.moveTo(b1[0], b1[1]); g.lineTo(a1[0], a1[1]); g.moveTo(b2[0], b2[1]); g.lineTo(a2[0], a2[1]);
         g.moveTo(a1[0], a1[1]); g.lineTo(a2[0], a2[1]); g.stroke();
@@ -367,6 +429,45 @@
         var s0 = segs(e); g.beginPath(); s0.forEach(function (s) { var u = aPant(s[0]), v = aPant(s[1]); g.moveTo(u[0], u[1]); g.lineTo(v[0], v[1]); }); g.stroke(); break;
     }
   }
+  // cotas angular, de radio y de diámetro: medida y dibujo
+  function cotaAng(e) {                 // arco de cota: empieza en t0 y barre dt (antihorario) por el lado de d
+    var a1 = ang(e.v, e.p1), a2 = ang(e.v, e.p2), ad = ang(e.v, e.d);
+    return norm(ad - a1) <= norm(a2 - a1) ? { t0: a1, dt: norm(a2 - a1), R: dist(e.v, e.d) } : { t0: a2, dt: norm(a1 - a2), R: dist(e.v, e.d) };
+  }
+  function medidaCota(e) {
+    if (e.k === 'ang') return cotaAng(e).dt * 180 / Math.PI;
+    if (e.k === 'rad') return dist(e.c, e.p);
+    if (e.k === 'dia') return dist(e.p1, e.p2);
+    return cotaGeo(e).m;
+  }
+  function textoCota(e) {
+    var m = medidaCota(e), s = e.k === 'ang' ? (Math.round(m * 100) / 100) + '°' : (e.k === 'rad' ? 'R' : e.k === 'dia' ? 'Ø' : '') + fmt(m);
+    return e.txt && e.txt !== '<>' ? e.txt.replace('<>', s) : s;
+  }
+  function flecha(g, o, ux, uy) {       // punta en o, hacia (ux, uy) en pantalla; 8 px
+    g.beginPath(); g.moveTo(o[0], o[1]); g.lineTo(o[0] - 8 * ux - 2.5 * uy, o[1] - 8 * uy + 2.5 * ux); g.lineTo(o[0] - 8 * ux + 2.5 * uy, o[1] - 8 * uy - 2.5 * ux); g.closePath(); g.fill();
+  }
+  function rotulo(g, t, x, y) { g.save(); g.font = '12px "Segoe UI",Arial,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x, y); g.restore(); }
+  function trazarCota(g, e) {
+    g.lineWidth = 0.9;
+    if (e.k === 'ang') {
+      var A = cotaAng(e), c = aPant(e.v), R = A.R * S.v.k;
+      [[e.p1, ang(e.v, e.p1)], [e.p2, ang(e.v, e.p2)]].forEach(function (f) {   // líneas de referencia hasta el arco
+        var r0 = dist(e.v, f[0]); if (r0 >= A.R) return; var q0 = aPant(f[0]), q1 = aPant([e.v[0] + A.R * Math.cos(f[1]), e.v[1] + A.R * Math.sin(f[1])]);
+        g.beginPath(); g.moveTo(q0[0], q0[1]); g.lineTo(q1[0], q1[1]); g.stroke();
+      });
+      g.beginPath(); g.arc(c[0], c[1], R, -A.t0, -(A.t0 + A.dt), true); g.stroke();
+      var s1 = [c[0] + R * Math.cos(A.t0), c[1] - R * Math.sin(A.t0)], s2 = [c[0] + R * Math.cos(A.t0 + A.dt), c[1] - R * Math.sin(A.t0 + A.dt)];
+      flecha(g, s1, Math.sin(A.t0), Math.cos(A.t0)); flecha(g, s2, -Math.sin(A.t0 + A.dt), -Math.cos(A.t0 + A.dt));
+      var tm = A.t0 + A.dt / 2; rotulo(g, textoCota(e), c[0] + (R + 12) * Math.cos(tm), c[1] - (R + 12) * Math.sin(tm));
+      return;
+    }
+    var p = aPant(e.k === 'rad' ? e.c : e.p1), q = aPant(e.k === 'rad' ? e.p : e.p2), ux = q[0] - p[0], uy = q[1] - p[1], L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L;
+    g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
+    flecha(g, q, ux, uy); if (e.k === 'dia') flecha(g, p, -ux, -uy);
+    var an = Math.atan2(uy, ux); if (an > Math.PI / 2 || an < -Math.PI / 2) an += Math.PI;
+    g.save(); g.translate((p[0] + q[0]) / 2, (p[1] + q[1]) / 2); g.rotate(an); g.font = '12px "Segoe UI",Arial,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(textoCota(e), 0, -3); g.restore();
+  }
   function marca(g, s) {                // marcador de OSNAP (formas de AutoCAD) + su nombre
     var p = aPant(s.p), r = 6; g.save(); g.strokeStyle = S.cMarca; g.lineWidth = 2; g.beginPath();
     switch (s.modo) {
@@ -376,9 +477,11 @@
       case 'inter': g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] + r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); break;
       case 'perp': g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] - r, p[1]); g.lineTo(p[0], p[1]); g.lineTo(p[0], p[1] + r); break;
       case 'nodo': g.arc(p[0], p[1], r, 0, 2 * Math.PI); g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] + r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); break;
+      case 'cuad': g.moveTo(p[0], p[1] - r); g.lineTo(p[0] + r, p[1]); g.lineTo(p[0], p[1] + r); g.lineTo(p[0] - r, p[1]); g.closePath(); break;
+      case 'tan': g.arc(p[0], p[1], r * 0.8, 0, 2 * Math.PI); g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] - r); break;
     }
     g.stroke();
-    var nom = { fin: 'Punto final', medio: 'Punto medio', centro: 'Centro', inter: 'Intersección', perp: 'Perpendicular', nodo: 'Punto' }[s.modo];
+    var nom = { fin: 'Punto final', medio: 'Punto medio', centro: 'Centro', inter: 'Intersección', perp: 'Perpendicular', nodo: 'Punto', cuad: 'Cuadrante', tan: 'Tangente' }[s.modo];
     g.font = '11px "Segoe UI",Arial,sans-serif'; var w = g.measureText(nom).width;
     g.fillStyle = S.cMarca; g.fillRect(p[0] + 10, p[1] + 10, w + 8, 16); g.fillStyle = '#111'; g.fillText(nom, p[0] + 14, p[1] + 22); g.restore();
   }
@@ -409,10 +512,18 @@
       g.setLineDash(cr ? [5, 3] : []); g.fillRect(v0[0], v0[1], S.q[0] - v0[0], S.q[1] - v0[1]); g.strokeRect(v0[0], v0[1], S.q[0] - v0[0], S.q[1] - v0[1]); g.setLineDash([]);
     }
     if (S.snap) marca(g, S.snap);
+    if (S.pol && S.req && S.req.base && S.q) {   // rastreo polar: el rayo de alineación y su rótulo (distancia < ángulo)
+      var pb = aPant(S.req.base), far = 4 * (S.W + S.H);
+      g.save(); g.strokeStyle = '#2e9e4f'; g.lineWidth = 1; g.setLineDash([2, 4]); g.beginPath(); g.moveTo(pb[0], pb[1]);
+      g.lineTo(pb[0] + far * Math.cos(S.pol.ang), pb[1] - far * Math.sin(S.pol.ang)); g.stroke(); g.setLineDash([]);
+      var tp = 'Polar: ' + fmt(S.pol.L) + ' < ' + fmt(S.pol.ang * 180 / Math.PI) + '°', cq = aPant(S.cur);
+      g.font = '11px "Segoe UI",Arial,sans-serif'; var wp = g.measureText(tp).width;
+      g.fillStyle = '#2e9e4f'; g.fillRect(cq[0] + 12, cq[1] + 12, wp + 8, 16); g.fillStyle = '#fff'; g.fillText(tp, cq[0] + 16, cq[1] + 24); g.restore();
+    }
     if (S.q && S.cur) {                 // mirilla: cruz + cuadro de designación
       var c = S.snap ? S.q : aPant(S.cur); g.strokeStyle = S.cFg; g.lineWidth = 1; g.beginPath();
       g.moveTo(c[0] - 22, c[1]); g.lineTo(c[0] + 22, c[1]); g.moveTo(c[0], c[1] - 22); g.lineTo(c[0], c[1] + 22); g.stroke();
-      if (!S.req || S.req.t === 'sel') g.strokeRect(c[0] - PICK, c[1] - PICK, 2 * PICK, 2 * PICK);
+      if (!S.req || S.req.t === 'sel' || S.req.t === 'obj') g.strokeRect(c[0] - PICK, c[1] - PICK, 2 * PICK, 2 * PICK);
     }
     estado();
   }
@@ -425,10 +536,14 @@
     arcos(e).forEach(function (a) { var t = ang(a.c, w); if (enArco(a, t)) d = Math.min(d, Math.abs(dist(a.c, w) - a.r)); });
     if (e.t === 'POINT') d = Math.min(d, dist(e.p, w));
     if (e.t === 'TEXT') { var b = caja(e); if (w[0] >= b[0] && w[0] <= b[2] && w[1] >= b[1] && w[1] <= b[3]) d = 0; }
+    if (e.t === 'DIMENSION' && e.k === 'ang') { var A = cotaAng(e); if (norm(ang(e.v, w) - A.t0) <= A.dt) d = Math.min(d, Math.abs(dist(e.v, w) - A.R)); }
+    if (e.t === 'DIMENSION' && e.k === 'rad') d = Math.min(d, dseg(e.c, e.p));
+    if (e.t === 'DIMENSION' && e.k === 'dia') d = Math.min(d, dseg(e.p1, e.p2));
     return d;
   }
-  function pick(q) {
-    var w = aMundo(q), tol = PICK / S.v.k, best = null, bd = Infinity;
+  function pick(q) { return pickW(aMundo(q)); }
+  function pickW(w) {                   // el objeto más cercano a w (mundo) dentro del cuadro de designación
+    var tol = PICK / S.v.k, best = null, bd = Infinity;
     S.ents.forEach(function (e) { var d = distEnt(e, w); if (d <= tol && d < bd) { bd = d; best = e; } });
     return best;
   }
@@ -468,6 +583,227 @@
     }
     var s = S.sel; S.sel = []; return s;
   }
+
+  // ------------------------------------------------------------------ piezas: la entidad como tramos con parámetro
+  // u ∈ [k, k+1] recorre la pieza k en el sentido de la entidad: LINE a→b · ARC a1→a2 (antihorario) · CIRCLE
+  // desde 0 rad · LWPOLYLINE vértice i→i+1 (con abultamiento: dt < 0 = horario). RECORTAR, ALARGAR, DESFASE,
+  // EMPALME y CHAFLÁN trabajan sobre u, así la polilínea se corta y se rehace con sus abultamientos.
+  function sub(a, b) { return [a[0] - b[0], a[1] - b[1]]; }
+  function cruz(a, b) { return a[0] * b[1] - a[1] * b[0]; }
+  function unit(v) { var L = Math.hypot(v[0], v[1]) || 1; return [v[0] / L, v[1] / L]; }
+  function piezas(e) {
+    var r = [];
+    if (e.t === 'LINE') r.push({ s: 1, a: e.a, b: e.b });
+    else if (e.t === 'ARC') r.push({ s: 0, c: e.c, r: e.r, t0: e.a1, dt: norm(e.a2 - e.a1) || 2 * Math.PI });
+    else if (e.t === 'CIRCLE') r.push({ s: 0, c: e.c, r: e.r, t0: 0, dt: 2 * Math.PI, full: true });
+    else if (e.t === 'LWPOLYLINE') {
+      var n = e.pts.length;
+      for (var i = 0; i < (e.cerr ? n : n - 1); i++) {
+        var p = e.pts[i], q = e.pts[(i + 1) % n], b = e.bul[i];
+        if (!b) r.push({ s: 1, a: p, b: q });
+        else { var A = bulgeArco(p, q, b); r.push({ s: 0, c: A.c, r: A.r, t0: ang(A.c, p), dt: 4 * Math.atan(b) }); }
+      }
+    } else if (e.t === 'RAW') segs(e).forEach(function (s) { r.push({ s: 1, a: s[0], b: s[1] }); });
+    return r;
+  }
+  function cerrada(e) { return e.t === 'CIRCLE' || (e.t === 'LWPOLYLINE' && !!e.cerr); }
+  function enPieza(P, t) { return P.s ? [P.a[0] + t * (P.b[0] - P.a[0]), P.a[1] + t * (P.b[1] - P.a[1])] : [P.c[0] + P.r * Math.cos(P.t0 + t * P.dt), P.c[1] + P.r * Math.sin(P.t0 + t * P.dt)]; }
+  function tArco(P, p) {                // fracción recorrida del arco hasta el punto p (del círculo); > 1 = fuera
+    var d = P.dt >= 0 ? norm(ang(P.c, p) - P.t0) : norm(P.t0 - ang(P.c, p));
+    if (d > 2 * Math.PI - 1e-9) d = 0;
+    return d / Math.abs(P.dt);
+  }
+  function puntoU(e, u) {
+    var P = piezas(e), n = P.length; if (cerrada(e)) u = ((u % n) + n) % n;
+    var k = Math.min(n - 1, Math.max(0, Math.floor(u + 1e-12))); return enPieza(P[k], Math.min(1, Math.max(0, u - k)));
+  }
+  function uDe(e, w) {                   // parámetro del punto de la entidad más cercano a w
+    var P = piezas(e), best = { u: 0, d: Infinity };
+    P.forEach(function (Q, k) {
+      var t, d;
+      if (Q.s) { var v = sub(Q.b, Q.a), L2 = v[0] * v[0] + v[1] * v[1]; t = L2 ? Math.max(0, Math.min(1, ((w[0] - Q.a[0]) * v[0] + (w[1] - Q.a[1]) * v[1]) / L2)) : 0; d = dist(enPieza(Q, t), w); }
+      else { t = tArco(Q, w); if (t <= 1) d = Math.abs(dist(Q.c, w) - Q.r); else { var d0 = dist(enPieza(Q, 0), w), d1 = dist(enPieza(Q, 1), w); t = d0 < d1 ? 0 : 1; d = Math.min(d0, d1); } }
+      if (d < best.d) best = { u: k + t, d: d, k: k };
+    });
+    return best;
+  }
+  function raices(a, d, c, r) {         // a + t·d sobre el círculo (c, r): los t
+    var f = sub(a, c), A = d[0] * d[0] + d[1] * d[1], B = 2 * (f[0] * d[0] + f[1] * d[1]), C = f[0] * f[0] + f[1] * f[1] - r * r, D = B * B - 4 * A * C;
+    if (A < 1e-24 || D < -1e-12) return [];
+    D = Math.sqrt(Math.max(0, D)); return D < 1e-12 ? [-B / (2 * A)] : [(-B - D) / (2 * A), (-B + D) / (2 * A)];
+  }
+  function sobre(P, p) { return P.full || tArco(P, p) <= 1 + 1e-9; }
+  // t sobre X donde X toca a Y (Y acotada; X también, salvo libre = su recta o su círculo enteros)
+  function cortes(X, Y, libre) {
+    var out = [], E = 1e-9;
+    if (X.s && Y.s) {
+      var d1 = sub(X.b, X.a), d2 = sub(Y.b, Y.a), den = cruz(d1, d2); if (Math.abs(den) < 1e-14) return out;
+      var w = sub(Y.a, X.a), t = cruz(w, d2) / den, u = cruz(w, d1) / den;
+      if (u >= -E && u <= 1 + E && (libre || (t >= -E && t <= 1 + E))) out.push(t);
+    } else if (X.s) {
+      raices(X.a, sub(X.b, X.a), Y.c, Y.r).forEach(function (t) { if ((libre || (t >= -E && t <= 1 + E)) && sobre(Y, enPieza(X, t))) out.push(t); });
+    } else if (Y.s) {
+      raices(Y.a, sub(Y.b, Y.a), X.c, X.r).forEach(function (u) { if (u < -E || u > 1 + E) return; var p = enPieza(Y, u), t = tArco(X, p); if (libre || X.full || t <= 1 + E) out.push(t); });
+    } else {
+      interAA({ c: X.c, r: X.r, full: true }, { c: Y.c, r: Y.r, full: true }).forEach(function (p) { if (!sobre(Y, p)) return; var t = tArco(X, p); if (libre || X.full || t <= 1 + E) out.push(t); });
+    }
+    return out;
+  }
+  function bordesDe(lista, e) { return (lista || S.ents).filter(function (b) { return b !== e && S.ents.indexOf(b) >= 0; }); }
+  function uCortes(e, bordes) {         // los u donde los bordes cortan a e, ordenados y sin repetir
+    var P = piezas(e), us = [];
+    P.forEach(function (X, k) { bordes.forEach(function (b) { piezas(b).forEach(function (Y) { cortes(X, Y, false).forEach(function (t) { us.push(k + Math.min(1, Math.max(0, t))); }); }); }); });
+    us.sort(function (a, b) { return a - b; });
+    return us.filter(function (u, i) { return i === 0 || u - us[i - 1] > 1e-9; });
+  }
+  // el trozo [u0, u1] de e como entidad nueva (u1 puede pasar de n en una cerrada: da la vuelta)
+  function trozo(e, u0, u1) {
+    var o = clon(e), P = piezas(e), n = P.length;
+    if (e.t === 'LINE') { o.a = puntoU(e, u0); o.b = puntoU(e, u1); return o; }
+    if (e.t === 'ARC') { var A = P[0]; o.a1 = norm(A.t0 + u0 * A.dt); o.a2 = norm(A.t0 + u1 * A.dt); return o; }
+    if (e.t === 'CIRCLE') { o.t = 'ARC'; o.a1 = norm(2 * Math.PI * u0); o.a2 = norm(2 * Math.PI * u1); return o; }
+    var pts = [], bul = [], ua = u0;
+    while (ua < u1 - 1e-12) {
+      var k = Math.floor(ua + 1e-12), ub = Math.min(u1, k + 1), Q = P[((k % n) + n) % n], ta = Math.max(0, ua - k), tb = ub - k;
+      pts.push(enPieza(Q, ta)); bul.push(Q.s ? 0 : Math.tan((tb - ta) * Q.dt / 4)); ua = ub;
+    }
+    pts.push(puntoU(e, u1)); bul.push(0);
+    o.pts = pts; o.bul = bul; o.cerr = 0; return o;
+  }
+  function reemplazar(e, nuevos) { var i = S.ents.indexOf(e); if (i < 0) return; S.ents.splice.apply(S.ents, [i, 1].concat(nuevos)); if (nuevos.length) S.ult = nuevos[nuevos.length - 1]; }
+  // RECORTAR: quita el trozo de e entre los dos cortes que rodean al punto designado
+  function recortar(e, w, bordes) {
+    var P = piezas(e), n = P.length; if (!n) return 'ese objeto no se puede recortar';
+    var us = uCortes(e, bordesDe(bordes, e)), u0 = uDe(e, w).u;
+    if (!cerrada(e)) {
+      us = us.filter(function (u) { return u > 1e-9 && u < n - 1e-9; });
+      var lo = null, hi = null; us.forEach(function (u) { if (u < u0) lo = u; else if (hi === null && u > u0) hi = u; });
+      if (lo === null && hi === null) return 'el objeto no corta ninguna arista de corte';
+      var r = []; if (lo !== null) r.push(trozo(e, 0, lo)); if (hi !== null) r.push(trozo(e, hi, n));
+      reemplazar(e, r); return null;
+    }
+    if (us.length < 2) return 'un objeto cerrado necesita dos cortes';
+    var lo2 = null, hi2 = null; us.forEach(function (u) { if (u < u0) lo2 = u; else if (hi2 === null && u > u0) hi2 = u; });
+    if (lo2 === null) lo2 = us[us.length - 1] - n; if (hi2 === null) hi2 = us[0] + n;
+    reemplazar(e, [trozo(e, hi2, lo2 + n)]); return null;
+  }
+  // ALARGAR: lleva el extremo más cercano a w hasta el primer borde que encuentre su prolongación
+  function alargar(e, w, bordes) {
+    var B = bordesDe(bordes, e), P = piezas(e), n = P.length;
+    if (!n || cerrada(e)) return 'ese objeto no se puede alargar';
+    var fin = uDe(e, w).u > n / 2, k = fin ? n - 1 : 0, X = P[k];
+    if (!fin) X = X.s ? { s: 1, a: X.b, b: X.a } : { s: 0, c: X.c, r: X.r, t0: X.t0 + X.dt, dt: -X.dt };   // la pieza al revés: se alarga «su final»
+    var best = null;
+    B.forEach(function (b) { piezas(b).forEach(function (Y) { cortes(X, Y, true).forEach(function (t) { if (t > 1 + 1e-9 && (X.s || t * Math.abs(X.dt) < 2 * Math.PI - 1e-9) && (best === null || t < best)) best = t; }); }); });
+    if (best === null) return 'la prolongación no toca ningún borde';
+    var p = enPieza(X, best), o = clon(e);
+    if (e.t === 'LINE') { if (fin) o.b = p; else o.a = p; }
+    else if (e.t === 'ARC') { if (fin) o.a2 = norm(ang(e.c, p)); else o.a1 = norm(ang(e.c, p)); }
+    else if (e.t === 'LWPOLYLINE') {
+      var i = fin ? n : 0, j = fin ? n - 1 : 0;
+      o.pts[i] = p; if (!P[k].s) o.bul[j] = Math.tan(best * X.dt / 4) * (fin ? 1 : -1);
+    } else return 'ese objeto no se puede alargar';
+    reemplazar(e, [o]); return null;
+  }
+  // DESFASE: copia paralela a distancia d del lado de w (líneas, arcos, círculos y polilíneas, con inglete en las esquinas)
+  function desfase(e, d, w) {
+    var o = clon(e);
+    if (e.t === 'LINE') {
+      var n0 = unit([-(e.b[1] - e.a[1]), e.b[0] - e.a[0]]), s = cruz(sub(e.b, e.a), sub(w, e.a)) >= 0 ? 1 : -1;
+      o.a = [e.a[0] + s * d * n0[0], e.a[1] + s * d * n0[1]]; o.b = [e.b[0] + s * d * n0[0], e.b[1] + s * d * n0[1]]; return o;
+    }
+    if (e.t === 'CIRCLE' || e.t === 'ARC') { o.r = e.r + (dist(e.c, w) > e.r ? d : -d); return o.r > 1e-12 ? o : null; }
+    if (e.t !== 'LWPOLYLINE') return null;
+    var P = piezas(e), n = P.length, near = uDe(e, w), Q = P[near.k || 0], sg;
+    if (Q.s) sg = cruz(sub(Q.b, Q.a), sub(w, Q.a)) >= 0 ? 1 : -1;
+    else sg = (dist(Q.c, w) < Q.r) === (Q.dt > 0) ? 1 : -1;
+    var dl = sg * d, O = P.map(function (X) {         // cada pieza desplazada dl a su IZQUIERDA
+      if (X.s) { var nn = unit([-(X.b[1] - X.a[1]), X.b[0] - X.a[0]]); return { s: 1, a: [X.a[0] + dl * nn[0], X.a[1] + dl * nn[1]], b: [X.b[0] + dl * nn[0], X.b[1] + dl * nn[1]] }; }
+      var r = X.r - dl * (X.dt > 0 ? 1 : -1); return r > 1e-12 ? { s: 0, c: X.c, r: r, t0: X.t0, dt: X.dt } : null;
+    });
+    if (O.some(function (X) { return !X; })) return null;
+    function esquina(A, B) {             // vértice entre la pieza A (llega) y la B (sale)
+      if (A.s && B.s) { var d1 = sub(A.b, A.a), d2 = sub(B.b, B.a); if (Math.abs(cruz(d1, d2)) > 1e-14) { var t = cruz(sub(B.a, A.a), d2) / cruz(d1, d2); return enPieza(A, t); } }
+      var p = enPieza(A, 1), q = enPieza(B, 0); return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    }
+    var m = e.pts.length;
+    o.pts = e.pts.map(function (p, i) {
+      if (e.cerr) return esquina(O[(i - 1 + n) % n], O[i]);
+      if (i === 0) return enPieza(O[0], 0); if (i === m - 1) return enPieza(O[n - 1], 1);
+      return esquina(O[i - 1], O[i]);
+    });
+    return o;
+  }
+  function distA(e, w) { return dist(puntoU(e, uDe(e, w).u), w); }
+  // EMPALME (r > 0) y CHAFLÁN (d1, d2): dos líneas, o dos tramos rectos seguidos de una polilínea
+  function esquinaDe(e1, w1, e2, w2) {
+    function recta(e, w) { if (e.t === 'LINE') return { a: e.a, b: e.b }; if (e.t === 'LWPOLYLINE') { var r = uDe(e, w), Q = piezas(e)[r.k]; return Q && Q.s ? { a: Q.a, b: Q.b, k: r.k } : null; } return null; }
+    var A = recta(e1, w1), B = recta(e2, w2); if (!A || !B) return null;
+    var d1 = sub(A.b, A.a), d2 = sub(B.b, B.a), den = cruz(d1, d2); if (Math.abs(den) < 1e-14) return { paralelas: true };
+    var X = enPieza({ s: 1, a: A.a, b: A.b }, cruz(sub(B.a, A.a), d2) / den);
+    function lado(R, w) {               // dirección desde X hacia el lado designado y el extremo lejano de ese lado
+      var u = unit(sub(R.b, R.a)), pw = (w[0] - X[0]) * u[0] + (w[1] - X[1]) * u[1]; if (pw < 0) u = [-u[0], -u[1]];
+      var fa = (R.a[0] - X[0]) * u[0] + (R.a[1] - X[1]) * u[1], fb = (R.b[0] - X[0]) * u[0] + (R.b[1] - X[1]) * u[1];
+      return { u: u, F: fa >= fb ? R.a : R.b, L: Math.max(fa, fb) };
+    }
+    return { X: X, A: A, B: B, l1: lado(A, w1), l2: lado(B, w2) };
+  }
+  function redondeo(e1, w1, e2, w2, r, cha) {   // cha = [d1, d2] para CHAFLÁN
+    var q = esquinaDe(e1, w1, e2, w2);
+    if (!q) return 'solo líneas o tramos rectos de una polilínea';
+    if (q.paralelas) return 'las líneas son paralelas';
+    var X = q.X, u1 = q.l1.u, u2 = q.l2.u, phi = Math.acos(Math.max(-1, Math.min(1, u1[0] * u2[0] + u1[1] * u2[1])));
+    var L1, L2; if (cha) { L1 = cha[0]; L2 = cha[1]; } else { L1 = L2 = r / Math.tan(phi / 2); }
+    if (L1 > q.l1.L + 1e-9 || L2 > q.l2.L + 1e-9) return cha ? 'la distancia es mayor que la línea' : 'el radio es demasiado grande';
+    var T1 = [X[0] + L1 * u1[0], X[1] + L1 * u1[1]], T2 = [X[0] + L2 * u2[0], X[1] + L2 * u2[1]];
+    if (e1 === e2) {                     // misma polilínea: los dos tramos deben ser seguidos
+      // la pieza i va del vértice i al i+1: si k2 = k1 + 1, el vértice común es k2 (k1 llega, k2 sale)
+      var e = e1, n = e.pts.length, np = piezas(e).length, k1 = q.A.k, k2 = q.B.k, v, primeroLlega;
+      if (np > 2 && k2 === (k1 + 1) % np) { v = k2; primeroLlega = true; }
+      else if (np > 2 && k1 === (k2 + 1) % np) { v = k1; primeroLlega = false; }
+      else return 'los dos tramos deben ser seguidos';
+      if (!cha && !(r > 0)) return null;
+      var Pv = e.pts[(v - 1 + n) % n], Nv = e.pts[(v + 1) % n], V = e.pts[v];
+      var dPrev = unit(sub(Pv, V)), dNext = unit(sub(Nv, V)), Lp = primeroLlega ? L1 : L2, Ln = primeroLlega ? L2 : L1;
+      var A1 = [V[0] + Lp * dPrev[0], V[1] + Lp * dPrev[1]], A2 = [V[0] + Ln * dNext[0], V[1] + Ln * dNext[1]], b = 0;
+      if (!cha) { var giroIzq = cruz(sub(V, Pv), sub(Nv, V)) > 0; b = (giroIzq ? 1 : -1) * Math.tan((Math.PI - phi) / 4); }
+      var o = clon(e), bv = o.bul[v];
+      o.pts.splice(v, 1, A1, A2); o.bul.splice(v, 1, b, bv);
+      reemplazar(e, [o]); return null;
+    }
+    var n1 = clon(e1), n2 = clon(e2);
+    if (e1.t !== 'LINE' || e2.t !== 'LINE') return 'con dos objetos distintos: solo líneas';
+    n1.a = q.l1.F.slice(); n1.b = T1; n2.a = q.l2.F.slice(); n2.b = T2;
+    reemplazar(e1, [n1]); reemplazar(e2, [n2]);
+    if (cha) { if (dist(T1, T2) > 1e-12) { var l = lin(T1, T2); l.capa = e1.capa; l.color = e1.color; agregar(l); } }
+    else if (r > 0) {
+      var C = [X[0] + (r / Math.sin(phi / 2)) * unit([u1[0] + u2[0], u1[1] + u2[1]])[0], X[1] + (r / Math.sin(phi / 2)) * unit([u1[0] + u2[0], u1[1] + u2[1]])[1]];
+      var ar = cruz(sub(T1, C), sub(T2, C)) > 0 ? arcE(C, r, ang(C, T1), ang(C, T2)) : arcE(C, r, ang(C, T2), ang(C, T1));
+      ar.capa = e1.capa; ar.color = e1.color; agregar(ar);
+    }
+    return null;
+  }
+  function* designarBordes(nombre) {    // «Designe aristas … o <seleccionar todo>»: Intro sin nada = TODO
+    var r = yield { t: 'sel', msg: nombre + '  Designe aristas o <seleccionar todo>', op: ['TODO', 'ALL'] };
+    if (r === null) return null;
+    if (r.kw) return null;
+    var sel = (r.ids || []).slice(); S.sel = sel.slice();
+    for (;;) {
+      var m = yield { t: 'sel', msg: 'Designe aristas (' + S.sel.length + ') — Intro para terminar' };
+      if (m === null) break; (m.ids || []).forEach(function (e) { if (S.sel.indexOf(e) < 0) S.sel.push(e); });
+    }
+    sel = S.sel; S.sel = []; return sel;
+  }
+  function espejo(m1, m2) {
+    var al = ang(m1, m2), u = [Math.cos(al), Math.sin(al)];
+    return { alfa: al, f: function (p) { var v = sub(p, m1), s = v[0] * u[0] + v[1] * u[1]; return limpio([m1[0] + 2 * s * u[0] - v[0], m1[1] + 2 * s * u[1] - v[1]]); } };
+  }
+  function girarF(b, t) { var c = Math.cos(t), s = Math.sin(t); return function (p) { var v = sub(p, b); return limpio([b[0] + c * v[0] - s * v[1], b[1] + s * v[0] + c * v[1]]); }; }
+  function escalaF(b, k) { return function (p) { return limpio([b[0] + k * (p[0] - b[0]), b[1] + k * (p[1] - b[1])]); }; }
+  function aplicar(sel, f, rot, esc, alfa, copia) {
+    return sel.map(function (e) { var o = copia ? clon(e) : e; transformar(o, f, rot, esc, alfa); if (copia) agregar(o); return o; });
+  }
+  function previa(sel, f, rot, esc, alfa) { return sel.map(function (e) { var o = clon(e); transformar(o, f, rot, esc, alfa); return o; }); }
   var ORDENES = {
     LINEA: function* () {
       var ini = yield { t: 'punto', msg: 'LINEA  Primer punto' }; if (!esPt(ini)) return;
@@ -553,6 +889,203 @@
       var v = q === null ? b : (esPt(q) ? [q[0] - b[0], q[1] - b[1]] : null); if (!v) return;
       sel.forEach(function (e) { trasladar(e, v); });
     },
+    // COPIAR (CO): varias copias seguidas (COPYMODE múltiple de AutoCAD); Intro en la primera = desplazamiento
+    COPIAR: function* () {
+      var sel = S.sel.length ? S.sel.slice() : yield* designar(); S.sel = [];
+      if (!sel.length) return;
+      var b = yield { t: 'punto', msg: 'Punto base o <desplazamiento>', marcar: sel }; if (!esPt(b)) return;
+      var hechas = 0;
+      for (;;) {
+        var q = yield { t: 'punto', msg: hechas ? 'Segundo punto o [Salir/desHacer] <Salir>' : 'Segundo punto o <usar el primer punto como desplazamiento>', op: hechas ? ['S', 'H'] : [], base: b, marcar: sel,
+          prev: function (p) { return sel.map(function (e) { var c = clon(e); trasladar(c, [p[0] - b[0], p[1] - b[1]]); return c; }); } };
+        if (q && q.kw === 'H') { if (hechas) { for (var i = 0; i < sel.length; i++) S.ents.pop(); hechas--; } continue; }
+        if (q === null && !hechas) { sel.forEach(function (e) { var c = clon(e); trasladar(c, b); agregar(c); }); return; }
+        if (!esPt(q)) return;
+        sel.forEach(function (e) { var c = clon(e); trasladar(c, [q[0] - b[0], q[1] - b[1]]); agregar(c); }); hechas++;
+      }
+    },
+    // GIRAR (RO): ángulo en grados (antihorario) o con el cursor; [Copia/Referencia]
+    GIRAR: function* () {
+      var sel = S.sel.length ? S.sel.slice() : yield* designar(); S.sel = [];
+      if (!sel.length) return;
+      var b = yield { t: 'punto', msg: 'GIRAR  Punto base', marcar: sel }; if (!esPt(b)) return;
+      var copia = false, a;
+      for (;;) {
+        a = yield { t: 'numero', msg: 'Ángulo de rotación o [Copia/Referencia] <0>', op: ['C', 'R'], base: b, angulo: true, marcar: sel,
+          prev: function (p) { var t = ang(b, p); return previa(sel, girarF(b, t), t, 1); } };
+        if (a && a.kw === 'C') { copia = !copia; msg(copia ? 'Girando una copia de los objetos designados.' : 'Girando los objetos designados.'); continue; }
+        if (a && a.kw === 'R') {
+          var r0 = yield { t: 'numero', msg: 'Ángulo de referencia <0>', base: b, angulo: true }; if (r0 === null) r0 = 0; if (typeof r0 !== 'number') return;
+          var r1 = yield { t: 'numero', msg: 'Ángulo nuevo', base: b, angulo: true }; if (typeof r1 !== 'number') return;
+          a = r1 - r0;
+        }
+        break;
+      }
+      if (a === null) a = 0; if (typeof a !== 'number') return;
+      var t = a * Math.PI / 180; aplicar(sel, girarF(b, t), t, 1, undefined, copia);
+    },
+    // ESCALA (SC): factor tecleado o la distancia base → cursor; [Copia/Referencia]
+    ESCALA: function* () {
+      var sel = S.sel.length ? S.sel.slice() : yield* designar(); S.sel = [];
+      if (!sel.length) return;
+      var b = yield { t: 'punto', msg: 'ESCALA  Punto base', marcar: sel }; if (!esPt(b)) return;
+      var copia = false, k;
+      for (;;) {
+        k = yield { t: 'numero', msg: 'Factor de escala o [Copia/Referencia]', op: ['C', 'R'], base: b, sinOrto: true, marcar: sel,
+          prev: function (p) { var f = dist(b, p) || 1e-9; return previa(sel, escalaF(b, f), 0, f); } };
+        if (k && k.kw === 'C') { copia = !copia; msg(copia ? 'Escalando una copia de los objetos designados.' : 'Escalando los objetos designados.'); continue; }
+        if (k && k.kw === 'R') {
+          var l0 = yield { t: 'numero', msg: 'Longitud de referencia <1>', base: b, sinOrto: true }; if (l0 === null) l0 = 1; if (!(l0 > 0)) return;
+          var l1 = yield { t: 'numero', msg: 'Longitud nueva', base: b, sinOrto: true }; if (!(l1 > 0)) return;
+          k = l1 / l0;
+        }
+        break;
+      }
+      if (typeof k !== 'number' || !(k > 0)) return;
+      aplicar(sel, escalaF(b, k), 0, k, undefined, copia);
+    },
+    // SIMETRÍA (MI): dos puntos de la línea de simetría; ¿borrar los de origen? <No>
+    SIMETRIA: function* () {
+      var sel = S.sel.length ? S.sel.slice() : yield* designar(); S.sel = [];
+      if (!sel.length) return;
+      var m1 = yield { t: 'punto', msg: 'SIMETRÍA  Primer punto de la línea de simetría', marcar: sel }; if (!esPt(m1)) return;
+      var m2 = yield { t: 'punto', msg: 'Segundo punto de la línea de simetría', base: m1, marcar: sel,
+        prev: function (p) { if (dist(m1, p) < 1e-12) return []; var E = espejo(m1, p); return previa(sel, E.f, 0, 1, E.alfa); } };
+      if (!esPt(m2) || dist(m1, m2) < 1e-12) return;
+      var bo = yield { t: 'punto', msg: '¿Borrar los objetos de origen? [Sí/No] <No>', op: ['S', 'N', 'SI', 'SÍ', 'Y'], marcar: sel };
+      var E = espejo(m1, m2), borra = bo && /^(S|SI|SÍ|Y)$/.test(bo.kw || '');
+      aplicar(sel, E.f, 0, 1, E.alfa, !borra);
+    },
+    // DESFASE (O / EQ): distancia (o punto a atravesar) y, en bucle: objeto → lado
+    DESFASE: function* () {
+      var d = yield { t: 'numero', msg: 'DESFASE  Distancia o [Punto a atravesar] <' + (S.desf > 0 ? fmt(S.desf) : 'Punto a atravesar') + '>', op: ['P', 'A'] };
+      var pasa = false;
+      if (d === null) { if (S.desf > 0) d = S.desf; else pasa = true; }
+      else if (d.kw) pasa = true;
+      else if (!(d > 0)) return;
+      if (!pasa) S.desf = d;
+      for (;;) {
+        var o = yield { t: 'obj', msg: 'Designe el objeto a desplazar o [Salir] <Salir>', op: ['S'] };
+        if (!o || o.kw) return;
+        var e = o.e, q = yield { t: 'punto', msg: pasa ? 'Punto por el que pasa la copia' : 'Punto en el lado del desfase', marcar: [e],
+          prev: function (p) { var c = desfase(e, pasa ? distA(e, p) : d, p); return c ? [c] : []; } };
+        if (!esPt(q)) return;
+        var c = desfase(e, pasa ? distA(e, q) : d, q);
+        if (c) agregar(c); else msg('No se puede desfasar ese objeto a esa distancia.');
+      }
+    },
+    // RECORTAR (TR): aristas de corte (Intro = todas) y, en bucle, el trozo a quitar
+    RECORTAR: function* () {
+      S.pila = []; var bordes = yield* designarBordes('RECORTAR');
+      for (;;) {
+        var o = yield { t: 'obj', msg: 'Designe el objeto a recortar o [desHacer] — Intro para terminar', op: ['H'], marcar: bordes || [] };
+        if (!o) return;
+        if (o.kw === 'H') { if (S.pila && S.pila.length) volver(S.pila.pop()); continue; }
+        (S.pila = S.pila || []).push(foto());
+        var m = recortar(o.e, o.p, bordes); if (m) { S.pila.pop(); msg('RECORTAR: ' + m + '.'); }
+      }
+    },
+    // ALARGAR (EX): aristas contorno (Intro = todas) y, en bucle, el extremo a alargar
+    ALARGAR: function* () {
+      S.pila = []; var bordes = yield* designarBordes('ALARGAR');
+      for (;;) {
+        var o = yield { t: 'obj', msg: 'Designe el objeto a alargar (cerca del extremo) o [desHacer] — Intro para terminar', op: ['H'], marcar: bordes || [] };
+        if (!o) return;
+        if (o.kw === 'H') { if (S.pila && S.pila.length) volver(S.pila.pop()); continue; }
+        (S.pila = S.pila || []).push(foto());
+        var m = alargar(o.e, o.p, bordes); if (m) { S.pila.pop(); msg('ALARGAR: ' + m + '.'); }
+      }
+    },
+    // EMPALME (F): [Radio/Múltiple]; radio 0 = esquina viva (alarga o recorta hasta cortarse)
+    EMPALME: function* () {
+      var multiple = false;
+      for (;;) {
+        var o1 = yield { t: 'obj', msg: 'EMPALME (radio = ' + fmt(S.radio) + ')  Designe el primer objeto o [Radio/Múltiple]', op: ['R', 'M'] };
+        if (!o1) return;
+        if (o1.kw === 'R') { var r = yield { t: 'numero', msg: 'Radio de empalme <' + fmt(S.radio) + '>' }; if (typeof r === 'number' && r >= 0) S.radio = r; continue; }
+        if (o1.kw === 'M') { multiple = true; continue; }
+        var o2 = yield { t: 'obj', msg: 'Designe el segundo objeto', marcar: [o1.e] }; if (!o2 || o2.kw) return;
+        var m = redondeo(o1.e, o1.p, o2.e, o2.p, S.radio, null); if (m) msg('EMPALME: ' + m + '.');
+        if (!multiple) return;
+      }
+    },
+    // CHAFLÁN (CHA): [Distancia/Múltiple]; primera distancia sobre el primer objeto
+    CHAFLAN: function* () {
+      var multiple = false;
+      for (;;) {
+        var o1 = yield { t: 'obj', msg: 'CHAFLÁN (dist1 = ' + fmt(S.cha[0]) + ', dist2 = ' + fmt(S.cha[1]) + ')  Designe la primera línea o [Distancia/Múltiple]', op: ['D', 'M'] };
+        if (!o1) return;
+        if (o1.kw === 'D') {
+          var d1 = yield { t: 'numero', msg: 'Primera distancia de chaflán <' + fmt(S.cha[0]) + '>' }; if (d1 === null) d1 = S.cha[0]; if (!(d1 >= 0)) continue;
+          var d2 = yield { t: 'numero', msg: 'Segunda distancia de chaflán <' + fmt(d1) + '>' }; if (d2 === null) d2 = d1; if (!(d2 >= 0)) continue;
+          S.cha = [d1, d2]; continue;
+        }
+        if (o1.kw === 'M') { multiple = true; continue; }
+        var o2 = yield { t: 'obj', msg: 'Designe la segunda línea', marcar: [o1.e] }; if (!o2 || o2.kw) return;
+        var m = redondeo(o1.e, o1.p, o2.e, o2.p, 0, S.cha); if (m) msg('CHAFLÁN: ' + m + '.');
+        if (!multiple) return;
+      }
+    },
+    // COTA ANGULAR (DAN): dos líneas, un arco, o <vértice> y dos puntos; luego dónde va el arco de cota
+    COTAANG: function* () {
+      var o = yield { t: 'obj', msg: 'COTA ANGULAR  Designe un arco o una línea, o <precisar vértice>' }, v, p1, p2;
+      if (o === null) {
+        v = yield { t: 'punto', msg: 'Vértice del ángulo' }; if (!esPt(v)) return;
+        p1 = yield { t: 'punto', msg: 'Primer punto del ángulo', base: v }; if (!esPt(p1)) return;
+        p2 = yield { t: 'punto', msg: 'Segundo punto del ángulo', base: v }; if (!esPt(p2)) return;
+      } else if (o.kw) return;
+      else if (o.e.t === 'ARC') { v = o.e.c.slice(); p1 = enPieza(piezas(o.e)[0], 0); p2 = enPieza(piezas(o.e)[0], 1); }
+      else {
+        var o2 = yield { t: 'obj', msg: 'Designe la segunda línea', marcar: [o.e] }; if (!o2 || o2.kw) return;
+        var q = esquinaDe(o.e, o.p, o2.e, o2.p); if (!q || q.paralelas) { msg('COTA ANGULAR: hacen falta dos líneas que se corten.'); return; }
+        v = q.X; var L1 = dist(q.A.a, q.A.b), L2 = dist(q.B.a, q.B.b);
+        p1 = [v[0] + L1 * q.l1.u[0], v[1] + L1 * q.l1.u[1]]; p2 = [v[0] + L2 * q.l2.u[0], v[1] + L2 * q.l2.u[1]];
+        var elegir = function (d) {            // el sector (de los cuatro) donde cae el arco de cota, como AutoCAD
+          var best = null;
+          [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (s) {
+            var a = [v[0] + s[0] * (p1[0] - v[0]), v[1] + s[0] * (p1[1] - v[1])], b = [v[0] + s[1] * (p2[0] - v[0]), v[1] + s[1] * (p2[1] - v[1])];
+            var t1 = ang(v, a), t2 = ang(v, b); if (norm(t2 - t1) > Math.PI) { var x = a; a = b; b = x; x = t1; t1 = t2; t2 = x; }
+            if (norm(ang(v, d) - t1) <= norm(t2 - t1) + 1e-12) best = [a, b];
+          });
+          return best || [p1, p2];
+        };
+      }
+      var mk = function (d) { var pp = elegir ? elegir(d) : [p1, p2]; return nueva('DIMENSION', { k: 'ang', v: v.slice(), p1: pp[0].slice(), p2: pp[1].slice(), d: d.slice(), txt: '' }); };
+      var d = yield { t: 'punto', msg: 'Posición del arco de cota', sinOrto: true, prev: function (x) { return dist(x, v) > 1e-12 ? [mk(x)] : []; } };
+      if (!esPt(d) || dist(d, v) < 1e-12) return;
+      agregar(mk(d));
+    },
+    // COTA RADIO (DRA) / DIÁMETRO (DDI): círculo o arco, y la posición de la línea de cota
+    COTARAD: function* (dia) {
+      var o = yield { t: 'obj', msg: (dia ? 'COTA DIÁMETRO' : 'COTA RADIO') + '  Designe un arco o un círculo' };
+      if (!o || o.kw) return;
+      if (o.e.t !== 'CIRCLE' && o.e.t !== 'ARC') { msg('Designe un arco o un círculo.'); return; }
+      var c = o.e.c, r = o.e.r;
+      var mk = function (x) {
+        var u = unit(sub(x, c)), p = [c[0] + r * u[0], c[1] + r * u[1]], L = Math.max(0, dist(c, x) - r);
+        return dia ? nueva('DIMENSION', { k: 'dia', p1: [c[0] - r * u[0], c[1] - r * u[1]], p2: p, L: L, txt: '' }) : nueva('DIMENSION', { k: 'rad', c: c.slice(), p: p, L: L, txt: '' });
+      };
+      var x = yield { t: 'punto', msg: 'Posición de la línea de cota', sinOrto: true, prev: function (q) { return dist(q, c) > 1e-12 ? [mk(q)] : []; } };
+      if (!esPt(x) || dist(x, c) < 1e-12) return;
+      agregar(mk(x));
+    },
+    // EDITAR TEXTO (ED, doble clic): el texto o la cota se editan EN SU SITIO; en una cota, <> = la medida
+    EDITAR: function* (pre) {
+      var e = pre;
+      if (!e) { var o = yield { t: 'obj', msg: 'EDITAR  Designe un texto o una cota' }; if (!o || o.kw) return; e = o.e; }
+      if (e.t !== 'TEXT' && e.t !== 'DIMENSION') { msg('Designe un texto o una cota.'); return; }
+      var ov = editorEnSitio(e, e.t === 'TEXT' ? e.s : (e.txt || '<>'));
+      try {
+        var s = yield { t: 'texto', msg: 'Texto nuevo (' + (e.t === 'TEXT' ? 'Intro vacío = sin cambios' : '<> = la medida') + ')', marcar: [e] };
+        if (s === null || s === undefined) return;
+        if (e.t === 'TEXT') { if (s.length) e.s = s; } else e.txt = s === '<>' ? '' : s;
+      } finally { ov.remove(); }
+    },
+    POLAR: function* () {
+      var a = yield { t: 'numero', msg: 'RASTREO POLAR  Incremento de ángulo (grados) <' + fmt(S.polarAng) + '>' };
+      if (typeof a === 'number' && a > 0 && a <= 180) S.polarAng = a;
+      S.polar = true; S.orto = false; barra();
+    },
     CAPA: function* () {
       var n = yield { t: 'texto', msg: 'CAPA  Nombre de la capa actual <' + S.capa + '>', una: true }; if (!n) return;
       n = n.trim().replace(/[<>\/\\":;?*|=`]/g, '_'); if (!n) return;
@@ -581,11 +1114,20 @@
     E: 'BORRAR', ERASE: 'BORRAR', BORRAR: 'BORRAR', SUPR: 'BORRAR', M: 'MOVER', MOVE: 'MOVER', MOVER: 'MOVER', DESPLAZA: 'MOVER',
     U: 'DESHACER', DESHACER: 'DESHACER', UNDO: 'DESHACER', REDO: 'REHACER', REHACER: 'REHACER',
     LA: 'CAPA', CAPA: 'CAPA', LAYER: 'CAPA', COL: 'COLOR', COLOR: 'COLOR', REJ: 'REJILLA', GRID: 'REJILLA', REJILLA: 'REJILLA', FORZC: 'REJILLA', SNAP: 'REJILLA',
-    Z: 'ZOOM', ZOOM: 'ZOOM', GUARDAR: 'GUARDAR', SAVE: 'GUARDAR', QSAVE: 'GUARDAR' };
+    Z: 'ZOOM', ZOOM: 'ZOOM', GUARDAR: 'GUARDAR', SAVE: 'GUARDAR', QSAVE: 'GUARDAR',
+    CO: 'COPIAR', CP: 'COPIAR', COPY: 'COPIAR', COPIA: 'COPIAR', COPIAR: 'COPIAR',
+    RO: 'GIRAR', ROTATE: 'GIRAR', GIRA: 'GIRAR', GIRAR: 'GIRAR', SC: 'ESCALA', SCALE: 'ESCALA', ESCALA: 'ESCALA',
+    MI: 'SIMETRIA', MIRROR: 'SIMETRIA', SIMETRIA: 'SIMETRIA', 'SIMETRÍA': 'SIMETRIA',
+    O: 'DESFASE', OFFSET: 'DESFASE', EQ: 'DESFASE', EQUIDIST: 'DESFASE', DESFASE: 'DESFASE',
+    TR: 'RECORTAR', TRIM: 'RECORTAR', RECORTA: 'RECORTAR', RECORTAR: 'RECORTAR', EX: 'ALARGAR', EXTEND: 'ALARGAR', ALARGA: 'ALARGAR', ALARGAR: 'ALARGAR',
+    F: 'EMPALME', FILLET: 'EMPALME', EMPALME: 'EMPALME', CHA: 'CHAFLAN', CHAMFER: 'CHAFLAN', CHAFLAN: 'CHAFLAN', 'CHAFLÁN': 'CHAFLAN',
+    DAN: 'COTAANG', DIMANGULAR: 'COTAANG', ACOANG: 'COTAANG', DRA: 'COTARAD', DIMRADIUS: 'COTARAD', ACORADIO: 'COTARAD',
+    DDI: 'COTADIA', DIMDIAMETER: 'COTADIA', ACODIAM: 'COTADIA',
+    ED: 'EDITAR', DDEDIT: 'EDITAR', TEXTEDIT: 'EDITAR', EDITAR: 'EDITAR', POLAR: 'POLAR', DSETTINGS: 'POLAR' };
   var NOMBRES = { rojo: 1, amarillo: 2, verde: 3, cian: 4, azul: 5, magenta: 6, blanco: 7, negro: 7, gris: 8, 'gris-claro': 9, naranja: 30 };
   function aci(s) { s = String(s || '').trim().toLowerCase(); if (!s) return 0; if (NOMBRES[s]) return NOMBRES[s]; var n = parseInt(s, 10); return n >= 1 && n <= 255 ? n : 0; }
 
-  function orden(nom) {
+  function orden(nom, arg) {
     var o = ALIAS[String(nom).toUpperCase()];
     if (!o) { msg('Orden desconocida «' + nom + '». Pulse F1 o mire la barra de herramientas.'); return; }
     S.ultOrden = nom.toUpperCase();
@@ -594,7 +1136,7 @@
     if (o === 'GUARDAR') { guardar(); return; }
     eco(nom.toUpperCase());
     S.antes = foto();
-    S.cmd = o === 'COTAA' ? ORDENES.COTA(true) : ORDENES[o]();
+    S.cmd = o === 'COTAA' ? ORDENES.COTA(true) : o === 'COTADIA' ? ORDENES.COTARAD(true) : ORDENES[o](arg);
     avanzar(undefined);
     barra();
   }
@@ -654,6 +1196,10 @@
     if (S.req.t === 'texto' && !txt.length) { avanzar(null); return; }
     var r = leer(txt);
     if (r === undefined || r === null && txt.trim()) { msg('Punto o valor no válido: «' + txt + '»'); return; }
+    if (S.req.t === 'obj' && esPt(r)) {         // x,y tecleado = designar el objeto que pasa por ese punto
+      var eo = pickW(r); if (!eo) { msg('Ningún objeto en ' + fmt(r[0]) + ',' + fmt(r[1]) + '.'); inp.value = ''; return; }
+      eco(txt); inp.value = ''; avanzar({ e: eo, p: r }); return;
+    }
     eco(txt);
     if (esPt(r)) S.ult0 = r.slice();
     avanzar(r);
@@ -678,7 +1224,7 @@
   function barra() {
     var b = S.raiz;
     b.querySelectorAll('[data-t]').forEach(function (x) {
-      var k = x.getAttribute('data-t'); x.classList.toggle('on', !!(k === 'rejilla' ? S.rejilla : k === 'forzc' ? S.forzc : k === 'orto' ? S.orto : S.osnapOn));
+      var k = x.getAttribute('data-t'); x.classList.toggle('on', !!(k === 'rejilla' ? S.rejilla : k === 'forzc' ? S.forzc : k === 'orto' ? S.orto : k === 'polar' ? S.polar : S.osnapOn));
     });
     b.querySelectorAll('[data-m]').forEach(function (x) { x.checked = !!S.modos[x.getAttribute('data-m')]; });
     var sc = $('.hkcad-capa', b); sc.innerHTML = '';
@@ -688,8 +1234,10 @@
     b.querySelectorAll('.hkcad-herr button[data-o]').forEach(function (x) { x.classList.toggle('on', !!S.cmd && S.ultOrden && ALIAS[S.ultOrden] === ALIAS[x.getAttribute('data-o')]); });
   }
   function conmuta(k) {
-    if (k === 'rejilla') S.rejilla = !S.rejilla; else if (k === 'forzc') S.forzc = !S.forzc; else if (k === 'orto') S.orto = !S.orto; else S.osnapOn = !S.osnapOn;
-    var nom = { rejilla: 'Rejilla', forzc: 'Forzcursor', orto: 'Orto', osnap: 'Refent' }[k], on = k === 'rejilla' ? S.rejilla : k === 'forzc' ? S.forzc : k === 'orto' ? S.orto : S.osnapOn;
+    // orto y polar se excluyen (como F8 / F10 en AutoCAD)
+    if (k === 'rejilla') S.rejilla = !S.rejilla; else if (k === 'forzc') S.forzc = !S.forzc; else if (k === 'orto') { S.orto = !S.orto; if (S.orto) S.polar = false; }
+    else if (k === 'polar') { S.polar = !S.polar; if (S.polar) S.orto = false; } else S.osnapOn = !S.osnapOn;
+    var nom = { rejilla: 'Rejilla', forzc: 'Forzcursor', orto: 'Orto', polar: 'Polar', osnap: 'Refent' }[k], on = k === 'rejilla' ? S.rejilla : k === 'forzc' ? S.forzc : k === 'orto' ? S.orto : k === 'polar' ? S.polar : S.osnapOn;
     msg('<' + nom + (on ? ' act' : ' desact') + '>'); barra(); pintar();
   }
 
@@ -739,7 +1287,10 @@
     '.hkcad-est .hkcad-xy{font:12px Consolas,monospace;min-width:230px;color:var(--fg,#222)}.hkcad-est label{margin-right:6px;white-space:nowrap}' +
     '.hkcad-copia{position:absolute;left:10%;right:10%;top:20%;height:50%;z-index:3;font:12px Consolas,monospace}';
   var HERR = [['LINEA', 'Línea', 'L'], ['POLILINEA', 'Polilínea', 'PL'], ['RECTANGULO', 'Rectángulo', 'REC'], ['CIRCULO', 'Círculo', 'C'], ['ARCO', 'Arco', 'A'],
-    ['PUNTO', 'Punto', 'PO'], ['TEXTO', 'Texto', 'T'], ['COTA', 'Cota', 'DIM'], ['|'], ['MOVER', 'Mover', 'M'], ['BORRAR', 'Borrar', 'E'], ['U', '↶ Deshacer', 'Ctrl+Z'], ['REHACER', '↷ Rehacer', 'Ctrl+Y']];
+    ['PUNTO', 'Punto', 'PO'], ['TEXTO', 'Texto', 'T'], ['COTA', 'Cota', 'DIM'], ['COTAANG', 'Cota ∠', 'DAN'], ['COTARAD', 'Radio', 'DRA'], ['COTADIA', 'Diámetro', 'DDI'], ['|'],
+    ['MOVER', 'Mover', 'M'], ['COPIAR', 'Copiar', 'CO'], ['GIRAR', 'Girar', 'RO'], ['ESCALA', 'Escala', 'SC'], ['SIMETRIA', 'Simetría', 'MI'], ['DESFASE', 'Desfase', 'O'],
+    ['RECORTAR', 'Recortar', 'TR'], ['ALARGAR', 'Alargar', 'EX'], ['EMPALME', 'Empalme', 'F'], ['CHAFLAN', 'Chaflán', 'CHA'], ['EDITAR', 'Editar texto', 'ED'], ['BORRAR', 'Borrar', 'E'], ['|'],
+    ['U', '↶ Deshacer', 'Ctrl+Z'], ['REHACER', '↷ Rehacer', 'Ctrl+Y']];
 
   function abrir(id) {
     if (S) return;
@@ -761,15 +1312,17 @@
       '<div class="hkcad-ord"><span class="hkcad-prompt">Orden:</span><input class="hkcad-inp" spellcheck="false" autocomplete="off"></div>' +
       '<div class="hkcad-est"><span class="hkcad-xy"></span>' +
       '<button type="button" data-t="rejilla" title="F7">Rejilla</button><button type="button" data-t="forzc" title="F9: el cursor salta a la rejilla">Forzc</button>' +
-      '<button type="button" data-t="orto" title="F8">Orto</button><button type="button" data-t="osnap" title="F3: referencia a objetos">Refent</button>' +
+      '<button type="button" data-t="orto" title="F8">Orto</button><button type="button" data-t="polar" title="F10: rastreo polar (POLAR fija el incremento)">Polar</button><button type="button" data-t="osnap" title="F3: referencia a objetos">Refent</button>' +
       '<label><input type="checkbox" data-m="fin">Final</label><label><input type="checkbox" data-m="medio">Medio</label><label><input type="checkbox" data-m="centro">Centro</label>' +
       '<label><input type="checkbox" data-m="inter">Intersección</label><label><input type="checkbox" data-m="perp">Perpendicular</label><label><input type="checkbox" data-m="nodo">Punto</label>' +
+      '<label><input type="checkbox" data-m="cuad">Cuadrante</label><label><input type="checkbox" data-m="tan">Tangente</label>' +
       '<span class="hkcad-sp" style="flex:1"></span>Rejilla <input class="hkcad-rej" style="width:64px"> ' + dat.ud + '</div>';
     document.body.appendChild(velo); document.body.appendChild(raiz);
     var fondo = css('--bg', '#ffffff');
     S = { raiz: raiz, velo: velo, id: id, nombre: dat.nombre, ud: dat.ud || 'm', pal: dat.pal || {}, capas: dat.capas && dat.capas.length ? dat.capas : [{ n: '0', c: 7 }],
       ents: (dat.ents || []).map(desdePares), capa: '0', color: 256, rej: +dat.rejilla || 0, th: 0,
-      rejilla: true, forzc: true, orto: false, osnapOn: true, modos: { fin: 1, medio: 1, centro: 1, inter: 1, perp: 1, nodo: 1 },
+      rejilla: true, forzc: true, orto: false, osnapOn: true, modos: { fin: 1, medio: 1, centro: 1, inter: 1, perp: 1, nodo: 1, cuad: 1, tan: 1 },
+      polar: false, polarAng: 90, desf: 0, radio: 0, cha: [0, 0],
       undo: [], redo: [], sel: [], cmd: null, req: null, v: { k: 1, x0: 0, y0: 0 }, ovf: document.documentElement.style.overflow,
       cFondo: fondo, cFg: css('--fg', '#222'), cRej: css('--mut', '#999'), cEje: css('--sep', '#ccc'), cSel: '#3c8dff', cPrev: css('--var', '#1c5fbf'), cMarca: '#e8a400' };
     if (S.capas.length > 1) { var cu = S.ents.length ? S.ents[S.ents.length - 1].capa : S.capas[S.capas.length - 1].n; if (capaDe(cu)) S.capa = capaDe(cu).n; }
@@ -788,8 +1341,8 @@
     };
     window.addEventListener('resize', S.resize); S.resize(); encuadre();
     barra(); prompt();
-    linea('Ventana de dibujo «' + S.nombre + '». Órdenes: L PL REC C A PO T DIM DAL · M E · U REDO · LA COL REJ Z · Intro repite, Esc cancela.');
-    linea('Coordenadas: x,y · @dx,dy · @d<ángulo · un número = distancia en la dirección del cursor. F3 Refent · F7 Rejilla · F8 Orto · F9 Forzc.');
+    linea('Ventana de dibujo «' + S.nombre + '». Órdenes: L PL REC C A PO T · DIM DAL DAN DRA DDI · M CO RO SC MI O TR EX F CHA ED E · U REDO · LA COL REJ Z POLAR · Intro repite, Esc cancela.');
+    linea('Coordenadas: x,y · @dx,dy · @d<ángulo · un número = distancia en la dirección del cursor. F3 Refent · F7 Rejilla · F8 Orto · F9 Forzc · F10 Polar. Doble clic en un texto o una cota: editarlo.');
 
     // --- ratón
     var pan = null;
@@ -809,7 +1362,12 @@
     });
     cv.addEventListener('pointerup', function (ev) { if (pan) { pan = null; try { cv.releasePointerCapture(ev.pointerId); } catch (e) { } } });
     cv.addEventListener('pointerleave', function () { S.q = null; S.snap = null; pintar(); });
-    cv.addEventListener('dblclick', function (ev) { if (ev.button === 1) encuadre(); });
+    cv.addEventListener('dblclick', function (ev) {
+      if (ev.button === 1) { encuadre(); return; }
+      if (ev.button !== 0 || S.cmd) return;
+      var e = pick(qDe(ev)); if (!e || (e.t !== 'TEXT' && e.t !== 'DIMENSION')) return;
+      S.sel = []; orden('ED', e);
+    });
     cv.addEventListener('auxclick', function (ev) { if (ev.button === 1 && ev.detail === 2) encuadre(); });
     cv.addEventListener('wheel', function (ev) { ev.preventDefault(); zoomEn(qDe(ev), ev.deltaY < 0 ? 1.2 : 1 / 1.2); S.cur = S.q ? cursor(S.q) : S.cur; }, { passive: false });
 
@@ -817,7 +1375,7 @@
     S.tecla = function (ev) {
       if (!S) return;
       var k = ev.key, inp = S.inp, enInp = document.activeElement === inp, otro = !enInp && /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
-      var F = { F3: 'osnap', F7: 'rejilla', F8: 'orto', F9: 'forzc' }[k];
+      var F = { F3: 'osnap', F7: 'rejilla', F8: 'orto', F9: 'forzc', F10: 'polar' }[k];
       if (F) { ev.preventDefault(); ev.stopPropagation(); conmuta(F); return; }
       if ((ev.ctrlKey || ev.metaKey) && /^[zZ]$/.test(k)) { ev.preventDefault(); ev.stopPropagation(); if (!S.cmd) deshacer(); return; }
       if ((ev.ctrlKey || ev.metaKey) && /^[yY]$/.test(k)) { ev.preventDefault(); ev.stopPropagation(); if (!S.cmd) rehacer(); return; }
@@ -853,6 +1411,22 @@
     S.inp.focus();
     anfitrion({ hkCad: 'abrir', nombre: S.nombre });
   }
+  // el cuadro de edición EN SU SITIO: encima del texto (o del rótulo de la cota), con su tamaño; Intro acepta, Esc cancela
+  function editorEnSitio(e, valor) {
+    var p, hpx = 14, rot = 0;
+    if (e.t === 'TEXT') { p = aPant(e.p); hpx = Math.max(12, e.h * S.v.k); rot = e.rot; }
+    else {
+      var b = caja(e); p = aPant([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
+      if (!e.k) { var G = cotaGeo(e); p = aPant([(G.q1[0] + G.q2[0]) / 2, (G.q1[1] + G.q2[1]) / 2]); }
+    }
+    var ov = el('input', 'hkcad-ensitio'); ov.value = valor; ov.spellcheck = false;
+    ov.style.cssText = 'position:absolute;z-index:4;left:' + (p[0] - (e.t === 'TEXT' ? 2 : 60)) + 'px;top:' + (p[1] - hpx - 4) + 'px;font:' + hpx.toFixed(1) +
+      'px "Segoe UI",Arial,sans-serif;min-width:120px;padding:1px 3px;border:1px dashed #3c8dff;background:var(--bg,#fff);color:var(--fg,#222);transform-origin:0 100%;transform:rotate(' + (-rot) + 'rad)';
+    ov.style.width = Math.max(120, (valor.length + 3) * hpx * 0.6) + 'px';
+    ov.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); var v = ov.value; responder(v.length ? v : ''); } });
+    $('.hkcad-lienzo', S.raiz).appendChild(ov); setTimeout(function () { ov.focus(); ov.select(); }, 0);
+    return ov;
+  }
   function clic(q) {
     var req = S.req;
     if (S.ventana) {                    // segunda esquina de la ventana de designación
@@ -860,6 +1434,10 @@
       if (S.cmd && req && req.t === 'sel') avanzar({ ids: ids });
       else { ids.forEach(function (e) { if (S.sel.indexOf(e) < 0) S.sel.push(e); }); pintar(); }
       return;
+    }
+    if (S.cmd && req && req.t === 'obj') {
+      var eo = pick(q); if (!eo) { msg('Designe un objeto.'); return; }
+      var w = aMundo(q); eco(fmt(w[0]) + ',' + fmt(w[1])); avanzar({ e: eo, p: w }); return;
     }
     if (!S.cmd || (req && req.t === 'sel')) {
       var e = pick(q);
@@ -884,6 +1462,12 @@
     pantalla: function (x, y) { var r = S.cv.getBoundingClientRect(), p = aPant([x, y]); return [r.left + p[0], r.top + p[1]]; },
     estado: function () { return S ? { ents: S.ents.map(aPares), capas: S.capas, orden: S.cmd ? S.req.msg : null, rej: S.rej, v: S.v } : null; },
     cuerpo: function () { return S ? cuerpo() : null; },
+    // para las pruebas: medida de una cota, enganche y rastreo polar activos, y encuadrar una zona
+    medida: function (i) { var e = S && S.ents[i]; return e && e.t === 'DIMENSION' ? medidaCota(e) : null; },
+    enganche: function () { return S && S.snap ? S.snap.modo : null; },
+    polar: function () { return S && S.pol ? S.pol.ang * 180 / Math.PI : null; },
+    estadoPolar: function () { return !!(S && S.polar); },
+    ver: function (x0, y0, x1, y1) { if (!S) return; var k = Math.min(S.W / (x1 - x0), S.H / (y1 - y0)); S.v = { k: k, x0: (x0 + x1) / 2 - S.W / (2 * k), y0: (y0 + y1) / 2 - S.H / (2 * k) }; pintarYa(); },
     desdePares: desdePares, aPares: aPares, entmake: entmake,
   };
 })();

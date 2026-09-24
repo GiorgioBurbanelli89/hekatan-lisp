@@ -270,8 +270,7 @@ function K = mitc4_K(X, dd)
       Bd(c + 3:c + 5) = -shp(3, j)·g3
     end
     % l.1022-1026: flexión de B_J por (−1)
-    BJ = B(:, :)
-    % copia: «BJ = B» comparte memoria en la hoja (cambiar BJ cambiaría B)
+    BJ = B
     for j = 1:4
       c = 6·j - 5
       BJ(4:6, c + 3:c + 5) = -BJ(4:6, c + 3:c + 5)

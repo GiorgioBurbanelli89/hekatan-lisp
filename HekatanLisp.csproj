@@ -29,6 +29,10 @@
     <None Update="ejemplos\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- MANUAL (Ayuda → Manual): los PDF de docs/manual se copian a bin/.../manual -->
+    <None Include="docs\manual\*.pdf" Link="manual\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran) -->
     <EmbeddedResource Include="Lisp.xshd" />
     <!-- la ventana de dibujo de #dibujar (JS que va dentro de la página del resultado) -->

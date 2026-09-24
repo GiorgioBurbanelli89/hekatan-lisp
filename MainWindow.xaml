@@ -167,6 +167,10 @@
                           ToolTip="Traduce las funciones a MATLAB aproximado (solo para ENTENDER; no corre)"/>
             </MenuItem>
             <MenuItem Header="A_yuda" Foreground="{DynamicResource ThemeText}">
+                <MenuItem Header="📘 Manual de Hekatan LISP (PDF)" Click="MenuManual" Tag="Manual_Hekatan_LISP.pdf"/>
+                <MenuItem Header="📐 Dibujo estilo AutoCAD: ventana de dibujo, órdenes y teclas (PDF)" Click="MenuManual" Tag="Hekatan_LISP_Dibujo_estilo_AutoCAD.pdf"/>
+                <MenuItem Header="Descargar el manual más reciente (web)" Click="MenuManual" Tag="web"/>
+                <Separator/>
                 <MenuItem Header="Reglas de LISP (para comentar)" Click="MenuReglas"/>
                 <MenuItem Header="Acerca de Hekatan LISP" Click="MenuAbout"/>
             </MenuItem>

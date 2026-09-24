@@ -242,6 +242,10 @@ const ACCIONES = {
   pdf: () => { if (view !== 'render') setView('render'); $('render').contentWindow?.print(); },
   verMotor: async () => cargarTexto(await (await fetch('engine.lisp')).text(), 'engine.lisp'),
   compartir: () => compartir(),
+  // Ayuda → manual (docs/manual del repo, copiado a wwwroot/manual): se abre y se puede descargar
+  manual: () => window.open('manual/Manual_Hekatan_LISP.pdf', '_blank'),
+  manualDibujo: () => window.open('manual/Hekatan_LISP_Dibujo_estilo_AutoCAD.pdf', '_blank'),
+  manualWeb: () => window.open('manual/Manual_Hekatan_LISP.html', '_blank'),
   acerca: () => aviso('<b style="color:var(--gold)">Hekatan LISP</b> — una forma de mostrar operaciones <b>simbólicas y numéricas</b>, paso a paso.<br><br>' +
     'Sirve para compartir ejemplos: el <b>Jacobiano</b>, las <b>funciones de forma</b>, y las formulaciones que usan ' +
     '<b>ETABS, SAP2000, SAFE, Hekatan Struct</b> o cualquier programa de cálculo. Escribe la hoja y pulsa <b>🔗 Compartir</b>: ' +

@@ -85,6 +85,88 @@ Los **vectores llevan flecha** (`v` → **v⃗**). La operación se muestra comp
 
 ---
 
+## Hoja numérica — `#numerico` (como Calcpad)
+
+Con una línea `#numerico` la hoja entera es **un programa con estado**: bucles, matrices grandes,
+ensamblaje y solución, como en Calcpad. Las variables que un bucle modifica las leen las líneas
+siguientes. Cada línea se muestra `nombre = fórmula = valor` (doble precisión, formato de Calcpad).
+
+| Escribes | Hace |
+|---|---|
+| `for i = 1:n` · `while c` · `if … elseif … else` · `end` | bloques (sintaxis MATLAB) |
+| `#for i = 1 : n` … `#loop` · `#if` … `#else if` … `#end if` | lo mismo, con las palabras de Calcpad |
+| `A(i, j) = x` · `K(g, g) = K(g, g) + K_e` · `M(:, j)` · `a:b:c` | índices, rangos, asignación indexada |
+| `A'` · `A*B` · `A` · `.*` `./` `.^` · `[a, b; c, d]` | álgebra de matrices |
+| `f(x, y) = …` · `g = @(x) …` · `function y = f(a) … end` | funciones |
+| `zeros` `eye` `size` `sum` `max` `round` `row` `col` `submatrix` `slice` `extract` `take` `add` | biblioteca (MATLAB y Calcpad) |
+| `lsolve(A, b)` · `clsolve(A, b)` (Cholesky) · `inv` · `det` | sistemas |
+| `integral(f, a, b)` · `integral2(f, a, b, c, d)` · `spline(u, v, M)` | integrales (también de matrices) e interpolación de Calcpad |
+| `#hide` / `#show` · `#noc` / `#equ` / `#val` | visibilidad y modo de ecuación de Calcpad |
+| `#map(f(x, y), [xa xb], [ya yb])` · `#malla(x_j, y_j, e_j, s_j)` | mapa de color y malla del modelo |
+
+Los nombres distinguen mayúsculas (`e` ≠ `E`). Ejemplo completo: `ejemplos/71 Losa rectangular por elementos finitos (Rectangular Slab FEA de Calcpad).lisp`
+(849 números de Calcpad, iguales a 4 decimales). Pruebas: `tests/numerico/`.
+
+---
+
+## Dibujo AutoLISP — `#autolisp` … `#fin` (2D y 3D)
+
+**El código es la lista de datos**: una entidad es una lista DXF de LISP, `((0 . "LINE") (8 . "0") (10 0 0) (11 3 4))`,
+que se arma con `list`/`cons`/`mapcar`, se transforma y se pone en el dibujo con `entmake`; `ssget`/`entget` la leen
+de vuelta para seguir calculando. Semántica real de AutoCAD: el bloque AutoLISP puro corre igual en AutoCAD 2027
+(juez: `tests/autolisp/juez_autocad.py`, accoreconsole, entidad a entidad, x y z a 1e-9).
+
+```
+#autolisp("Título", ancho = 160, alto = 110, vert = 1, exporta = n A, nuevo = no)
+(entmake (list '(0 . "LINE") '(10 0 0) (cons 11 (polar '(0 0) (/ pi 6) 5))))
+(setq n (sslength (ssget "_X" '((0 . "LINE")))))
+#fin
+```
+
+| Nivel | Funciones |
+|---|---|
+| AutoLISP (portable) | `entmake` `entmakex` `entget` `entmod` `entdel` `entlast` `entnext` `entupd` `handent` · `ssget "_X"` (filtros, comodines, `-4`) `sslength` `ssname` `ssadd` `ssdel` `ssmemb` · `tblsearch` `getvar` `setvar` · `polar` `distance` `angle` `inters` · `strcat` `itoa` `atoi` `atof` `rtos` `angtos` `strlen` `substr` `strcase` `wcmatch` `fix` · `repeat` `foreach` `while` · `(defun f (a / locales) …)`, `'(lambda …)`, `(princ)` |
+| Entidades | POINT, LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE 2D/3D (+VERTEX, SEQEND), 3DFACE, TEXT, MTEXT, SOLID, HATCH, DIMENSION; capas con `(0 . "LAYER")` |
+| Capa simple (español) | `punto` `linea` `circulo` `arco` (grados) `poli` `rect` `texto` `formula` (rótulo con la matemática de la hoja) `cota` `achurado` `curva` `curva-par` `ejes` `capa` · 3D: `poli3` `cara3` `flecha3` `vista` · listas: `desplazar` `rotar` `escalar` · medir: `longitud` `area` `vertices` `dxf` · `vertical` `guardar` |
+
+Las definiciones de la hoja de arriba (`L = 6`, `f(x) = x^2`) llegan al bloque; las de `exporta` vuelven como `n = …`.
+El dibujo sale en SVG con encuadre automático, colores ACI y capas; con z se ve en 3D y se gira con el ratón
+(Planta · Frente · Lateral · 3D). **Guardar**: `(guardar "x.dxf")` — el formato lo da la extensión: `.dxf` (R12),
+`.svg`, `.png`, `.pdf`, `.dwg` (acadrust; en escritorio necesita Node) — o los botones bajo cada dibujo, o
+Archivo → *Guardar dibujo como…*. Un programa LISP entero que dibuja (sin `#autolisp`) también se pinta.
+Ejemplos: 79 (derivada, tangente y área + zapata paramétrica) y 80 (cáscara alabeada 3D). Pruebas: `tests/autolisp/`.
+
+### Ventana de dibujo — `#dibujar(nombre)` … `#fin`
+
+```
+#dibujar(seccion, ancho = 100, alto = 95, ud = m, cuadricula = 0.025)
+(entmake '((0 . "LWPOLYLINE") (100 . "AcDbEntity") (8 . "SECCION") (100 . "AcDbPolyline") (90 . 4) (70 . 1) (10 0.0 0.0) …))
+#fin
+#autolisp("Lo dibujado, leído", exporta = A)
+(setq A (area (ssname (ssget "_X" '((0 . "LWPOLYLINE"))) 0)))
+#fin
+```
+
+En el resultado sale el dibujo con el botón **✏ Dibujar / Editar**, que abre una ventana CAD dentro de la misma página
+(escritorio y web: el mismo `LispCad.js`). **💾 Guardar en la hoja** escribe lo dibujado entre `#dibujar` y `#fin`,
+una entidad por línea, como `(entmake '(…))` de AutoLISP (se puede pegar en AutoCAD: `tests/autolisp/juez_autocad.py`
+también juzga estos bloques), y recalcula. Un `#autolisp` justo después sigue sobre ese mismo dibujo (`nuevo = no`
+implícito): `ssget`, `entget`, `area`, `vertices`… y `exporta` devuelven los valores a la hoja. Sin `#fin`, el bloque
+está vacío y la ventana lo crea. La ventana reescribe el bloque entero: el cálculo va en el `#autolisp` de abajo.
+
+| | |
+|---|---|
+| Órdenes (línea de órdenes, alias de AutoCAD) | `L` línea · `PL` polilínea (`C` cierra, `D`/`U` deshace el tramo) · `REC` · `C` círculo (`D` diámetro) · `A` arco (3 puntos o `C` centro-inicio-fin) · `PO` punto · `T`/`DT` texto · `DIM`/`DLI` cota (`H`/`V`/`A`) · `DAL` alineada · `M` mover · `E` borrar (designar: clic, ventana, captura, `TODO`, `U`ltimo) · `U` deshacer · `REDO` · `LA` capa · `COL` color · `REJ` rejilla · `Z` zoom |
+| Coordenadas | `x,y` · `@dx,dy` · `@d<ángulo` · `d<ángulo` · un número solo = distancia en la dirección del cursor |
+| Teclas | Intro / Espacio / clic derecho = Intro · Intro vacío repite · Esc cancela · F3 refent · F7 rejilla · F8 orto · F9 forzcursor · Ctrl+Z / Ctrl+Y · Supr borra lo designado |
+| Ratón | rueda = zoom en el cursor · arrastre con la rueda (o Mayús + arrastre) = encuadre · doble clic con la rueda = extensión |
+| Enganche | OSNAP (apertura 10 px: final, medio, centro, intersección, perpendicular, punto) manda sobre ORTO y sobre la rejilla, como AutoCAD |
+
+Ejemplo: 81 (una T dibujada → área, centroide e inercia por Green, rotulados; la fórmula de la T da lo mismo).
+Pruebas: `tests/dibujar/` (web con Playwright, escritorio con `--ctl`).
+
+---
+
 ## Las cuatro vistas
 
 **Izquierda (cómo escribes):** `matemática` · `expr LISP` (`(setf name forma)`) · `LISP ▶` (script ejecutable) · `Hekatan Lab` (código MATLAB).

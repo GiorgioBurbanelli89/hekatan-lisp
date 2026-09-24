@@ -117,7 +117,21 @@ function sourceText() {                 // SourceText(): el ORIGINAL, no el deri
   const derivado = ts.startsWith(';;;; Script LISP') || ts.startsWith('% Hekatan Lab') || ts.startsWith('% =====');
   return derivado && lispBackup != null ? lispBackup : t;
 }
+// El cálculo corre en el hilo de la página: sin esto, una hoja de 1–3 s (mallas grandes) dejaba el
+// panel quieto sin decir nada. Se pinta «calculando…» y se calcula en el cuadro siguiente.
+let calcGen = 0;
 function showResult() {
+  const g = ++calcGen;
+  let b = $('hk-calc');
+  if (!b) {
+    b = document.createElement('div'); b.id = 'hk-calc'; b.textContent = 'calculando…';
+    b.style.cssText = 'position:fixed;top:64px;right:18px;z-index:99;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;display:none';
+    document.body.appendChild(b);
+  }
+  b.style.display = 'block';
+  setTimeout(() => { if (g !== calcGen) return; try { calcularYMostrar(); } finally { if (g === calcGen) b.style.display = 'none'; } }, 30);
+}
+function calcularYMostrar() {
   const text = sourceText();
   let out;
   try { out = W.Compute(text, op, $('txt-var').value.trim(), view, dark); }
@@ -322,6 +336,31 @@ function setSolo(on) {
   $('btn-solo').title = on ? 'Volver al editor (Esc)' : 'Ver solo el resultado, a pantalla completa (Esc para volver)';
 }
 $('btn-solo').onclick = () => setSolo(!document.body.classList.contains('solo'));
+
+// ---------- ventana de dibujo de #dibujar (LispCad.js, dentro del iframe del resultado) ----------
+//   abrir → el resultado a pantalla completa · guardar → el bloque #dibujar(nombre) … #fin del editor
+//   recibe las listas DXF (entmake) y la hoja se recalcula · cerrar → vuelve como estaba
+let soloAntesDeDibujar = null;
+addEventListener('message', e => {
+  const m = e.data;
+  if (!m || typeof m !== 'object' || !m.hkCad || e.source !== $('render').contentWindow) return;
+  if (m.hkCad === 'abrir') { if (soloAntesDeDibujar === null) soloAntesDeDibujar = document.body.classList.contains('solo'); setSolo(true); return; }
+  if (soloAntesDeDibujar !== null) { setSolo(soloAntesDeDibujar); soloAntesDeDibujar = null; }
+  if (m.hkCad !== 'guardar') return;
+  if (sourceText() !== ed.value) {       // el editor mostraba una forma derivada: se vuelve al original
+    const t = sourceText(); syntaxLisp = synFull = transliterated = false; lispBackup = null; highlightSyntax();
+    $('lbl-in').textContent = 'escribes: texto plano'; ed.value = t;
+  }
+  const viejo = ed.value, nuevo = W.EscribirDibujo(viejo, m.nombre, m.cuerpo);
+  let a = 0, z = 0;                      // solo el tramo que cambia (el deshacer del navegador lo recupera)
+  while (a < viejo.length && a < nuevo.length && viejo[a] === nuevo[a]) a++;
+  while (z < viejo.length - a && z < nuevo.length - a && viejo[viejo.length - 1 - z] === nuevo[nuevo.length - 1 - z]) z++;
+  ed.focus(); ed.setSelectionRange(a, viejo.length - z);
+  if (!document.execCommand || !document.execCommand('insertText', false, nuevo.slice(a, nuevo.length - z))) ed.setRangeText(nuevo.slice(a, nuevo.length - z), a, viejo.length - z, 'end');
+  if (ed.value !== nuevo) ed.value = nuevo;
+  pintarEditor(); guardarLocal('hlisp-autosave', ed.value);
+  clearTimeout(pendiente); showResult();
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.body.classList.contains('solo') && !$('modal').classList.contains('on')) setSolo(false);
 });

@@ -31,6 +31,8 @@
     </None>
     <!-- resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran) -->
     <EmbeddedResource Include="Lisp.xshd" />
+    <!-- la ventana de dibujo de #dibujar (JS que va dentro de la página del resultado) -->
+    <EmbeddedResource Include="LispCad.js" LogicalName="LispCad.js" />
   </ItemGroup>
 
   <!-- Empaquetar SBCL dentro del app (autocontenido, no necesita SBCL instalado).
@@ -41,5 +43,10 @@
       <SbclFiles Include="C:\Program Files\Steel Bank Common Lisp\sbcl.core" />
     </ItemGroup>
     <Copy SourceFiles="@(SbclFiles)" DestinationFolder="$(OutDir)sbcl" SkipUnchangedFiles="true" />
+    <!-- DWG: el escritor de acadrust-wasm para Node (lo corre MainWindow.Dibujo.cs); si no está, el DWG avisa -->
+    <ItemGroup>
+      <DwgFiles Include="C:\Users\j-b-j\acadrust-wasm\pkg-node\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DwgFiles)" DestinationFolder="$(OutDir)dwg" SkipUnchangedFiles="true" Condition="'@(DwgFiles)' != ''" />
   </Target>
 </Project>

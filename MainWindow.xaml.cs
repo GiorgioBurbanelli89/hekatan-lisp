@@ -73,6 +73,7 @@ namespace HekatanLisp
             Viewer.CoreWebView2.Profile.PreferredColorScheme =
                 _dark ? CoreWebView2PreferredColorScheme.Dark : CoreWebView2PreferredColorScheme.Light;
             _webReady = true;
+            InstalarDibujo();   // guardar dibujo: DWG con acadrust (Node), PNG desde la página
 
             Editor.TextChanged += (s, ev) =>
             {
@@ -153,15 +154,25 @@ namespace HekatanLisp
             }
         }
 
-        // Ctrl + rueda del ratón → zoom del texto (agranda/achica la fuente del editor/salida)
+        // Ctrl + rueda del ratón → zoom del texto del editor (o de la salida de texto), igual que
+        // Hekatan Lab: ±2 puntos entre 6 y 40. Tunelado (PreviewMouseWheel): el ScrollViewer de
+        // AvalonEdit se come la rueda si se escucha el evento burbuja.
         private void OnCtrlZoom(object sender, System.Windows.Input.MouseWheelEventArgs e)
         {
-            if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
+            if ((System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0) return;
             if (sender is ICSharpCode.AvalonEdit.TextEditor ed)
             {
-                ed.FontSize = Math.Max(8, Math.Min(48, ed.FontSize + (e.Delta > 0 ? 1.5 : -1.5)));
+                ZoomTexto(ed, Math.Sign(e.Delta));
                 e.Handled = true;
             }
+        }
+
+        /// <summary>+2 / −2 puntos, entre 6 y 40 (los pasos y topes de Hekatan Lab). Devuelve el tamaño.</summary>
+        private static double ZoomTexto(ICSharpCode.AvalonEdit.TextEditor ed, int sentido)
+        {
+            var d = ed.FontSize + 2 * sentido;
+            if (d >= 6 && d <= 40) ed.FontSize = d;
+            return ed.FontSize;
         }
 
         /// <summary>Resaltado de sintaxis AvalonEdit (embebido, como Hekatan Fortran/Lab).</summary>
@@ -232,7 +243,24 @@ namespace HekatanLisp
             Viewer.Visibility = IsRenderView ? Visibility.Visible : Visibility.Collapsed;
 
             // el cálculo pesado (SBCL) fuera del hilo de UI
-            var forms = await System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
+            var calc = System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
+            // Si tarda (hojas con mallas grandes: 1–3 s), un aviso «calculando…» sobre lo que se ve;
+            // antes el panel se quedaba quieto (o en blanco) sin decir nada. Lo borra la página nueva.
+            if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
+            {
+                var avisa = System.Threading.Tasks.Task.Delay(350);
+                if (await System.Threading.Tasks.Task.WhenAny(calc, avisa) == avisa && gen == _showGen)
+                {
+                    try
+                    {
+                        _ = Viewer.ExecuteScriptAsync("(function(){var d=document.getElementById('hk-calc');if(!d){d=document.createElement('div');d.id='hk-calc';" +
+                            "d.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;opacity:.92';" +
+                            "(document.body||document.documentElement).appendChild(d);}d.textContent='calculando…';})();");
+                    }
+                    catch { }
+                }
+            }
+            var forms = await calc;
             if (gen != _showGen) return;                   // llegó algo más nuevo → descarta este
 
             if (IsRenderView)
@@ -592,6 +620,27 @@ namespace HekatanLisp
 
                 case "state":
                     return System.Text.Json.JsonSerializer.Serialize(new { view = _view, op = _op, lisp = _syntaxLisp, autorun = _autoRun });
+                // Zoom del editor como Ctrl+rueda: {"op":"zoom","steps":+1|-1} -> tamaño de letra
+                case "zoom":
+                    {
+                        int pasos = doc.RootElement.TryGetProperty("steps", out var sp) ? sp.GetInt32() : 1;
+                        double fs = Editor.FontSize;
+                        for (int k = 0; k < Math.Abs(pasos); k++) fs = ZoomTexto(Editor, Math.Sign(pasos));
+                        return "{\"ok\":true,\"fontSize\":" + fs.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
+                    }
+                // Anchos editor | divisor | resultado y DÓNDE está el divisor en pantalla (px físicos),
+                // para arrastrarlo con el ratón de verdad desde un test.
+                case "layout":
+                    {
+                        var inv = System.Globalization.CultureInfo.InvariantCulture;
+                        var p0 = MainSplitter.PointToScreen(new Point(0, 0));
+                        var p1 = MainSplitter.PointToScreen(new Point(MainSplitter.ActualWidth, MainSplitter.ActualHeight));
+                        var pe = Editor.PointToScreen(new Point(Editor.ActualWidth / 2, Editor.ActualHeight / 2));   // centro del editor
+                        return string.Format(inv,
+                            "{{\"ok\":true,\"editor\":{0},\"splitter\":{1},\"web\":{2},\"sx0\":{3},\"sy0\":{4},\"sx1\":{5},\"sy1\":{6},\"ecx\":{7},\"ecy\":{8},\"fontSize\":{9}}}",
+                            EditorCol.ActualWidth, MainSplitter.ActualWidth, WebCol.ActualWidth,
+                            (int)p0.X, (int)p0.Y, (int)p1.X, (int)p1.Y, (int)pe.X, (int)pe.Y, Editor.FontSize);
+                    }
                 case "hashl":
                     return System.Text.Json.JsonSerializer.Serialize(new { hl = Editor.SyntaxHighlighting?.Name });
                 case "quit":
@@ -622,8 +671,11 @@ namespace HekatanLisp
         {
             try
             {
-                ShowResult();                        // fuerza el pipeline: SBCL → RenderPage → gráficas
+                // Si al abrir la hoja ya se lanzó el cálculo (AutoRun), se ESPERA ese; lanzar otro
+                // hacía correr la hoja dos veces (el doble de tiempo) y a la vez.
+                if (_showTask == null || (_showTask.IsCompleted && _lastHtml == null)) ShowResult();
                 try { await _showTask; } catch { }   // espera a que el cálculo/render termine
+                if (_lastHtml == null) { ShowResult(); try { await _showTask; } catch { } }
                 File.WriteAllText(path, _lastHtml ?? "");
             }
             catch (Exception ex) { File.WriteAllText(Path.ChangeExtension(path, ".error.txt"), ex.ToString()); }

@@ -717,6 +717,8 @@ namespace HekatanLisp
         /// los identificadores que chocarían en LISP. Llena CaseMap para volver a dibujarlos
         /// como se escribieron. Solo toca líneas de matemática y los argumentos de #fplot/#surf/#map
         /// (la prosa #:, los comentarios ; y la etiqueta @@ quedan igual).</summary>
+        // [unidad] en medio de la línea: tras ) o número, y antes de ; o ' (la columna siguiente o la descripción)
+        static readonly Regex RxUnidadMedio = new Regex(@"([\)\d]\s*)\[([^\[\];,=]*[A-Za-z°][^\[\];,=]*)\](?=\s*[;'])");
         public static string PrepareNames(string text)
         {
             CaseMap.Clear(); _mangle.Clear();
@@ -724,6 +726,7 @@ namespace HekatanLisp
             var uniOrig = new Dictionary<string, string>(StringComparer.Ordinal);   // ascii → como se tecleó (Δu)
             var groups = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             var cuerpo = new string[lines.Length]; var cola = new string[lines.Length];
+            var unidMedio = new List<string>();
             for (int k = 0; k < lines.Length; k++)
             {
                 var ln = lines[k]; var t = ln.TrimStart();
@@ -738,8 +741,14 @@ namespace HekatanLisp
                 if (t.Length == 0 || ((t[0] == '#' || t[0] == ';' || t[0] == '%') && !plotDir)) continue;
                 int at = ln.IndexOf("@@", StringComparison.Ordinal);
                 string body = at >= 0 ? ln.Substring(0, at) : ln, tail = at >= 0 ? ln.Substring(at) : "";
+                // la DESCRIPCIÓN ('texto al final) es prosa: sus letras no son nombres (con g y G en la hoja,
+                // «'rigidez G (kN/m)» salía «ghkq2»). Se aparta y vuelve intacta tras la unidad.
+                if (SepararDescripcion(body.TrimEnd(), out var sinDesc, out var descTxt)) { body = sinDesc; tail = " '" + descTxt + " " + tail; }
                 // la UNIDAD visible [kN] tampoco es matemática: sus letras no son nombres de la hoja
                 if (SepararUnidad(body.TrimEnd(), out var cuerpoSinU, out var uVis)) { tail = " [" + uVis + "] " + tail; body = cuerpoSinU; }
+                // y las unidades de las COLUMNAS de en medio  (a = dec(…) [N/mm] ; b = …): SepararUnidad solo ve
+                // la del final. Sin esto, con N y n en la hoja, «[N/mm]» salía «nhkq1/mm». Se tapan y se reponen al final.
+                body = RxUnidadMedio.Replace(body, m => { unidMedio.Add(m.Groups[2].Value); return m.Groups[1].Value + "[\u0001" + (unidMedio.Count - 1) + "]"; });
                 if (HasGreekUni(body))
                     body = RxIdentUni.Replace(body, m =>
                     {
@@ -785,6 +794,10 @@ namespace HekatanLisp
                 var body = _mangle.Count == 0 ? cuerpo[k] : RxIdent.Replace(cuerpo[k], m => _mangle.TryGetValue(m.Value, out var r) ? r : m.Value);
                 lines[k] = body + cola[k];
             }
+            if (unidMedio.Count > 0)
+                for (int k = 0; k < lines.Length; k++)
+                    if (lines[k].IndexOf('\u0001') >= 0)
+                        lines[k] = Regex.Replace(lines[k], @"\[\u0001(\d+)\]", m => "[" + unidMedio[int.Parse(m.Groups[1].Value)] + "]");
             return string.Join("\n", lines);
         }
 
@@ -1095,7 +1108,23 @@ namespace HekatanLisp
                 baseN = name.Substring(0, i); sub = name.Substring(i);
             }
             if (sub.Length > 0 && !(baseN.Length > 0 && char.IsLetter(baseN[0]))) { baseN = name; sub = ""; }
+            // primas con TOKEN (Φprime_1a → Φ′₁ₐ, Φpprime_1a → Φ″₁ₐ), igual que en VarHtml: una función
+            // derivada se llama como la variable derivada. Antes el nombre de la FUNCIÓN no lo deshacía
+            // y la definición  Φprime_1a(ξ) = …  salía «Φprime₁ₐ».
+            string primas = "";
+            for (bool sigue = true; sigue; )
+            {
+                sigue = false;
+                foreach (var (tk, np) in new[] { ("tprime", 3), ("pprime", 2), ("prime", 1) })
+                {
+                    if (baseN.Length > tk.Length && baseN.EndsWith(tk, StringComparison.Ordinal))
+                    { baseN = baseN.Substring(0, baseN.Length - tk.Length); primas = string.Concat(Enumerable.Repeat("&prime;", np)) + primas; sigue = true; break; }
+                    if (sub.Length > tk.Length && sub.EndsWith(tk, StringComparison.Ordinal))
+                    { sub = sub.Substring(0, sub.Length - tk.Length); primas = string.Concat(Enumerable.Repeat("&prime;", np)) + primas; sigue = true; break; }
+                }
+            }
             var h = "<span class=\"m-fn\">" + GreekSym(baseN) + "</span>";
+            if (primas.Length > 0) h += "<sup class=\"m-sup\">" + primas + "</sup>";
             if (sub.Length > 0) h += "<sub class=\"m-sub\">" + System.Net.WebUtility.HtmlEncode(sub) + "</sub>";
             return h;
         }
@@ -1104,6 +1133,18 @@ namespace HekatanLisp
         // GRANDE (>9 col ó >11 filas): índices de fila/columna en los bordes y el centro
         //   COLAPSADO con … ⋮ ⋱ (como el MathCanvas de Hekatan Calc y como NumPy/MATLAB).
         //   Chica: cuadrícula simple, sin índices.
+        // Un número (también negativo, o 1.5·10²⁰ de la hoja numérica) NO pide separador de columnas:
+        // el separador es para distinguir EXPRESIONES. Antes un solo −0.41 ponía rayas en toda la matriz.
+        static bool EsNumeroSimple(N c)
+        {
+            if (c.IsAtom) return true;
+            if (c.Op == "neg" && c.A != null) return EsNumeroSimple(c.A);
+            if ((c.Op == "^" || c.Op == "expt") && c.A != null && c.B != null && c.A.IsAtom && c.A.Atom == "10") return EsNumeroSimple(c.B);
+            if (c.Op == "*" && c.A != null && c.B != null && c.A.IsAtom && double.TryParse(c.A.Atom, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                return EsNumeroSimple(c.B);
+            return false;
+        }
+
         static string GridHtml(List<List<N>> rows, bool bars = false)
         {
             // bars = true → delimitadores de DETERMINANTE (barras verticales |…|) en vez de
@@ -1119,7 +1160,7 @@ namespace HekatanLisp
             {
                 // separador vertical entre columnas si los elementos son SIMBÓLICOS (expresiones),
                 // como Hekatan Lab: distingue dónde termina cada elemento. Números/variables solos, no.
-                bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !c.IsAtom));
+                bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !EsNumeroSimple(c)));
                 var sc = new StringBuilder();
                 foreach (var row in rows)
                 {
@@ -1187,7 +1228,7 @@ namespace HekatanLisp
         {
             bool showCol = ncols > 1, showRow = nrows > 1;
             // separador vertical entre columnas de DATOS si la matriz es simbólica (como Hekatan Lab).
-            bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !c.IsAtom));
+            bool symSep = ncols > 1 && rows.Any(r => r.Any(c => c != null && !EsNumeroSimple(c)));
             int brkCol   = showRow ? 2 : 1;
             int dataCol0 = brkCol + 1;
             int brkRCol  = dataCol0 + cols.Count;
@@ -1313,6 +1354,16 @@ table.ws-table sub{font-size:.72em;} table.ws-table sup{font-size:.72em;}
 .hk-dib-ley{display:flex;flex-wrap:wrap;gap:.2em 1.3em;font-family:'Segoe UI',sans-serif;font-size:9.5pt;color:var(--fg);margin:.35em 0 .2em;}
 .hk-dib-li{display:inline-flex;align-items:center;gap:.35em;}
 .hk-dib-err{color:var(--dib-rojo);font-family:'Segoe UI',sans-serif;font-size:9.5pt;margin:.3em 0;}
+/* DIBUJO AUTOLISP (#autolisp … #fin): salida del programa (como la línea de órdenes) + dibujo + guardar */
+.hk-al{margin:.5em 0 1em;}
+.hk-al-out{margin:.3em 0 .6em;padding:.45em .8em;border-left:2px solid var(--sep);background:transparent;color:var(--mut);font-family:Consolas,'Cascadia Code',monospace;font-size:9.5pt;line-height:1.45;white-space:pre-wrap;}
+.hk-al-errl{color:var(--dib-rojo);}
+.hk-al-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.35em;margin:.35em 0 .2em;font-family:'Segoe UI',sans-serif;font-size:8.5pt;color:var(--mut);}
+.hk-al-bar span{margin-right:.3em;}
+.hk-al-bar button{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--sep);border-radius:3px;padding:.05em .6em;cursor:pointer;}
+.hk-al-bar button:hover{border-color:var(--var);color:var(--var);}
+.hk-al-nota{font-family:'Segoe UI',sans-serif;font-size:8.5pt;color:var(--mut);text-align:center;}
+@media print{.hk-al-bar{display:none;}}
 table.hk-obs td{white-space:normal;vertical-align:top;}
 table.hk-obs td:nth-child(3){min-width:22em;}
 .hk-obs-n{display:inline-block;width:1.7em;height:1.7em;line-height:1.7em;border-radius:50%;color:#fff;text-align:center;font-weight:700;font-size:.88em;}
@@ -1454,7 +1505,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             {
                 // MATEMÁTICA: '#' estilo MARKDOWN.  encabezados por nº de '#':  # H1 · ## H2 · ### H3.
                 // Alineación (la "forma"), con UN solo #:  #: izq · #| ó #= centro · #> der · #< izq.
-                if (Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
+                if (!EsTitulo(s0) && Regex.IsMatch(s0, @"^#+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|newpage)\b", RegexOptions.IgnoreCase)) return null;
                 // #tabla(…)/#table(…): directiva de TABLA (headers)(cols) — no es prosa, se procesa aparte.
                 if (Regex.IsMatch(s0, @"^#+\s*(?:tabla|table)\s*\(", RegexOptions.IgnoreCase)) return null;
                 if (s0.Length >= 2 && s0[1] != '#' && ":|=><".IndexOf(s0[1]) >= 0)
@@ -1553,6 +1604,10 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // Va a la derecha de la linea, en texto normal. Solo dibujo.
         public const char DescSep = '\x05';
         static readonly Regex RxDescFinal = new Regex(@"^(?<cuerpo>.*?)\s+'(?<d>[^']*)$", RegexOptions.Compiled);
+        /// <summary>«# Elemento ShellMITC4 …», «# Cuadratura de Gauss»: '#', espacio, palabra, espacio y otra
+        /// palabra = TÍTULO, aunque la primera palabra sea el nombre de una directiva (elemento, gauss, punto…).
+        /// Las directivas van pegadas (#elemento(…)) o con paréntesis (#  fila(…)).</summary>
+        public static bool EsTitulo(string linea) => Regex.IsMatch(linea ?? "", @"^\s*#+[ \t]+\w+[ \t]+[^\s(]");
         public static bool SepararDescripcion(string linea, out string cuerpo, out string desc)
         {
             cuerpo = linea; desc = null;
@@ -2008,6 +2063,12 @@ document.addEventListener('mouseup',function(){
             if (n.Op == "fn")
             {
                 double a = (n.Items != null && n.Items.Count > 0) ? Eval(n.Items[0], var, x) : double.NaN;
+                // max/min de DOS argumentos (curvas por tramos: la placa base, Y ≥ m o Y < m)
+                if ((n.Atom == "max" || n.Atom == "min") && n.Items != null && n.Items.Count == 2)
+                {
+                    double b2 = Eval(n.Items[1], var, x);
+                    return n.Atom == "max" ? Math.Max(a, b2) : Math.Min(a, b2);
+                }
                 return n.Atom switch
                 {
                     "sqrt" => Math.Sqrt(a), "sin" => Math.Sin(a), "cos" => Math.Cos(a), "tan" => Math.Tan(a),

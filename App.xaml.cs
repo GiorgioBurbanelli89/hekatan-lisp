@@ -26,7 +26,31 @@ namespace HekatanLisp
                 if (!creada) { Shutdown(0); return; }   // ya existe una → cerrar esta
             }
 
+            // Un error sin atrapar cerraba la ventana SIN AVISO (Jorge: «al rato la app ya no estaba»).
+            // Ahora queda escrito en %LOCALAPPDATA%\HekatanLisp\errores.log y la ventana sigue viva.
+            DispatcherUnhandledException += (s, ev) =>
+            {
+                Registra("UI", ev.Exception);
+                ev.Handled = true;
+                try { MessageBox.Show("Error interno (la hoja sigue abierta):\n" + ev.Exception.Message + "\n\nDetalle en " + LogPath, "Hekatan LISP"); } catch { }
+            };
+            AppDomain.CurrentDomain.UnhandledException += (s, ev) => Registra("dominio", ev.ExceptionObject as Exception);
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, ev) => { Registra("tarea", ev.Exception); ev.SetObserved(); };
+
             base.OnStartup(e);   // muestra MainWindow normal
+        }
+
+        private static string LogPath => System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HekatanLisp", "errores.log");
+
+        private static void Registra(string donde, Exception ex)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(LogPath));
+                System.IO.File.AppendAllText(LogPath, $"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} [{donde}] pid {Environment.ProcessId}\n{ex}\n");
+            }
+            catch { }
         }
 
         private System.Threading.Mutex _mutex;

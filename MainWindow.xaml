@@ -114,9 +114,9 @@
             <RowDefinition Height="Auto"/>   <!-- 5 calculadora (keypad, solo bajo el editor) -->
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="220"/>   <!-- 0 editor + keypad -->
-            <ColumnDefinition Width="6"/>                  <!-- 1 divisor arrastrable -->
-            <ColumnDefinition Width="*" MinWidth="220"/>   <!-- 2 resultado (altura completa) -->
+            <ColumnDefinition x:Name="EditorCol" Width="*" MinWidth="220"/>   <!-- 0 editor + keypad -->
+            <ColumnDefinition x:Name="SplitCol" Width="6"/>                    <!-- 1 divisor arrastrable -->
+            <ColumnDefinition x:Name="WebCol" Width="*" MinWidth="220"/>      <!-- 2 resultado (altura completa) -->
         </Grid.ColumnDefinitions>
 
         <!-- ============ barra de menus ============ -->
@@ -136,6 +136,8 @@
                 <MenuItem Header="Copiar como LISP ejecutable (portapapeles)" Click="OnExportLisp"/>
                 <Separator/>
                 <MenuItem Header="Exportar a PDF…  (para imprimir / LinkedIn)" Click="MenuPdf"/>
+                <MenuItem Header="Guardar dibujo como…  (DXF · SVG · PNG · PDF · DWG)" Click="MenuGuardarDibujo"/>
+                <MenuItem Header="Compartir enlace web…  (Hekatan LISP web)" Click="MenuCompartirWeb"/>
                 <Separator/>
                 <MenuItem Header="Salir" Click="MenuSalir"/>
             </MenuItem>
@@ -182,6 +184,8 @@
                        FontFamily="Roboto" FontSize="15" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="14,0,0,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button x:Name="BtnCompartir" Style="{StaticResource ModeBtn}" Content="🔗 Compartir" Click="MenuCompartirWeb"
+                        ToolTip="Crea el enlace de Hekatan LISP web con esta hoja (se abre en cualquier navegador, sin instalar): lo copia y lo abre"/>
                 <Button x:Name="BtnRun" Style="{StaticResource ModeBtn}" Content="▶ Ejecutar" Click="OnRun"
                         Foreground="{DynamicResource ThemeAccentGold}" ToolTip="Ejecuta ahora (F5). Útil si AutoRun está apagado."/>
                 <CheckBox x:Name="ChkAutoRun" Content="AutoRun" IsChecked="True" Foreground="{DynamicResource ThemeText}"
@@ -385,7 +389,7 @@
                        Background="{DynamicResource ThemeWindowBg}" Foreground="{DynamicResource ThemeText}"/>
         <wv:WebView2 x:Name="Viewer" Grid.Row="4" Grid.RowSpan="2" Grid.Column="2" Visibility="Collapsed"/>
         <!-- divisor arrastrable (como Hekatan Lab): agranda editor o resultado -->
-        <GridSplitter Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Width="6"
+        <GridSplitter x:Name="MainSplitter" Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Width="6"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                       Background="{DynamicResource ThemeButtonBorder}"
                       ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" Cursor="SizeWE"

@@ -1117,6 +1117,32 @@ dib();})();";
         /// Salida de cada bloque de control plegado, por numero de linea (ver PlegarBloques).
         private Dictionary<int, string> _salidasProg = new Dictionary<int, string>();
 
+        // ------------------------- DIBUJO AUTOLISP (#autolisp … #fin) -------------------------
+        // Lo pinta LispAutoLisp.cs con lo que imprime el motor (engine.lisp, sección AUTOLISP).
+        private Dictionary<int, string> _alHtml;
+        /// Corre el programa del dibujo en el motor SIN CleanSbcl: CleanSbcl cambia TODA la salida por
+        /// un aviso si ve «is unbound», y aquí eso borraría el dibujo; los errores ya vienen por forma.
+        private static string CorrerAutoLisp(string code)
+        {
+            var engine = System.IO.Path.Combine(AppContext.BaseDirectory, "engine.lisp").Replace("\\", "/");
+            return LispEngine.RunScript("(setf *print-case* :downcase)\n(setf *print-right-margin* 100000)\n(load \"" + engine + "\")\n" + code);
+        }
+#if HEKATAN_WEB
+        private Func<string, byte[], string> GuardarDibujo => null;   // web: botones de descarga
+#else
+        /// (guardar "x.ext"): junto a la hoja; las hojas de ejemplos/ (y las sin guardar) → Documentos\Hekatan LISP\dibujos.
+        private Func<string, byte[], string> GuardarDibujo => (fn, bytes) =>
+        {
+            string dir = !string.IsNullOrEmpty(_currentFile) ? System.IO.Path.GetDirectoryName(_currentFile) : null;
+            if (dir == null || System.IO.Path.GetFileName(dir).Equals("ejemplos", StringComparison.OrdinalIgnoreCase))
+                dir = System.IO.Path.Combine(DocsDir, "dibujos");
+            System.IO.Directory.CreateDirectory(dir);
+            string ruta = System.IO.Path.IsPathRooted(fn) ? fn : System.IO.Path.Combine(dir, fn);
+            if (bytes != null) System.IO.File.WriteAllBytes(ruta, bytes);
+            return ruta;
+        };
+#endif
+
         /// <summary>
         /// Trocea una hoja que MEZCLA texto y bloques de control (for/while/if/function).
         ///
@@ -1328,6 +1354,11 @@ dib();})();";
             }
             else
             {
+            // DIBUJO AutoLISP: los bloques #autolisp … #fin se ejecutan ANTES que nada (son LISP, no
+            // matemática: si no, un (setq …) convertía la hoja entera en programa) y dejan su marcador.
+            _alHtml = null;
+            if (LispAutoLisp.RxInicio.IsMatch(text) || System.Text.RegularExpressions.Regex.IsMatch(text, @"(?im)^\s*#\s*autolisp\b"))
+                text = LispAutoLisp.Plegar(text, CorrerAutoLisp, GuardarDibujo, out _alHtml);
             // (antes esta regex llevaba un RETROCESO (0x08) literal donde iba \b: no casaba nunca y
             //  los bloques for/if de una hoja se pintaban como texto, sin ejecutarse)
             if (!LooksLikeLisp(text) &&
@@ -1353,6 +1384,8 @@ dib();})();";
             {
                 if (!Balanced(text)) return new List<string> { "…  (paréntesis sin cerrar)" };
                 _ranProgram = true;
+                if (LispAutoLisp.UsaDibujo(text))   // AutoLISP: salida + dibujo
+                    return new List<string> { LispConverter.TxtLine("table", "left", LispAutoLisp.Programa(text, CorrerAutoLisp, GuardarDibujo)) };
                 return new List<string> { RunLispClean(text) };
             }
             // Solo EJECUTAR (imperativo) si hay CONTROL DE FLUJO real (for/while/if/function).
@@ -1426,7 +1459,7 @@ dib();})();";
                 bool textDir = s.StartsWith("#:") || s.StartsWith("##") || s.StartsWith("#>") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^#\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                                   @"^#\s*(autolispout|anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                                System.Text.RegularExpressions.Regex.IsMatch(s, @"^#\s*(?:tabla|table)\s*\(",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -1637,6 +1670,15 @@ dib();})();";
                     if (numOculta[i] && !conError) { display.Add(NumOculta); continue; }
                     var nd = NumDisplay(i, lines[i], labels[i], treeOf[i], numModo[i]);
                     if (nd != null) { display.Add(nd); continue; }
+                }
+                {
+                    var alm = LispAutoLisp.RxMarca.Match(lines[i]);   // #autolisp … #fin: salida + dibujo del motor
+                    if (alm.Success)
+                    {
+                        string h = _alHtml != null && _alHtml.TryGetValue(int.Parse(alm.Groups[1].Value), out var hh) ? hh : "";
+                        display.Add(LispConverter.TxtLine("table", "left", h));
+                        continue;
+                    }
                 }
                 if (dibujos[i] != null)   // #dibujo … #fin: SVG técnico con los valores YA calculados de la hoja
                 {

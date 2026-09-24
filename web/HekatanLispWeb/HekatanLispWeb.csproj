@@ -28,6 +28,7 @@
     <Compile Include="..\..\BeamSchematic.cs" Link="shared\BeamSchematic.cs" />
     <Compile Include="..\..\HkFont.cs" Link="shared\HkFont.cs" />
     <Compile Include="..\..\LispDibujo.cs" Link="shared\LispDibujo.cs" />
+    <Compile Include="..\..\LispAutoLisp.cs" Link="shared\LispAutoLisp.cs" />
     <Compile Include="..\..\HojaNumerica.cs" Link="shared\HojaNumerica.cs" />
     <!-- fuente de las gráficas en WASM: Open Sans + → ₓ de DejaVu (ver fonts/LEEME.txt) -->
     <EmbeddedResource Include="fonts\hekatan-plot.ttf" LogicalName="hekatan-plot.ttf" />

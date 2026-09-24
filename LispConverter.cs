@@ -42,6 +42,7 @@ namespace HekatanLisp
             { "sum", "suma-op" }, { "product", "producto-op" }, { "root", "root-op" },
             { "find", "find-op" }, { "sup", "sup-op" }, { "inf", "inf-op" }, { "repeat", "repeat-op" },
             { "lim", "limite" }, { "limit", "limite" }, { "limite", "limite" },   // límite  lim_{x→a} f
+            { "taylor", "taylor-op" },   // serie de Taylor alrededor de 0:  Taylor{ f @ x = 0 : n }  (n = grado)
             { "ngauss", "ngauss" },   // integral de Gauss 2x2 NUMERICA de una matriz: NGauss{ M @ xi, eta }
             // tokens de operación simbólica (nuestra notación): computan inline
             { "partial", "partial" }, { "derivate", "derive-x" }, { "diff", "derive-x" },
@@ -224,7 +225,7 @@ namespace HekatanLisp
             { "producto-op", "product" }, { "root-op", "root" },
             { "find-op", "find" }, { "sup-op", "sup" }, { "inf-op", "inf" }, { "repeat-op", "repeat" },
             { "partial", "partial" }, { "derive-x", "derivate" }, { "integ-var", "integral" },
-            { "factor", "factor" }, { "expand*", "expand" }, { "limite", "lim" },
+            { "factor", "factor" }, { "expand*", "expand" }, { "limite", "lim" }, { "taylor-op", "taylor" },
             { "despejar", "despejar" },   // (despejar lhs rhs var) → se renderiza como  lhs = rhs
         };
 
@@ -300,6 +301,7 @@ namespace HekatanLisp
                 "sum" => $"(suma '{f} '{v} {a} {b})",
                 "product" => $"(producto-op '{f} '{v} {a} {b})",
                 "lim" or "limit" or "limite" => $"(limite '{f} '{v} {a})",   // lím  x→a  f
+                "taylor" => $"(taylor-op '{f} '{v} {a} {b ?? "6"})",   // polinomio de Taylor de grado b en torno a 0
 
                 "root" => $"(root-op '{f} '{v})",
                 "find" => $"(find-op '{f} '{v} {a} {b})",
@@ -384,6 +386,7 @@ namespace HekatanLisp
                     "<span class=\"m-lim\"><span class=\"m-lim-op\">lim</span><small class=\"m-lim-sub\">" + v +
                     "→" + LimTarget(n.Items.Count > 2 ? n.Items[2] : null, a) + "</small></span>&hairsp;" + Paren(f),
                 "slope" or "derivative" => ddv + Paren(f) + "<span class=\"m-op\"> │</span><sub class=\"m-sub\">" + v + "=" + a + "</sub>",
+                "taylor" => "<span class=\"m-fn\">T</span><sub class=\"m-sub\">" + (b ?? "6") + "</sub>" + Paren(f),   // T_n(f): Taylor de grado n
                 "partial" => pdv + Paren(f),                           // ∂/∂x (f) — derivada PARCIAL
                 "derivate" or "diff" or "pasos" or "diffpasos" => ddv + Paren(f),   // d/dx (f) — derivada total (pasos = mostrando el trabajo)
                 // simplify/factor/expand NO tienen símbolo matemático: se muestra solo la EXPRESIÓN,

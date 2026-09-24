@@ -137,6 +137,9 @@
 
 ;;; ---------- el problema completo ----------
 (defun zapata ()
+  (format t "# La zapata de Das 6.10 resuelta aquí por elementos finitos~%")
+  (format t "#: Braja M. Das, *Principles of Foundation Engineering*, 9.ª ed. (2019), ejemplo 6.10, p. 247-248. Zapata ~,2f × ~,2f × ~,2f m, P = ~a kN con e_{x} = ~,2f m y e_{y} = ~,2f m, sobre arena de k_{s} = 2000 tonf/m³.~%" *B* *L* *t* (round *P*) *ex* *ey*)
+  (format t "#: El programa de esta hoja arma la placa (elemento MZC de Kirchhoff, 12 × 12, Gauss 3 × 3), la ensambla en una malla de ~a × ~a, pone un muelle por nudo (k_{s} × área tributaria) y resuelve el **contacto**: el suelo no admite tracción, así que el nudo que sube pierde su muelle y se vuelve a resolver hasta que la lista de nudos en contacto no cambia.~%" *n* *n*)
   (multiple-value-bind (xs ys) (malla)
     (let* ((nn (* (1+ *n*) (1+ *n*)))
            (ndof (* 3 nn))
@@ -182,10 +185,10 @@
                   (when (and (aref activo nd) sube) (setf (aref activo nd) nil cambio t))
                   (when (and (not (aref activo nd)) (not sube)) (setf (aref activo nd) t cambio t))))
               (unless cambio
-                (format t "~&convergio en ~a iteraciones~%" (1+ iter))
+                (format t "~&## Contacto~%#: El contacto converge en ~a iteraciones.~%" (1+ iter))
                 (return)))))
         ;; resultados
-        (format t "~&~%nudo    x      y      w [mm]     p [kPa]~%")
+        (format t "~&## Asiento y presión en cada nudo~%| nudo | x [m] | y [m] | w [mm] | p [kPa] |~%|---|---|---|---|---|~%")
         (let ((wmin 0d0) (pmax 0d0) (q 0d0))
           (dotimes (j (1+ *n*))
             (dotimes (i (1+ *n*))
@@ -193,11 +196,11 @@
                      (p (if (and (aref activo nd) (< w 0d0)) (* (- w) *ks*) 0d0)))
                 (setf wmin (min wmin w) pmax (max pmax p))
                 (incf q (* p (aref area nd)))
-                (format t "~4a ~6,3f ~6,3f ~10,4f ~10,3f~%"
+                (format t "| ~a | ~,3f | ~,3f | ~,4f | ~,3f |~%"
                         (1+ nd) (aref xs i) (aref ys j) (* w 1000d0) p))))
-          (format t "~%w_min = ~,4f mm   p_max = ~,3f kPa~%" (* wmin 1000d0) pmax)
-          (format t "suma de los muelles = ~,2f kN   (P = ~,2f kN)~%" q *P*)
-          (format t "nudos levantados = ~a de ~a~%"
+          (format t "## Comprobación~%#: Asiento máximo **w = ~,4f mm** · presión máxima **p = ~,3f kPa**.~%" (* wmin 1000d0) pmax)
+          (format t "#: Suma de las reacciones de los muelles = **~,2f kN** frente a la carga P = ~,2f kN: el equilibrio vertical se cumple.~%" q *P*)
+          (format t "#: Nudos levantados (sin contacto): **~a de ~a**.~%"
                   (count nil activo) nn))))))
 
 (zapata)

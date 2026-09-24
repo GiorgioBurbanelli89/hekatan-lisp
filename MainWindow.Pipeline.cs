@@ -1429,6 +1429,9 @@ dib();})();";
         {
             _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
+            // un PROGRAMA LISP corre con SU texto: PrepareNames es para la matemática de la hoja y
+            // renombraba también dentro de las cadenas "…" del programa («La» → «lahkq6»).
+            string textoPrograma = text;
 
             // CaseMap: recuerda cómo escribió el usuario cada identificador con mayúsculas
             // (L, EI, N1…) para restaurar el case en el render (el motor los devuelve en minúscula).
@@ -1488,7 +1491,9 @@ dib();})();";
                 _ranProgram = true;
                 if (LispAutoLisp.UsaDibujo(text))   // AutoLISP: salida + dibujo
                     return new List<string> { LispConverter.TxtLine("table", "left", LispAutoLisp.Programa(text, CorrerAutoLisp, GuardarDibujo)) };
-                return new List<string> { RunLispClean(text) };
+                // el texto ORIGINAL si nada lo plegó antes (sin bloques #autolisp ni control de flujo)
+                var prog = LooksLikeLisp(textoPrograma) && IsLispProgram(textoPrograma) && Balanced(textoPrograma) ? textoPrograma : text;
+                return SalidaDePrograma(RunLispClean(prog));
             }
             // Solo EJECUTAR (imperativo) si hay CONTROL DE FLUJO real (for/while/if/function).
             // Las asignaciones simples "N1 = expr" NO se ejecutan: son etiquetas simbólicas.
@@ -2236,7 +2241,7 @@ dib();})();";
         // ¿la forma LISP contiene alguna llamada de operación (Partial, Factor, ∫, …)?
         private static readonly string[] OpCalls = {
             "(partial","(derive-x","(factor","(expand*","(integ-var","(integ-x","(area-under","(slope-at",
-            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite","(despejar",
+            "(suma","(producto-op","(root-op","(find-op","(sup-op","(inf-op","(repeat-op","(limite","(taylor-op","(despejar",
             "(ceil ","(floor ","(round ","(max ","(min " };   // numéricas: se muestra  n = ⌈As/Ab⌉ = 7
         private static bool HasNumFn(string f) => f != null &&
             (f.Contains("(ceil ") || f.Contains("(floor ") || f.Contains("(round ") || f.Contains("(max ") || f.Contains("(min "));
@@ -2312,6 +2317,49 @@ dib();})();";
         private static bool IsLispProgram(string t)
             => System.Text.RegularExpressions.Regex.IsMatch(t,
                 @"(?<![A-Za-z0-9_.])\(\s*(defun|defparameter|defvar|let\*?|setf|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\s+(?=[^\s\-+*/^=)·,])");
+
+        /// <summary>La salida (stdout) de un PROGRAMA LISP, con el mismo formato que la hoja: las líneas
+        /// que el programa escribe con # (título), ## / ### (subtítulos), #: #| #> #< (párrafos) salen
+        /// como texto con formato, y las que empiezan con | forman una TABLA (la fila |---|---| se salta).
+        /// El resto sale tal cual. Sin ninguna de esas líneas, la salida queda como antes (una sola pieza).</summary>
+        private static List<string> SalidaDePrograma(string salida)
+        {
+            var lineas = (salida ?? "").Replace("\r", "").Split('\n');
+            if (!System.Array.Exists(lineas, l => l.StartsWith("#") || l.TrimStart().StartsWith("|")))
+                return new List<string> { salida };
+            var res = new List<string>(); var plano = new StringBuilder();
+            void Plano() { if (plano.Length > 0) { res.Add(plano.ToString().TrimEnd()); plano.Clear(); } }
+            string Celda(string c) => LispConverter.FormatInlineText(c.Trim(), null);
+            for (int i = 0; i < lineas.Length; i++)
+            {
+                var l = lineas[i];
+                if (l.TrimStart().StartsWith("|"))
+                {
+                    Plano();
+                    var filas = new List<List<string>>();
+                    for (; i < lineas.Length && lineas[i].TrimStart().StartsWith("|"); i++)
+                    {
+                        var t = lineas[i].Trim().Trim('|');
+                        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^[\s:\-|]+$")) continue;   // |---|---|
+                        filas.Add(new List<string>(System.Array.ConvertAll(t.Split('|'), Celda)));
+                    }
+                    i--;
+                    if (filas.Count == 0) continue;
+                    var cab = filas[0]; filas.RemoveAt(0);
+                    var al = new List<string>();
+                    for (int c = 0; c < cab.Count; c++)
+                        al.Add(filas.TrueForAll(f => c < f.Count && double.TryParse(f[c].Replace(" ", ""),
+                            System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) ? "num" : "txt");
+                    res.Add(LispConverter.TxtLine("table", "left", LispConverter.BuildTable(null, al, cab, filas)));
+                    continue;
+                }
+                var d = l.StartsWith("#") ? LispConverter.TextDirective(l) : null;
+                if (d != null) { Plano(); res.Add(LispConverter.TxtLine(d.Value.kind, d.Value.align, LispConverter.FormatInlineText(d.Value.text, null))); }
+                else plano.AppendLine(l);
+            }
+            Plano();
+            return res;
+        }
 
         private static string RunLispClean(string code)
         {

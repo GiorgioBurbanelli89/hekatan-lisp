@@ -1,25 +1,19 @@
-;;;; ================================================================
-;;;; LA DERIVADA — definicion historica (Newton / Leibniz, s. XVII)
-;;;; ================================================================
-;;;; La derivada nacio del problema de la TANGENTE:
-;;;;   toma la recta SECANTE que corta la curva en x y en x+h;
-;;;;   su pendiente es  [ f(x+h) - f(x) ] / h .
-;;;;   Cuando h -> 0, la secante se vuelve la TANGENTE, y esa pendiente
-;;;;   es la DERIVADA:      f'(x) = lim_{h->0} [f(x+h) - f(x)] / h
-;;;;
-;;;; Ejemplo con  f(x) = x^2.  La tangente en x0=1 tiene pendiente f'(1)=2.
-;;;; La grafica muestra la PARABOLA (F) y su TANGENTE en x=1 (T=2x-1):
-;;;; se tocan en (1,1).
-;fplot(F, T, [-1 3])
+# La derivada: de la secante a la tangente
+#: La derivada nació en el siglo XVII (Newton y Leibniz) con el problema de la **tangente**. Se traza la recta **secante** que corta la curva en dos puntos, x y x + h, y se acerca un punto al otro: cuando h tiende a 0, la secante se vuelve tangente y su pendiente es la derivada.
 
-(format t "f(x) = x^2 ;  probamos la definicion en x0 = 1~%~%")
-(format t "  F = ~a~%" '(expt x 2))                    ; la parabola
-(format t "  T = ~a~%" '(- (* 2 x) 1))                 ; tangente en x=1:  1 + 2(x-1) = 2x-1
-(format t "~%pendiente de la SECANTE cuando h se hace chico (x0=1):~%")
-(dolist (h '(1 1/2 1/10 1/100 1/1000))
-  (format t "  h = ~8a  ->  pendiente = ~a~%"
-          h (simplify (list '/ (list '- (subst-var '(expt x 2) 'x (+ 1 h))
-                                        (subst-var '(expt x 2) 'x 1)) h))))
-(format t "~%... la pendiente TIENDE a 2.~%")
-(format t "derivada POR DEFINICION:  f'(x) = ~a~%" (infix (deriv-def '(expt x 2))))
-(format t "en x0=1:  f'(1) = 2   (la pendiente de la tangente)~%")
+## 1 · La pendiente de la secante
+f(x) = x^2
+#: Entre x = 1 y x = 1 + h la pendiente de la secante es (f(1 + h) − f(1))/h:
+m_s = Simplify{((1 + h)^2 - 1^2)/h}
+#: Sale 2 + h: depende de h. Con h = 1 vale 3; con h = 0.1 vale 2.1.
+
+## 2 · El límite: la tangente
+m_t = Limit{((1 + h)^2 - 1)/h @ h = 0}
+#: La animación achica h = 1/n (n = 1 … 12): la secante gira hasta coincidir con la tangente en el punto (1, 1).
+#anim fplot(f = x^2, secante = 1 + (2 + 1/n)*(x - 1), tangente = 1 + 2*(x - 1), [-1 3]), n = 1:12
+
+## 3 · La regla que sale del límite
+#: Lo mismo en cualquier x da la derivada:
+Limit{((x + h)^2 - x^2)/h @ h = 0}
+Derivate{x^2 @ x}
+Slope{x^2 @ x = 1}

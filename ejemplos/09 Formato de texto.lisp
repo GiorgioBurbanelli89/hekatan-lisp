@@ -1,20 +1,25 @@
-;# Formato de texto en Hekatan LISP
-;| Todo esto vive dentro de *comentarios* ( ; ) — al ejecutar el .lisp NO se ve.
-;| Solo Hekatan LISP lo dibuja. Sirve para explicar tus cálculos.
+# Formato de texto en Hekatan LISP
+#: Una línea que empieza con **#** es texto. Lo demás es matemática que se calcula. Así se explica el cálculo en la misma hoja.
 
-;## Alineación
-;< Este texto va a la IZQUIERDA
-;| Este texto va CENTRADO
-;> Este texto va a la DERECHA
+## Títulos
+#: **#** título · **##** subtítulo · **###** apartado.
 
-;## Estilos y variables
-;: Puedes combinar *negrita*, _cursiva_ y {variables} de la hoja.
+### Esto es un apartado
+
+## Alineación
+#< Este texto va a la izquierda
+#| Este texto va centrado
+#> Este texto va a la derecha
+
+## Estilos
+#: Doble asterisco para **negrita** y uno para *cursiva*.
+
+## Valores de la hoja dentro del texto
 A = (x + 1)^2
-B = x^2 - 1
-;: El cuadrado del binomio es  A = {A}  y la diferencia  B = {B}.
+b = 12 'base, cm
+h = 30 'altura, cm
+I = b*h^3/12 'inercia, cm⁴
+#: La arroba pone el valor dentro de la frase: la sección de @b por @h tiene @I.
 
-;## Directivas
-;: ;#  Título        ;##  Subtítulo
-;: ;<  izquierda     ;>  derecha      ;|  ó  ;=  centrado
-;: ;:  ó  ;-  párrafo normal
-;: inline:  *negrita*   _cursiva_   {Variable}
+## Comentario de línea
+#: Después del apóstrofo va la descripción de cada dato, como en b y h de arriba.

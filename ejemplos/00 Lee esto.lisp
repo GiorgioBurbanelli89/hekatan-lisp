@@ -1,19 +1,19 @@
-;;;; ============================================================
-;;;; BIENVENIDO A HEKATAN LISP  —  ejemplos para practicar
-;;;; ============================================================
-;;;; - Escribe matematica (MATLAB) o LISP a la izquierda.
-;;;; - El resultado sale a la derecha (Render CSS / LISP / MATLAB / 3 formas).
-;;;; - Pulsa  ▶ Ejecutar  (o deja AutoRun encendido).
-;;;;
-;;;; El motor (funciones LISP) hace lo simbolico:
-;;;;   derive-x  : derivada respecto a x
-;;;;   integ-x   : integral indefinida respecto a x
-;;;;   simplify  : junta terminos, quita 0+ , 1* , etc.
-;;;;   expand*   : distribuye productos y potencias
-;;;;   infix     : muestra una forma LISP como matematica ( (+ x 1) -> x + 1 )
-;;;;
-;;;; Menu -> Motor -> Ver funciones : para VER esas funciones.
-;;;; Abre los otros ejemplos de esta carpeta y juega con ellos.
+# Bienvenido a Hekatan LISP
+#: A la izquierda se escribe; a la derecha sale la matemática ya calculada y dibujada. Hay tres tipos de línea:
+#: **#** delante es texto · sin nada es matemática · **;** delante es LISP puro.
 
-(format t "Hola. Deriva x^2: ~a  =  ~a~%"
-        (infix '(expt x 2)) (infix (derive-x '(expt x 2))))
+## 1 · Datos y fórmulas
+L = 6 'largo de la viga, m
+q = 10 'carga repartida, kN/m
+M = q*L^2/8 'momento máximo de una viga simplemente apoyada, kN·m
+
+## 2 · Operaciones simbólicas
+f(x) = x^3 - 2*x
+Derivate{f(x) @ x}
+Integral{f(x) @ x}
+Area{f(x) @ x = 0 : 2}
+
+## 3 · Por dentro es LISP
+#: Cada fórmula se convierte en una lista: x³ − 2x es (- (expt x 3) (* 2 x)). Arriba, en **resultado como**, el botón **LISP** muestra la hoja entera en listas y **3 formas** pone juntas la matemática, el LISP y el MATLAB.
+
+#: Abre los otros ejemplos (menú **Ejemplos**) y cambia los datos: la hoja se recalcula sola.

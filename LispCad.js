@@ -546,7 +546,10 @@
           if (L > 1e-9) {
             cajaDin(g, L.toFixed(2) + ' ' + S.ud, (bb[0] + c[0]) / 2, (bb[1] + c[1]) / 2, '#25b7d3', true);
             var an = Math.atan2(dy, dx) * 180 / Math.PI; if (an < 0) an += 360;
-            cajaDin(g, Math.round(an) % 360 + '°', c[0], c[1] + 58, '#25b7d3', false, '#35c6e0');
+            // el ángulo va bajo el cursor; si ahí cae la caja de longitud (tramo corto), va al costado
+            var mx = (bb[0] + c[0]) / 2, my = (bb[1] + c[1]) / 2, ax = c[0], ay = c[1] + 58;
+            if (Math.abs(mx - ax) < 90 && Math.abs(my - ay) < 34) { ax = c[0] + (mx <= c[0] ? 72 : -72); ay = c[1] + 34; }
+            cajaDin(g, Math.round(an) % 360 + '°', ax, ay, '#25b7d3', false, '#35c6e0');
           }
         } else cajaDin(g, w0[0].toFixed(2) + ',' + w0[1].toFixed(2), c[0] + 40, c[1] - 52, '#25b7d3', true);
       }

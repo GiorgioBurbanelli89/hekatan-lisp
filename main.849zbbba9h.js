@@ -138,7 +138,21 @@ function calcularYMostrar() {
   catch (e) { out = view === 'render' || view === 'learn' ? `<pre style="color:#c0392b">${esc(String(e))}</pre>` : String(e); }
   const render = view === 'render' || view === 'learn';
   $('render').hidden = !render; $('texto').hidden = render;
-  if (render) $('render').srcdoc = out; else $('texto').textContent = out;
+  if (render) $('render').srcdoc = conPosicion(out); else $('texto').textContent = out;
+}
+// Recalcular NO manda arriba: se repone donde estaba el lector; si estaba al final (escribiendo la
+// última línea), se queda al final. (Lo mismo que el escritorio en ShowResult.)
+function conPosicion(html) {
+  try {
+    const w = $('render').contentWindow, d = w && w.document.documentElement;
+    if (!d) return html;
+    const y = w.scrollY || 0, alFinal = w.innerHeight + y >= d.scrollHeight - 40 && d.scrollHeight > w.innerHeight + 40;
+    if (!y && !alFinal) return html;
+    const ir = alFinal ? 'window.scrollTo(0,document.documentElement.scrollHeight)' : `window.scrollTo(0,${y})`;
+    const js = `<script>${ir};addEventListener('load',function(){${ir}});<\/script>`;
+    const i = html.toLowerCase().lastIndexOf('</body>');
+    return i >= 0 ? html.slice(0, i) + js + html.slice(i) : html + js;
+  } catch { return html; }
 }
 function programar() {                  // _debounce de 280 ms, como el escritorio
   clearTimeout(pendiente);

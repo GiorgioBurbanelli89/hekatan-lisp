@@ -294,6 +294,25 @@ namespace HekatanLisp
                     if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + "</body>");   // orbit + hover de mapas, una vez
                 }
                 _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)
+                // Recalcular NO debe mandar arriba: se guarda dónde estaba el lector y se repone en la
+                // página nueva; si estaba al final (escribiendo la última línea), se queda al final.
+                try
+                {
+                    var pos = await Viewer.ExecuteScriptAsync(
+                        "(function(){var d=document.documentElement;return JSON.stringify([window.scrollY||0,(window.innerHeight+(window.scrollY||0))>=d.scrollHeight-40&&d.scrollHeight>window.innerHeight+40]);})()");
+                    if (gen != _showGen) return;
+                    var arr = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Deserialize<string>(pos) ?? "[0,false]").RootElement;
+                    double y = arr[0].GetDouble(); bool alFinal = arr[1].GetBoolean();
+                    if (y > 0 || alFinal)
+                    {
+                        string ir = alFinal ? "window.scrollTo(0,document.documentElement.scrollHeight)"
+                                            : "window.scrollTo(0," + y.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+                        string js = "<script>" + ir + ";addEventListener('load',function(){" + ir + "});</script>";
+                        int cb = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+                        html = cb >= 0 ? html.Insert(cb, js) : html + js;
+                    }
+                }
+                catch { }
                 Viewer.NavigateToString(html);
                 return;
             }
@@ -521,10 +540,16 @@ namespace HekatanLisp
             foreach (var f in Directory.GetFiles(_ctl, "cmd-*.json"))
             {
                 if (_ctlSeen.Contains(f)) continue;
+                // la orden puede estar A MEDIO ESCRIBIR (el guion aún la tiene abierta): se lee en la
+                // próxima vuelta. Antes se contestaba con un error y la orden se PERDÍA (p. ej. el tema).
+                string texto;
+                try { texto = File.ReadAllText(f); System.Text.Json.JsonDocument.Parse(texto).Dispose(); }
+                catch (IOException) { continue; }
+                catch (System.Text.Json.JsonException) { continue; }
                 _ctlSeen.Add(f);
                 string resp;
-                try { resp = await HandleCtl(File.ReadAllText(f)); }
-                catch (Exception ex) { resp = "{\"error\":\"" + ex.Message.Replace("\"", "'") + "\"}"; }
+                try { resp = await HandleCtl(texto); }
+                catch (Exception ex) { resp = System.Text.Json.JsonSerializer.Serialize(new { error = ex.Message }); }   // JSON válido aunque lleve rutas con '\'
                 File.WriteAllText(f.Replace("cmd-", "resp-"), resp);
             }
         }

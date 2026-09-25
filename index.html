@@ -11,31 +11,31 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css?v=95d21bfdde">
-  <link href="_framework/dotnet.72va5j506g.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-v1wjBfCadIhDyQNbxXIJbr1kHKNPrSwqaMHRcgqkVPs=" />
+  <link href="_framework/dotnet.87xrqas7gr.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-LN2hcW+WTZTGooTPU/AjhRZvlit6WcBR3TDF1Cmcqq0=" />
   <script type="importmap">{
   "imports": {
-    "./_framework/dotnet.js": "./_framework/dotnet.72va5j506g.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.87xrqas7gr.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.jwpb6aevwu.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
-    "./hlisp.js": "./hlisp.lvb4eyb92g.js",
-    "./main.js": "./main.849zbbba9h.js"
+    "./hlisp.js": "./hlisp.gevp0t7ttn.js",
+    "./main.js": "./main.41hyyvc152.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.72va5j506g.js": "sha256-v1wjBfCadIhDyQNbxXIJbr1kHKNPrSwqaMHRcgqkVPs=",
-    "./_framework/dotnet.js": "sha256-v1wjBfCadIhDyQNbxXIJbr1kHKNPrSwqaMHRcgqkVPs=",
+    "./_framework/dotnet.87xrqas7gr.js": "sha256-LN2hcW+WTZTGooTPU/AjhRZvlit6WcBR3TDF1Cmcqq0=",
+    "./_framework/dotnet.js": "sha256-LN2hcW+WTZTGooTPU/AjhRZvlit6WcBR3TDF1Cmcqq0=",
     "./_framework/dotnet.native.js": "sha256-Hdq+Wa7iE/Lfspe1r5W0TzvZPElJDa4w74hVJz5UqRQ=",
     "./_framework/dotnet.native.jwpb6aevwu.js": "sha256-Hdq+Wa7iE/Lfspe1r5W0TzvZPElJDa4w74hVJz5UqRQ=",
     "./_framework/dotnet.runtime.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
-    "./hlisp.js": "sha256-IZv7ekPgRsZrT2MwNfL3sEBs0MfUiev/Q28DWgISMSs=",
-    "./hlisp.lvb4eyb92g.js": "sha256-IZv7ekPgRsZrT2MwNfL3sEBs0MfUiev/Q28DWgISMSs=",
-    "./main.849zbbba9h.js": "sha256-GMAWpd+c1FGjiRmJpGCatN1z7meeTaA7Mr36My/5Yq0=",
-    "./main.js": "sha256-GMAWpd+c1FGjiRmJpGCatN1z7meeTaA7Mr36My/5Yq0="
+    "./hlisp.gevp0t7ttn.js": "sha256-yFDZYltALh3D7k0YGFrcpYTR3Y2VUQO2XxLgyHSiGZE=",
+    "./hlisp.js": "sha256-yFDZYltALh3D7k0YGFrcpYTR3Y2VUQO2XxLgyHSiGZE=",
+    "./main.41hyyvc152.js": "sha256-uMgZh5gxjLptKT8+fLqv4ZrDO1lrj2yPU2pjylSi1tg=",
+    "./main.js": "sha256-uMgZh5gxjLptKT8+fLqv4ZrDO1lrj2yPU2pjylSi1tg="
   }
 }</script>
-  <script src="hlisp.lvb4eyb92g.js"></script>
-  <script type="module" src="main.849zbbba9h.js"></script>
+  <script src="hlisp.gevp0t7ttn.js"></script>
+  <script type="module" src="main.41hyyvc152.js"></script>
 </head>
 <body>
   <div class="carga" id="carga"><div>Cargando <b>Hekatan LISP</b>… (motor LISP + render)</div></div>
@@ -81,6 +81,15 @@
         <button data-ins="cos(§§)">cos( )</button>
       </div>
     </div>
+    <div class="mi"><span>Dibujo</span>
+      <div class="sub">
+        <button data-a="dibujo2d">✏ Ventana de dibujo 2D (como AutoCAD)…</button>
+        <button data-a="dibujo3d">🧊 Ventana de dibujo 3D (como AutoCAD 3D)…</button>
+        <hr>
+        <button data-a="bloqueAutolisp">Bloque AutoLISP (entmake, ssget, polar…)</button>
+        <button data-a="bloqueDibujo">Bloque de dibujo con medidas de la hoja (#dibujo)</button>
+      </div>
+    </div>
     <div class="mi"><span>Motor</span>
       <div class="sub">
         <button data-a="verMotor">Ver funciones del motor (LISP)</button>
@@ -101,6 +110,7 @@
   <div class="modos">
     <span class="titulo">Hekatan LISP</span>
     <button class="mode" data-a="nuevo" style="margin-left:14px" title="Hoja nueva en blanco">📄 Nuevo</button>
+    <button class="mode" data-a="dibujo2d" title="Abre la ventana de dibujo como AutoCAD (línea de órdenes, OSNAP, cotas, 3D). Lo dibujado vuelve a la hoja como entmake de AutoLISP.">✏ Dibujar (CAD)</button>
     <button class="mode" data-a="compartir" title="Copia un enlace con esta hoja: quien lo abra la ve igual, ya calculada">🔗 Compartir</button>
     <label class="ejemplos" title="Carga un ejemplo y lo calcula (AutoRun)">
       <span class="lbl">ejemplos:</span>

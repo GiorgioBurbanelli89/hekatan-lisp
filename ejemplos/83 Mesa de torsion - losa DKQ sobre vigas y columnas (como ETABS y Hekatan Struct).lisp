@@ -47,14 +47,12 @@ D_m = Simplify{E/(1-nu^2)*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]}
 B_m(xi, eta) = Simplify{[-(1-eta)/(4*a), 0, (1-eta)/(4*a), 0, (1+eta)/(4*a), 0, -(1+eta)/(4*a), 0; 0, -(1-xi)/(4*a), 0, -(1+xi)/(4*a), 0, (1+xi)/(4*a), 0, (1-xi)/(4*a); -(1-xi)/(4*a), -(1-eta)/(4*a), -(1+xi)/(4*a), (1-eta)/(4*a), (1+xi)/(4*a), (1+eta)/(4*a), (1-xi)/(4*a), -(1+eta)/(4*a)]}
 #: **Modos incompatibles de Wilson**: u = Σ Nᵢ·uᵢ + (1 − ξ²)·α₁ + (1 − η²)·α₂, y v con α₃, α₄. Sus derivadas dan otra matriz G (3 × 4):
 G_m(xi, eta) = Simplify{[Partial{1-xi^2 @ xi}/a, 0, 0, 0; 0, 0, 0, Partial{1-eta^2 @ eta}/a; 0, Partial{1-eta^2 @ eta}/a, Partial{1-xi^2 @ xi}/a, 0]}
-#: **Rigidez**: K = t·∫∫ Bᵀ·D·B·det J dξ dη. Los integrandos son de grado 2: Gauss 2 × 2 da lo mismo que la integral exacta.
-K_uu = Simplify{t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*B_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
-K_ua = Simplify{t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
-K_aa = Simplify{t*a^2*Area{Area{transpose(G_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
-#: **Condensación estática**: los α no son grados de nudo; se eliminan con K_{αα}·α = −K_{αu}·u, y queda
-K_Q6 = Simplify{K_uu - K_ua*inv(K_aa)*transpose(K_ua)}
-#: Todos los términos llevan E·t/(1 − ν²). Sacando el factor común E·t/(24·(1 − ν²)), lo que queda son números y ν:
-K_Q6n = Simplify{24*(1-nu^2)/(E*t)*K_Q6}
+#: **Rigidez**: K = t·∫∫ Bᵀ·D·B·det J dξ dη. Los integrandos son de grado 2: Gauss 2 × 2 da lo mismo que la integral exacta. Para que se lean, cada matriz se escribe con su factor común afuera: K_{uu} = E·t/(24·(1 − ν²))·K̂_{uu}, y K_{uα}, K_{αα} con E·t/(3·(1 − ν²)).
+Kn_uu = Simplify{24*(1-nu^2)/(E*t)*t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*B_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+Kn_ua = Simplify{3*(1-nu^2)/(E*t)*t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+Kn_aa = Simplify{3*(1-nu^2)/(E*t)*t*a^2*Area{Area{transpose(G_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+#: **Condensación estática**: los α no son grados de nudo; se eliminan con K_{αα}·α = −K_{αu}·u, y queda K_{Q6} = K_{uu} − K_{uα}·K_{αα}⁻¹·K_{αu}. Con los factores de arriba (su razón es 24/3 = 8), K_{Q6} = E·t/(24·(1 − ν²))·K̂_{Q6} con
+Kn_Q6 = Simplify{Kn_uu - 8*Kn_ua*inv(Kn_aa)*transpose(Kn_ua)}
 
 ### A.5 · Placa DKQ (12 × 12)
 #: **Kirchhoff discreto** (Batoz y Tahar 1982): los giros β se interpolan con 8 nudos y la condición β = ∇w se impone solo en los nudos y en el medio de los lados. Las curvaturas κ = [∂β_{x}/∂x; ∂β_{y}/∂y; ∂β_{x}/∂y + ∂β_{y}/∂x] quedan B_{f}·u con u = [w₁ β_{x1} β_{y1} …]. **Ley constitutiva** (D = E·t³/(12·(1 − ν²))):
@@ -62,8 +60,8 @@ D_f = Simplify{D*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]}
 D_t = Simplify{E*t^3/(12*(1-nu^2))}
 #: **Matriz B** del DKQ rectangular de lado d (la de Hekatan Struct, python_dkq.py):
 B_f(xi, eta) = Simplify{[3*xi*(1-eta)/d^2, 0, (1-eta)*(3*xi-1)/(2*d), -3*xi*(1-eta)/d^2, 0, (1-eta)*(1+3*xi)/(2*d), -3*xi*(1+eta)/d^2, 0, (1+eta)*(1+3*xi)/(2*d), 3*xi*(1+eta)/d^2, 0, (1+eta)*(3*xi-1)/(2*d); 3*(1-xi)*eta/d^2, -(1-xi)*(3*eta-1)/(2*d), 0, 3*(1+xi)*eta/d^2, -(1+xi)*(3*eta-1)/(2*d), 0, -3*(1+xi)*eta/d^2, -(1+xi)*(1+3*eta)/(2*d), 0, -3*(1-xi)*eta/d^2, -(1-xi)*(1+3*eta)/(2*d), 0; 3*(2-xi^2-eta^2)/(2*d^2), -(1-eta)*(1+3*eta)/(4*d), (1-xi)*(1+3*xi)/(4*d), -3*(2-xi^2-eta^2)/(2*d^2), (1-eta)*(1+3*eta)/(4*d), (1+xi)*(1-3*xi)/(4*d), 3*(2-xi^2-eta^2)/(2*d^2), -(1+eta)*(3*eta-1)/(4*d), (1+xi)*(3*xi-1)/(4*d), -3*(2-xi^2-eta^2)/(2*d^2), -(1+eta)*(1-3*eta)/(4*d), -(1-xi)*(1+3*xi)/(4*d)]}
-#: **Rigidez con Gauss 2 × 2** (det J = (d/2)²), exactamente como la calcula el programa. No es la integral exacta: el término (2 − ξ² − η²)² es de grado 4 (ver A.3).
-K_DKQ = Simplify{(d/2)^2*(transpose(B_f(-1/sqrt(3), -1/sqrt(3)))*D_f*B_f(-1/sqrt(3), -1/sqrt(3)) + transpose(B_f(1/sqrt(3), -1/sqrt(3)))*D_f*B_f(1/sqrt(3), -1/sqrt(3)) + transpose(B_f(1/sqrt(3), 1/sqrt(3)))*D_f*B_f(1/sqrt(3), 1/sqrt(3)) + transpose(B_f(-1/sqrt(3), 1/sqrt(3)))*D_f*B_f(-1/sqrt(3), 1/sqrt(3)))}
+#: **Rigidez con Gauss 2 × 2** (det J = (d/2)²), exactamente como la calcula el programa. No es la integral exacta: el término (2 − ξ² − η²)² es de grado 4 (ver A.3). Con el factor común afuera, K_{DKQ} = D/(24·d²)·K̂_{DKQ}:
+Kn_DKQ = Simplify{24*d^2/D*(d/2)^2*(transpose(B_f(-1/sqrt(3), -1/sqrt(3)))*D_f*B_f(-1/sqrt(3), -1/sqrt(3)) + transpose(B_f(1/sqrt(3), -1/sqrt(3)))*D_f*B_f(1/sqrt(3), -1/sqrt(3)) + transpose(B_f(1/sqrt(3), 1/sqrt(3)))*D_f*B_f(1/sqrt(3), 1/sqrt(3)) + transpose(B_f(-1/sqrt(3), 1/sqrt(3)))*D_f*B_f(-1/sqrt(3), 1/sqrt(3)))}
 #: El DKQ usa β_{x} = θ_{y} y β_{y} = −θ_{x}: en la losa se multiplica por P = diag(1, −1, −1, …) a los dos lados, K_{placa} = P·K_{DKQ}·P.
 
 ### A.6 · Giro en el plano (drilling)
@@ -510,20 +508,36 @@ r_C10 = round(S_C(10), 4)
 r_C11 = round(S_C(11), 4)
 r_C12 = round(S_C(12), 4)
 #show
-#| magnitud | Dead | Live | SCP | UDCon2 | ETABS Dead | ETABS Live | ETABS SCP | ETABS UDCon2 |
-#|---|--:|--:|--:|--:|--:|--:|--:|--:|
-#| losa: Mxx máximo [tonf·m/m] | @{r_D2} | @{r_L2} | @{r_S2} | @{r_C2} | 0.296 | 0.654 | 1.308 | 2.970 |
-#| losa: Mxy máximo [tonf·m/m] | @{r_D3} | @{r_L3} | @{r_S3} | @{r_C3} | 0.083 | 0.189 | 0.379 | 0.857 |
-#| columna: P [tonf] | @{r_D4} | @{r_L4} | @{r_S4} | @{r_C4} | 5.72 | 4.50 | 9.00 | 24.86 |
-#| columna: V [tonf] | @{r_D5} | @{r_L5} | @{r_S5} | @{r_C5} | 0.45 | 0.61 | 1.22 | 2.97 |
-#| columna: M en la cara [tonf·m] | @{r_D6} | @{r_L6} | @{r_S6} | @{r_C6} | 1.57 | 2.13 | 4.26 | 10.40 |
-#| viga: V en la cara [tonf] | @{r_D7} | @{r_L7} | @{r_S7} | @{r_C7} | 2.05 | 2.20 | 4.41 | 11.27 |
-#| viga: T [tonf·m] | @{r_D8} | @{r_L8} | @{r_S8} | @{r_C8} | 0.53 | 1.15 | 2.29 | 5.23 |
-#| viga: M en la cara (0.2 m) [tonf·m] | @{r_D9} | @{r_L9} | @{r_S9} | @{r_C9} | | | | −3.99 |
-#| viga: M en 3.2 m [tonf·m] | @{r_D10} | @{r_L10} | @{r_S10} | @{r_C10} | 2.43 | 3.14 | 6.28 | 15.48 |
-#| viga: P [tonf] | @{r_D11} | @{r_L11} | @{r_S11} | @{r_C11} | | | | 1.84 |
-#| suma de reacciones [tonf] | @{r_D12} | @{r_L12} | @{r_S12} | @{r_C12} | 22.874 | 18.000 | 36.000 | 99.449 |
-#| w en el centro [mm] | @{r_D1} | @{r_L1} | @{r_S1} | @{r_C1} | | −6.50 | | |
+#: **Dead y Live:**
+#| magnitud | Dead | ETABS | Live | ETABS |
+#|---|--:|--:|--:|--:|
+#| losa: Mxx máximo [tonf·m/m] | @{r_D2} | 0.296 | @{r_L2} | 0.654 |
+#| losa: Mxy máximo [tonf·m/m] | @{r_D3} | 0.083 | @{r_L3} | 0.189 |
+#| columna: P [tonf] | @{r_D4} | 5.72 | @{r_L4} | 4.50 |
+#| columna: V [tonf] | @{r_D5} | 0.45 | @{r_L5} | 0.61 |
+#| columna: M en la cara [tonf·m] | @{r_D6} | 1.57 | @{r_L6} | 2.13 |
+#| viga: V en la cara [tonf] | @{r_D7} | 2.05 | @{r_L7} | 2.20 |
+#| viga: T [tonf·m] | @{r_D8} | 0.53 | @{r_L8} | 1.15 |
+#| viga: M en la cara (0.2 m) [tonf·m] | @{r_D9} |  | @{r_L9} |  |
+#| viga: M en 3.2 m [tonf·m] | @{r_D10} | 2.43 | @{r_L10} | 3.14 |
+#| viga: P [tonf] | @{r_D11} |  | @{r_L11} |  |
+#| suma de reacciones [tonf] | @{r_D12} | 22.874 | @{r_L12} | 18.000 |
+#| w en el centro [mm] | @{r_D1} |  | @{r_L1} | −6.50 |
+#: **SCP y UDCon2:**
+#| magnitud | SCP | ETABS | UDCon2 | ETABS |
+#|---|--:|--:|--:|--:|
+#| losa: Mxx máximo [tonf·m/m] | @{r_S2} | 1.308 | @{r_C2} | 2.970 |
+#| losa: Mxy máximo [tonf·m/m] | @{r_S3} | 0.379 | @{r_C3} | 0.857 |
+#| columna: P [tonf] | @{r_S4} | 9.00 | @{r_C4} | 24.86 |
+#| columna: V [tonf] | @{r_S5} | 1.22 | @{r_C5} | 2.97 |
+#| columna: M en la cara [tonf·m] | @{r_S6} | 4.26 | @{r_C6} | 10.40 |
+#| viga: V en la cara [tonf] | @{r_S7} | 4.41 | @{r_C7} | 11.27 |
+#| viga: T [tonf·m] | @{r_S8} | 2.29 | @{r_C8} | 5.23 |
+#| viga: M en la cara (0.2 m) [tonf·m] | @{r_S9} |  | @{r_C9} | −3.99 |
+#| viga: M en 3.2 m [tonf·m] | @{r_S10} | 6.28 | @{r_C10} | 15.48 |
+#| viga: P [tonf] | @{r_S11} |  | @{r_C11} | 1.84 |
+#| suma de reacciones [tonf] | @{r_S12} | 36.000 | @{r_C12} | 99.449 |
+#| w en el centro [mm] | @{r_S1} |  | @{r_C1} |  |
 #: **Contra Python** (Hekatan Struct, mesa_hekatan.py con DKQ y las mismas cargas, 6 decimales), la combinación UDCon2:
 d_1 = round((S_C(2) - 2.969589)/2.969589·100, 4) 'Mxx %
 d_2 = round((S_C(3) - 0.856810)/0.856810·100, 4) 'Mxy %

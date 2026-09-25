@@ -26,13 +26,22 @@ table { border-collapse:collapse; width:100%; margin:10px 0; font-size:.95em; }
 th, td { border:1px solid var(--borde); padding:6px 9px; text-align:left; vertical-align:top; }
 th { background:var(--tabla); }
 figure { margin:14px 0 22px; }
-figure img { max-width:100%; border:1px solid var(--borde); border-radius:6px; display:block; }
+figure img { max-width:100%; border:1px solid var(--borde); border-radius:6px; display:block; margin:0 auto; }
 figcaption { color:var(--suave); font-size:.9em; margin-top:5px; }
 .alto { max-height:620px; overflow:auto; border:1px solid var(--borde); border-radius:6px; }
 .alto img { border:0; border-radius:0; }
 .nota { border-left:4px solid var(--acento); background:var(--tabla); padding:8px 14px; border-radius:0 6px 6px 0; }
-@media print { .alto { max-height:none; overflow:visible; border:0; } figure, pre, table { break-inside:avoid; } h2 { break-after:avoid; } }
+.dos { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+@media (max-width:760px) { .dos { grid-template-columns:1fr; } }
 kbd { border:1px solid var(--borde); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:.88em; background:var(--codigo); }
+@media print {
+  .alto { max-height:none; overflow:visible; border:0; }
+  figure, pre, table { break-inside:avoid; }
+  h2, h3 { break-after:avoid; }
+  figure img { max-height:245mm; width:auto; max-width:100%; }   /* una imagen alta cabe entera en la página */
+  .salto { break-before:page; }
+  .dos { grid-template-columns:1fr 1fr; }
+}
 </style>
 </head>
 <body>
@@ -46,6 +55,7 @@ y a la derecha sale la matemática dibujada, con los resultados. Por dentro, cad
 una lista de <b>LISP</b> y un motor simbólico la simplifica, deriva, integra y opera con matrices.
 La misma idea sirve para <b>dibujar</b>: en LISP un dibujo también es una lista (la de AutoCAD), así que
 se puede calcular un dibujo y medir lo dibujado.</p>
+<p class="nota">Las capturas llevan <b>marcos y números</b>: el número de cada marco es el de la lista que va debajo de la imagen.</p>
 
 <nav><b>Contenido</b>
 <ol>
@@ -53,11 +63,14 @@ se puede calcular un dibujo y medir lo dibujado.</p>
 <li><a href="#ventana">La ventana</a></li>
 <li><a href="#hoja">Mi primera hoja</a></li>
 <li><a href="#simbolico">Operaciones simbólicas</a></li>
+<li><a href="#series">Límites, sumas, series y áreas</a></li>
 <li><a href="#numerico">Hoja numérica (como Calcpad)</a></li>
+<li><a href="#anim">Animación y voz</a></li>
 <li><a href="#dibujo">Dibujo con medidas calculadas</a></li>
 <li><a href="#autolisp">Dibujo AutoLISP (2D y 3D)</a></li>
-<li><a href="#dibujar">Ventana de dibujo</a></li>
-<li><a href="#guardar">Guardar el dibujo</a></li>
+<li><a href="#dibujar">Dibujo como AutoCAD: ventana 2D</a></li>
+<li><a href="#dibujar3d">Dibujo como AutoCAD: ventana 3D</a></li>
+<li><a href="#guardar">Guardar el dibujo (DXF · DWG …)</a></li>
 <li><a href="#compartir">Compartir y la versión web</a></li>
 <li><a href="#ejemplos">Ejemplos</a></li>
 <li><a href="#teclas">Teclas</a></li>
@@ -69,57 +82,72 @@ se puede calcular un dibujo y medir lo dibujado.</p>
 <p><a href="https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases/latest">github.com/GiorgioBurbanelli89/hekatan-lisp/releases</a>
 → <code>HekatanLisp_Setup_v1.29.x.exe</code>. Queda en <code>%LOCALAPPDATA%\Programs\Hekatan LISP</code>.</p>
 <p>Sin instalar nada, la versión web: <a href="https://giorgioburbanelli89.github.io/hekatan-lisp/">giorgioburbanelli89.github.io/hekatan-lisp</a>.</p>
-
 </section>
+
 <section id="ventana">
 <h2>2 · La ventana</h2>
-<figure><img src="img/01_ventana.png" alt="Ventana de Hekatan LISP: barra, editor a la izquierda y resultado a la derecha">
-<figcaption>Izquierda: lo que escribes. Derecha: el resultado. La línea del medio se arrastra.</figcaption></figure>
+<figure><img src="img/01_ventana.png" alt="Ventana de Hekatan LISP con 12 partes marcadas">
+<figcaption>Izquierda: lo que escribes (9). Derecha: el resultado (10). El divisor (11) se arrastra.</figcaption></figure>
 <table>
-<tr><th>Parte</th><th>Para qué</th></tr>
-<tr><td><b>🔗 Compartir</b></td><td>Crea un enlace de la web con tu hoja dentro (ver <a href="#compartir">§10</a>).</td></tr>
-<tr><td><b>▶ Ejecutar</b> · <b>AutoRun</b></td><td>Calcula. Con AutoRun encendido calcula solo, mientras escribes. <kbd>F5</kbd> = Ejecutar.</td></tr>
-<tr><td><b>resultado como</b></td><td><code>Render CSS</code> (matemática dibujada) · <code>LISP</code> · <code>matemática</code> · <code>3 formas</code> (las tres juntas, para aprender).</td></tr>
-<tr><td><b>escribo</b></td><td>Cómo escribes a la izquierda: <code>matemática</code> (lo normal), <code>expr LISP</code>, <code>LISP ▶</code> (programa), <code>Hekatan Lab</code> (MATLAB).</td></tr>
-<tr><td><b>operar</b></td><td>Aplica a toda la hoja: <code>simplify</code>, <code>expand</code>, <code>diff</code>, <code>∫ int</code>, <code>despejar</code>. En <b>var</b> va la variable.</td></tr>
-<tr><td><b>Archivo</b></td><td>Abrir, Guardar (<kbd>Ctrl</kbd>+<kbd>S</kbd>), Exportar a PDF, Guardar dibujo como…, Compartir enlace web.</td></tr>
-<tr><td><b>Calculadora</b> (🖩)</td><td>Botones de letras griegas, funciones y LISP. Se oculta con «minimizar».</td></tr>
+<tr><th>N.º</th><th>Parte</th><th>Para qué</th></tr>
+<tr><td>1</td><td><b>Menús</b></td><td><b>Archivo</b>: abrir, guardar (<kbd>Ctrl</kbd>+<kbd>S</kbd>), exportar a PDF, guardar dibujo, compartir. <b>Dibujo</b>: ventanas de dibujo 2D y 3D (<a href="#dibujar">§10</a>). <b>Ayuda</b>: este manual.</td></tr>
+<tr><td>2</td><td><b>✏ Dibujar (CAD)</b></td><td>Pone un bloque de dibujo en la hoja y abre la ventana de dibujo.</td></tr>
+<tr><td>3</td><td><b>🔗 Compartir</b></td><td>Crea un enlace de la web con tu hoja dentro (<a href="#compartir">§13</a>).</td></tr>
+<tr><td>4</td><td><b>▶ Ejecutar</b> · <b>AutoRun</b></td><td>Calcula. Con AutoRun encendido calcula solo, mientras escribes. <kbd>F5</kbd> = Ejecutar.</td></tr>
+<tr><td>5</td><td><b>resultado como</b></td><td><code>Render CSS</code> (matemática dibujada) · <code>LISP</code> · <code>matemática</code> (texto) · <code>3 formas</code> (las tres juntas, para aprender).</td></tr>
+<tr><td>6</td><td><b>🖩</b> · <b>☀/☾</b></td><td>Muestra la calculadora · cambia el tema claro u oscuro.</td></tr>
+<tr><td>7</td><td><b>escribo</b></td><td>Cómo escribes a la izquierda: <code>matemática</code> (lo normal), <code>expr LISP</code>, <code>LISP ▶</code> (programa), <code>Hekatan Lab</code> (MATLAB).</td></tr>
+<tr><td>8</td><td><b>operar</b></td><td>Aplica a toda la hoja: <code>simplify</code>, <code>expand</code>, <code>diff</code>, <code>∫ int</code>, <code>despejar</code>. En <b>var</b> va la variable.</td></tr>
+<tr><td>9 · 10</td><td><b>Editor · Resultado</b></td><td>Lo que escribes y lo que sale. <kbd>Ctrl</kbd> + rueda = zoom en los dos.</td></tr>
+<tr><td>11</td><td><b>Divisor</b></td><td>Arrástralo para dar más ancho al editor o al resultado.</td></tr>
+<tr><td>12</td><td><b>Calculadora</b></td><td>Letras griegas, funciones, constantes y bloques LISP. «− minimizar» la esconde.</td></tr>
 </table>
-<p class="nota"><kbd>Ctrl</kbd> + rueda del ratón = zoom, en el editor y en el resultado.</p>
-
 </section>
+
 <section id="hoja">
 <h2>3 · Mi primera hoja</h2>
 <p><b>La regla madre:</b> una línea que empieza con <code>#</code> es texto; sin nada es matemática;
-con <code>;</code> es LISP. Lo que va después de un apóstrofo <code>'</code> es el comentario de esa línea (las unidades, qué es).</p>
+con <code>;</code> es LISP. Lo que va después de un apóstrofo <code>'</code> es la descripción de esa línea (qué es, en qué unidades).</p>
 <pre># Mi primera hoja
-#: Escribo datos y fórmulas a la izquierda; a la derecha sale la matemática dibujada.
+## Datos
+#: Viga simplemente apoyada con carga **uniforme** en toda la luz.
 L = 6 'largo de la viga, m
 q = 10 'carga repartida, kN/m
 M = q*L^2/8 'momento máximo, kN·m
-## Operaciones simbólicas
+#: El momento máximo es @M.
+## Funciones
 f(x) = x^3 - 2*x
+f(2)
 Derivate{f(x) @ x}
 Integral{f(x) @ x}
 Area{x^2 @ x = 0 : 3}
+## Límites, sumas y series
+Limit{sin(x)/x @ x = 0}
+Limit{(x^2 - 1)/(x - 1) @ x = 1}
+Sum{i @ i = 1 : 100}
+Sum{i @ i = 1 : n}
+Taylor{sin(x) @ x = 0 : 7}
 ## Matrices
 A = [2 1; 1 3]
-A^-1</pre>
-<figure><img src="img/02_primera_hoja.png" alt="Resultado de la primera hoja" style="max-width:520px">
-<figcaption>M = q·L²/8 = 10·36/8 = 45. La derivada, la integral, el área (∫₀³ x² dx = 9) y la inversa exacta salen solas.</figcaption></figure>
+A^-1
+## Gráfica
+#fplot(sin(x), T_7 = x - x^3/6 + x^5/120 - x^7/5040, [-4 4])</pre>
+<figure><img src="img/02_primera_hoja.png" alt="Resultado de la primera hoja con 16 marcas" style="max-width:620px">
+<figcaption>Qué sale de cada línea. M = q·L²/8 = 10·36/8 = 45; @M lo pone dentro del párrafo. La derivada, la integral, el área, los límites, las sumas, la serie de Taylor y la inversa exacta salen solas.</figcaption></figure>
 
 <h3>Texto</h3>
 <table>
 <tr><th>Escribes</th><th>Sale</th></tr>
-<tr><td><code># Título</code> · <code>## Subtítulo</code> · <code>### …</code></td><td>encabezados</td></tr>
-<tr><td><code>#: texto</code></td><td>párrafo</td></tr>
+<tr><td><code># Título</code> · <code>## Subtítulo</code> · <code>### …</code></td><td>encabezados (marcas 1 y 2)</td></tr>
+<tr><td><code>#: texto</code></td><td>párrafo (marca 3)</td></tr>
 <tr><td><code>#|</code> · <code>#&gt;</code> · <code>#&lt;</code></td><td>centrado · derecha · izquierda</td></tr>
 <tr><td><code>**negrita**</code> · <code>*cursiva*</code></td><td><b>negrita</b> · <i>cursiva</i></td></tr>
-<tr><td><code>@var</code> · <code>@{expr}</code></td><td>pone «var = valor» o solo el valor dentro del texto</td></tr>
+<tr><td><code>x = 6 'descripción</code></td><td>el dato y, a su lado, la descripción (marca 4)</td></tr>
+<tr><td><code>@var</code> · <code>@{expr}</code></td><td>pone «var = valor» o solo el valor dentro del texto (marca 6)</td></tr>
 <tr><td><code>x_0</code> · <code>theta</code> · <code>N_1(x)</code></td><td>subíndice x₀ · letra griega θ · N₁(x)</td></tr>
 </table>
-
 </section>
+
 <section id="simbolico">
 <h2>4 · Operaciones simbólicas</h2>
 <p>Se escriben <code>Nombre{ f @ variable = a : b }</code>; los campos que sobran se omiten.</p>
@@ -129,15 +157,36 @@ A^-1</pre>
 <tr><td><code>Derivate{f @ x}</code> · <code>Partial{f @ x}</code></td><td>derivada total · parcial ∂f/∂x</td></tr>
 <tr><td><code>Integral{f @ x}</code> · <code>Area{f @ x = a : b}</code></td><td>integral indefinida · definida</td></tr>
 <tr><td><code>Slope{f @ x = a}</code></td><td>pendiente: la derivada evaluada en a</td></tr>
-<tr><td><code>Sum{f @ i = a : b}</code> · <code>Product{…}</code></td><td>Σ · Π</td></tr>
+<tr><td><code>Limit{f @ x = a}</code></td><td>límite de f cuando x → a</td></tr>
+<tr><td><code>Sum{f @ i = a : b}</code> · <code>Product{…}</code></td><td>Σ · Π (b puede ser una letra: da la fórmula cerrada)</td></tr>
+<tr><td><code>Taylor{f @ x = a : n}</code></td><td>serie de Taylor de f alrededor de a, hasta el grado n</td></tr>
 <tr><td><code>Root{f @ x}</code> · <code>Find{f @ x = a : b}</code></td><td>despeja f = 0 · busca la raíz en [a, b]</td></tr>
 <tr><td><code>f(x) = …</code> y luego <code>f(3)</code> o <code>f(a)</code></td><td>define y aplica la función (numérico o simbólico)</td></tr>
 <tr><td><code>A = [1 2; 3 4]</code> · <code>A'</code> · <code>A^-1</code> · <code>A*B</code></td><td>matrices como en MATLAB; la inversa sale en fracciones exactas</td></tr>
 </table>
-
 </section>
+
+<section id="series">
+<h2>5 · Límites, sumas, series y áreas</h2>
+<p>El motor da el resultado <b>exacto</b>: fracciones, π y logaritmos quedan como símbolos, no como decimales.
+Estos resultados se comprobaron en la aplicación (versión 1.29):</p>
+<table>
+<tr><th>Escribes</th><th>Sale</th><th>Por qué</th></tr>
+<tr><td><code>Limit{sin(x)/x @ x = 0}</code></td><td>1</td><td>cerca de 0, sin x ≈ x</td></tr>
+<tr><td><code>Limit{(x^2 - 1)/(x - 1) @ x = 1}</code></td><td>2</td><td>x² − 1 = (x − 1)(x + 1): se simplifica y queda x + 1</td></tr>
+<tr><td><code>Sum{i @ i = 1 : 100}</code></td><td>5050</td><td>la suma de Gauss</td></tr>
+<tr><td><code>Sum{i @ i = 1 : n}</code></td><td>n²/2 + n/2</td><td>la misma, con n como letra: la fórmula n(n + 1)/2</td></tr>
+<tr><td><code>Sum{i^2 @ i = 1 : n}</code></td><td>n³/3 + n²/2 + n/6</td><td>suma de cuadrados</td></tr>
+<tr><td><code>Taylor{sin(x) @ x = 0 : 7}</code></td><td>x − x³/6 + x⁵/120 − x⁷/5040</td><td>solo potencias impares: sin es impar</td></tr>
+<tr><td><code>Area{x^2 @ x = 0 : 3}</code></td><td>9</td><td>x³/3 de 0 a 3 = 27/3</td></tr>
+<tr><td><code>Area{sin(x) @ x = 0 : pi}</code></td><td>2</td><td>−cos x de 0 a π = 1 + 1</td></tr>
+<tr><td><code>Area{1/x @ x = 1 : 2}</code></td><td>ln(2)</td><td>la primitiva de 1/x es ln x</td></tr>
+</table>
+<p class="nota">La gráfica de la primera hoja (marca 16 de la figura de §3) dibuja sin x junto a su serie T₇: coinciden cerca de 0 y se separan hacia ±4. Así se <b>ve</b> cuánto vale una serie truncada.</p>
+</section>
+
 <section id="numerico">
-<h2>5 · Hoja numérica (como Calcpad)</h2>
+<h2>6 · Hoja numérica (como Calcpad)</h2>
 <p>Con una línea <code>#numerico</code> la hoja es un <b>programa con estado</b>: bucles, matrices grandes,
 ensamblaje y solución. Cada línea sale como <code>nombre = fórmula = valor</code>.</p>
 <pre>#numerico
@@ -158,10 +207,34 @@ u = lsolve(K, ones(n, 1))</pre>
 </table>
 <figure><div class="alto"><img src="img/03_numerico.png" alt="Ejemplo 71: losa por elementos finitos"></div>
 <figcaption>Ejemplo 71: la losa «Rectangular Slab FEA» de Calcpad, línea por línea (849 números iguales a Calcpad a 4 decimales).</figcaption></figure>
-
 </section>
+
+<section id="anim">
+<h2>7 · Animación y voz</h2>
+<p>Una animación son <b>varios cuadros</b> que el motor calcula de antemano, uno por cada valor de un parámetro.
+La página enseña uno y los demás esperan. Cada animación trae <b>▶/⏸</b>, una <b>barra de cuadro</b>, el rótulo
+(<code>n = 3 (3/8)</code>), un <b>subtítulo</b> y el botón <b>🔊</b> que lee el texto en voz alta (voz en español del sistema).</p>
+<table>
+<tr><th>Escribes</th><th>Hace</th></tr>
+<tr><td><code>#anim fplot(u = x^n, [0 1]), n = 1:8</code></td><td>una gráfica por valor de n (paso opcional: <code>n = 1:2:15</code>)</td></tr>
+<tr><td><code>#anim surf(A*sin(pi*x)*sin(pi*y), [0 1], [0 1]), A = 0.25:0.25:1</code></td><td>superficie que se gira con el ratón; la escala z es común, así se ve crecer la amplitud</td></tr>
+<tr><td><code>#anim surf(N_{k}, [0 1], [0 1]), k = 1:16</code></td><td><code>{k}</code> arma el nombre: N_1 … N_16, una función por cuadro</td></tr>
+<tr><td><code>#anim map(…), k = 1:3</code></td><td>mapa de color animado</td></tr>
+<tr><td><code>#anim(n = 2:2:16)</code> … <code>#finanim</code></td><td><b>bloque</b>: todo lo de dentro (dibujos, mallas, fórmulas, texto, bucles) se calcula una vez por valor</td></tr>
+<tr><td><code>#voz: texto</code></td><td>narración. Pegada a una animación: <b>una línea por cuadro</b>, en orden (una sola vale para todos). Suelta: un párrafo con su 🔊. Dentro valen <code>{k}</code> y <code>@{var}</code></td></tr>
+</table>
+<pre>#anim surf(N_{k}, [0 1], [0 1]), k = 1:16
+#voz: Función 1: flecha unitaria en el nudo 1. Vale 1 allí y 0 en los otros tres nudos.
+#voz: Función 2: giro unitario theta x en el nudo 1.
+…</pre>
+<p><b>Ejemplo 82</b> (funciones de forma del BFS y refinamiento h de la losa): el motor deduce las cúbicas de Hermite,
+arma las 16 funciones de forma de la placa y las anima con 16 voces; después refina la malla de 2 × 2 a 16 × 16
+elementos y compara la flecha del centro con la solución de Navier en cada cuadro.</p>
+<p class="nota">Al imprimir o exportar a PDF queda el <b>cuadro 1</b> con su texto. El mismo código funciona en el escritorio y en la web.</p>
+</section>
+
 <section id="dibujo">
-<h2>6 · Dibujo con medidas calculadas</h2>
+<h2>8 · Dibujo con medidas calculadas</h2>
 <p>Un bloque <code>#dibujo(…) … #fin</code> dibuja con las variables de la hoja. Si cambias un dato, cambian el cálculo y el dibujo.</p>
 <pre>B = 8 'ancho de la placa
 H = 5 'alto
@@ -176,10 +249,10 @@ r = sqrt(3/pi) 'radio del agujero de área 3
 Estilos: <code>gruesa</code>, <code>fina</code>, <code>eje</code>, colores (<code>rojo</code>, <code>azul</code>…), <code>relleno</code>, <code>tenue</code>.</p>
 <figure><div class="alto"><img src="img/04_dibujo.png" alt="Dibujo de una placa y de una curva con su tangente"></div>
 <figcaption>Placa con agujero de área dada y esquina redondeada; debajo, y = x²/4 con su tangente calculada.</figcaption></figure>
-
 </section>
+
 <section id="autolisp">
-<h2>7 · Dibujo AutoLISP (2D y 3D)</h2>
+<h2>9 · Dibujo AutoLISP (2D y 3D)</h2>
 <p>En LISP <b>el código es la lista de datos</b>. Una línea del dibujo es la lista de AutoCAD
 <code>((0 . "LINE") (10 0 0) (11 3 4))</code>: se arma con el cálculo, se pone con <code>entmake</code> y se lee de vuelta con
 <code>ssget</code> / <code>entget</code> para seguir calculando. Es AutoLISP real: el mismo bloque corre en AutoCAD.</p>
@@ -197,90 +270,194 @@ Estilos: <code>gruesa</code>, <code>fina</code>, <code>eje</code>, colores (<cod
 <figcaption>Ejemplo 79: el motor deriva f(x), despeja f′(x) = 0, integra (A = 39/4) y todo se dibuja y se rotula. El área medida del dibujo se compara con la exacta.</figcaption></figure>
 <figure><img src="img/06_3d.png" alt="Ejemplo 80: cáscara alabeada en 3D con sus ejes locales" style="max-width:640px">
 <figcaption>Ejemplo 80: la cáscara de 4 nudos alabeada (ShellMITC4) con sus ejes locales g₁ g₂ g₃, en 3D.</figcaption></figure>
-
 </section>
-<section id="dibujar">
-<h2>8 · Ventana de dibujo</h2>
-<p>Con <code>#dibujar(nombre) … #fin</code> sale en el resultado el botón <b>✏ Dibujar / Editar</b>.
-Abre una ventana CAD (como AutoCAD). Al pulsar <b>💾 Guardar en la hoja</b>, lo dibujado se escribe entre
-<code>#dibujar</code> y <code>#fin</code>, una entidad por línea, y la hoja se recalcula: un <code>#autolisp</code> debajo lo mide.</p>
+
+<section id="dibujar" class="salto">
+<h2>10 · Dibujo como AutoCAD: la ventana 2D</h2>
+<p>Además de escribir el dibujo, se puede <b>dibujar a mano</b>, con las órdenes y las teclas de AutoCAD.
+Lo dibujado vuelve a la hoja como listas DXF (<code>entmake</code>) y la hoja lo mide.</p>
+
+<h3>Abrir la ventana de dibujo</h3>
+<div class="dos">
+<figure><img src="img/03_menu_dibujo.png" alt="Menú Dibujo abierto en el escritorio">
+<figcaption>Escritorio: menú <b>Dibujo</b>.</figcaption></figure>
+<figure><img src="img/07b_web_menu.png" alt="Menú Dibujo abierto en la web">
+<figcaption>Web: el mismo menú.</figcaption></figure>
+</div>
+<p><b>Dibujo → Ventana de dibujo 2D</b> (o el botón <b>✏ Dibujar (CAD)</b>) escribe en la hoja un bloque vacío
+<code>#dibujar(dibujo1, ud = m, cuadricula = 0.1)</code> … <code>#fin</code> y abre la ventana. Las otras opciones ponen
+un bloque AutoLISP (<a href="#autolisp">§9</a>) o un bloque <code>#dibujo</code> (<a href="#dibujo">§8</a>) para empezar.
+Si la hoja ya tiene un <code>#dibujar</code>, su botón <b>✏ Dibujar / Editar</b> abre la ventana con lo que hay.</p>
+
+<h3>La ventana</h3>
+<figure><img src="img/04_ventana_2d.png" alt="Ventana de dibujo 2D con una T dibujada, una línea a medio hacer y el enganche en un punto final">
+<figcaption>Una T dibujada con <code>PL</code> por la línea de órdenes y una LÍNEA a medio hacer: el cursor se enganchó en la esquina de la T (9).</figcaption></figure>
+<table>
+<tr><th>N.º</th><th>Parte</th><th>Qué hace</th></tr>
+<tr><td>1</td><td>Línea de órdenes</td><td>Escribe la orden y pulsa <kbd>Intro</kbd> o <kbd>Espacio</kbd>. Arriba queda el historial y lo que pide ahora (Primer punto, Siguiente punto…).</td></tr>
+<tr><td>2</td><td>Barra de órdenes</td><td>Los mismos botones, cada uno con su alias (L, PL, REC…).</td></tr>
+<tr><td>3</td><td>Capa y color</td><td>La capa actual (<b>+</b> crea otra) y el color ACI (PorCapa = el de la capa).</td></tr>
+<tr><td>4</td><td>Ayudas</td><td>Rejilla <kbd>F7</kbd> · Forzcursor <kbd>F9</kbd> (salta a la rejilla) · Orto <kbd>F8</kbd> · Polar <kbd>F10</kbd> · Refent <kbd>F3</kbd>.</td></tr>
+<tr><td>5</td><td>Modos OSNAP</td><td>A qué se engancha el cursor: final, medio, centro, intersección, intersección ficticia, perpendicular, punto, cuadrante, tangente.</td></tr>
+<tr><td>6 · 12</td><td>Estado</td><td>x, y del cursor · paso de la rejilla.</td></tr>
+<tr><td>7 · 8</td><td>Goma</td><td>Mientras dibujas: <b>longitud</b> del tramo en el medio y su <b>ángulo</b> bajo el cursor.</td></tr>
+<tr><td>9</td><td>OSNAP</td><td>El marcador (un cuadrado = punto final) y su nombre. La mira salta a ese punto.</td></tr>
+<tr><td>10</td><td>Punto base</td><td>El primer punto de la orden (cuadrito naranja).</td></tr>
+<tr><td>11</td><td>💾 Guardar en la hoja</td><td>Escribe el dibujo entre <code>#dibujar</code> y <code>#fin</code> y recalcula la hoja.</td></tr>
+</table>
+<figure><img src="img/04b_mira.png" alt="La mira del cursor con la caja de coordenadas" style="max-width:460px">
+<figcaption>Antes del primer punto, junto a la mira sale la caja con las coordenadas x,y (entrada dinámica).</figcaption></figure>
+
+<h3>Órdenes y coordenadas</h3>
+<table>
+<tr><th></th><th></th></tr>
+<tr><td>Dibujar</td><td><code>L</code> línea · <code>PL</code> polilínea (<code>C</code> cierra) · <code>REC</code> rectángulo · <code>C</code> círculo · <code>A</code> arco · <code>PO</code> punto · <code>T</code> texto · <code>DIM</code> cota · <code>DAL</code> · <code>DAN</code> · <code>DRA</code> · <code>DDI</code></td></tr>
+<tr><td>Modificar</td><td><code>M</code> mover · <code>CO</code> copiar · <code>RO</code> girar · <code>SC</code> escala · <code>MI</code> simetría · <code>O</code> desfase · <code>TR</code> recortar · <code>EX</code> alargar · <code>F</code> empalme · <code>CHA</code> chaflán · <code>ED</code> editar texto · <code>E</code> borrar · <code>U</code> deshacer · <code>REDO</code></td></tr>
+<tr><td>Ajustes</td><td><code>LA</code> capa · <code>COL</code> color · <code>REJ</code> rejilla · <code>Z</code> zoom · <code>POLAR</code> incremento polar</td></tr>
+<tr><td>Coordenadas</td><td><code>x,y</code> absolutas · <code>@dx,dy</code> relativas · <code>@d&lt;ángulo</code> polares · un número solo = distancia en la dirección del cursor</td></tr>
+<tr><td>Teclas</td><td><kbd>Intro</kbd>/<kbd>Espacio</kbd>/clic derecho = Intro (vacío repite la última orden) · <kbd>Esc</kbd> cancela · doble clic en un texto o una cota: editarlo</td></tr>
+<tr><td>Ratón</td><td>rueda = zoom · arrastrar con la rueda = encuadre · doble clic con la rueda = ver todo</td></tr>
+</table>
+<p>Así se dibujó la T de la figura (se teclea tal cual, sin tocar el ratón):</p>
+<pre>PL
+0.175,0
+@0.25,0
+@0,0.45
+@0.175,0
+@0,0.15
+@-0.6,0
+@0,-0.15
+@0.175,0
+C</pre>
+
+<h3>Referencia a objetos (OSNAP) con los valores de AutoCAD</h3>
+<p>Los valores se leyeron de <b>AutoCAD 2027</b> (variables del sistema) y la ventana los usa igual:</p>
+<ul>
+<li><b>APERTURE = 10</b>: el cursor engancha un punto que está a 10 píxeles o menos.</li>
+<li><b>AutoSnapColor = 31</b> (color ACI 31, un naranja claro): el color del marcador y de su rótulo.</li>
+<li><b>Imán</b> (AUTOSNAP = 63): la mira <b>salta</b> al punto enganchado; el clic cae exactamente ahí.</li>
+<li>Cada modo con su forma de AutoCAD: cuadrado = final, triángulo = medio, círculo = centro, aspa = intersección.</li>
+</ul>
+
+<h3>La hoja lee lo dibujado</h3>
 <pre>#dibujar(seccion, ancho = 100, alto = 95, ud = m, cuadricula = 0.025)
 #fin
 #autolisp("Lo dibujado, leído", exporta = A)
 (setq A (area (ssname (ssget "_X" '((0 . "LWPOLYLINE"))) 0)))
 #fin</pre>
-<figure><img src="img/08_ventana_cad.png" alt="Ventana de dibujo abierta con una sección T">
-<figcaption>La ventana de dibujo con la T del ejemplo 81. Las órdenes se teclean en cualquier momento (abajo, «Orden:»).</figcaption></figure>
-<table>
-<tr><th></th><th></th></tr>
-<tr><td>Órdenes</td><td><code>L</code> línea · <code>PL</code> polilínea (<code>C</code> cierra) · <code>REC</code> · <code>C</code> círculo · <code>A</code> arco · <code>PO</code> punto · <code>T</code> texto · <code>DIM</code> cota · <code>M</code> mover · <code>CO</code> copiar · <code>RO</code> girar · <code>SC</code> escala · <code>MI</code> simetría · <code>O</code> desfase · <code>TR</code> recortar · <code>EX</code> alargar · <code>F</code> empalme · <code>CHA</code> chaflán · <code>E</code> borrar · <code>U</code> deshacer · <code>LA</code> capa · <code>COL</code> color · <code>Z</code> zoom</td></tr>
-<tr><td>Coordenadas</td><td><code>x,y</code> · <code>@dx,dy</code> · <code>@d&lt;ángulo</code> · un número solo = distancia en la dirección del cursor</td></tr>
-<tr><td>Teclas</td><td><kbd>Intro</kbd>/<kbd>Espacio</kbd>/clic derecho = Intro (vacío repite) · <kbd>Esc</kbd> cancela · <kbd>F3</kbd> referencia a objetos · <kbd>F7</kbd> rejilla · <kbd>F8</kbd> orto · <kbd>F9</kbd> forzar cursor · <kbd>F10</kbd> polar</td></tr>
-<tr><td>Ratón</td><td>rueda = zoom · arrastrar con la rueda = encuadre · doble clic con la rueda = ver todo</td></tr>
-</table>
 <figure><div class="alto"><img src="img/07_ventana_dibujo_hoja.png" alt="Ejemplo 81: la T dibujada y su área, centroide e inercia"></div>
 <figcaption>Ejemplo 81: la T dibujada a mano → área, centroide e inercia leídos del dibujo; la fórmula de libro da lo mismo (diferencia 0).</figcaption></figure>
-
 </section>
+
+<section id="dibujar3d" class="salto">
+<h2>11 · Dibujo como AutoCAD: la ventana 3D</h2>
+<p><b>Dibujo → Ventana de dibujo 3D</b> abre la misma ventana en vista isométrica. Con un bloque que ya tiene z
+(ejemplo 84, un pórtico con losa) se ve así:</p>
+<figure><img src="img/05_ventana_3d.png" alt="Ventana de dibujo 3D en Iso SO con el pórtico del ejemplo 84">
+<figcaption>Iso SO, orden <code>3P</code> en marcha y el cursor enganchado en la esquina de la losa (5, 4, 3).</figcaption></figure>
+<table>
+<tr><th>N.º</th><th>Parte</th><th>Qué hace</th></tr>
+<tr><td>1</td><td>Vistas</td><td><b>Planta</b> (la 2D) · <b>Frente</b> · <b>Lateral</b> (ponen su SCP, como AutoCAD) · <b>Iso SO</b> · <b>Iso SE</b>. Órbita: <kbd>Mayús</kbd> + botón central arrastrando, o la orden <code>3DO</code>.</td></tr>
+<tr><td>2</td><td>Órdenes 3D</td><td><code>3P</code> polilínea 3D · <code>3F</code> cara 3D · <code>SCP</code> sistema de coordenadas.</td></tr>
+<tr><td>3</td><td>Mira 3D</td><td>La <b>estrella</b>: los tres ejes del SCP (X rojo, Y verde, Z azul). Aquí, enganchada a un «Punto final».</td></tr>
+<tr><td>4</td><td>Entrada dinámica</td><td>x,y,z del punto bajo el cursor.</td></tr>
+<tr><td>5</td><td>Icono del SCP</td><td>Hacia dónde apuntan X, Y, Z. El cuadradito indica el SCP Universal.</td></tr>
+<tr><td>6</td><td>Barra de vista</td><td>«Iso SO · Plano XY · SCP Universal»: vista, plano de trabajo y SCP.</td></tr>
+<tr><td>7</td><td>Línea de órdenes</td><td>Lo que pide la orden (aquí: el punto inicial de la 3DPOL).</td></tr>
+<tr><td>8</td><td>💾 Guardar en la hoja</td><td>Escribe POLYLINE + VERTEX (con z) + SEQEND, 3DFACE… y recalcula.</td></tr>
+</table>
+<h3>Coordenadas y órdenes 3D</h3>
+<table>
+<tr><td>Coordenadas</td><td><code>x,y,z</code> · <code>@dx,dy,dz</code>. Con dos números, la z es la del plano del SCP. Un número solo = distancia en la dirección del cursor <b>en el espacio</b>. La caja de la goma da la <b>longitud 3D</b> del tramo.</td></tr>
+<tr><td><code>3P</code> (3DPOL)</td><td>polilínea 3D; <code>C</code> la cierra.</td></tr>
+<tr><td><code>3F</code> (3DCARA)</td><td>4 puntos; <kbd>Intro</kbd> en el 4.º = cara de 3 lados. Sigue con el 3.º y el 4.º de la cara siguiente. <code>I</code> antes de un punto = arista invisible.</td></tr>
+<tr><td><code>SCP</code></td><td><code>U</code> universal · <code>XY</code> · <code>XZ</code> · <code>YZ</code> · un punto = origen nuevo; y, si se quiere, un punto en el eje X y otro en el plano XY = <b>SCP de 3 puntos</b> · <code>A</code> anterior.</td></tr>
+<tr><td>Vista</td><td><code>PLANTA</code> · <code>VISTA</code> · <code>3DO</code> (órbita).</td></tr>
+<tr><td>OSNAP 3D</td><td>final, medio, centro, intersección e <b>intersección ficticia</b> (APPINT: donde dos líneas se cruzan <b>en la vista</b> aunque en el espacio no se toquen) enganchan los puntos 3D proyectados.</td></tr>
+</table>
+<pre>LA COLUMNAS · L 0,0,0 0,0,3 …
+LA VIGAS    · 3P 0,0,3 5,0,3 5,4,3 0,4,3 C
+LA LOSA     · 3F 0,0,3 5,0,3 5,4,3 0,4,3 Intro
+LA ARRIOSTRE · L 0,0,0 5,0,3</pre>
+<h3>La hoja mide el dibujo 3D</h3>
+<figure><img src="img/06_hoja_3d.png" alt="Ejemplo 84: el pórtico leído del dibujo y sus medidas" style="max-width:720px">
+<figcaption>Ejemplo 84: un bloque AutoLISP lee el pórtico (ssget por capa, entget, distance en 3D) y devuelve las medidas a la hoja: L_col = 12, P_vig = 18, A_los = 20.</figcaption></figure>
+</section>
+
 <section id="guardar">
-<h2>9 · Guardar el dibujo</h2>
-<p>Debajo de cada dibujo: <b>DXF · SVG · PNG · PDF · DWG</b>. También <b>Archivo → Guardar dibujo como…</b>
+<h2>12 · Guardar el dibujo (DXF · DWG …)</h2>
+<p>Debajo de cada dibujo: <b>DXF · SVG · PNG · PDF · DWG</b> (marca 5 de la figura anterior). También <b>Archivo → Guardar dibujo como…</b>
 (eliges el tipo al guardar) o dentro del código: <code>(guardar "planta.dwg")</code> (el tipo lo da la extensión).</p>
 <table>
 <tr><th>Tipo</th><th>Para qué</th></tr>
-<tr><td>DXF · DWG</td><td>abrir en AutoCAD / otros CAD. El DWG se escribe con acadrust (en escritorio necesita Node instalado).</td></tr>
-<tr><td>SVG · PNG · PDF</td><td>informes, presentaciones, imprimir</td></tr>
+<tr><td>DXF</td><td>abrir en AutoCAD y en cualquier CAD (R12; con POLYLINE 3D y 3DFACE si hay z).</td></tr>
+<tr><td>DWG</td><td>el archivo nativo de AutoCAD (2018). Lo escribe <b>acadrust</b>, el mismo escritor en la web y en el escritorio; se comprobó abriéndolo en AutoCAD 2027. En el escritorio necesita <b>Node</b> instalado (si no está, avisa y ofrece DXF).</td></tr>
+<tr><td>SVG · PNG · PDF</td><td>informes, presentaciones, imprimir.</td></tr>
 </table>
 <p>La hoja completa se exporta con <b>Archivo → Exportar a PDF</b>.</p>
-
 </section>
+
 <section id="compartir">
-<h2>10 · Compartir y la versión web</h2>
+<h2>13 · Compartir y la versión web</h2>
+<p>La web es la misma aplicación, sin instalar: <a href="https://giorgioburbanelli89.github.io/hekatan-lisp/">giorgioburbanelli89.github.io/hekatan-lisp</a>.</p>
+<figure><img src="img/07_web.png" alt="Hekatan LISP web con sus partes marcadas">
+<figcaption>Hekatan LISP web: menú Dibujo (1), Ayuda (2), Dibujar (CAD) (3), Compartir (4), ejemplos (5), Ejecutar (6).</figcaption></figure>
 <p>El botón <b>🔗 Compartir</b> (o <b>Archivo → Compartir enlace web…</b>) crea un enlace de
 <b>Hekatan LISP web</b> que lleva <b>la hoja dentro</b> (comprimida en el propio enlace). Lo copia al portapapeles
 y lo abre en tu navegador. Quien lo reciba ve la hoja calculada, sin instalar nada, y puede editarla.</p>
 <figure><img src="img/09_web_compartida.png" alt="La hoja compartida abierta en Hekatan LISP web">
 <figcaption>La misma hoja, abierta desde el enlace en el navegador: mismo texto, mismo cálculo, mismo dibujo.</figcaption></figure>
 <p class="nota">El enlace no pasa por ningún servidor: la hoja va escrita en el enlace. Una hoja muy larga da un enlace largo.</p>
-
 </section>
+
 <section id="ejemplos">
-<h2>11 · Ejemplos</h2>
-<p>Menú <b>Ejemplos</b> (arriba en la web; carpeta <code>ejemplos</code> en escritorio). Algunos para empezar:</p>
+<h2>14 · Ejemplos</h2>
+<p>Menú <b>Archivo → Ejemplos</b> (en la web también la lista «ejemplos»). Algunos para empezar:</p>
 <table>
 <tr><th>N.º</th><th>Tema</th></tr>
-<tr><td>01 – 03</td><td>derivadas, integrales, simplificar y expandir</td></tr>
+<tr><td>01 – 03 · 06</td><td>derivadas, integrales, simplificar y expandir · límites, series y sumatorias</td></tr>
 <tr><td>09</td><td>formato de texto</td></tr>
 <tr><td>13 – 32</td><td>funciones de forma, Jacobiano y rigidez de barra, paso a paso</td></tr>
 <tr><td>33 – 40</td><td>álgebra lineal y formas de invertir una matriz</td></tr>
+<tr><td>47 · 82</td><td>animación (fplot) · funciones de forma del BFS y refinamiento h, animados con voz</td></tr>
 <tr><td>55 – 63</td><td>unidades y cuadratura de Gauss</td></tr>
 <tr><td>71 · 77</td><td>losa y losa plana por elementos finitos (como Calcpad)</td></tr>
 <tr><td>72</td><td>elemento ShellMITC4 de OpenSees</td></tr>
 <tr><td>73 – 78</td><td>losas con malla BFS (apoyada, empotrada, voladizo, convergencia frente a Navier)</td></tr>
-<tr><td>70 · 79 · 80 · 81</td><td>dibujo técnico, AutoLISP con matemática simbólica, 3D y ventana de dibujo</td></tr>
+<tr><td>70 · 79 · 80</td><td>dibujo técnico, AutoLISP con matemática simbólica, 3D</td></tr>
+<tr><td>81 · 84</td><td>ventana de dibujo: sección T en 2D · pórtico con losa en 3D</td></tr>
+<tr><td>83</td><td>mesa de torsión: losa DKQ sobre vigas y columnas (como ETABS)</td></tr>
 </table>
-
 </section>
+
 <section id="teclas">
-<h2>12 · Teclas</h2>
+<h2>15 · Teclas</h2>
 <table>
+<tr><th colspan="2">Hoja</th></tr>
 <tr><td><kbd>F5</kbd></td><td>Ejecutar</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Guardar</td></tr>
 <tr><td><kbd>Ctrl</kbd> + rueda</td><td>Zoom del editor o del resultado</td></tr>
-<tr><td>Arrastrar la línea del medio</td><td>Cambiar el ancho del editor y del resultado</td></tr>
+<tr><td>Arrastrar el divisor</td><td>Cambiar el ancho del editor y del resultado</td></tr>
+<tr><th colspan="2">Ventana de dibujo</th></tr>
+<tr><td><kbd>Intro</kbd> · <kbd>Espacio</kbd> · clic derecho</td><td>Intro (vacío: repite la última orden)</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Cancela la orden</td></tr>
+<tr><td><kbd>F3</kbd> · <kbd>F7</kbd> · <kbd>F8</kbd> · <kbd>F9</kbd> · <kbd>F10</kbd></td><td>Refent (OSNAP) · Rejilla · Orto · Forzcursor · Polar</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer · Rehacer</td></tr>
+<tr><td>Rueda · arrastrar con la rueda</td><td>Zoom · encuadre (doble clic con la rueda: ver todo)</td></tr>
+<tr><td><kbd>Mayús</kbd> + botón central</td><td>Órbita 3D (como 3DO)</td></tr>
 </table>
-
 </section>
 <p class="sub" style="margin-top:3em">Hekatan Engineers · Hekatan LISP es software libre (MIT). Hereda la idea de hoja viva de Calcpad (Nedelcho Ganchovski).</p>
 </div>
 <script>
-// #solo-dibujo: solo la parte de dibujo estilo AutoCAD (guía corta y su PDF)
+// #solo-dibujo: solo la parte de dibujo estilo AutoCAD (guía corta y su PDF): dibujo, AutoLISP, ventanas 2D y 3D, guardar
 if (location.hash === "#solo-dibujo") {
-  const dejar = ["dibujo", "autolisp", "dibujar", "guardar"];
+  const dejar = ["dibujo", "autolisp", "dibujar", "dibujar3d", "guardar"];
   document.querySelectorAll("section").forEach(s => { if (!dejar.includes(s.id)) s.remove(); });
   document.querySelector("nav").remove();
   document.querySelector(".sub").textContent = "Dibujo estilo AutoCAD · versión 1.29 · escritorio (Windows) y web";
   document.title = "Dibujo estilo AutoCAD";
+  document.querySelectorAll(".salto").forEach(s => s.classList.remove("salto"));
 }
 </script>
 </body>

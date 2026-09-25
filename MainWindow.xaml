@@ -160,6 +160,13 @@
                 <MenuItem Header="sin( )"         Click="OnInsert" Tag="sin(§§)"/>
                 <MenuItem Header="cos( )"         Click="OnInsert" Tag="cos(§§)"/>
             </MenuItem>
+            <MenuItem Header="_Dibujo" Foreground="{DynamicResource ThemeText}">
+                <MenuItem Header="✏ Ventana de dibujo 2D (como AutoCAD)…" Click="MenuDibujoCad" Tag="2d"/>
+                <MenuItem Header="🧊 Ventana de dibujo 3D (como AutoCAD 3D)…" Click="MenuDibujoCad" Tag="3d"/>
+                <Separator/>
+                <MenuItem Header="Bloque AutoLISP (entmake, ssget, polar…)" Click="MenuDibujoCad" Tag="autolisp"/>
+                <MenuItem Header="Bloque de dibujo con medidas de la hoja (#dibujo)" Click="MenuDibujoCad" Tag="dibujo"/>
+            </MenuItem>
             <MenuItem Header="_Motor" Foreground="{DynamicResource ThemeText}">
                 <MenuItem Header="Ver funciones del motor (LISP)" Click="MenuVerMotor"
                           ToolTip="Carga engine.lisp en el editor: verás derive-x, simplify, expand*, integ-x, infix…"/>
@@ -188,6 +195,8 @@
                        FontFamily="Roboto" FontSize="15" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="14,0,0,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button x:Name="BtnDibujar" Style="{StaticResource ModeBtn}" Content="✏ Dibujar (CAD)" Click="MenuDibujoCad" Tag="2d"
+                        ToolTip="Abre la ventana de dibujo como AutoCAD (línea de órdenes, OSNAP, cotas). Lo dibujado vuelve a la hoja como entmake de AutoLISP."/>
                 <Button x:Name="BtnCompartir" Style="{StaticResource ModeBtn}" Content="🔗 Compartir" Click="MenuCompartirWeb"
                         ToolTip="Crea el enlace de Hekatan LISP web con esta hoja (se abre en cualquier navegador, sin instalar): lo copia y lo abre"/>
                 <Button x:Name="BtnRun" Style="{StaticResource ModeBtn}" Content="▶ Ejecutar" Click="OnRun"

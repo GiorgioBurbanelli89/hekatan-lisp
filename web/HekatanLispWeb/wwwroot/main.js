@@ -154,6 +154,30 @@ function conPosicion(html) {
     return i >= 0 ? html.slice(0, i) + js + html.slice(i) : html + js;
   } catch { return html; }
 }
+function insertarDibujo(tipo) {
+  let k = 1; while (ed.value.includes('#dibujar(dibujo' + k)) k++;
+  const nom = 'dibujo' + k;
+  let b = { '3d': `#dibujar(${nom}, ud = m, cuadricula = 0.5)\n#fin\n`,
+            autolisp: `#autolisp("Dibujo", ancho = 120, alto = 90)\n(linea '(0 0) '(4 3))\n(circulo '(4 3) 1)\n#fin\n`,
+            dibujo: `#dibujo("Dibujo", ud = m, ancho = 120, alto = 90)\n#  linea(0, 0, 4, 0, "gruesa")\n#fin\n` }[tipo]
+          || `#dibujar(${nom}, ud = m, cuadricula = 0.1)\n#fin\n`;
+  let p = ed.selectionStart ?? ed.value.length;
+  const ini = ed.value.lastIndexOf('\n', p - 1) + 1;
+  if (p !== ini) { const fin = ed.value.indexOf('\n', p); p = fin < 0 ? ed.value.length : fin; b = '\n' + b; }
+  ponerEditor(ed.value.slice(0, p) + b + ed.value.slice(p));
+  clearTimeout(pendiente);
+  calcularYMostrar();                       // ahora, no con el AutoRun (que recalcularía luego y cerraría la ventana)
+  if (tipo !== '2d' && tipo !== '3d') return;
+  const fr = $('render');
+  fr.addEventListener('load', function abrir() {
+    fr.removeEventListener('load', abrir);
+    const w = fr.contentWindow, d = w.document;
+    const btn = [...d.querySelectorAll('.hk-cad-btn')].find(x => (x.textContent || '').includes('«' + nom + '»')) || [...d.querySelectorAll('.hk-cad-btn')].pop();
+    if (!btn) return;
+    btn.scrollIntoView({ block: 'center' }); btn.click();
+    if (tipo === '3d') { let n = 0; const t = setInterval(() => { try { if (d.querySelector('.hkcad')) { w.hkCad.vista('ISOSO'); clearInterval(t); } } catch { } if (++n > 30) clearInterval(t); }, 100); }
+  });
+}
 function programar() {                  // _debounce de 280 ms, como el escritorio
   clearTimeout(pendiente);
   pendiente = setTimeout(showResult, 280);
@@ -256,6 +280,12 @@ const ACCIONES = {
   pdf: () => { if (view !== 'render') setView('render'); $('render').contentWindow?.print(); },
   verMotor: async () => cargarTexto(await (await fetch('engine.lisp')).text(), 'engine.lisp'),
   compartir: () => compartir(),
+  // Dibujo: el bloque entra en el cursor (en una línea propia) y, si es una ventana, se ABRE
+  // (el botón «✏ Dibujar / Editar» que la hoja pone en el resultado). 3D: arranca en Iso SO.
+  dibujo2d: () => insertarDibujo('2d'),
+  dibujo3d: () => insertarDibujo('3d'),
+  bloqueAutolisp: () => insertarDibujo('autolisp'),
+  bloqueDibujo: () => insertarDibujo('dibujo'),
   // Ayuda → manual (docs/manual del repo, copiado a wwwroot/manual): se abre y se puede descargar
   manual: () => window.open('manual/Manual_Hekatan_LISP.pdf', '_blank'),
   manualDibujo: () => window.open('manual/Hekatan_LISP_Dibujo_estilo_AutoCAD.pdf', '_blank'),

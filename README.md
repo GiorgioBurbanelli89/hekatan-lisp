@@ -189,8 +189,28 @@ está vacío y la ventana lo crea. La ventana reescribe el bloque entero: el cá
 | Ratón | rueda = zoom en el cursor · arrastre con la rueda (o Mayús + arrastre) = encuadre · doble clic con la rueda = extensión |
 | Enganche | OSNAP (apertura 10 px: final, medio, centro, intersección, perpendicular, punto) manda sobre ORTO y sobre la rejilla, como AutoCAD |
 
-Ejemplo: 81 (una T dibujada → área, centroide e inercia por Green, rotulados; la fórmula de la T da lo mismo).
-Pruebas: `tests/dibujar/` (web con Playwright, escritorio con `--ctl`).
+#### En 3D (como AutoCAD 3D)
+
+La ventana también modela en 3D, con la semántica de AutoCAD (proyección paralela, estructura alámbrica).
+**Planta** es la ventana 2D de siempre; las demás vistas dibujan la rejilla (líneas, una mayor cada 5) en el plano
+XY del SCP, la mira es la estrella de Struct (ejes X rojo, Y verde, Z azul del SCP, proyectados) y abajo a la
+izquierda va el icono del SCP (el cuadrito = SCP Universal). La barra de estado dice la vista, el plano y el SCP.
+
+| | |
+|---|---|
+| Vistas | botones **Planta · Frente · Lateral · Iso SO · Iso SE** (o `VISTA`); `PLANTA` [Actual/Universal]. Frente y Lateral ponen su SCP (XZ, YZ), como AutoCAD con UCSORTHO = 1 · **Mayús + botón central** arrastrando = órbita (3DORBITA); `3DO` = órbita con el botón izquierdo hasta Intro/Esc |
+| Coordenadas 3D | `x,y,z` · `@dx,dy,dz` (en el SCP actual); con 2 números la z es la del plano del SCP; `@d<ang` en el plano XY del SCP; un número solo = distancia en la dirección del cursor **en el espacio**. La entrada dinámica da la longitud 3D |
+| SCP | `SCP`/`UCS`: `U` universal · `XY` · `XZ` · `YZ` · un punto = origen nuevo (y, como AutoCAD, un punto en el eje X y otro en el plano XY = SCP de 3 puntos; Intro acepta) · `A` anterior. El cursor cae en el plano XY del SCP (rayo ∩ plano; de canto, en el plano de la vista); ORTO, POLAR y FORZC trabajan en ese plano |
+| Entidades 3D | `LINE` con z · `3P`/`3DPOL` (POLYLINE 70 = 8, VERTEX 70 = 32, `C` cierra, `H` deshace) · `3F`/`3DCARA` (3DFACE 10–13; Intro en el 4.º = cara de 3 lados; sigue con el 3.º y 4.º de la cara siguiente; `I` antes de un punto = arista invisible, 70) · MOVER/COPIAR con z, ESCALA también en z |
+| Enganche 3D | final, medio, centro, cuadrante, intersección y **intersección ficticia** (APPINT: se cruzan en la vista pero no en el espacio; el punto va sobre el primero) sobre los puntos proyectados, mismo marcador ACI 31 e imán |
+| Guardar | `(entmake …)` con z; la 3DPOL en una línea: `(entmake POLYLINE) (entmake VERTEX)… (entmake SEQEND)`. El `#autolisp` de abajo la lee (`entnext` por los VERTEX) y el visor 3D la enseña; DXF R12 (POLYLINE 3D y 3DFACE) y DWG (acadrust) llevan la z |
+
+Sin sólidos ACIS. En un SCP girado, las órdenes planas (REC, C, A, cotas, texto, RECORTAR…) siguen en el XY universal.
+
+Ejemplos: 81 (una T dibujada → área, centroide e inercia por Green, rotulados; la fórmula de la T da lo mismo) ·
+83 (pórtico con losa en 3D: columnas LINE con z, vigas 3DPOL, losa 3DCARA, riostras; el `#autolisp` mide longitudes 3D y el área de la losa).
+Pruebas: `tests/dibujar/` (web con Playwright, escritorio con `--ctl`): `test_ordenes_cad.py` (2D) y `test_dibujo_3d.py`,
+`test_ventana_escritorio_3d.py` (3D).
 
 ---
 

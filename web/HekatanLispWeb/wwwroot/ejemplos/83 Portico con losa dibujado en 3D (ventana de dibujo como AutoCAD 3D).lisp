@@ -1,7 +1,7 @@
 # Pórtico con losa dibujado en 3D (la ventana de dibujo como AutoCAD 3D)
 
 #: La ventana **✏ Dibujar / Editar** también dibuja en **3D**, con las órdenes y las reglas de AutoCAD. Los botones **Planta · Frente · Lateral · Iso SO · Iso SE** cambian la vista; **Mayús + botón central** (la rueda pulsada) arrastrando gira la vista (**3DORBITA**, o la orden **3DO**). **Planta** es la ventana 2D de siempre. Frente y Lateral ponen su **SCP** (como AutoCAD con UCSORTHO = 1): lo que se dibuja cae en ese plano.
-#: Coordenadas 3D: **x,y,z** · **@dx,dy,dz**; con dos números la z es la del plano del SCP; un número solo = distancia en la dirección del cursor **en el espacio**. La caja junto a la goma da la **longitud 3D** del tramo.
+#: Coordenadas 3D: **x,y,z** · **@**dx,dy,dz; con dos números la z es la del plano del SCP; un número solo = distancia en la dirección del cursor **en el espacio**. La caja junto a la goma da la **longitud 3D** del tramo.
 #: Órdenes 3D: **3P** (3DPOL: polilínea 3D, C cierra) · **3F** (3DCARA: 4 puntos, Intro en el 4.º = cara de 3 lados; sigue con el 3.º y el 4.º de la cara siguiente; **I** antes de un punto = arista invisible) · **SCP** (U universal · XY · XZ · YZ · un punto = origen nuevo y, si se quiere, un punto en el eje X y otro en el plano XY = SCP de 3 puntos · A anterior) · **PLANTA** · **VISTA**. La referencia a objetos (final, medio, centro, intersección e **intersección ficticia**) engancha los puntos 3D proyectados.
 
 ## 1. El pórtico, dibujado en la ventana
@@ -68,9 +68,9 @@ e_los = 0.20 'espesor de la losa, m
 b_c = 0.30 'lado de la columna cuadrada, m
 b_v = 0.25 'ancho de la viga, m
 h_v = 0.40 'peralte de la viga, m
-V_los = A_los*e_los 'hormigón de la losa, m³
-V_col = n_col*b_c^2*h_col 'hormigón de las columnas, m³
-V_vig = P_vig*b_v*(h_v - e_los) 'hormigón de las vigas bajo la losa, m³
-V_tot = V_los + V_col + V_vig 'total, m³
-L_1 = sqrt(5^2 + 3^2) 'riostra de libro: diagonal de 5 × 3 m
-e_r = L_arr/2 - L_1 'diferencia con la leída del dibujo
+V_los = dec(A_los*e_los, 3) 'hormigón de la losa, m³
+V_col = dec(n_col*b_c^2*h_col, 3) 'hormigón de las columnas, m³
+V_vig = dec(P_vig*b_v*(h_v - e_los), 3) 'hormigón de las vigas bajo la losa, m³
+V_tot = dec(V_los + V_col + V_vig, 3) 'total, m³
+L_1 = dec(sqrt(5^2 + 3^2), 6) 'riostra de libro: diagonal de 5 × 3 m
+e_r = dec(L_arr/2 - sqrt(5^2 + 3^2), 6) 'diferencia con la leída del dibujo (exporta trae 6 decimales)

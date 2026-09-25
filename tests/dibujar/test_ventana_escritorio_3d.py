@@ -32,7 +32,7 @@ def ok(c, m):
     print(("  ✓ " if c else "  ✗ ") + m)
     if not c: fallos.append(m)
 
-HOJA = open(os.path.join(RAIZ, "ejemplos", "83 Portico con losa dibujado en 3D (ventana de dibujo como AutoCAD 3D).lisp"), encoding="utf-8").read()
+HOJA = open(os.path.join(RAIZ, "ejemplos", "84 Portico con losa dibujado en 3D (ventana de dibujo como AutoCAD 3D).lisp"), encoding="utf-8").read()
 TECLAS = """(function(t){var cv=document.querySelector('.hkcad canvas');cv.focus();
 for(const ch of t){cv.focus();var k=ch==='\\n'?'Enter':ch;document.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true}));}return true})(%s)"""
 MOVER = """(function(x,y,z){var cv=document.querySelector('.hkcad canvas'),q=hkCad.pantalla(x,y,z);

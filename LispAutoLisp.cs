@@ -1375,6 +1375,28 @@ namespace HekatanLisp
                         G(0, "SEQEND"); G(8, capa);
                         break;
                     }
+                    case "POLYLINE":
+                    {   // POLYLINE compleja del motor (vértices como 1011/1042): 3D (70 bit 8) con VERTEX 70 = 32, como AutoCAD
+                        bool p3d = (e.Int(70, 0) & 8) != 0;
+                        Comun("POLYLINE"); G(66, "1"); Gn(10, 0); Gn(20, 0); Gn(30, 0);
+                        G(70, ((e.Int(70, 0) & 1) | (p3d ? 8 : 0)).ToString());
+                        int k = -1; var vs = new List<(double[] p, double b)>();
+                        foreach (var p in e.D)
+                        {
+                            if (p.Key == 1011) { vs.Add((Ent.ParsePt(p.Value), 0)); k++; }
+                            else if (p.Key == 1042 && k >= 0 && double.TryParse(p.Value, NumberStyles.Float, Inv, out var b)) vs[k] = (vs[k].p, b);
+                        }
+                        foreach (var (p, b) in vs) { G(0, "VERTEX"); G(8, capa); P(10, p); if (p3d) G(70, "32"); else if (Math.Abs(b) > 1e-12) Gn(42, b); }
+                        G(0, "SEQEND"); G(8, capa);
+                        break;
+                    }
+                    case "3DFACE":
+                    {   // 10 11 12 13 (sin 13 → triángulo: 13 = 12); 70 = aristas invisibles
+                        var a = e.Pt(10); var b1 = e.Pt(11) ?? a; var c = e.Pt(12) ?? b1; var dd = e.Pt(13) ?? c;
+                        Comun("3DFACE"); P(10, a); P(11, b1); P(12, c); P(13, dd);
+                        if ((e.Int(70, 0) & 15) != 0) G(70, (e.Int(70, 0) & 15).ToString());
+                        break;
+                    }
                     case "TEXT":
                     {
                         int h72 = e.Int(72, 0), v73 = e.Int(73, 0);

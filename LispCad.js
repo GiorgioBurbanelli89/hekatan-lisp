@@ -20,7 +20,20 @@
   function clon(o) { return JSON.parse(JSON.stringify(o)); }
   function pt2(v) { return [+(v && v[0]) || 0, +(v && v[1]) || 0]; }
   function esPt(v) { return Array.isArray(v) && v.length >= 2 && isFinite(v[0]) && isFinite(v[1]); }
-  function dist(a, b) { return Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  function dist(a, b) { var dz = (b[2] || 0) - (a[2] || 0); return dz ? Math.hypot(b[0] - a[0], b[1] - a[1], dz) : Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  // ---- 3D: vectores, puntos con z (un punto 2D es [x,y]; con z ≠ 0 lleva [x,y,z], como los pares DXF 10)
+  function P3(p) { return [+p[0] || 0, +p[1] || 0, +(p[2] || 0)]; }
+  function vs(a, b) { return [(a[0] || 0) - (b[0] || 0), (a[1] || 0) - (b[1] || 0), (a[2] || 0) - (b[2] || 0)]; }
+  function va(a, b) { return [(a[0] || 0) + (b[0] || 0), (a[1] || 0) + (b[1] || 0), (a[2] || 0) + (b[2] || 0)]; }
+  function vk(k, a) { return [k * (a[0] || 0), k * (a[1] || 0), k * (a[2] || 0)]; }
+  function vd(a, b) { return (a[0] || 0) * (b[0] || 0) + (a[1] || 0) * (b[1] || 0) + (a[2] || 0) * (b[2] || 0); }
+  function vx(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function vu(a) { var L = Math.sqrt(vd(a, a)) || 1; return vk(1 / L, a); }
+  function nz(p) { var z = +(p[2] || 0); return Math.abs(z) < 1e-12 ? [p[0], p[1]] : [p[0], p[1], z]; }
+  function nzL(p) { var z = +(+(p[2] || 0)).toFixed(12); return Math.abs(z) < 1e-12 ? limpio(p) : limpio(p).concat([z]); }
+  function ptz(v) { return nz([+(v && v[0]) || 0, +(v && v[1]) || 0, +(v && v[2]) || 0]); }
+  function medio(a, b) { return nz([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ((a[2] || 0) + (b[2] || 0)) / 2]); }
+  function conZ(p, ref) { return ref && ref[2] ? [p[0], p[1], ref[2]] : p; }
   function ang(a, b) { var t = Math.atan2(b[1] - a[1], b[0] - a[0]); return t < 0 ? t + 2 * Math.PI : t; }
   function norm(t) { t = t % (2 * Math.PI); return t < 0 ? t + 2 * Math.PI : t; }
   function limpio(p) { return [+(+p[0]).toFixed(12), +(+p[1]).toFixed(12)]; }   // 0.6000000000000001 → 0.6
@@ -40,6 +53,24 @@
   function desdePares(P) {
     var t = String(P[0][1]).toUpperCase(), e = { t: t, capa: '0', color: 256, x: [] }, g = {}, pts = [], bul = [];
     var kc = t === 'DIMENSION' ? tipoCota(P) : 0;
+    if (t === 'POLYLINE' && P.some(function (p) { return p[0] === 70 && ((+p[1]) & 8); })) {   // POLYLINE 3D (70 bit 8): 3DPOL
+      e.t = 'POLY3D'; e.cerr = 0;
+      P.forEach(function (p) {
+        if (p[0] === 8) e.capa = String(p[1]); else if (p[0] === 62) e.color = +p[1];
+        else if (p[0] === 70) e.cerr = (+p[1]) & 1; else if (p[0] === 1011) pts.push(ptz(p[1]));
+      });
+      e.pts = pts; return e;
+    }
+    if (t === '3DFACE') {             // 3DCARA: 10 11 12 13 (sin 13 = triángulo: 13 = 12); 70 = aristas invisibles
+      e.t = 'FACE3D'; e.inv = 0; var q = {};
+      P.forEach(function (p) {
+        var c = p[0];
+        if (c === 0 || c === 5 || c === 100 || c === -1 || c === 330) return;
+        if (c === 8) e.capa = String(p[1]); else if (c === 62) e.color = +p[1];
+        else if (c >= 10 && c <= 13 && !(c in q)) q[c] = ptz(p[1]); else if (c === 70) e.inv = (+p[1]) & 15; else e.x.push([c, p[1]]);
+      });
+      e.pts = [q[10] || [0, 0], q[11] || q[10] || [0, 0], q[12] || q[11] || [0, 0], q[13] || q[12] || [0, 0]]; return e;
+    }
     if (t === 'POLYLINE') {           // la POLYLINE 2D se edita como LWPOLYLINE
       e.t = 'LWPOLYLINE'; e.cerr = 0;
       P.forEach(function (p) {
@@ -67,8 +98,8 @@
       e.x.push([c, v]);
     });
     switch (t) {
-      case 'LINE': e.a = pt2(g[10]); e.b = pt2(g[11]); break;
-      case 'POINT': e.p = pt2(g[10]); break;
+      case 'LINE': e.a = ptz(g[10]); e.b = ptz(g[11]); break;
+      case 'POINT': e.p = ptz(g[10]); break;
       case 'CIRCLE': e.c = pt2(g[10]); e.r = +g[40]; break;
       case 'ARC': e.c = pt2(g[10]); e.r = +g[40]; e.a1 = +g[50]; e.a2 = +g[51]; break;
       case 'TEXT': e.p = pt2(g[10]); e.h = +(g[40] || 2.5); e.s = String(g[1] == null ? '' : g[1]); e.rot = +(g[50] || 0); break;
@@ -83,12 +114,12 @@
     }
     return e;
   }
-  function p3(p) { return [p[0], p[1], 0]; }
+  function p3(p) { return [p[0], p[1], +(p[2] || 0)]; }
   // Entidad → pares DXF en el orden que acepta entmake de AutoCAD (LWPOLYLINE y DIMENSION con sus 100)
   function aPares(e) {
     var P = [];
     if (e.t === 'RAW') { P.push([0, e.tipo], [8, e.capa]); if (e.color !== 256) P.push([62, e.color]); return P.concat(e.x); }
-    P.push([0, e.t]);
+    P.push([0, e.t === 'POLY3D' ? 'POLYLINE' : e.t === 'FACE3D' ? '3DFACE' : e.t]);
     if (e.t === 'LWPOLYLINE' || e.t === 'DIMENSION') P.push([100, 'AcDbEntity']);
     P.push([8, e.capa]);
     if (e.color !== 256) P.push([62, e.color]);
@@ -98,6 +129,12 @@
       case 'CIRCLE': P.push([10, p3(e.c)], [40, e.r]); break;
       case 'ARC': P.push([10, p3(e.c)], [40, e.r], [50, e.a1], [51, e.a2]); break;
       case 'TEXT': P.push([10, p3(e.p)], [40, e.h], [1, e.s]); if (e.rot) P.push([50, e.rot]); break;
+      case 'POLY3D':                  // POLYLINE 3D: cabecera + VERTEX (70 = 32) + SEQEND; aquí los vértices van como 1011
+        P.push([66, 1], [10, [0, 0, 0]], [70, 8 | (e.cerr ? 1 : 0)]);
+        e.pts.forEach(function (p) { P.push([1011, p3(p)]); });
+        return P.concat(e.x);
+      case 'FACE3D':
+        P.push([10, p3(e.pts[0])], [11, p3(e.pts[1])], [12, p3(e.pts[2])], [13, p3(e.pts[3])]); if (e.inv) P.push([70, e.inv]); break;
       case 'LWPOLYLINE':
         P.push([100, 'AcDbPolyline'], [90, e.pts.length], [70, e.cerr ? 1 : 0]);
         P = P.concat(e.x);
@@ -138,7 +175,12 @@
       if (!usada && c.n !== S.capa) return;
       L.push(entmake([[0, 'LAYER'], [100, 'AcDbSymbolTableRecord'], [100, 'AcDbLayerTableRecord'], [2, c.n], [70, 0], [62, c.c], [6, c.tipo || 'CONTINUOUS']]));
     });
-    S.ents.forEach(function (e) { L.push(entmake(aPares(e))); });
+    S.ents.forEach(function (e) {
+      if (e.t !== 'POLY3D') { L.push(entmake(aPares(e))); return; }
+      // 3DPOL como la escribe AutoLISP: (entmake POLYLINE) + un (entmake VERTEX) por vértice + (entmake SEQEND)
+      var cab = aPares(e).filter(function (p) { return p[0] !== 1011; }), lay = [8, e.capa];
+      L.push(entmake(cab) + ' ' + e.pts.map(function (p) { return entmake([[0, 'VERTEX'], lay, [10, p3(p)], [70, 32]]); }).join(' ') + ' ' + entmake([[0, 'SEQEND'], lay]));
+    });
     return L.join('\n');
   }
 
@@ -146,6 +188,8 @@
   function nueva(t, o) { o.t = t; o.capa = S.capa; o.color = S.color; o.x = []; return o; }
   function lin(a, b) { return nueva('LINE', { a: a.slice(), b: b.slice() }); }
   function poliE(pts, cerr) { return nueva('LWPOLYLINE', { pts: pts.map(function (p) { return p.slice(); }), bul: pts.map(function () { return 0; }), cerr: cerr ? 1 : 0 }); }
+  function poli3E(pts, cerr) { return nueva('POLY3D', { pts: pts.map(function (p) { return p.slice(); }), cerr: cerr ? 1 : 0 }); }
+  function caraE(p, inv) { return nueva('FACE3D', { pts: [p[0].slice(), p[1].slice(), p[2].slice(), (p[3] || p[2]).slice()], inv: inv || 0 }); }
   function rectE(a, b) { return poliE([a, [b[0], a[1]], b, [a[0], b[1]]], true); }
   function circE(c, r) { return nueva('CIRCLE', { c: c.slice(), r: r }); }
   function arcE(c, r, a1, a2) { return nueva('ARC', { c: c.slice(), r: r, a1: norm(a1), a2: norm(a2) }); }
@@ -183,17 +227,19 @@
     return { q1: q1, q2: q2, u: u, n: n, m: Math.abs((e.p2[0] - e.p1[0]) * u[0] + (e.p2[1] - e.p1[1]) * u[1]) };
   }
   function trasladar(e, v) {
-    function m(p) { p[0] += v[0]; p[1] += v[1]; }
+    var dz = +(v[2] || 0), plano = e.t === 'LWPOLYLINE';   // la LWPOLYLINE sube con su elevación (38), no por vértice
+    function m(p) { p[0] += v[0]; p[1] += v[1]; if (dz && !plano) { var z = (p[2] || 0) + dz; if (Math.abs(z) < 1e-12) p.length = 2; else p[2] = z; } }
     ['a', 'b', 'p', 'c', 'd', 'p1', 'p2', 'v'].forEach(function (k) { if (esPt(e[k])) m(e[k]); });
     if (e.pts) e.pts.forEach(m);
     e.x.forEach(function (p) { if (((p[0] >= 10 && p[0] <= 18) || p[0] === 1011) && esPt(p[1])) { p[1] = p[1].slice(); m(p[1]); } });
+    if (plano && dz) { var el = e.x.filter(function (p) { return p[0] === 38; })[0]; if (el) el[1] = +el[1] + dz; else e.x.push([38, dz]); }
   }
   // GIRAR, ESCALA y SIMETRÍA: f lleva cada punto; rot = giro (rad), esc = factor; alfa = ángulo de la línea de
   // simetría (solo en SIMETRÍA). El texto se refleja con MIRRTEXT = 0 (por defecto en AutoCAD): cambia de sitio
   // pero se sigue leyendo al derecho.
   function transformar(e, f, rot, esc, alfa) {
     var esp = alfa !== undefined;
-    function m(p) { var q = f(p); p[0] = q[0]; p[1] = q[1]; }
+    function m(p) { var q = f(p); p[0] = q[0]; p[1] = q[1]; if (q.length > 2) { if (Math.abs(q[2]) < 1e-12) p.length = 2; else p[2] = q[2]; } }
     function giro(t) { t = norm(t); return t > 2 * Math.PI - 1e-12 ? 0 : t; }
     if (e.t === 'TEXT' && esp) {
       var w = e.h * 0.6 * Math.max(1, e.s.length), fin = [e.p[0] + w * Math.cos(e.rot), e.p[1] + w * Math.sin(e.rot)];
@@ -216,6 +262,8 @@
   function segs(e) {
     var r = [];
     if (e.t === 'LINE') r.push([e.a, e.b]);
+    else if (e.t === 'POLY3D') { var m3 = e.pts.length; for (var k = 0; k < (e.cerr ? m3 : m3 - 1); k++) r.push([e.pts[k], e.pts[(k + 1) % m3]]); }
+    else if (e.t === 'FACE3D') { for (var f = 0; f < 4; f++) { var A = e.pts[f], B = e.pts[(f + 1) % 4]; if (!(e.inv & (1 << f)) && dist(A, B) > 1e-12) r.push([A, B]); } }
     else if (e.t === 'LWPOLYLINE') {
       var n = e.pts.length;
       for (var i = 0; i < (e.cerr ? n : n - 1); i++) if (!e.bul[i]) r.push([e.pts[i], e.pts[(i + 1) % n]]);
@@ -242,10 +290,10 @@
   function enArco(a, t) { if (a.full) return true; var s = norm(a.a2 - a.a1), d = norm(t - a.a1); return d <= s + 1e-9; }
   function notables(e) {             // [punto, modo]: fin, medio, centro, nodo
     var r = [];
-    if (e.t === 'LINE') { r.push([e.a, 'fin'], [e.b, 'fin'], [[(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2], 'medio']); }
-    else if (e.t === 'LWPOLYLINE') {
-      e.pts.forEach(function (p) { r.push([p, 'fin']); });
-      segs(e).forEach(function (s) { r.push([[(s[0][0] + s[1][0]) / 2, (s[0][1] + s[1][1]) / 2], 'medio']); });
+    if (e.t === 'LINE') { r.push([e.a, 'fin'], [e.b, 'fin'], [medio(e.a, e.b), 'medio']); }
+    else if (e.t === 'LWPOLYLINE' || e.t === 'POLY3D' || e.t === 'FACE3D') {
+      e.pts.forEach(function (p, i) { if (e.t !== 'FACE3D' || i < 3 || dist(p, e.pts[2]) > 1e-12) r.push([p, 'fin']); });
+      segs(e).forEach(function (s) { r.push([medio(s[0], s[1]), 'medio']); });
     } else if (e.t === 'POINT') r.push([e.p, 'nodo']);
     else if (e.t === 'TEXT') r.push([e.p, 'nodo']);
     else if (e.t === 'DIMENSION') { if (!e.k) r.push([e.p1, 'nodo'], [e.p2, 'nodo']); }
@@ -253,8 +301,8 @@
       r.push([a.c, 'centro']);
       if (!a.full) {
         var am = a.a1 + norm(a.a2 - a.a1) / 2;
-        r.push([[a.c[0] + a.r * Math.cos(a.a1), a.c[1] + a.r * Math.sin(a.a1)], 'fin'], [[a.c[0] + a.r * Math.cos(a.a2), a.c[1] + a.r * Math.sin(a.a2)], 'fin'],
-               [[a.c[0] + a.r * Math.cos(am), a.c[1] + a.r * Math.sin(am)], 'medio']);
+        r.push([conZ([a.c[0] + a.r * Math.cos(a.a1), a.c[1] + a.r * Math.sin(a.a1)], a.c), 'fin'], [conZ([a.c[0] + a.r * Math.cos(a.a2), a.c[1] + a.r * Math.sin(a.a2)], a.c), 'fin'],
+               [conZ([a.c[0] + a.r * Math.cos(am), a.c[1] + a.r * Math.sin(am)], a.c), 'medio']);
       }
     });
     return r;
@@ -287,7 +335,7 @@
   function caja(e) {
     var P = [];
     if (e.t === 'LINE') P = [e.a, e.b];
-    else if (e.t === 'LWPOLYLINE') P = e.pts;
+    else if (e.t === 'LWPOLYLINE' || e.t === 'POLY3D' || e.t === 'FACE3D') P = e.pts;
     else if (e.t === 'POINT') P = [e.p];
     else if (e.t === 'TEXT') { var w = e.h * 0.6 * Math.max(1, e.s.length); P = [e.p, [e.p[0] + w * Math.cos(e.rot) - e.h * Math.sin(e.rot), e.p[1] + w * Math.sin(e.rot) + e.h * Math.cos(e.rot)]]; }
     else if (e.t === 'DIMENSION') {
@@ -304,9 +352,60 @@
   }
 
   // ------------------------------------------------------------------ vista (mundo ⇄ pantalla)
-  function aPant(p) { return [(p[0] - S.v.x0) * S.v.k, S.H - (p[1] - S.v.y0) * S.v.k]; }
-  function aMundo(q) { return [q[0] / S.v.k + S.v.x0, (S.H - q[1]) / S.v.k + S.v.y0]; }
+  // PLANTA (S.c3 = null): la vista 2D de siempre, mundo XY → pantalla. En 3D (S.c3): proyección paralela
+  // (PERSPECTIVE = 0, como AutoCAD) desde la dirección az/el (grados; el ojo en E), mirando al objetivo t.
+  function es3D() { return !!(S && S.c3); }
+  function camara(az, el, k, t) {
+    var A = az * Math.PI / 180, B = el * Math.PI / 180, cb = Math.abs(el) === 90 ? 0 : Math.cos(B);
+    var E = [cb * Math.cos(A), cb * Math.sin(A), Math.abs(el) === 90 ? Math.sign(el) : Math.sin(B)], R = [-Math.sin(A), Math.cos(A), 0];
+    R = R.map(function (x) { return Math.abs(x) < 1e-15 ? 0 : x; });
+    return { az: az, el: el, k: k, t: t, E: E, R: R, U: vx(E, R) };
+  }
+  function kEsc() { return S.c3 ? S.c3.k : S.v.k; }
+  function aPant(p) {
+    if (!S.c3) return [(p[0] - S.v.x0) * S.v.k, S.H - (p[1] - S.v.y0) * S.v.k];
+    var c = S.c3, d = vs(p, c.t); return [S.W / 2 + c.k * vd(d, c.R), S.H / 2 - c.k * vd(d, c.U)];
+  }
+  function aMundo(q) { return S.c3 ? planoPt(q) : [q[0] / S.v.k + S.v.x0, (S.H - q[1]) / S.v.k + S.v.y0]; }
+  function enPantalla(q) { var c = S.c3; return va(va(c.t, vk((q[0] - S.W / 2) / c.k, c.R)), vk((S.H / 2 - q[1]) / c.k, c.U)); }
+  // el cursor CAE EN EL PLANO XY DEL SCP (rayo de la vista ∩ plano); de canto (< 2°), en el plano de la vista por el origen del SCP
+  function planoPt(q) {
+    var u = S.ucs, N = u.Z, P0, D;
+    if (S.c3) { P0 = enPantalla(q); D = vk(-1, S.c3.E); }
+    else { var w = [q[0] / S.v.k + S.v.x0, (S.H - q[1]) / S.v.k + S.v.y0]; P0 = [w[0], w[1], 0]; D = [0, 0, -1]; }
+    var den = vd(D, N);
+    if (Math.abs(den) < 0.035) { N = vk(-1, D); den = vd(D, N); }
+    return nz(va(P0, vk(vd(vs(u.o, P0), N) / den, D)));
+  }
+  // ---- SCP (UCS): origen o y ejes X Y Z en coordenadas universales
+  var SCP_U = { nom: 'Universal', o: [0, 0, 0], X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
+  function scp(nom, o, X, Y) { X = vu(X); var Z = vu(vx(X, Y)); return { nom: nom, o: P3(o), X: X, Y: vx(Z, X), Z: Z }; }
+  function univ() { var u = S.ucs; return u.nom === 'Universal' || (!vd(u.o, u.o) && u.X[0] === 1 && u.Y[1] === 1); }
+  function aSCP(p) { var u = S.ucs, d = vs(p, u.o); return [vd(d, u.X), vd(d, u.Y), vd(d, u.Z)]; }
+  function deSCP(l) { var u = S.ucs; return va(va(va(u.o, vk(l[0], u.X)), vk(l[1], u.Y)), vk(l[2] || 0, u.Z)); }
+  function planoNom() {
+    var Z = S.ucs.Z, a = [Math.abs(Z[0]), Math.abs(Z[1]), Math.abs(Z[2])];
+    return a[2] > 1 - 1e-9 ? 'XY' : a[1] > 1 - 1e-9 ? 'XZ' : a[0] > 1 - 1e-9 ? 'YZ' : 'SCP';
+  }
+  function puntos3(e) {                 // puntos de la entidad para encuadrar y designar en 3D (curvas muestreadas)
+    var P = [];
+    segs(e).forEach(function (s) { P.push(s[0], s[1]); });
+    trazos3(e).forEach(function (l) { P = P.concat(l); });
+    ['p', 'c', 'd', 'p1', 'p2', 'v'].forEach(function (k) { if (esPt(e[k])) P.push(e[k]); });
+    return P;
+  }
+  function trazos3(e) {                 // arcos y círculos (en su plano, con la z del centro) como polilíneas 3D
+    var L = [];
+    arcos(e).forEach(function (a) {
+      var dt = a.full ? 2 * Math.PI : norm(a.a2 - a.a1) || 2 * Math.PI, n = Math.max(8, Math.ceil(dt / (Math.PI / 32))), l = [], z = a.c[2] || e.pts && elev(e) || 0;
+      for (var i = 0; i <= n; i++) { var t = a.a1 === undefined ? i * dt / n : a.a1 + i * dt / n; l.push([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t), z]); }
+      L.push(l);
+    });
+    return L;
+  }
+  function elev(e) { var p = e.x && e.x.filter(function (x) { return x[0] === 38; })[0]; return p ? +p[1] : 0; }
   function encuadre() {
+    if (S.c3) { encuadre3(); return; }
     var b = [Infinity, Infinity, -Infinity, -Infinity];
     S.ents.forEach(function (e) { var c = caja(e); if (c) { b[0] = Math.min(b[0], c[0]); b[1] = Math.min(b[1], c[1]); b[2] = Math.max(b[2], c[2]); b[3] = Math.max(b[3], c[3]); } });
     if (!isFinite(b[0])) b = [0, 0, 20 * S.rej, 12 * S.rej];
@@ -315,25 +414,64 @@
     S.v = { k: k, x0: (b[0] + b[2]) / 2 - S.W / (2 * k), y0: (b[1] + b[3]) / 2 - S.H / (2 * k) };
     pintar();
   }
+  function encuadre3() {
+    var P = []; S.ents.forEach(function (e) { P = P.concat(puntos3(e)); });
+    if (!P.length) P = [[0, 0, 0], [20 * S.rej, 12 * S.rej, 0]];
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    P.forEach(function (p) { p = P3(p); for (var i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], p[i]); hi[i] = Math.max(hi[i], p[i]); } });
+    var c = S.c3, t = vk(0.5, va(lo, hi)), x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    P.forEach(function (p) { var d = vs(p, t), x = vd(d, c.R), y = vd(d, c.U); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+    var w = Math.max(x1 - x0, S.rej * 4), h = Math.max(y1 - y0, S.rej * 4);
+    S.c3 = camara(c.az, c.el, Math.min(S.W / (w * 1.25), S.H / (h * 1.25)), va(va(t, vk((x0 + x1) / 2, c.R)), vk((y0 + y1) / 2, c.U)));
+    pintar();
+  }
+  // VISTAS (como las de AutoCAD; UCSORTHO = 1: las ortogonales ponen su SCP) y ÓRBITA
+  var VISTAS = { PLANTA: [270, 90], FRENTE: [270, 0], LATERAL: [0, 0], ISOSO: [225, 35.26438968], ISOSE: [315, 35.26438968] };
+  var NOMV = { PLANTA: 'Planta', FRENTE: 'Frente', LATERAL: 'Lateral', ISOSO: 'Iso SO', ISOSE: 'Iso SE' };
+  function vista(n) {
+    n = String(n).toUpperCase();
+    if (n === 'PLANTA') { S.c3 = null; S.ucs = SCP_U; S.vnom = 'Planta'; encuadre(); barra(); return; }
+    if (n === 'FRENTE') S.ucs = scp('Frente', [0, 0, 0], [1, 0, 0], [0, 0, 1]);
+    if (n === 'LATERAL') S.ucs = scp('Lateral', [0, 0, 0], [0, 1, 0], [0, 0, 1]);
+    var v = VISTAS[n]; S.c3 = camara(v[0], v[1], 1, [0, 0, 0]); S.vnom = NOMV[n]; encuadre3(); barra();
+  }
+  function orbitar(dx, dy) {            // 3DORBITA restringida: horizontal = giro alrededor de Z, vertical = inclinación
+    if (!S.c3) S.c3 = camara(270, 90, S.v.k, [S.v.x0 + S.W / (2 * S.v.k), S.v.y0 + S.H / (2 * S.v.k), 0]);
+    var c = S.c3, el = Math.max(-90, Math.min(90, c.el + dy * 0.4)), az = ((c.az - dx * 0.4) % 360 + 360) % 360;
+    S.c3 = camara(az, el, c.k, c.t); S.vnom = 'Órbita'; pintar(); barra();
+  }
   function paso() {                    // separación de la rejilla que se ve (≥ 8 px), múltiplo de la de trabajo
-    var s = S.rej; while (s * S.v.k < 8) s *= (String(s / S.rej).charAt(0) === '2' ? 2.5 : 2);
+    var s = S.rej; while (s * kEsc() < 8) s *= (String(s / S.rej).charAt(0) === '2' ? 2.5 : 2);
     return s;
   }
 
   // ------------------------------------------------------------------ cursor: OSNAP > ORTO > FORZC
+  function lerp(a, b, t) { return nz([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), (a[2] || 0) + t * ((b[2] || 0) - (a[2] || 0))]); }
+  // intersección de dos tramos (3D): en planta se cortan sus proyecciones XY, en 3D las de la pantalla; si en el
+  // espacio no se tocan es la INTERSECCIÓN FICTICIA de AutoCAD (APPINT): el punto va sobre el primer tramo.
+  function interSeg(a, b) {
+    var A0 = a[0], A1 = a[1], B0 = b[0], B1 = b[1];
+    if (S.c3) { A0 = aPant(a[0]); A1 = aPant(a[1]); B0 = aPant(b[0]); B1 = aPant(b[1]); }
+    var d1 = [A1[0] - A0[0], A1[1] - A0[1]], d2 = [B1[0] - B0[0], B1[1] - B0[1]], den = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(den) < 1e-14) return null;
+    var w = [B0[0] - A0[0], B0[1] - A0[1]], t = (w[0] * d2[1] - w[1] * d2[0]) / den, u = (w[0] * d1[1] - w[1] * d1[0]) / den;
+    if (!(t >= -1e-9 && t <= 1 + 1e-9 && u >= -1e-9 && u <= 1 + 1e-9)) return null;
+    var pa = lerp(a[0], a[1], t), pb = lerp(b[0], b[1], u), tam = Math.max(1, Math.abs(P3(pa)[0]) + Math.abs(P3(pa)[1]) + Math.abs(P3(pa)[2]));
+    return { p: pa, modo: dist(pa, pb) <= 1e-9 * tam ? 'inter' : 'aparente' };
+  }
   function osnap(q, base) {
-    var w = aMundo(q), tol = APERTURA / S.v.k, best = null, cand = [];
+    var w = aMundo(q), tol = APERTURA / kEsc(), best = null, cand = [], tres = !!S.c3;
     function prueba(p, modo) { var s = aPant(p), d = Math.hypot(s[0] - q[0], s[1] - q[1]); if (d <= APERTURA) cand.push({ p: p, modo: modo, d: d }); }
-    var cerca = S.ents.filter(function (e) {
+    var cerca = tres ? S.ents.slice() : S.ents.filter(function (e) {
       var b = caja(e); return b && w[0] >= b[0] - tol && w[0] <= b[2] + tol && w[1] >= b[1] - tol && w[1] <= b[3] + tol;
     });
     cerca.forEach(function (e) { notables(e).forEach(function (n) { if (S.modos[n[1]]) prueba(n[0], n[1]); }); });
     // CUADRANTE: 0°, 90°, 180°, 270° del círculo (en un arco, los que caen dentro)
     if (S.modos.cuad) cerca.forEach(function (e) { arcos(e).forEach(function (a) {
-      for (var k = 0; k < 4; k++) { var t = k * Math.PI / 2; if (enArco(a, t)) prueba([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], 'cuad'); }
+      for (var k = 0; k < 4; k++) { var t = k * Math.PI / 2; if (enArco(a, t)) prueba(conZ([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], a.c), 'cuad'); }
     }); });
     // TANGENTE (desde el punto anterior): los dos puntos donde la recta desde la base toca el círculo
-    if (S.modos.tan && base) cerca.forEach(function (e) { arcos(e).forEach(function (a) {
+    if (S.modos.tan && base && !tres) cerca.forEach(function (e) { arcos(e).forEach(function (a) {
       var d = dist(a.c, base); if (d <= a.r + 1e-12) return;
       var b0 = ang(a.c, base), be = Math.acos(a.r / d);
       [b0 + be, b0 - be].forEach(function (t) { if (enArco(a, norm(t))) prueba([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], 'tan'); });
@@ -341,22 +479,24 @@
     if (S.modos.inter) {
       var S1 = [], A1 = [];
       cerca.forEach(function (e) { if (e.t !== 'DIMENSION') { segs(e).forEach(function (s) { S1.push(s); }); arcos(e).forEach(function (a) { A1.push(a); }); } });
-      for (var i = 0; i < S1.length; i++) for (var j = i + 1; j < S1.length; j++) interSS(S1[i], S1[j]).forEach(function (p) { prueba(p, 'inter'); });
-      S1.forEach(function (s) { A1.forEach(function (a) { interSA(s, a).forEach(function (p) { prueba(p, 'inter'); }); }); });
-      for (var m = 0; m < A1.length; m++) for (var n = m + 1; n < A1.length; n++) interAA(A1[m], A1[n]).forEach(function (p) { prueba(p, 'inter'); });
+      for (var i = 0; i < S1.length; i++) for (var j = i + 1; j < S1.length; j++) { var x = interSeg(S1[i], S1[j]); if (x && (x.modo === 'inter' || S.modos.aparente)) prueba(x.p, x.modo); }
+      if (!tres) {
+        S1.forEach(function (s) { A1.forEach(function (a) { interSA(s, a).forEach(function (p) { prueba(p, 'inter'); }); }); });
+        for (var m = 0; m < A1.length; m++) for (var n = m + 1; n < A1.length; n++) interAA(A1[m], A1[n]).forEach(function (p) { prueba(p, 'inter'); });
+      }
     }
-    if (S.modos.perp && base) {
+    if (S.modos.perp && base && !tres) {
       cerca.forEach(function (e) {
         if (e.t === 'DIMENSION') return;
         segs(e).forEach(function (s) {
           var d = [s[1][0] - s[0][0], s[1][1] - s[0][1]], L2 = d[0] * d[0] + d[1] * d[1]; if (L2 < 1e-20) return;
           var t = ((base[0] - s[0][0]) * d[0] + (base[1] - s[0][1]) * d[1]) / L2;
-          if (t >= -1e-9 && t <= 1 + 1e-9) prueba([s[0][0] + t * d[0], s[0][1] + t * d[1]], 'perp');
+          if (t >= -1e-9 && t <= 1 + 1e-9) prueba(lerp(s[0], s[1], t), 'perp');
         });
         arcos(e).forEach(function (a) { var t = ang(a.c, base); if (enArco(a, t)) prueba([a.c[0] + a.r * Math.cos(t), a.c[1] + a.r * Math.sin(t)], 'perp'); });
       });
     }
-    var ORD = { fin: 0, inter: 1, medio: 2, centro: 3, cuad: 4, nodo: 5, tan: 6, perp: 7 };
+    var ORD = { fin: 0, inter: 1, aparente: 1.5, medio: 2, centro: 3, cuad: 4, nodo: 5, tan: 6, perp: 7 };
     cand.forEach(function (c) { if (!best || c.d < best.d - 0.5 || (Math.abs(c.d - best.d) <= 0.5 && ORD[c.modo] < ORD[best.modo])) best = c; });
     return best;
   }
@@ -365,6 +505,7 @@
     S.snap = S.osnapOn && req && (req.t === 'punto' || req.t === 'numero') ? osnap(q, base) : null;
     S.pol = null;
     if (S.snap) return S.snap.p.slice();
+    if (S.c3 || !univ()) return cursorSCP(q, req, base);
     var p = aMundo(q);
     // RASTREO POLAR (F10): cerca (≤ apertura) de un rayo a k·incremento desde el punto anterior, el cursor va
     // SOBRE el rayo (como AutoCAD: OSNAP > polar; polar y orto se excluyen). Con Forzc la distancia va a
@@ -384,6 +525,23 @@
     return p;
   }
 
+  // En 3D (o con un SCP que no es el Universal) ORTO, POLAR y FORZC trabajan en el plano XY del SCP, como AutoCAD:
+  // el punto se pasa al SCP, se ajusta en 2D y vuelve a coordenadas universales.
+  function cursorSCP(q, req, base) {
+    var l = aSCP(P3(planoPt(q))), p = [l[0], l[1]], b = base ? aSCP(P3(base)) : null, k = kEsc();
+    if (S.polar && b && !(req && req.sinOrto) && req && (req.t === 'punto' || req.t === 'numero')) {
+      var inc = S.polarAng * Math.PI / 180, a = ang(b, p), ap = Math.round(a / inc) * inc, d = Math.hypot(p[0] - b[0], p[1] - b[1]);
+      if (d * k > 4 && Math.cos(a - ap) > 0 && Math.abs(Math.sin(a - ap)) * d * k <= APERTURA) {
+        var L = d * Math.cos(a - ap); if (S.forzc) L = Math.round(L / S.rej) * S.rej;
+        S.pol = { ang: norm(ap), L: L };
+        return nzL(deSCP([b[0] + L * Math.cos(ap), b[1] + L * Math.sin(ap), 0]));
+      }
+    }
+    if (S.forzc) p = [Math.round(p[0] / S.rej) * S.rej, Math.round(p[1] / S.rej) * S.rej];
+    if (S.orto && b && !(req && req.sinOrto)) { if (Math.abs(p[0] - b[0]) >= Math.abs(p[1] - b[1])) p = [p[0], b[1]]; else p = [b[0], p[1]]; }
+    return nzL(deSCP([p[0], p[1], 0]));
+  }
+
   // ------------------------------------------------------------------ pintar
   function colorDe(e) {
     var c = e.color; if (c === 256 || c === 0) { var cp = capaDe(e.capa); c = cp ? cp.c : 7; }
@@ -393,6 +551,14 @@
   function trazar(g, e, col, ancho) {
     g.strokeStyle = col; g.fillStyle = col; g.lineWidth = ancho || 1.3;
     var P;
+    if (e.t === 'POLY3D' || e.t === 'FACE3D' || (S.c3 && (e.t === 'LWPOLYLINE' || e.t === 'CIRCLE' || e.t === 'ARC'))) {
+      // en 3D (y la 3DPOL y la 3DCARA siempre): tramos y curvas muestreadas, proyectados (estructura alámbrica 2D de AutoCAD)
+      var z0 = e.t === 'LWPOLYLINE' ? elev(e) : 0;
+      g.beginPath();
+      segs(e).forEach(function (sg) { var u = aPant(z0 ? [sg[0][0], sg[0][1], z0] : sg[0]), v = aPant(z0 ? [sg[1][0], sg[1][1], z0] : sg[1]); g.moveTo(u[0], u[1]); g.lineTo(v[0], v[1]); });
+      (S.c3 ? trazos3(e) : []).forEach(function (l) { l.forEach(function (p, i) { var u = aPant(p); if (i) g.lineTo(u[0], u[1]); else g.moveTo(u[0], u[1]); }); });
+      g.stroke(); return;
+    }
     switch (e.t) {
       case 'LINE': g.beginPath(); P = aPant(e.a); g.moveTo(P[0], P[1]); P = aPant(e.b); g.lineTo(P[0], P[1]); g.stroke(); break;
       case 'LWPOLYLINE':
@@ -483,13 +649,14 @@
       case 'medio': g.moveTo(p[0], p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.lineTo(p[0] - r, p[1] + r); g.closePath(); break;
       case 'centro': g.arc(p[0], p[1], r, 0, 2 * Math.PI); break;
       case 'inter': g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] + r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); break;
+      case 'aparente': g.rect(p[0] - r, p[1] - r, 2 * r, 2 * r); g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] + r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); break;
       case 'perp': g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] - r, p[1]); g.lineTo(p[0], p[1]); g.lineTo(p[0], p[1] + r); break;
       case 'nodo': g.arc(p[0], p[1], r, 0, 2 * Math.PI); g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] + r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); break;
       case 'cuad': g.moveTo(p[0], p[1] - r); g.lineTo(p[0] + r, p[1]); g.lineTo(p[0], p[1] + r); g.lineTo(p[0] - r, p[1]); g.closePath(); break;
       case 'tan': g.arc(p[0], p[1], r * 0.8, 0, 2 * Math.PI); g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] - r); break;
     }
     g.stroke();
-    var nom = { fin: 'Punto final', medio: 'Punto medio', centro: 'Centro', inter: 'Intersección', perp: 'Perpendicular', nodo: 'Punto', cuad: 'Cuadrante', tan: 'Tangente' }[s.modo];
+    var nom = { fin: 'Punto final', medio: 'Punto medio', centro: 'Centro', inter: 'Intersección', aparente: 'Intersección ficticia', perp: 'Perpendicular', nodo: 'Punto', cuad: 'Cuadrante', tan: 'Tangente' }[s.modo];
     g.font = '11px "Segoe UI",Arial,sans-serif'; var w = g.measureText(nom).width;
     g.fillStyle = S.cMarca; g.fillRect(p[0] + 10, p[1] + 10, w + 8, 16); g.fillStyle = '#111'; g.fillText(nom, p[0] + 14, p[1] + 22); g.restore();
   }
@@ -500,6 +667,8 @@
     var g = S.g, W = S.W, H = S.H;
     g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
     g.fillStyle = S.cFondo; g.fillRect(0, 0, W, H);
+    if (S.c3) rejilla3(g);
+    else {
     if (S.rejilla) {                    // rejilla de puntos (como AutoCAD clásico) y ejes por el origen
       var s = paso(), a = aMundo([0, H]), b = aMundo([W, 0]);
       g.fillStyle = S.cRej;
@@ -508,6 +677,7 @@
     }
     var o = aPant([0, 0]); g.strokeStyle = S.cEje; g.lineWidth = 1; g.setLineDash([6, 4]); g.beginPath();
     g.moveTo(0, o[1]); g.lineTo(W, o[1]); g.moveTo(o[0], 0); g.lineTo(o[0], H); g.stroke(); g.setLineDash([]);
+    }
     S.ents.forEach(function (e) {
       var sel = S.sel.indexOf(e) >= 0 || (S.req && S.req.marcar && S.req.marcar.indexOf(e) >= 0);
       if (sel) { g.setLineDash([5, 3]); trazar(g, e, S.cSel, 2); g.setLineDash([]); } else trazar(g, e, colorDe(e), 1.4);
@@ -523,9 +693,10 @@
     }
     if (S.snap) marca(g, S.snap);
     if (S.pol && S.req && S.req.base && S.q) {   // rastreo polar: el rayo de alineación y su rótulo (distancia < ángulo)
-      var pb = aPant(S.req.base), far = 4 * (S.W + S.H);
+      var pb = aPant(S.req.base), far = 4 * (S.W + S.H), dr = [Math.cos(S.pol.ang), -Math.sin(S.pol.ang)];
+      if (S.c3 || !univ()) { var u0 = S.ucs, pf = aPant(va(S.req.base, va(vk(Math.cos(S.pol.ang), u0.X), vk(Math.sin(S.pol.ang), u0.Y)))); dr = [pf[0] - pb[0], pf[1] - pb[1]]; var ld = Math.hypot(dr[0], dr[1]) || 1; dr = [dr[0] / ld, dr[1] / ld]; }
       g.save(); g.strokeStyle = '#39c93a'; g.lineWidth = 1.5; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(pb[0], pb[1]);
-      g.lineTo(pb[0] + far * Math.cos(S.pol.ang), pb[1] - far * Math.sin(S.pol.ang)); g.stroke(); g.setLineDash([]);
+      g.lineTo(pb[0] + far * dr[0], pb[1] + far * dr[1]); g.stroke(); g.setLineDash([]);
       var tp = 'Polar: ' + fmt(S.pol.L) + ' < ' + fmt(S.pol.ang * 180 / Math.PI) + '°', cq = aPant(S.cur);
       g.font = '11px "Segoe UI",Arial,sans-serif'; var wp = g.measureText(tp).width;
       cajaDin(g, tp, cq[0] + 70 + wp / 2, cq[1] - 34, '#2ecc71', false, '#2ecc71'); g.restore();
@@ -534,15 +705,25 @@
       // IMÁN de AutoSnap (AUTOSNAP = 63 en AutoCAD 2027, bit 4): la mira salta al punto enganchado
       var c = S.snap ? aPant(S.snap.p) : aPant(S.cur), w0 = S.snap ? S.snap.p : S.cur;
       // mira del CAD de Hekatan Struct: brazos cortos (24 px) + cuadrito blanco en el centro
-      g.save(); g.strokeStyle = S.oscuro ? 'rgba(215,220,228,.9)' : 'rgba(40,44,52,.85)'; g.lineWidth = 1.5; g.beginPath();
-      g.moveTo(c[0] - 24, c[1]); g.lineTo(c[0] + 24, c[1]); g.moveTo(c[0], c[1] - 24); g.lineTo(c[0], c[1] + 24); g.stroke();
-      g.fillStyle = S.oscuro ? '#fff' : '#222'; g.fillRect(c[0] - 3.5, c[1] - 3.5, 7, 7); g.restore();
+      g.save(); g.lineWidth = 1.5;
+      if (S.c3) {                       // en 3D: la ESTRELLA de Struct, los 3 ejes del SCP proyectados (X rojo, Y verde, Z azul, tenues)
+        [[S.ucs.X, 'rgba(255,51,68,.75)'], [S.ucs.Y, 'rgba(52,211,153,.75)'], [S.ucs.Z, 'rgba(96,165,250,.8)']].forEach(function (a) {
+          var dx = 30 * vd(a[0], S.c3.R), dy = -30 * vd(a[0], S.c3.U);
+          g.strokeStyle = a[1]; g.beginPath(); g.moveTo(c[0] - dx, c[1] - dy); g.lineTo(c[0] + dx, c[1] + dy); g.stroke();
+        });
+      } else {
+        g.strokeStyle = S.oscuro ? 'rgba(215,220,228,.9)' : 'rgba(40,44,52,.85)'; g.beginPath();
+        g.moveTo(c[0] - 24, c[1]); g.lineTo(c[0] + 24, c[1]); g.moveTo(c[0], c[1] - 24); g.lineTo(c[0], c[1] + 24); g.stroke();
+      }
+      g.fillStyle = S.oscuro || S.c3 ? '#fff' : '#222'; if (S.c3 && !S.oscuro) { g.strokeStyle = '#222'; g.lineWidth = 1; g.strokeRect(c[0] - 3.5, c[1] - 3.5, 7, 7); }
+      g.fillRect(c[0] - 3.5, c[1] - 3.5, 7, 7); g.restore();
       if (!S.req || S.req.t === 'sel' || S.req.t === 'obj') { g.strokeStyle = S.cFg; g.lineWidth = 1; g.strokeRect(c[0] - PICK, c[1] - PICK, 2 * PICK, 2 * PICK); }
       // ENTRADA DINÁMICA (como Struct): sin punto base, la coordenada junto al cursor; con base, la
       // longitud en el medio de la goma y el ángulo bajo el cursor
       if (S.req && S.req.t === 'punto') {
         if (S.req.base) {
-          var bb = aPant(S.req.base), dx = w0[0] - S.req.base[0], dy = w0[1] - S.req.base[1], L = Math.hypot(dx, dy);
+          // la longitud es 3D (la del tramo en el espacio); el ángulo, el del plano XY del SCP
+          var bb = aPant(S.req.base), L = dist(S.req.base, w0), l0 = aSCP(P3(S.req.base)), l1 = aSCP(P3(w0)), dx = l1[0] - l0[0], dy = l1[1] - l0[1];
           if (L > 1e-9) {
             cajaDin(g, L.toFixed(2) + ' ' + S.ud, (bb[0] + c[0]) / 2, (bb[1] + c[1]) / 2, '#25b7d3', true);
             var an = Math.atan2(dy, dx) * 180 / Math.PI; if (an < 0) an += 360;
@@ -551,10 +732,50 @@
             if (Math.abs(mx - ax) < 90 && Math.abs(my - ay) < 34) { ax = c[0] + (mx <= c[0] ? 72 : -72); ay = c[1] + 34; }
             cajaDin(g, Math.round(an) % 360 + '°', ax, ay, '#25b7d3', false, '#35c6e0');
           }
-        } else cajaDin(g, w0[0].toFixed(2) + ',' + w0[1].toFixed(2), c[0] + 40, c[1] - 52, '#25b7d3', true);
+        } else cajaDin(g, w0[0].toFixed(2) + ',' + w0[1].toFixed(2) + (S.c3 || w0[2] ? ',' + (+(w0[2] || 0)).toFixed(2) : ''), c[0] + 40, c[1] - 52, '#25b7d3', true);
       }
     }
+    iconoSCP(g);
     estado();
+  }
+
+  // REJILLA 3D: líneas en el plano XY del SCP (como la de AutoCAD en 3D: una mayor cada 5), alrededor del dibujo
+  function rejilla3(g) {
+    var u = S.ucs, lo = [0, 0], hi = [0, 0];
+    S.ents.forEach(function (e) { puntos3(e).forEach(function (p) { var l = aSCP(P3(p)); lo = [Math.min(lo[0], l[0]), Math.min(lo[1], l[1])]; hi = [Math.max(hi[0], l[0]), Math.max(hi[1], l[1])]; }); });
+    var s = paso(), m = Math.max(hi[0] - lo[0], hi[1] - lo[1], 10 * S.rej) * 0.25;
+    while (s * S.c3.k < 14) s *= 2;      // en 3D las líneas, no más juntas que 14 px
+    while ((hi[0] - lo[0] + 2 * m) / s > 160 || (hi[1] - lo[1] + 2 * m) / s > 160) s *= 2;
+    var x0 = Math.floor((lo[0] - m) / s) * s, x1 = Math.ceil((hi[0] + m) / s) * s, y0 = Math.floor((lo[1] - m) / s) * s, y1 = Math.ceil((hi[1] + m) / s) * s;
+    function L(a, b) { var p = aPant(deSCP(a)), q = aPant(deSCP(b)); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+    if (S.rejilla) {
+      g.save(); g.lineWidth = 1;
+      [0, 1].forEach(function (mayor) {
+        g.strokeStyle = S.cRej; g.globalAlpha = mayor ? 0.45 : 0.18; g.beginPath();
+        for (var x = x0; x <= x1 + 1e-9; x += s) { var i = Math.round(x / s); if ((i % 5 === 0) === !!mayor && Math.abs(x) > 1e-12) L([x, y0, 0], [x, y1, 0]); }
+        for (var y = y0; y <= y1 + 1e-9; y += s) { var j = Math.round(y / s); if ((j % 5 === 0) === !!mayor && Math.abs(y) > 1e-12) L([x0, y, 0], [x1, y, 0]); }
+        g.stroke();
+      });
+      g.restore();
+    }
+    g.save(); g.lineWidth = 1.2; g.globalAlpha = 0.7;   // ejes del SCP sobre su plano: X rojo, Y verde
+    g.strokeStyle = '#ff3344'; g.beginPath(); L([x0, 0, 0], [x1, 0, 0]); g.stroke();
+    g.strokeStyle = '#34d399'; g.beginPath(); L([0, y0, 0], [0, y1, 0]); g.stroke(); g.restore();
+  }
+  // ICONO DEL SCP abajo a la izquierda (UCSICON): X, Y (y Z en 3D); el cuadrito en la esquina = SCP Universal
+  function iconoSCP(g) {
+    var o = [52, S.H - 34], u = S.ucs, L = 34;
+    function pr(v) { return S.c3 ? [L * vd(v, S.c3.R), -L * vd(v, S.c3.U)] : [L * v[0], -L * v[1]]; }
+    g.save(); g.lineWidth = 2; g.font = 'bold 11px "Segoe UI",Arial,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    [[u.X, '#ff3344', 'X'], [u.Y, '#34d399', 'Y'], [u.Z, '#60a5fa', 'Z']].forEach(function (a) {
+      var d = pr(a[0]), n = Math.hypot(d[0], d[1]); if (n < 4) return;
+      g.strokeStyle = a[1]; g.fillStyle = a[1]; g.beginPath(); g.moveTo(o[0], o[1]); g.lineTo(o[0] + d[0], o[1] + d[1]); g.stroke();
+      var ux = d[0] / n, uy = d[1] / n, p = [o[0] + d[0], o[1] + d[1]];
+      g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0] - 7 * ux - 3 * uy, p[1] - 7 * uy + 3 * ux); g.lineTo(p[0] - 7 * ux + 3 * uy, p[1] - 7 * uy - 3 * ux); g.closePath(); g.fill();
+      g.fillText(a[2], p[0] + 9 * ux, p[1] + 9 * uy);
+    });
+    if (univ()) { g.strokeStyle = S.cFg; g.lineWidth = 1; g.strokeRect(o[0] - 1, o[1] - 7, 8, 8); }
+    g.restore();
   }
 
   // ------------------------------------------------------------------ designar
@@ -570,13 +791,37 @@
     if (e.t === 'DIMENSION' && e.k === 'dia') d = Math.min(d, dseg(e.p1, e.p2));
     return d;
   }
-  function pick(q) { return pickW(aMundo(q)); }
+  function pick(q) { return S.c3 ? pick3(q) : pickW(aMundo(q)); }
+  function trazosPant(e) {              // la entidad en pantalla (3D): tramos proyectados
+    var T = segs(e).map(function (s) { return [aPant(s[0]), aPant(s[1])]; });
+    trazos3(e).forEach(function (l) { for (var i = 0; i + 1 < l.length; i++) T.push([aPant(l[i]), aPant(l[i + 1])]); });
+    ['p', 'c'].forEach(function (k) { if ((e.t === 'POINT' || e.t === 'TEXT') && esPt(e[k])) { var q = aPant(e[k]); T.push([q, q]); } });
+    return T;
+  }
+  function dSegPant(q, a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)) : 0; return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); }
+  function pick3(q) {
+    var best = null, bd = Infinity;
+    S.ents.forEach(function (e) { trazosPant(e).forEach(function (s) { var d = dSegPant(q, s[0], s[1]); if (d <= PICK && d < bd) { bd = d; best = e; } }); });
+    return best;
+  }
+  function enVentana3(a, b) {           // ventana / captura sobre lo proyectado
+    var x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]), cruzar = b[0] < a[0];
+    function den(p) { return p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1; }
+    var R = [[[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]], [[x1, y1], [x0, y1]], [[x0, y1], [x0, y0]]];
+    return S.ents.filter(function (e) {
+      var T = trazosPant(e); if (!T.length) return false;
+      var todos = T.every(function (s) { return den(s[0]) && den(s[1]); });
+      if (!cruzar) return todos;
+      return todos || T.some(function (s) { return den(s[0]) || den(s[1]) || R.some(function (r) { return interSS(s, r).length; }); });
+    });
+  }
   function pickW(w) {                   // el objeto más cercano a w (mundo) dentro del cuadro de designación
     var tol = PICK / S.v.k, best = null, bd = Infinity;
     S.ents.forEach(function (e) { var d = distEnt(e, w); if (d <= tol && d < bd) { bd = d; best = e; } });
     return best;
   }
   function enVentana(a, b) {            // a, b en pantalla; a→b hacia la derecha = ventana, hacia la izquierda = captura
+    if (S.c3) return enVentana3(a, b);
     var p = aMundo(a), q = aMundo(b), x0 = Math.min(p[0], q[0]), x1 = Math.max(p[0], q[0]), y0 = Math.min(p[1], q[1]), y1 = Math.max(p[1], q[1]);
     var cruzar = b[0] < a[0];
     return S.ents.filter(function (e) {
@@ -828,7 +1073,9 @@
     return { alfa: al, f: function (p) { var v = sub(p, m1), s = v[0] * u[0] + v[1] * u[1]; return limpio([m1[0] + 2 * s * u[0] - v[0], m1[1] + 2 * s * u[1] - v[1]]); } };
   }
   function girarF(b, t) { var c = Math.cos(t), s = Math.sin(t); return function (p) { var v = sub(p, b); return limpio([b[0] + c * v[0] - s * v[1], b[1] + s * v[0] + c * v[1]]); }; }
-  function escalaF(b, k) { return function (p) { return limpio([b[0] + k * (p[0] - b[0]), b[1] + k * (p[1] - b[1])]); }; }
+  function escalaF(b, k) {              // ESCALA es 3D en AutoCAD: la z también se escala desde el punto base
+    return function (p) { var q = limpio([b[0] + k * (p[0] - b[0]), b[1] + k * (p[1] - b[1])]); return (p[2] || b[2]) ? q.concat([+((b[2] || 0) + k * ((p[2] || 0) - (b[2] || 0))).toFixed(12)]) : q; };
+  }
   function aplicar(sel, f, rot, esc, alfa, copia) {
     return sel.map(function (e) { var o = copia ? clon(e) : e; transformar(o, f, rot, esc, alfa); if (copia) agregar(o); return o; });
   }
@@ -886,6 +1133,77 @@
       var p3 = yield { t: 'punto', msg: 'Punto final del arco', base: p2, sinOrto: true, prev: function (q) { var a = arco3(p1, p2, q); return a ? [a] : [lin(p1, q)]; } }; if (!esPt(p3)) return;
       var a = arco3(p1, p2, p3); if (!a) { msg('Los tres puntos están alineados'); return; } agregar(a);
     },
+    // 3DPOL (3DPOLY): polilínea 3D, tramos rectos; «Precise punto final de línea o [Cerrar/desHacer]»
+    POL3D: function* () {
+      var p = yield { t: 'punto', msg: '3DPOL  Punto inicial de la polilínea' }; if (!esPt(p)) return;
+      var pts = [p], hecho = false;
+      try {
+        for (;;) {
+          var r = yield { t: 'punto', msg: 'Punto final de línea o [' + (pts.length >= 3 ? 'Cerrar/' : '') + 'desHacer]', op: pts.length >= 3 ? ['C', 'H', 'U', 'D'] : ['H', 'U', 'D'], base: pts[pts.length - 1], prev: function (q) { return [poli3E(pts.concat([q]), false)]; } };
+          if (r === null) break;
+          if (r.kw === 'C') { agregar(poli3E(pts, true)); hecho = true; return; }
+          if (r.kw) { if (pts.length > 1) pts.pop(); continue; }
+          pts.push(r);
+        }
+      } finally { if (!hecho && pts.length >= 2) agregar(poli3E(pts, false)); }
+    },
+    // 3DCARA (3DFACE): 1.º, 2.º, 3.º y 4.º punto (Intro = cara de 3 lados); luego sigue con 3.º y 4.º: la cara nueva
+    // empieza en el 3.º y 4.º de la anterior (AutoCAD). «I» antes de un punto = la arista que sale de él es invisible.
+    CARA3D: function* () {
+      var P = [], inv = 0, I = false, nom = ['primer', 'segundo', 'tercer', 'cuarto'], hechas = 0;
+      for (;;) {
+        var i = P.length;
+        var r = yield { t: 'punto', msg: (i === 0 ? '3DCARA  ' : '') + 'Precise ' + nom[i] + ' punto o [Invisible]' + (i === 3 ? ' <cara de tres lados>' : (i === 2 && hechas ? ' <salir>' : '')),
+          op: ['I'], base: P[i - 1], prev: function (q) { return P.length >= 2 ? [caraE(P.length === 3 ? P.concat([q]) : [P[0], P[1], q, q], inv)] : (P.length ? [lin(P[0], q)] : []); } };
+        if (r && r.kw === 'I') { I = true; continue; }
+        if (r === null && i === 2 && hechas) return;
+        if (r === null && i === 3) r = P[2].slice();
+        if (!esPt(r)) return;
+        if (I) inv |= 1 << i; I = false;
+        P.push(r);
+        if (P.length === 4) { agregar(caraE(P, inv)); hechas++; inv = (inv >> 2) & 1; P = [P[2], P[3]]; }
+      }
+    },
+    // SCP (UCS): origen (y, como AutoCAD, un punto en el eje X y otro en el plano XY: 3 puntos) o [Universal/XY/XZ/YZ/Anterior]
+    SCP: function* () {
+      var r = yield { t: 'punto', msg: 'SCP  Origen del SCP o [Universal/XY/XZ/YZ/Anterior] <Universal>', op: ['U', 'W', 'UNIVERSAL', 'WORLD', 'XY', 'XZ', 'YZ', 'A', 'P'] };
+      var ant = S.ucs;
+      if (r === null || (r.kw && /^(U|W|UNIVERSAL|WORLD)$/.test(r.kw))) S.ucs = SCP_U;
+      else if (r.kw === 'A' || r.kw === 'P') { if (S.ucsAnt && S.ucsAnt.length) { S.ucs = S.ucsAnt.pop(); msg('SCP anterior: ' + S.ucs.nom); } barra(); return; }
+      else if (r.kw === 'XY') S.ucs = scp('XY', S.ucs.o, [1, 0, 0], [0, 1, 0]);
+      else if (r.kw === 'XZ') S.ucs = scp('XZ', S.ucs.o, [1, 0, 0], [0, 0, 1]);
+      else if (r.kw === 'YZ') S.ucs = scp('YZ', S.ucs.o, [0, 1, 0], [0, 0, 1]);
+      else if (esPt(r)) {
+        var o = P3(r), u = S.ucs, X = u.X, Y = u.Y, gir = false;
+        var px = yield { t: 'punto', msg: 'Punto en el eje X o <aceptar>', base: r };
+        if (esPt(px) && dist(px, r) > 1e-12) {
+          gir = true; X = vu(vs(px, o)); Y = vs(u.Y, vk(vd(u.Y, X), X)); if (vd(Y, Y) < 1e-12) Y = vs(u.Z, vk(vd(u.Z, X), X));
+          var py = yield { t: 'punto', msg: 'Punto en el plano XY o <aceptar>', base: r };
+          if (esPt(py)) { var w = vs(py, o), yy = vs(w, vk(vd(w, X), X)); if (vd(yy, yy) > 1e-18) Y = yy; }
+        }
+        S.ucs = scp(gir ? '3 puntos' : (u.nom === 'Universal' ? 'Origen' : u.nom), o, X, Y);
+      } else return;
+      (S.ucsAnt = S.ucsAnt || []).push(ant); if (S.ucsAnt.length > 10) S.ucsAnt.shift();
+      msg('SCP ' + S.ucs.nom + ' · plano ' + planoNom() + ' · origen ' + P3(S.ucs.o).map(fmt).join(','));
+      barra();
+    },
+    // PLANTA (PLAN): la vista en planta del SCP actual o del Universal
+    PLANTA: function* () {
+      var r = yield { t: 'punto', msg: 'PLANTA  [Actual/Universal] <Actual>', op: ['A', 'U', 'W', 'ACTUAL', 'UNIVERSAL'] };
+      if (r && r.kw && /^(U|W|UNIVERSAL)$/.test(r.kw)) { S.c3 = null; S.vnom = 'Planta'; encuadre(); return; }
+      var Z = S.ucs.Z, X = S.ucs.X;
+      if (Z[2] > 1 - 1e-12 && X[0] > 1 - 1e-12) { S.c3 = null; S.vnom = 'Planta'; encuadre(); return; }
+      var el = Math.asin(Math.max(-1, Math.min(1, Z[2]))) * 180 / Math.PI, az = Math.abs(Z[2]) > 1 - 1e-12 ? Math.atan2(X[0], -X[1]) * 180 / Math.PI : Math.atan2(Z[1], Z[0]) * 180 / Math.PI;
+      S.c3 = camara((az + 360) % 360, el, kEsc(), [0, 0, 0]); S.vnom = 'Planta SCP'; encuadre3();
+    },
+    VISTA: function* () {
+      var r = yield { t: 'punto', msg: 'VISTA  [Superior/Frente/Lateral/isoSO/isoSE] <Superior>', op: ['S', 'SUPERIOR', 'TOP', 'F', 'FRENTE', 'FRONT', 'L', 'LATERAL', 'RIGHT', 'ISOSO', 'SO', 'SW', 'ISOSE', 'SE'] };
+      var k = r && r.kw || 'S';
+      vista(/^(F|FRENTE|FRONT)$/.test(k) ? 'FRENTE' : /^(L|LATERAL|RIGHT)$/.test(k) ? 'LATERAL' : /^(ISOSO|SO|SW)$/.test(k) ? 'ISOSO' : /^(ISOSE|SE)$/.test(k) ? 'ISOSE' : 'PLANTA');
+    },
+    // 3DORBITA (3DO): arrastrar con el botón izquierdo gira la vista (órbita restringida); Intro o Esc sale.
+    // Sin la orden: Mayús + botón central arrastrando (como AutoCAD).
+    ORBITA: function* () { yield { t: 'orbita', msg: '3DORBITA  Arrastre para girar la vista — Intro o Esc para salir' }; },
     PUNTO: function* () { var p = yield { t: 'punto', msg: 'PUNTO  Precise un punto' }; if (esPt(p)) agregar(nueva('POINT', { p: p })); },
     TEXTO: function* () {
       var p = yield { t: 'punto', msg: 'TEXTO  Punto inicial del texto' }; if (!esPt(p)) return;
@@ -914,8 +1232,8 @@
       if (!sel.length) return;
       var b = yield { t: 'punto', msg: 'Punto base o desplazamiento', marcar: sel }; if (!esPt(b)) return;
       var q = yield { t: 'punto', msg: 'Segundo punto o <usar el primer punto como desplazamiento>', base: b, marcar: sel,
-        prev: function (p) { return sel.map(function (e) { var c = clon(e); trasladar(c, [p[0] - b[0], p[1] - b[1]]); return c; }); } };
-      var v = q === null ? b : (esPt(q) ? [q[0] - b[0], q[1] - b[1]] : null); if (!v) return;
+        prev: function (p) { return sel.map(function (e) { var c = clon(e); trasladar(c, vs(p, b)); return c; }); } };
+      var v = q === null ? P3(b) : (esPt(q) ? vs(q, b) : null); if (!v) return;
       sel.forEach(function (e) { trasladar(e, v); });
     },
     // COPIAR (CO): varias copias seguidas (COPYMODE múltiple de AutoCAD); Intro en la primera = desplazamiento
@@ -926,11 +1244,11 @@
       var hechas = 0;
       for (;;) {
         var q = yield { t: 'punto', msg: hechas ? 'Segundo punto o [Salir/desHacer] <Salir>' : 'Segundo punto o <usar el primer punto como desplazamiento>', op: hechas ? ['S', 'H'] : [], base: b, marcar: sel,
-          prev: function (p) { return sel.map(function (e) { var c = clon(e); trasladar(c, [p[0] - b[0], p[1] - b[1]]); return c; }); } };
+          prev: function (p) { return sel.map(function (e) { var c = clon(e); trasladar(c, vs(p, b)); return c; }); } };
         if (q && q.kw === 'H') { if (hechas) { for (var i = 0; i < sel.length; i++) S.ents.pop(); hechas--; } continue; }
         if (q === null && !hechas) { sel.forEach(function (e) { var c = clon(e); trasladar(c, b); agregar(c); }); return; }
         if (!esPt(q)) return;
-        sel.forEach(function (e) { var c = clon(e); trasladar(c, [q[0] - b[0], q[1] - b[1]]); agregar(c); }); hechas++;
+        sel.forEach(function (e) { var c = clon(e); trasladar(c, vs(q, b)); agregar(c); }); hechas++;
       }
     },
     // GIRAR (RO): ángulo en grados (antihorario) o con el cursor; [Copia/Referencia]
@@ -1152,7 +1470,10 @@
     F: 'EMPALME', FILLET: 'EMPALME', EMPALME: 'EMPALME', CHA: 'CHAFLAN', CHAMFER: 'CHAFLAN', CHAFLAN: 'CHAFLAN', 'CHAFLÁN': 'CHAFLAN',
     DAN: 'COTAANG', DIMANGULAR: 'COTAANG', ACOANG: 'COTAANG', DRA: 'COTARAD', DIMRADIUS: 'COTARAD', ACORADIO: 'COTARAD',
     DDI: 'COTADIA', DIMDIAMETER: 'COTADIA', ACODIAM: 'COTADIA',
-    ED: 'EDITAR', DDEDIT: 'EDITAR', TEXTEDIT: 'EDITAR', EDITAR: 'EDITAR', POLAR: 'POLAR', DSETTINGS: 'POLAR' };
+    ED: 'EDITAR', DDEDIT: 'EDITAR', TEXTEDIT: 'EDITAR', EDITAR: 'EDITAR', POLAR: 'POLAR', DSETTINGS: 'POLAR',
+    '3DPOL': 'POL3D', '3DPOLY': 'POL3D', '3P': 'POL3D', '3DCARA': 'CARA3D', '3DFACE': 'CARA3D', '3F': 'CARA3D',
+    SCP: 'SCP', UCS: 'SCP', PLANTA: 'PLANTA', PLAN: 'PLANTA', VISTA: 'VISTA', '-VISTA': 'VISTA', '-VIEW': 'VISTA', '-V': 'VISTA',
+    '3DORBITA': 'ORBITA', '3DORBIT': 'ORBITA', '3DO': 'ORBITA', ORBITA: 'ORBITA', 'ÓRBITA': 'ORBITA' };
   var NOMBRES = { rojo: 1, amarillo: 2, verde: 3, cian: 4, azul: 5, magenta: 6, blanco: 7, negro: 7, gris: 8, 'gris-claro': 9, naranja: 30 };
   function aci(s) { s = String(s || '').trim().toLowerCase(); if (!s) return 0; if (NOMBRES[s]) return NOMBRES[s]; var n = parseInt(s, 10); return n >= 1 && n <= 255 ? n : 0; }
 
@@ -1193,19 +1514,28 @@
     if (req.op && req.op.indexOf(U) >= 0) return { kw: U };
     if (req.op && U.length >= 2 && /^[A-ZÁÉÍÓÚ]+$/.test(U)) { for (var i = 0; i < req.op.length; i++) if (req.op[i].indexOf(U) === 0) return { kw: req.op[i] }; }   // «CE» → CENTRO…
     var N = '([-+]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?)', m;
-    if ((m = new RegExp('^(@?)\\s*' + N + '\\s*,\\s*' + N + '$').exec(s))) {
-      var p = [+m[2], +m[3]]; if (m[1]) { var b = S.ult0 || [0, 0]; p = limpio([b[0] + p[0], b[1] + p[1]]); }
+    // x,y[,z] y @dx,dy[,dz] en el SCP actual (como AutoCAD); con dos números la z es la del plano XY del SCP
+    if ((m = new RegExp('^(@?)\\s*' + N + '\\s*,\\s*' + N + '(?:\\s*,\\s*' + N + ')?$').exec(s))) {
+      var z = m[4] === undefined ? 0 : +m[4], p;
+      if (univ()) {
+        p = m[4] === undefined ? [+m[2], +m[3]] : nz([+m[2], +m[3], z]);
+        if (m[1]) { var b = S.ult0 || [0, 0]; p = (b[2] || z) ? nzL([b[0] + p[0], b[1] + p[1], (b[2] || 0) + z]) : limpio([b[0] + p[0], b[1] + p[1]]); }
+      } else if (m[1]) { var u = S.ucs; p = nzL(va(P3(S.ult0 || u.o), va(va(vk(+m[2], u.X), vk(+m[3], u.Y)), vk(z, u.Z)))); }
+      else p = nzL(deSCP([+m[2], +m[3], z]));
       return req.t === 'numero' && req.base ? (req.angulo ? ang(req.base, p) * 180 / Math.PI : dist(req.base, p)) : (req.t === 'sel' ? null : p);
     }
     if ((m = new RegExp('^(@?)\\s*' + N + '\\s*<\\s*' + N + '$').exec(s))) {
-      var o = m[1] ? (S.ult0 || [0, 0]) : [0, 0], t = +m[3] * Math.PI / 180, q = limpio([o[0] + +m[2] * Math.cos(t), o[1] + +m[2] * Math.sin(t)]);
+      var t = +m[3] * Math.PI / 180, q;
+      if (univ()) { var o = m[1] ? (S.ult0 || [0, 0]) : [0, 0]; q = limpio([o[0] + +m[2] * Math.cos(t), o[1] + +m[2] * Math.sin(t)]); if (o[2]) q = nzL(q.concat([o[2]])); }
+      else { var U3 = S.ucs, o3 = m[1] ? P3(S.ult0 || U3.o) : U3.o; q = nzL(va(o3, va(vk(+m[2] * Math.cos(t), U3.X), vk(+m[2] * Math.sin(t), U3.Y)))); }
       return req.t === 'numero' && req.base ? dist(req.base, q) : q;
     }
     if ((m = new RegExp('^' + N + '$').exec(s))) {
       var v = +m[1];
       if (req.t === 'numero') return v;
-      if (req.t === 'punto' && req.base) {    // distancia directa: v en la dirección del cursor (con ORTO, la ortogonal)
-        var c = S.cur || [req.base[0] + 1, req.base[1]], d = dist(req.base, c) || 1;
+      if (req.t === 'punto' && req.base) {    // distancia directa: v en la dirección del cursor EN 3D (con ORTO, la ortogonal)
+        var c = S.cur || [req.base[0] + 1, req.base[1]], d = dist(req.base, c) || 1, bz = req.base[2] || 0, cz = c[2] || 0;
+        if (bz || cz) return nzL([req.base[0] + v * (c[0] - req.base[0]) / d, req.base[1] + v * (c[1] - req.base[1]) / d, bz + v * (cz - bz) / d]);
         return limpio([req.base[0] + v * (c[0] - req.base[0]) / d, req.base[1] + v * (c[1] - req.base[1]) / d]);
       }
     }
@@ -1226,7 +1556,7 @@
     var r = leer(txt);
     if (r === undefined || r === null && txt.trim()) { msg('Punto o valor no válido: «' + txt + '»'); return; }
     if (S.req.t === 'obj' && esPt(r)) {         // x,y tecleado = designar el objeto que pasa por ese punto
-      var eo = pickW(r); if (!eo) { msg('Ningún objeto en ' + fmt(r[0]) + ',' + fmt(r[1]) + '.'); inp.value = ''; return; }
+      var eo = S.c3 ? pick3(aPant(r)) : pickW(r); if (!eo) { msg('Ningún objeto en ' + fmt(r[0]) + ',' + fmt(r[1]) + '.'); inp.value = ''; return; }
       eco(txt); inp.value = ''; avanzar({ e: eo, p: r }); return;
     }
     eco(txt);
@@ -1243,12 +1573,15 @@
   function linea(t) { var h = $('.hkcad-hist', S.raiz); var d = el('div', null); d.textContent = t; h.appendChild(d); while (h.children.length > 60) h.removeChild(h.firstChild); h.scrollTop = h.scrollHeight; }
 
   // ------------------------------------------------------------------ zoom / encuadre
-  function zoomEn(q, f) { var w = aMundo(q); S.v.k *= f; S.v.x0 = w[0] - q[0] / S.v.k; S.v.y0 = w[1] - (S.H - q[1]) / S.v.k; pintar(); }
+  function zoomEn(q, f) {
+    if (S.c3) { var c = S.c3, w3 = enPantalla(q), k = c.k * f; S.c3 = camara(c.az, c.el, k, va(va(w3, vk(-(q[0] - S.W / 2) / k, c.R)), vk(-(S.H / 2 - q[1]) / k, c.U))); pintar(); return; }
+    var w = aMundo(q); S.v.k *= f; S.v.x0 = w[0] - q[0] / S.v.k; S.v.y0 = w[1] - (S.H - q[1]) / S.v.k; pintar(); }
 
   // ------------------------------------------------------------------ barra de estado
   function estado() {
     var c = S.cur || [0, 0];
-    $('.hkcad-xy', S.raiz).textContent = 'x = ' + fmt(c[0]) + '   y = ' + fmt(c[1]) + '  ' + S.ud;
+    $('.hkcad-xy', S.raiz).textContent = 'x = ' + fmt(c[0]) + '   y = ' + fmt(c[1]) + (S.c3 || c[2] ? '   z = ' + fmt(c[2] || 0) : '') + '  ' + S.ud;
+    var v = $('.hkcad-vista', S.raiz); if (v) v.textContent = (S.vnom || 'Planta') + ' · Plano ' + planoNom() + ' · SCP ' + S.ucs.nom;
   }
   function barra() {
     var b = S.raiz;
@@ -1260,6 +1593,8 @@
     S.capas.forEach(function (c) { var o = new Option(c.n, c.n); sc.add(o); }); sc.value = S.capa;
     var co = $('.hkcad-color', b); co.value = String(S.color); if (co.value !== String(S.color)) { co.add(new Option('ACI ' + S.color, String(S.color))); co.value = String(S.color); }
     $('.hkcad-rej', b).value = fmt(S.rej);
+    b.querySelectorAll('[data-v]').forEach(function (x) { x.classList.toggle('on', NOMV[x.getAttribute('data-v')] === (S.vnom || 'Planta')); });
+    estado();
     b.querySelectorAll('.hkcad-herr button[data-o]').forEach(function (x) { x.classList.toggle('on', !!S.cmd && S.ultOrden && ALIAS[S.ultOrden] === ALIAS[x.getAttribute('data-o')]); });
   }
   function conmuta(k) {
@@ -1319,6 +1654,7 @@
     ['PUNTO', 'Punto', 'PO'], ['TEXTO', 'Texto', 'T'], ['COTA', 'Cota', 'DIM'], ['COTAANG', 'Cota ∠', 'DAN'], ['COTARAD', 'Radio', 'DRA'], ['COTADIA', 'Diámetro', 'DDI'], ['|'],
     ['MOVER', 'Mover', 'M'], ['COPIAR', 'Copiar', 'CO'], ['GIRAR', 'Girar', 'RO'], ['ESCALA', 'Escala', 'SC'], ['SIMETRIA', 'Simetría', 'MI'], ['DESFASE', 'Desfase', 'O'],
     ['RECORTAR', 'Recortar', 'TR'], ['ALARGAR', 'Alargar', 'EX'], ['EMPALME', 'Empalme', 'F'], ['CHAFLAN', 'Chaflán', 'CHA'], ['EDITAR', 'Editar texto', 'ED'], ['BORRAR', 'Borrar', 'E'], ['|'],
+    ['POL3D', '3DPol', '3P'], ['CARA3D', '3DCara', '3F'], ['SCP', 'SCP', 'UCS'], ['|'],
     ['U', '↶ Deshacer', 'Ctrl+Z'], ['REHACER', '↷ Rehacer', 'Ctrl+Y']];
 
   function abrir(id) {
@@ -1330,6 +1666,8 @@
     var cols = [['256', 'PorCapa'], ['1', 'rojo'], ['2', 'amarillo'], ['3', 'verde'], ['4', 'cian'], ['5', 'azul'], ['6', 'magenta'], ['7', 'blanco/negro'], ['8', 'gris'], ['9', 'gris claro'], ['30', 'naranja']];
     raiz.innerHTML =
       '<div class="hkcad-cab"><b>✏ Dibujar — ' + dat.nombre.replace(/[<>&]/g, '') + '</b><span style="color:var(--mut,#777)">(' + dat.ud + ')</span><span class="hkcad-sp"></span>' +
+      '<span class="hkcad-g hkcad-vistas">' + [['PLANTA', 'Planta'], ['FRENTE', 'Frente'], ['LATERAL', 'Lateral'], ['ISOSO', 'Iso SO'], ['ISOSE', 'Iso SE']].map(function (v) {
+        return '<button type="button" data-v="' + v[0] + '" title="Vista ' + v[1] + (v[0] === 'PLANTA' ? ' (la de 2D; PLANTA)' : v[0].indexOf('ISO') === 0 ? ' (isométrica)' : ' (pone su SCP, como AutoCAD)') + ' · Mayús + botón central: órbita (3DO)">' + v[1] + '</button>'; }).join('') + '</span>' +
       '<button type="button" class="hkcad-enc" title="Zoom a la extensión (doble clic con la rueda)">⤢ Encuadre</button>' +
       '<button type="button" class="hkcad-guardar" title="Escribe el dibujo en la hoja como listas DXF (entmake) y recalcula">💾 Guardar en la hoja</button>' +
       '<button type="button" class="hkcad-cerrar" title="Cerrar sin guardar">✕ Cerrar</button></div>' +
@@ -1339,11 +1677,11 @@
       '<div class="hkcad-lienzo"><canvas tabindex="0"></canvas></div>' +
       '<div class="hkcad-hist"></div>' +
       '<div class="hkcad-ord"><span class="hkcad-prompt">Orden:</span><input class="hkcad-inp" spellcheck="false" autocomplete="off"></div>' +
-      '<div class="hkcad-est"><span class="hkcad-xy"></span>' +
+      '<div class="hkcad-est"><span class="hkcad-xy"></span><span class="hkcad-vista" style="margin-right:8px;color:var(--fg,#222)"></span>' +
       '<button type="button" data-t="rejilla" title="F7">Rejilla</button><button type="button" data-t="forzc" title="F9: el cursor salta a la rejilla">Forzc</button>' +
       '<button type="button" data-t="orto" title="F8">Orto</button><button type="button" data-t="polar" title="F10: rastreo polar (POLAR fija el incremento)">Polar</button><button type="button" data-t="osnap" title="F3: referencia a objetos">Refent</button>' +
       '<label><input type="checkbox" data-m="fin">Final</label><label><input type="checkbox" data-m="medio">Medio</label><label><input type="checkbox" data-m="centro">Centro</label>' +
-      '<label><input type="checkbox" data-m="inter">Intersección</label><label><input type="checkbox" data-m="perp">Perpendicular</label><label><input type="checkbox" data-m="nodo">Punto</label>' +
+      '<label><input type="checkbox" data-m="inter">Intersección</label><label title="APPINT: donde se cruzan en la vista aunque no se toquen en el espacio"><input type="checkbox" data-m="aparente">Int. ficticia</label><label><input type="checkbox" data-m="perp">Perpendicular</label><label><input type="checkbox" data-m="nodo">Punto</label>' +
       '<label><input type="checkbox" data-m="cuad">Cuadrante</label><label><input type="checkbox" data-m="tan">Tangente</label>' +
       '<span class="hkcad-sp" style="flex:1"></span>Rejilla <input class="hkcad-rej" style="width:64px"> ' + dat.ud + '</div>';
     document.body.appendChild(velo); document.body.appendChild(raiz);
@@ -1351,7 +1689,8 @@
     S = { raiz: raiz, velo: velo, id: id, nombre: dat.nombre, ud: dat.ud || 'm', pal: dat.pal || {}, capas: dat.capas && dat.capas.length ? dat.capas : [{ n: '0', c: 7 }],
       ents: (dat.ents || []).map(desdePares), capa: '0', color: 256, rej: +dat.rejilla || 0, th: 0,
       oscuro: (function (c) { var m = /#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(c) || /(\d+)\D+(\d+)\D+(\d+)/.exec(c); if (!m) return false; var v = m.slice(1, 4).map(function (t) { return /^[0-9a-f]{2}$/i.test(t) && m[0][0] === '#' ? parseInt(t, 16) : +t; }); return 0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2] < 128; })(fondo),
-      rejilla: true, forzc: true, orto: false, osnapOn: true, modos: { fin: 1, medio: 1, centro: 1, inter: 1, perp: 1, nodo: 1, cuad: 1, tan: 1 },
+      rejilla: true, forzc: true, orto: false, osnapOn: true, modos: { fin: 1, medio: 1, centro: 1, inter: 1, aparente: 1, perp: 1, nodo: 1, cuad: 1, tan: 1 },
+      c3: null, ucs: SCP_U, vnom: 'Planta', ucsAnt: [],
       polar: false, polarAng: 90, desf: 0, radio: 0, cha: [0, 0],
       undo: [], redo: [], sel: [], cmd: null, req: null, v: { k: 1, x0: 0, y0: 0 }, ovf: document.documentElement.style.overflow,
       cFondo: fondo, cFg: css('--fg', '#222'), cRej: css('--mut', '#999'), cEje: css('--sep', '#ccc'), cSel: '#3c8dff', cPrev: css('--var', '#1c5fbf'),
@@ -1375,6 +1714,7 @@
     barra(); prompt();
     linea('Ventana de dibujo «' + S.nombre + '». Órdenes: L PL REC C A PO T · DIM DAL DAN DRA DDI · M CO RO SC MI O TR EX F CHA ED E · U REDO · LA COL REJ Z POLAR · Intro repite, Esc cancela.');
     linea('Coordenadas: x,y · @dx,dy · @d<ángulo · un número = distancia en la dirección del cursor. F3 Refent · F7 Rejilla · F8 Orto · F9 Forzc · F10 Polar. Doble clic en un texto o una cota: editarlo.');
+    linea('3D: x,y,z · @dx,dy,dz · 3P (3DPOL) · 3F (3DCARA) · SCP (U/XY/XZ/YZ/origen y 3 puntos) · PLANTA · VISTA · 3DO; Mayús + botón central = órbita; botones Planta/Frente/Lateral/Iso.');
 
     // --- ratón
     var pan = null;
@@ -1382,13 +1722,17 @@
     cv.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
     cv.addEventListener('pointerdown', function (ev) {
       var q = qDe(ev); cv.focus();
-      if (ev.button === 1 || (ev.button === 0 && ev.shiftKey)) { pan = { q: q, x0: S.v.x0, y0: S.v.y0 }; cv.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
+      // Mayús + botón central = 3DORBITA transparente (AutoCAD); con la orden 3DO, el botón izquierdo
+      if ((ev.button === 1 && ev.shiftKey) || (ev.button === 0 && S.req && S.req.t === 'orbita')) { pan = { orb: true, q: q }; cv.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
+      if (ev.button === 1 || (ev.button === 0 && ev.shiftKey)) { pan = { q: q, x0: S.v.x0, y0: S.v.y0, c3: S.c3 }; cv.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
       if (ev.button === 2) { responder(S.inp.value); S.inp.value = ''; return; }   // clic derecho = Intro
       if (ev.button !== 0) return;
       clic(q);
     });
     cv.addEventListener('pointermove', function (ev) {
       var q = qDe(ev);
+      if (pan && pan.orb) { orbitar(q[0] - pan.q[0], q[1] - pan.q[1]); pan.q = q; S.q = q; S.cur = cursor(q); return; }
+      if (pan && pan.c3) { var c = pan.c3; S.c3 = camara(c.az, c.el, c.k, va(va(c.t, vk(-(q[0] - pan.q[0]) / c.k, c.R)), vk((q[1] - pan.q[1]) / c.k, c.U))); pintar(); return; }
       if (pan) { S.v.x0 = pan.x0 - (q[0] - pan.q[0]) / S.v.k; S.v.y0 = pan.y0 + (q[1] - pan.q[1]) / S.v.k; pintar(); return; }
       S.q = q; S.cur = cursor(q); pintar();
     });
@@ -1427,6 +1771,7 @@
       var b = ev.target.closest('button'); if (!b) return;
       if (b.dataset.o) { if (S.cmd) cancelar(); orden(b.dataset.o); S.inp.focus(); }
       else if (b.dataset.t) conmuta(b.dataset.t);
+      else if (b.dataset.v) { vista(b.dataset.v); S.inp.focus(); }
       else if (b.classList.contains('hkcad-enc')) encuadre();
       else if (b.classList.contains('hkcad-guardar')) guardar();
       else if (b.classList.contains('hkcad-cerrar')) cerrar();
@@ -1481,7 +1826,7 @@
     if (req.t === 'numero') r = req.base ? (req.angulo ? ang(req.base, p) * 180 / Math.PI : dist(req.base, p)) : undefined;
     else if (req.t !== 'punto') return;
     if (r === undefined) return;
-    eco(fmt(p[0]) + ',' + fmt(p[1]));
+    eco(fmt(p[0]) + ',' + fmt(p[1]) + (p[2] ? ',' + fmt(p[2]) : ''));
     S.ult0 = p.slice();
     avanzar(r);
   }
@@ -1491,7 +1836,14 @@
   window.hkCad = {
     abrir: abrir, cerrar: function () { if (S) { S.sucio = false; cerrar(); } }, guardar: function () { if (S) guardar(); },
     orden: function (t) { if (!S) return; t.split('\n').forEach(function (l) { responder(l); }); },
-    pantalla: function (x, y) { var r = S.cv.getBoundingClientRect(), p = aPant([x, y]); return [r.left + p[0], r.top + p[1]]; },
+    pantalla: function (x, y, z) { var r = S.cv.getBoundingClientRect(), p = aPant(z ? [x, y, z] : [x, y]); return [r.left + p[0], r.top + p[1]]; },
+    // 3D: vista por nombre (PLANTA, FRENTE, LATERAL, ISOSO, ISOSE), órbita en píxeles, cámara y SCP actuales, punto bajo el cursor
+    vista: function (n) { if (S) { vista(n); pintarYa(); } },
+    orbitar: function (dx, dy) { if (S) { orbitar(dx, dy); pintarYa(); } },
+    camara: function () { return S && S.c3 ? { az: S.c3.az, el: S.c3.el, k: S.c3.k, t: S.c3.t } : null; },
+    scp: function () { return S ? { nom: S.ucs.nom, o: S.ucs.o, X: S.ucs.X, Y: S.ucs.Y, Z: S.ucs.Z, plano: planoNom() } : null; },
+    cursor: function () { return S && S.cur ? S.cur.slice() : null; },
+    encuadre: function () { if (S) { encuadre(); pintarYa(); } },
     estado: function () { return S ? { ents: S.ents.map(aPares), capas: S.capas, orden: S.cmd ? S.req.msg : null, rej: S.rej, v: S.v } : null; },
     cuerpo: function () { return S ? cuerpo() : null; },
     // para las pruebas: medida de una cota, enganche y rastreo polar activos, y encuadrar una zona

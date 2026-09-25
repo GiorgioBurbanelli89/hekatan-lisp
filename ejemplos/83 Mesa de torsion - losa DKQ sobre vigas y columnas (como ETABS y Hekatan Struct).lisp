@@ -53,6 +53,8 @@ K_ua = Simplify{t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*G_m(xi, eta) @ xi = 
 K_aa = Simplify{t*a^2*Area{Area{transpose(G_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
 #: **Condensación estática**: los α no son grados de nudo; se eliminan con K_{αα}·α = −K_{αu}·u, y queda
 K_Q6 = Simplify{K_uu - K_ua*inv(K_aa)*transpose(K_ua)}
+#: Todos los términos llevan E·t/(1 − ν²). Sacando el factor común E·t/(24·(1 − ν²)), lo que queda son números y ν:
+K_Q6n = Simplify{24*(1-nu^2)/(E*t)*K_Q6}
 
 ### A.5 · Placa DKQ (12 × 12)
 #: **Kirchhoff discreto** (Batoz y Tahar 1982): los giros β se interpolan con 8 nudos y la condición β = ∇w se impone solo en los nudos y en el medio de los lados. Las curvaturas κ = [∂β_{x}/∂x; ∂β_{y}/∂y; ∂β_{x}/∂y + ∂β_{y}/∂x] quedan B_{f}·u con u = [w₁ β_{x1} β_{y1} …]. **Ley constitutiva** (D = E·t³/(12·(1 − ν²))):
@@ -108,7 +110,6 @@ t = 0.1 'espesor de la losa (m)
 E = 24.85e6 'módulo de elasticidad (kN/m²)
 ν = 0.2 'coeficiente de Poisson
 G_c = E/(2·(1 + ν)) 'módulo de corte (kN/m²)
-q = 4.9033 'carga viva: 0.5 tonf/m² en kN/m²
 g_0 = 9.80665 'kN por tonf
 b_c = 0.4 'columna: ancho (m)
 h_c = 0.4 'columna: peralte (m)
@@ -246,42 +247,39 @@ k_v33f = 12·E·I_yv/(d^3·(1 + φ_v)) 'fórmula
 k_v44 = k_vig(4, 4) 'torsión, del programa
 k_v44f = G_c·J_v/d 'fórmula G·J/L
 
-### B.4 · Ensamblaje, apoyos y solución
+### B.4 · Ensamblaje y apoyos
 d_n(j) = 6·(j - 1) + (1:6)
 #hide
 K = zeros(n_d, n_d)
-F = zeros(n_d, 1)
 #show
 #: Losa: los 25 elementos son iguales y no se giran; se suman en las filas y columnas de sus 4 nudos.
 for e = 1:n_s
   g = [d_n(e_s(e, 1)), d_n(e_s(e, 2)), d_n(e_s(e, 3)), d_n(e_s(e, 4))]
   K(g, g) = K(g, g) + K_s
 end
-#: Columnas y vigas: se giran a ejes globales antes de sumarse.
-for e = 1:n_c
-  g = [d_n(c_e(e, 1)), d_n(c_e(e, 2))]
-  R_f = rot_frame(X_n(c_e(e, 1), :), X_n(c_e(e, 2), :))
-  K(g, g) = K(g, g) + R_f'·k_col·R_f
-end
-for e = 1:n_b
-  g = [d_n(b_e(e, 1)), d_n(b_e(e, 2))]
-  R_f = rot_frame(X_n(b_e(e, 1), :), X_n(b_e(e, 2), :))
-  K(g, g) = K(g, g) + R_f'·k_vig·R_f
-end
-#: **Carga.** q por el área tributaria de cada nudo: d² en el interior, d²/2 en el borde y d²/4 en la esquina (como ETABS reparte la carga de área).
-for j = 0:n_e
-  for i = 0:n_e
-    f_a = 1
-    if i == 0 || i == n_e
-      f_a = f_a/2
-    end
-    if j == 0 || j == n_e
-      f_a = f_a/2
-    end
-    F(6·(p(i, j) - 1) + 3) = -q·d^2·f_a
+#: Columnas y vigas: se giran a ejes globales antes de sumarse. Las barras van en una sola lista: 1 a 4 las columnas, 5 a 24 los tramos de viga.
+#hide
+n_r = n_c + n_b
+e_f = zeros(n_r, 2)
+for e = 1:n_r
+  if e <= n_c
+    e_f(e, 1) = c_e(e, 1)
+    e_f(e, 2) = c_e(e, 2)
+  else
+    e_f(e, 1) = b_e(e - n_c, 1)
+    e_f(e, 2) = b_e(e - n_c, 2)
   end
 end
-Q_t = q·L_x^2/g_0 'carga total (tonf)
+#show
+for e = 1:n_r
+  g = [d_n(e_f(e, 1)), d_n(e_f(e, 2))]
+  R_f = rot_frame(X_n(e_f(e, 1), :), X_n(e_f(e, 2), :))
+  if e <= n_c
+    K(g, g) = K(g, g) + R_f'·k_col·R_f
+  else
+    K(g, g) = K(g, g) + R_f'·k_vig·R_f
+  end
+end
 #: **Apoyos.** Base de las columnas articulada (ETABS: RESTRAINT "UX UY UZ"): se quitan u, v, w de los nudos 1 a 4; sus giros quedan libres.
 #hide
 l_f = zeros(n_d - 12, 1)
@@ -292,124 +290,127 @@ for i = 1:n_d
     l_f(k) = i
   end
 end
-U = zeros(n_d, 1)
 #show
-n_f = k 'ecuaciones libres
-#: Cholesky sobre las ecuaciones libres:
-U(l_f) = clsolve(K(l_f, l_f), F(l_f))
+n_q = k 'ecuaciones libres
 
-### B.5 · Flecha de la losa
+### B.5 · Casos de carga de ETABS y combinación UDCon2
+#: Los tres patrones del e2k y la combinación de diseño **UDCon2** («Dead + Live [Strength]»): 1.2·Dead + 1.6·Live + 1.2·SCP.
+γ_c = 2.40277·g_0 'peso específico del hormigón (kN/m³)
+q_L = 0.5·g_0 'Live: 0.5 tonf/m² (kN/m²)
+q_S = 1.0·g_0 'SCP (sobrecarga permanente): 1 tonf/m² (kN/m²)
+#: **Live y SCP** van en los nudos de la losa por área tributaria: d² en el interior, d²/2 en el borde, d²/4 en la esquina.
 #hide
-W_g = zeros(n_1, n_1)
-for i = 0:n_e
-  for j = 0:n_e
-    W_g(i + 1, j + 1) = 1000·U(6·(p(i, j) - 1) + 3)
+F_L = zeros(n_d, 1)
+F_S = zeros(n_d, 1)
+F_D = zeros(n_d, 1)
+for j = 0:n_e
+  for i = 0:n_e
+    f_a = 1
+    if i == 0 || i == n_e
+      f_a = f_a/2
+    end
+    if j == 0 || j == n_e
+      f_a = f_a/2
+    end
+    F_L(6·(p(i, j) - 1) + 3) = -q_L·d^2·f_a
+    F_S(6·(p(i, j) - 1) + 3) = -q_S·d^2·f_a
+    F_D(6·(p(i, j) - 1) + 3) = -γ_c·t·d^2·f_a
   end
 end
 #show
-#: Flecha w de los nudos en mm (fila = y, columna = x):
-transpose(W_g)
-w_c = W_g(3, 3) 'flecha en el nudo central (mm)
-#: Entre nudos se interpola con las funciones de forma BILINEALES del Q4 (un spline se pasaría de los valores de los nudos). Pasa el cursor sobre el mapa para leer w en cada punto:
-w_z(x, y) = bil(W_g, x, y, d, n_e)
-#map(w_z(x, y), [0 L_x], [0 L_x])
+#: **Dead** es el peso propio, como lo carga ETABS: la losa en toda su área; cada viga solo en su **luz libre**, entre las caras de las columnas (de b_{c}/2 a L − b_{c}/2); y cada columna en toda su altura. En las barras la carga va con sus **cargas de empotramiento** (las Hermite de A.7 integradas sobre el tramo cargado, con momentos en los nudos), y la fuerza de la barra es f = k·Rot·u − f_{emp}.
+w_v = γ_c·A_v 'peso de la viga (kN/m)
+W_c = γ_c·A_c·H_c 'peso de una columna (kN)
+#hide
+Q_D = zeros(n_r, 12)
+for e = 1:n_r
+  if e <= n_c
+    f_g = zeros(12, 1)
+    f_g(3) = -W_c/2
+    f_g(9) = -W_c/2
+    R_f = rot_frame(X_n(e_f(e, 1), :), X_n(e_f(e, 2), :))
+    q_e = R_f·f_g
+  else
+    i_v = mod(e - n_c - 1, n_e)
+    a_1 = max(0, b_c/2 - i_v·d)
+    b_1 = min(d, L_x - b_c/2 - i_v·d)
+    q_e = fef_v(w_v, d, a_1, b_1)
+    R_f = rot_frame(X_n(e_f(e, 1), :), X_n(e_f(e, 2), :))
+  end
+  Q_D(e, :) = transpose(q_e)
+  g = [d_n(e_f(e, 1)), d_n(e_f(e, 2))]
+  F_D(g) = F_D(g) + R_f'·q_e
+end
+#show
+#: Cargas totales (tonf), la suma de las tres cosas en cada patrón:
+Q_Dt = (γ_c·t·L_x^2 + 4·w_v·(L_x - b_c) + 4·W_c)/g_0 'Dead
+Q_Lt = q_L·L_x^2/g_0 'Live
+Q_St = q_S·L_x^2/g_0 'SCP
+#: **Solución**: Cholesky sobre las ecuaciones libres, un vector de carga por patrón. La combinación es lineal: U de UDCon2 = 1.2·U_{D} + 1.6·U_{L} + 1.2·U_{S}.
+#hide
+U_D = zeros(n_d, 1)
+U_L = zeros(n_d, 1)
+U_S = zeros(n_d, 1)
+#show
+U_D(l_f) = clsolve(K(l_f, l_f), F_D(l_f))
+U_L(l_f) = clsolve(K(l_f, l_f), F_L(l_f))
+U_S(l_f) = clsolve(K(l_f, l_f), F_S(l_f))
+U_C = 1.2·U_D + 1.6·U_L + 1.2·U_S
+F_C = 1.2·F_D + 1.6·F_L + 1.2·F_S
 
-### B.6 · Momentos de la losa (recovery DKQ)
-#: En cada elemento: M = D_{b}·B(ξ, η)·u_{e} en los 4 puntos de Gauss (±1/√3), con la MISMA B del DKQ; luego se extrapola a los nudos con la matriz de √3. En cada nudo se guarda el valor de MAYOR |M| de los elementos que llegan (la envolvente, como la tabla element-joint de ETABS). Con el promedio de nudo Mxy saldría 0.170 en vez de 0.189.
+### B.6 · Resultados de la losa (UDCon2)
+#: Momentos con el recovery DKQ (A.9): M = D_{f}·B(ξ, η)·u_{e} en los 4 puntos de Gauss, extrapolados a los nudos; en cada nudo, la envolvente de los elementos que llegan (como la tabla element-joint de ETABS).
 s_3 = sqrt(3)
 A_x = [1 + s_3/2, -0.5, 1 - s_3/2, -0.5; -0.5, 1 + s_3/2, -0.5, 1 - s_3/2; 1 - s_3/2, -0.5, 1 + s_3/2, -0.5; -0.5, 1 - s_3/2, -0.5, 1 + s_3/2]
 #hide
-ξ_g = [-1, 1, 1, -1]/s_3
-η_g = [-1, -1, 1, 1]/s_3
+G_D = losa_M(U_D, e_s, P_d, D_b, d, n_e, A_x, g_0)
+G_L = losa_M(U_L, e_s, P_d, D_b, d, n_e, A_x, g_0)
+G_S = losa_M(U_S, e_s, P_d, D_b, d, n_e, A_x, g_0)
+G_C = losa_M(U_C, e_s, P_d, D_b, d, n_e, A_x, g_0)
+W_g = zeros(n_1, n_1)
 M_xg = zeros(n_1, n_1)
 M_yg = zeros(n_1, n_1)
 M_sg = zeros(n_1, n_1)
-o_i = [0, 1, 1, 0]
-o_j = [0, 0, 1, 1]
-for e = 1:n_s
-  u_e = zeros(12, 1)
-  for k = 1:4
-    j_d = 6·(e_s(e, k) - 1)
-    u_e(3·k - 2) = U(j_d + 3)
-    u_e(3·k - 1) = U(j_d + 4)
-    u_e(3·k) = U(j_d + 5)
-  end
-  u_d = P_d·u_e
-  M_g = zeros(3, 4)
-  for k = 1:4
-    M_g(:, k) = D_b·dkq_B(ξ_g(k), η_g(k), d)·u_d
-  end
-  M_n = A_x·transpose(M_g)/g_0
-  i_0 = mod(e - 1, n_e)
-  j_0 = floor((e - 1)/n_e)
-  for k = 1:4
-    i_n = i_0 + o_i(k) + 1
-    j_n = j_0 + o_j(k) + 1
-    if abs(M_n(k, 1)) > abs(M_xg(i_n, j_n))
-      M_xg(i_n, j_n) = M_n(k, 1)
-    end
-    if abs(M_n(k, 2)) > abs(M_yg(i_n, j_n))
-      M_yg(i_n, j_n) = M_n(k, 2)
-    end
-    if abs(M_n(k, 3)) > abs(M_sg(i_n, j_n))
-      M_sg(i_n, j_n) = M_n(k, 3)
-    end
+for i = 0:n_e
+  for j = 0:n_e
+    W_g(i + 1, j + 1) = 1000·U_C(6·(p(i, j) - 1) + 3)
+    M_xg(i + 1, j + 1) = G_C(i + 1, j + 1)
+    M_yg(i + 1, j + 1) = G_C(n_1 + i + 1, j + 1)
+    M_sg(i + 1, j + 1) = G_C(2·n_1 + i + 1, j + 1)
   end
 end
 #show
-#: **Mxx** en tonf·m/m (fila = y, columna = x). Negativo en el borde: la viga la empotra a medias.
+#: **Flecha w** en mm (fila = y, columna = x). Entre nudos se interpola con las funciones de forma bilineales del Q4, exactas en los nudos; pasa el cursor sobre cada mapa para leer el valor:
+transpose(W_g)
+w_z(x, y) = bil(W_g, x, y, d, n_e)
+#map(w_z(x, y), [0 L_x], [0 L_x])
+#: **Mxx** en tonf·m/m: negativo en el borde, donde la viga la empotra a medias.
 transpose(M_xg)
 M_xx(x, y) = bil(M_xg, x, y, d, n_e)
 #map(M_xx(x, y), [0 L_x], [0 L_x])
 #: **Myy**: lo mismo girado 90° (la mesa es simétrica).
 M_yy(x, y) = bil(M_yg, x, y, d, n_e)
 #map(M_yy(x, y), [0 L_x], [0 L_x])
-#: **Mxy**, la TORSIÓN de la losa: máxima cerca de las esquinas, donde la losa se alabea sobre las columnas. Es la que da nombre a la mesa.
+#: **Mxy**, la torsión de la losa: máxima cerca de las esquinas, donde la losa se alabea sobre las columnas.
 transpose(M_sg)
 M_xy(x, y) = bil(M_sg, x, y, d, n_e)
 #map(M_xy(x, y), [0 L_x], [0 L_x])
-M_11 = max(abs(M_xg)) 'max |Mxx| (tonf·m/m)
-M_12 = max(abs(M_sg)) 'max |Mxy| (tonf·m/m)
 
-### B.7 · Fuerzas en columnas y vigas
-#: En cada barra: f = k·Rot·u_{e} (ejes locales, orden P, V₂, V₃, T, M₂, M₃ en el nudo i y luego en el j), en tonf y tonf·m.
-f_c = transpose(k_col·rot_frame(X_n(1, :), X_n(p(0, 0), :))·U([d_n(1), d_n(p(0, 0))]))/g_0
-#: Columna de la esquina (0, 0). El momento en el nudo de arriba es 2.434, pero ETABS lo reporta en la CARA de la viga, medio metro más abajo: M_{cara} = M_{nudo} − V·o_{f}.
-P_c = abs(f_c(1)) 'axial (tonf)
-V_c = abs(f_c(8)) 'cortante (tonf)
-M_cn = abs(f_c(12)) 'momento en el nudo (tonf·m)
-M_cc = M_cn - V_c·o_f 'momento en la cara (tonf·m)
-#: Los 5 tramos de la viga del borde y = 0 (una fila por tramo):
+### B.7 · Fuerzas en columnas y vigas (UDCon2)
+#: En cada barra f = k·Rot·u_{e} − f_{emp}, en ejes locales: P, V₂, V₃, T, M₂, M₃ en el nudo i y luego en el j (tonf, tonf·m). Filas 1 a 4 las columnas, 5 a 24 los tramos de viga.
 #hide
-f_b = zeros(n_e, 12)
-for e = 1:n_e
-  g = [d_n(b_e(e, 1)), d_n(b_e(e, 2))]
-  f_b(e, :) = transpose(k_vig·rot_frame(X_n(b_e(e, 1), :), X_n(b_e(e, 2), :))·U(g))/g_0
-end
+f_D = barras_F(U_D, X_n, e_f, k_col, k_vig, n_c, Q_D, g_0)
+f_L = barras_F(U_L, X_n, e_f, k_col, k_vig, n_c, 0·Q_D, g_0)
+f_S = barras_F(U_S, X_n, e_f, k_col, k_vig, n_c, 0·Q_D, g_0)
+f_t = barras_F(U_C, X_n, e_f, k_col, k_vig, n_c, 1.2·Q_D, g_0)
 #show
-f_b
-P_v = abs(f_b(1, 1)) 'axial (tonf)
-V_v = abs(f_b(1, 3)) 'cortante vertical en el apoyo (tonf)
-T_v = abs(f_b(1, 4)) 'torsión: la losa hace girar a la viga (tonf·m)
-M_v = abs(f_b(3, 5)) 'momento al centro de la luz (tonf·m)
-#: **Todas las barras**: filas 1 a 4 las columnas, 5 a 24 los tramos de viga; columnas P, V₂, V₃, T, M₂, M₃ en el nudo i y luego en el j (tonf, tonf·m).
+f_t
+#: **Dónde reporta ETABS:** la columna, en la cara de la viga (medio metro bajo el nudo): M_{cara} = M_{nudo} − V·o_{f}. La viga, en sus estaciones: la cara de la columna (0.2 m), donde empieza la carga, y 3.2 m cerca del centro. Entre nudos, M(x) = M_{i} + V_{i}·x − w·x²/2.
 #hide
-n_r = n_c + n_b
-e_f = zeros(n_r, 2)
-f_t = zeros(n_r, 12)
-for e = 1:n_r
-  if e <= n_c
-    e_f(e, 1) = c_e(e, 1)
-    e_f(e, 2) = c_e(e, 2)
-    k_e = k_col
-  else
-    e_f(e, 1) = b_e(e - n_c, 1)
-    e_f(e, 2) = b_e(e - n_c, 2)
-    k_e = k_vig
-  end
-  g = [d_n(e_f(e, 1)), d_n(e_f(e, 2))]
-  f_t(e, :) = transpose(k_e·rot_frame(X_n(e_f(e, 1), :), X_n(e_f(e, 2), :))·U(g))/g_0
-end
+S_D = resumen(f_D, G_D, U_D, F_D, K, n_c, n_1, p(2, 2), o_f, w_v/g_0)
+S_L = resumen(f_L, G_L, U_L, F_L, K, n_c, n_1, p(2, 2), o_f, 0)
+S_S = resumen(f_S, G_S, U_S, F_S, K, n_c, n_1, p(2, 2), o_f, 0)
+S_C = resumen(f_t, G_C, U_C, F_C, K, n_c, n_1, p(2, 2), o_f, 1.2·w_v/g_0)
 M_f = zeros(n_r, 2)
 V_f = zeros(n_r, 2)
 T_f = zeros(n_r, 2)
@@ -439,63 +440,193 @@ end
 U_3 = zeros(n_j, 3)
 for j = 1:n_j
   for k = 1:3
-    U_3(j, k) = U(6·(j - 1) + k)
+    U_3(j, k) = U_C(6·(j - 1) + k)
   end
 end
 #show
-f_t
 #: **Diagramas por barra** (valor en el nudo i y en el j, con el signo del diagrama):
-M_f 'momento de flexión M₂ (tonf·m): en la viga, negativo junto a la columna y 3.14 al centro
-T_f 'torsión (tonf·m): la losa hace girar a la viga, 1.15 en los extremos
-#: **El modelo en 3D.** Arrastra para girar, rueda para acercar y pasa el cursor para leer el valor de la losa o de la barra. Deformada ×80 con w y el momento de las barras:
-#modelo3d(X_n, e_s, e_f, w_n, M_f, U_3, 80)
+M_f 'momento M₂ (tonf·m)
+T_f 'torsión (tonf·m): la losa hace girar a la viga
+
+### B.8 · El modelo en 3D (UDCon2)
+#: Arrastra para girar, rueda para acercar y pasa el cursor para leer el valor de la losa o de la barra. Los diagramas de las barras van con sus valores en los nudos de la malla (cada 1.2 m); lo que el peso propio agrega dentro de un tramo (15.48 en 3.2 m, frente a 15.41 en los nudos) está en la tabla de B.9. Deformada ×20 con w y el momento de las barras:
+#modelo3d(X_n, e_s, e_f, w_n, M_f, U_3, 20)
 #: Torsión de la losa (Mxy) y de las barras (T):
 #modelo3d(X_n, e_s, e_f, Mxy_n, T_f)
 #: Mxx de la losa y cortante vertical de las barras (V₃):
 #modelo3d(X_n, e_s, e_f, Mxx_n, V_f)
-#: Myy de la losa y axial de las barras (P): las columnas bajan la carga, 4.5 tonf cada una.
+#: Myy de la losa y axial de las barras (P):
 #modelo3d(X_n, e_s, e_f, Myy_n, P_f)
-#: **Equilibrio**: la suma de las 4 reacciones verticales de la base tiene que ser la carga total.
-R_z = (K(3, :)·U + K(9, :)·U + K(15, :)·U + K(21, :)·U)/g_0 'suma de reacciones (tonf)
 
-### B.8 · Verificación
-#: **Referencias.** ETABS 22 (mismo e2k) y el motor de Hekatan Struct en Python (hekatan-fem-py, mesa_hekatan.py con DKQ), mismo modelo nudo a nudo. El +2.6 % de w es de ETABS: rigidiza la viga en la zona de junta con la columna (0.40 m); aquí la viga va de nudo a nudo (6.0 m).
-w_py = -6.670544 'Hekatan Struct (Python)
-M_11py = 0.653683
-M_12py = 0.189311
-M_ccpy = 2.129719
-P_cpy = 4.499977
-V_cpy = 0.608491
-V_vpy = 2.203397
-T_vpy = 1.146536
-M_vpy = 3.141190
-P_vpy = 0.376362
-d_w = round((w_c - w_py)/w_py·100, 4) '%
-d_11 = round((M_11 - M_11py)/M_11py·100, 4) '%
-d_12 = round((M_12 - M_12py)/M_12py·100, 4) '%
-d_cc = round((M_cc - M_ccpy)/M_ccpy·100, 4) '%
-d_pc = round((P_c - P_cpy)/P_cpy·100, 4) '%
-d_vc = round((V_c - V_cpy)/V_cpy·100, 4) '%
-d_vv = round((V_v - V_vpy)/V_vpy·100, 4) '%
-d_tv = round((T_v - T_vpy)/T_vpy·100, 4) '%
-d_mv = round((M_v - M_vpy)/M_vpy·100, 4) '%
-d_pv = round((P_v - P_vpy)/P_vpy·100, 4) '%
-d_r = round((R_z - Q_t)/Q_t·100, 4) '%
-#| magnitud | ETABS | Hekatan Struct (Python) | Hekatan LISP | dif. con Python % |
-#|---|--:|--:|--:|--:|
-#| losa: w en el centro [mm] | −6.50 | @{w_py} | @{w_c} | @{d_w} |
-#| losa: Mxx máximo en valor absoluto [tonf·m/m] | 0.654 | @{M_11py} | @{M_11} | @{d_11} |
-#| losa: Mxy máximo en valor absoluto [tonf·m/m] | 0.189 | @{M_12py} | @{M_12} | @{d_12} |
-#| columna: M en la cara [tonf·m] | 2.130 | @{M_ccpy} | @{M_cc} | @{d_cc} |
-#| columna: P [tonf] | 4.50 | @{P_cpy} | @{P_c} | @{d_pc} |
-#| columna: V [tonf] | 0.608 | @{V_cpy} | @{V_c} | @{d_vc} |
-#| viga: V [tonf] | 2.203 | @{V_vpy} | @{V_v} | @{d_vv} |
-#| viga: T [tonf·m] | 1.147 | @{T_vpy} | @{T_v} | @{d_tv} |
-#| viga: M al centro [tonf·m] | 3.141 | @{M_vpy} | @{M_v} | @{d_mv} |
-#| viga: P [tonf] | 0.376 | @{P_vpy} | @{P_v} | @{d_pv} |
-#| suma de reacciones [tonf] | q·L²/g = @{Q_t} | @{Q_t} | @{R_z} | @{d_r} |
+### B.9 · Verificación contra ETABS
+#: **Referencia:** ETABS 22 con el mismo e2k (tablas de fuerzas del modelo del usuario, 3 decimales en la losa y 2 en las barras). Por caso, las mismas magnitudes: losa (máximos en valor absoluto), columna 1 y viga del borde y = 0. El residuo de w (+2.6 %) es de ETABS: rigidiza la viga en la junta con la columna.
+#hide
+r_D1 = round(S_D(1), 4)
+r_D2 = round(S_D(2), 4)
+r_D3 = round(S_D(3), 4)
+r_D4 = round(S_D(4), 4)
+r_D5 = round(S_D(5), 4)
+r_D6 = round(S_D(6), 4)
+r_D7 = round(S_D(7), 4)
+r_D8 = round(S_D(8), 4)
+r_D9 = round(S_D(9), 4)
+r_D10 = round(S_D(10), 4)
+r_D11 = round(S_D(11), 4)
+r_D12 = round(S_D(12), 4)
+r_L1 = round(S_L(1), 4)
+r_L2 = round(S_L(2), 4)
+r_L3 = round(S_L(3), 4)
+r_L4 = round(S_L(4), 4)
+r_L5 = round(S_L(5), 4)
+r_L6 = round(S_L(6), 4)
+r_L7 = round(S_L(7), 4)
+r_L8 = round(S_L(8), 4)
+r_L9 = round(S_L(9), 4)
+r_L10 = round(S_L(10), 4)
+r_L11 = round(S_L(11), 4)
+r_L12 = round(S_L(12), 4)
+r_S1 = round(S_S(1), 4)
+r_S2 = round(S_S(2), 4)
+r_S3 = round(S_S(3), 4)
+r_S4 = round(S_S(4), 4)
+r_S5 = round(S_S(5), 4)
+r_S6 = round(S_S(6), 4)
+r_S7 = round(S_S(7), 4)
+r_S8 = round(S_S(8), 4)
+r_S9 = round(S_S(9), 4)
+r_S10 = round(S_S(10), 4)
+r_S11 = round(S_S(11), 4)
+r_S12 = round(S_S(12), 4)
+r_C1 = round(S_C(1), 4)
+r_C2 = round(S_C(2), 4)
+r_C3 = round(S_C(3), 4)
+r_C4 = round(S_C(4), 4)
+r_C5 = round(S_C(5), 4)
+r_C6 = round(S_C(6), 4)
+r_C7 = round(S_C(7), 4)
+r_C8 = round(S_C(8), 4)
+r_C9 = round(S_C(9), 4)
+r_C10 = round(S_C(10), 4)
+r_C11 = round(S_C(11), 4)
+r_C12 = round(S_C(12), 4)
+#show
+#| magnitud | Dead | Live | SCP | UDCon2 | ETABS Dead | ETABS Live | ETABS SCP | ETABS UDCon2 |
+#|---|--:|--:|--:|--:|--:|--:|--:|--:|
+#| losa: Mxx máximo [tonf·m/m] | @{r_D2} | @{r_L2} | @{r_S2} | @{r_C2} | 0.296 | 0.654 | 1.308 | 2.970 |
+#| losa: Mxy máximo [tonf·m/m] | @{r_D3} | @{r_L3} | @{r_S3} | @{r_C3} | 0.083 | 0.189 | 0.379 | 0.857 |
+#| columna: P [tonf] | @{r_D4} | @{r_L4} | @{r_S4} | @{r_C4} | 5.72 | 4.50 | 9.00 | 24.86 |
+#| columna: V [tonf] | @{r_D5} | @{r_L5} | @{r_S5} | @{r_C5} | 0.45 | 0.61 | 1.22 | 2.97 |
+#| columna: M en la cara [tonf·m] | @{r_D6} | @{r_L6} | @{r_S6} | @{r_C6} | 1.57 | 2.13 | 4.26 | 10.40 |
+#| viga: V en la cara [tonf] | @{r_D7} | @{r_L7} | @{r_S7} | @{r_C7} | 2.05 | 2.20 | 4.41 | 11.27 |
+#| viga: T [tonf·m] | @{r_D8} | @{r_L8} | @{r_S8} | @{r_C8} | 0.53 | 1.15 | 2.29 | 5.23 |
+#| viga: M en la cara (0.2 m) [tonf·m] | @{r_D9} | @{r_L9} | @{r_S9} | @{r_C9} | | | | −3.99 |
+#| viga: M en 3.2 m [tonf·m] | @{r_D10} | @{r_L10} | @{r_S10} | @{r_C10} | 2.43 | 3.14 | 6.28 | 15.48 |
+#| viga: P [tonf] | @{r_D11} | @{r_L11} | @{r_S11} | @{r_C11} | | | | 1.84 |
+#| suma de reacciones [tonf] | @{r_D12} | @{r_L12} | @{r_S12} | @{r_C12} | 22.874 | 18.000 | 36.000 | 99.449 |
+#| w en el centro [mm] | @{r_D1} | @{r_L1} | @{r_S1} | @{r_C1} | | −6.50 | | |
+#: **Contra Python** (Hekatan Struct, mesa_hekatan.py con DKQ y las mismas cargas, 6 decimales), la combinación UDCon2:
+d_1 = round((S_C(2) - 2.969589)/2.969589·100, 4) 'Mxx %
+d_2 = round((S_C(3) - 0.856810)/0.856810·100, 4) 'Mxy %
+d_3 = round((S_C(6) - 10.403524)/10.403524·100, 4) 'M cara columna %
+d_4 = round((S_C(8) - 5.224802)/5.224802·100, 4) 'T viga %
+d_5 = round((S_C(10) - 15.483881)/15.483881·100, 4) 'M viga en 3.2 m %
+d_6 = round((S_C(12) - 99.449244)/99.449244·100, 4) 'reacciones %
 
 #hide
+function f = fef_v(w, L, a, b)
+  % cargas de empotramiento (locales) de una carga w hacia abajo sobre [a, b] del tramo de largo L:
+  % las Hermite de A.7 integradas con Gauss de 2 puntos (exacto: cúbica por constante)
+  f = zeros(12, 1)
+  gp = [-1, 1]/sqrt(3)
+  for k = 1:2
+    x = (a + b)/2 + (b - a)/2·gp(k)
+    s = x/L
+    h = (b - a)/2
+    f(3) = f(3) - h·w·(1 - 3·s^2 + 2·s^3)
+    f(9) = f(9) - h·w·(3·s^2 - 2·s^3)
+    f(5) = f(5) + h·w·L·(s - 2·s^2 + s^3)
+    f(11) = f(11) + h·w·L·(s^3 - s^2)
+  end
+end
+
+function G = losa_M(U, es, Pd, Db, d, ne, Ax, g0)
+  % recovery DKQ: momentos en los 4 puntos de Gauss, extrapolados a los nudos, envolvente nodal.
+  % Devuelve [Mxx; Myy; Mxy] apiladas, cada una de (ne+1) × (ne+1), en tonf·m/m
+  n1 = ne + 1
+  G = zeros(3·n1, n1)
+  s3 = sqrt(3)
+  xg = [-1, 1, 1, -1]/s3
+  yg = [-1, -1, 1, 1]/s3
+  oi = [0, 1, 1, 0]
+  oj = [0, 0, 1, 1]
+  for e = 1:ne^2
+    ue = zeros(12, 1)
+    for k = 1:4
+      jd = 6·(es(e, k) - 1)
+      ue(3·k - 2) = U(jd + 3)
+      ue(3·k - 1) = U(jd + 4)
+      ue(3·k) = U(jd + 5)
+    end
+    ud = Pd·ue
+    Mg = zeros(3, 4)
+    for k = 1:4
+      Mg(:, k) = Db·dkq_B(xg(k), yg(k), d)·ud
+    end
+    Mn = Ax·transpose(Mg)/g0
+    i0 = mod(e - 1, ne)
+    j0 = floor((e - 1)/ne)
+    for k = 1:4
+      ii = i0 + oi(k) + 1
+      jj = j0 + oj(k) + 1
+      for c = 0:2
+        if abs(Mn(k, c + 1)) > abs(G(c·n1 + ii, jj))
+          G(c·n1 + ii, jj) = Mn(k, c + 1)
+        end
+      end
+    end
+  end
+end
+
+function f = barras_F(U, X, ef, kc, kv, nc, Q, g0)
+  % fuerzas locales de cada barra: k·Rot·u − cargas de empotramiento, en tonf y tonf·m
+  n = n_rows(ef)
+  f = zeros(n, 12)
+  for e = 1:n
+    a = ef(e, 1)
+    b = ef(e, 2)
+    g = [6·(a - 1) + (1:6), 6·(b - 1) + (1:6)]
+    R = rot_frame(X(a, :), X(b, :))
+    if e <= nc
+      fe = kc·R·U(g) - Q(e, :)
+    else
+      fe = kv·R·U(g) - Q(e, :)
+    end
+    f(e, :) = transpose(fe)/g0
+  end
+end
+
+function r = resumen(f, G, U, F, K, nc, n1, jc, of, w)
+  % las magnitudes que reporta ETABS: w central, máximos de la losa, columna 1 y viga del borde y = 0
+  r = zeros(12, 1)
+  r(1) = 1000·U(6·(jc - 1) + 3)
+  r(2) = max(abs(G(1:n1, :)))
+  r(3) = max(abs(G(2·n1 + 1:3·n1, :)))
+  r(4) = abs(f(1, 1))
+  r(5) = abs(f(1, 8))
+  r(6) = abs(f(1, 12)) - r(5)·of
+  b = nc + 1
+  r(7) = abs(f(b, 3))
+  r(8) = abs(f(b, 4))
+  r(9) = f(b, 5) + f(b, 3)·0.2
+  r(10) = f(b + 2, 5) + f(b + 2, 3)·0.8 - w·0.8^2/2
+  r(11) = abs(f(b, 1))
+  s = 0
+  for k = [3, 9, 15, 21]
+    s = s + K(k, :)·U - F(k)
+  end
+  r(12) = s/9.80665
+end
+
 function z = bil(Gr, x, y, d, n)
   % interpolación bilineal de la rejilla de nudos (funciones de forma del Q4)
   i = min(max(floor(x/d), 0), n - 1)

@@ -1403,8 +1403,16 @@ dib();})();";
                 bool antes = kv.Key < linea, mejorAntes = mejor >= 0 && mejor < linea;
                 if (mejor < 0 || (antes && (!mejorAntes || kv.Key > mejor)) || (!antes && !mejorAntes && kv.Key < mejor)) mejor = kv.Key;
             }
+            // si no hay línea visible con ese nombre, una oculta (#hide) que dio un número
+            if (mejor < 0)
+                foreach (var kv in _numRes.Oculta)
+                {
+                    if (kv.Value.Nombre != name && kv.Value.Nombre != mang) continue;
+                    bool antes = kv.Key < linea, mejorAntes = mejor >= 0 && mejor < linea;
+                    if (mejor < 0 || (antes && (!mejorAntes || kv.Key > mejor)) || (!antes && !mejorAntes && kv.Key < mejor)) mejor = kv.Key;
+                }
             if (mejor < 0) return null;
-            var v = HojaNumerica.FormatoLiteral(_numRes.Valor[mejor]);
+            var v = HojaNumerica.FormatoLiteral(_numRes.Valor.TryGetValue(mejor, out var vis) ? vis : _numRes.Oculta[mejor].Valor);
             try { return LispConverter.ToHtml(LispConverter.ParseLisp(v)); }
             catch { return System.Net.WebUtility.HtmlEncode(v); }
         }

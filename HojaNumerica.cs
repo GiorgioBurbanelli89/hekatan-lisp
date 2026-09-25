@@ -49,6 +49,7 @@ namespace HekatanLisp
             public readonly Dictionary<int, Rejilla> Mapa = new();          // línea #map → rejilla
             public readonly Dictionary<int, MallaDatos> Malla = new();      // línea #malla → nudos y elementos
             public readonly Dictionary<int, List<string>> Modelo3D = new(); // línea #modelo3d → literales de sus datos
+            public readonly Dictionary<int, (string Nombre, string Valor)> Oculta = new(); // línea #hide con número → para @{nombre}
             public readonly HashSet<int> Calculada = new();                 // líneas que entraron al programa
             public double Segundos;          // todo: traducir, compilar (SBCL), correr y leer
             public double SegundosMotor;     // solo correr el programa ya compilado
@@ -280,7 +281,10 @@ namespace HekatanLisp
             {
                 var n = asg.Groups[1].Value;
                 var e = Valor(new Tr(ctx).Expr(asg.Groups[2].Value));
-                return "(setf " + Sym(n) + " " + e + ")" + (visible ? " (hn-out " + idx + " \"" + n + "\" " + Sym(n) + ")" : "");
+                // 24-sep-2026: una línea OCULTA que da un número también manda su valor (marca #o): no se
+                // dibuja, pero el texto la puede citar con @{nombre} (tablas #|…| con resultados de #hide).
+                return "(setf " + Sym(n) + " " + e + ")" + (visible ? " (hn-out " + idx + " \"" + n + "\" " + Sym(n) + ")"
+                       : " (when (numberp " + Sym(n) + ") (hn-emit " + idx + " \"#o\" (concatenate 'string \"" + n + "=\" (hn-lit " + Sym(n) + "))))");
             }
             var ia = RxIdxAsig.Match(t);
             if (ia.Success && ctx.Vars.Contains(ia.Groups[1].Value))
@@ -764,6 +768,11 @@ namespace HekatanLisp
                 {
                     if (!res.Salida.TryGetValue(idx, out var l)) res.Salida[idx] = l = new List<string>();
                     l.Add(text);
+                }
+                else if (tag == "#o")
+                {
+                    int q = text.IndexOf('=');
+                    if (q > 0) res.Oculta[idx] = (text.Substring(0, q), text.Substring(q + 1));
                 }
                 else if (tag == "#m3d")
                     res.Modelo3D[idx] = text.Split(';').ToList();

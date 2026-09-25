@@ -1918,12 +1918,14 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // AUTO-FIT: una ecuación más ancha que la página se ESCALA para caber entera (sin scroll,
         // sin recorte). Antes las matrices anchas (p.ej. J⁻¹ de un quad general) se cortaban y había
         // que usar la barra. Se envuelve el contenido en un span y se le aplica transform:scale.
+        // 24-sep-2026: el alto se mide YA escalado (getBoundingClientRect) y se recorta solo en x
+        // (overflow-x: clip). Con offsetHeight·s y overflow-x: hidden la última fila de K_Q6 salía cortada.
         const string MAT_JS =
             "<script>(function(){function fit(){document.querySelectorAll('.ws-eq,.deq-body').forEach(function(eq){try{" +
             "if(eq.dataset.fit||eq.classList.contains('ws-deq'))return;var w=eq.clientWidth;if(w<8)return;" +
             "var inner=eq.querySelector(':scope>.ws-fit');if(!inner){inner=document.createElement('span');inner.className='ws-fit';" +
             "inner.style.display='inline-block';inner.style.transformOrigin='left top';while(eq.firstChild)inner.appendChild(eq.firstChild);eq.appendChild(inner);}" +
-            "var cw=inner.scrollWidth;if(cw>w+2){var s=w/cw;inner.style.transform='scale('+s+')';eq.style.height=(inner.offsetHeight*s)+'px';eq.style.overflowX='hidden';}" +
+            "var cw=inner.scrollWidth;if(cw>w+2){var s=w/cw;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';eq.style.height=Math.ceil(inner.getBoundingClientRect().height+4)+'px';eq.style.overflowX='clip';eq.style.overflowY='visible';}" +
             "eq.dataset.fit='1';}catch(e){}});}" +
             "window.addEventListener('load',function(){setTimeout(fit,40);setTimeout(fit,250);});" +
             "if(document.readyState!=='loading')setTimeout(fit,40);})();</script>";
@@ -1995,7 +1997,7 @@ document.addEventListener('mouseup',function(){
   if(eq){var inner=eq.querySelector(':scope>.ws-fit');
     if(inner){inner.style.transform='';eq.style.height='';
       var w=eq.clientWidth,cw=inner.scrollWidth;
-      if(cw>w+2){var s=w/cw;inner.style.transform='scale('+s+')';eq.style.height=(inner.offsetHeight*s)+'px';eq.style.overflowX='hidden';}}}
+      if(cw>w+2){var s=w/cw;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';eq.style.height=Math.ceil(inner.getBoundingClientRect().height+4)+'px';eq.style.overflowX='clip';eq.style.overflowY='visible';}}}
   arr=null;},true);
 })();</script>";
 

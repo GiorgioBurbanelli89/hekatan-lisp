@@ -1920,15 +1920,28 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // que usar la barra. Se envuelve el contenido en un span y se le aplica transform:scale.
         // 24-sep-2026: el alto se mide YA escalado (getBoundingClientRect) y se recorta solo en x
         // (overflow-x: clip). Con offsetHeight·s y overflow-x: hidden la última fila de K_Q6 salía cortada.
+        // Y NO se achica por debajo de 0.72 (Jorge: «que no sea muy pequeño, no va a ser visible»): si aun
+        // así no cabe, la ecuación se desplaza dentro de su caja (barra horizontal) sin salirse de la hoja.
         const string MAT_JS =
-            "<script>(function(){function fit(){document.querySelectorAll('.ws-eq,.deq-body').forEach(function(eq){try{" +
-            "if(eq.dataset.fit||eq.classList.contains('ws-deq'))return;var w=eq.clientWidth;if(w<8)return;" +
+            "<script>(function(){var SMIN=0.72;" +
+            // 24-sep-2026: se puede REPETIR (antes quedaba marcado con data-fit y, si el panel del WebView aún
+            // no tenía su ancho final, nunca se corregía: la matriz se salía de la hoja). Primero deshace lo anterior.
+            "function uno(eq){var w=eq.clientWidth;if(w<8)return;" +
             "var inner=eq.querySelector(':scope>.ws-fit');if(!inner){inner=document.createElement('span');inner.className='ws-fit';" +
             "inner.style.display='inline-block';inner.style.transformOrigin='left top';while(eq.firstChild)inner.appendChild(eq.firstChild);eq.appendChild(inner);}" +
-            "var cw=inner.scrollWidth;if(cw>w+2){var s=w/cw;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';eq.style.height=Math.ceil(inner.getBoundingClientRect().height+4)+'px';eq.style.overflowX='clip';eq.style.overflowY='visible';}" +
-            "eq.dataset.fit='1';}catch(e){}});}" +
-            "window.addEventListener('load',function(){setTimeout(fit,40);setTimeout(fit,250);});" +
-            "if(document.readyState!=='loading')setTimeout(fit,40);})();</script>";
+            "inner.style.transform='';inner.style.marginRight='';eq.style.height='';eq.style.overflowX='';eq.style.overflowY='';" +
+            "var cw=inner.scrollWidth;if(cw<=w+2)return;" +
+            // matriz grande con índices: antes de encoger por debajo de SMIN se muestran MENOS columnas (⋯ y la última)
+            "if(w/cw<SMIN&&window.hkPintaMat){var ms=inner.querySelectorAll('.m-matx[data-hk-cells]');" +
+            "for(var k=0;k<60&&w/cw<SMIN;k++){var m=null,mc=0;ms.forEach(function(x){var v=+x.dataset.visCols;if(v>3&&x.scrollWidth>mc){mc=x.scrollWidth;m=x;}});" +
+            "if(!m)break;m.dataset.visCols=(+m.dataset.visCols)-1;window.hkPintaMat(m);cw=inner.scrollWidth;}if(cw<=w+2)return;}" +
+            "var s=w/cw,sc=s<SMIN;if(sc)s=SMIN;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';" +
+            "eq.style.height=Math.ceil(inner.getBoundingClientRect().height+(sc?18:4))+'px';eq.style.overflowX=sc?'auto':'clip';eq.style.overflowY=sc?'hidden':'visible';" +
+            "if(sc)inner.style.marginRight=(-(cw*(1-s)))+'px';}" +
+            "function fit(){document.querySelectorAll('.ws-eq,.deq-body').forEach(function(eq){try{if(!eq.classList.contains('ws-deq'))uno(eq);}catch(e){}});}" +
+            "window.hkFit=fit;var tr=0;window.addEventListener('resize',function(){clearTimeout(tr);tr=setTimeout(fit,150);});" +
+            "window.addEventListener('load',function(){setTimeout(fit,40);setTimeout(fit,250);setTimeout(fit,1000);});" +
+            "if(document.readyState!=='loading'){setTimeout(fit,40);setTimeout(fit,1000);}})();</script>";
 
         // ARRASTRAR matrices/vectores grandes: la manija de abajo-derecha cambia cuantas filas y
         // columnas se ven. El HTML ya trae TODAS las celdas en data-hk-cells (ver CeldasJson), asi
@@ -1974,6 +1987,7 @@ function manijas(){document.querySelectorAll('.m-matx[data-hk-cells]').forEach(m
 window.addEventListener('load',function(){setTimeout(manijas,120);setTimeout(manijas,420);});
 if(document.readyState!=='loading')setTimeout(manijas,120);
 function celdas(el){ if(!el.__hkCells){ try{el.__hkCells=JSON.parse(el.dataset.hkCells);}catch(e){return null;} } return el.__hkCells; }
+window.hkPintaMat=function(el){ if(celdas(el)) pinta(el); };   /* el auto-fit quita columnas a una matriz ancha */
 document.addEventListener('mousedown',function(e){
   var g=e.target.closest?e.target.closest('.mat-grip'):null; if(!g)return;
   var el=g.closest('.m-matx'); if(!el||!el.dataset.hkCells)return;
@@ -1997,7 +2011,7 @@ document.addEventListener('mouseup',function(){
   if(eq){var inner=eq.querySelector(':scope>.ws-fit');
     if(inner){inner.style.transform='';eq.style.height='';
       var w=eq.clientWidth,cw=inner.scrollWidth;
-      if(cw>w+2){var s=w/cw;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';eq.style.height=Math.ceil(inner.getBoundingClientRect().height+4)+'px';eq.style.overflowX='clip';eq.style.overflowY='visible';}}}
+      if(cw>w+2){var s=w/cw,sc=s<0.72;if(sc)s=0.72;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';eq.style.height=Math.ceil(inner.getBoundingClientRect().height+(sc?18:4))+'px';eq.style.overflowX=sc?'auto':'clip';eq.style.overflowY=sc?'hidden':'visible';if(sc)inner.style.marginRight=(-(cw*(1-s)))+'px';}}}
   arr=null;},true);
 })();</script>";
 

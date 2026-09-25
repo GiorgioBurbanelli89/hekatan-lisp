@@ -521,7 +521,8 @@
       g.fillStyle = '#2e9e4f'; g.fillRect(cq[0] + 12, cq[1] + 12, wp + 8, 16); g.fillStyle = '#fff'; g.fillText(tp, cq[0] + 16, cq[1] + 24); g.restore();
     }
     if (S.q && S.cur) {                 // mirilla: cruz + cuadro de designación
-      var c = S.snap ? S.q : aPant(S.cur); g.strokeStyle = S.cFg; g.lineWidth = 1; g.beginPath();
+      // IMÁN de AutoSnap (AUTOSNAP = 63 en AutoCAD 2027, bit 4): la mira salta al punto enganchado
+      var c = S.snap ? aPant(S.snap.p) : aPant(S.cur); g.strokeStyle = S.cFg; g.lineWidth = 1; g.beginPath();
       g.moveTo(c[0] - 22, c[1]); g.lineTo(c[0] + 22, c[1]); g.moveTo(c[0], c[1] - 22); g.lineTo(c[0], c[1] + 22); g.stroke();
       if (!S.req || S.req.t === 'sel' || S.req.t === 'obj') g.strokeRect(c[0] - PICK, c[1] - PICK, 2 * PICK, 2 * PICK);
     }
@@ -1324,7 +1325,9 @@
       rejilla: true, forzc: true, orto: false, osnapOn: true, modos: { fin: 1, medio: 1, centro: 1, inter: 1, perp: 1, nodo: 1, cuad: 1, tan: 1 },
       polar: false, polarAng: 90, desf: 0, radio: 0, cha: [0, 0],
       undo: [], redo: [], sel: [], cmd: null, req: null, v: { k: 1, x0: 0, y0: 0 }, ovf: document.documentElement.style.overflow,
-      cFondo: fondo, cFg: css('--fg', '#222'), cRej: css('--mut', '#999'), cEje: css('--sep', '#ccc'), cSel: '#3c8dff', cPrev: css('--var', '#1c5fbf'), cMarca: '#e8a400' };
+      cFondo: fondo, cFg: css('--fg', '#222'), cRej: css('--mut', '#999'), cEje: css('--sep', '#ccc'), cSel: '#3c8dff', cPrev: css('--var', '#1c5fbf'),
+      // marcador de AutoSnap: AutoSnapColor = 31 (ACI 31 = 255,191,127), leído de AutoCAD 2027 (getenv)
+      cMarca: '#ffbf7f' };
     if (S.capas.length > 1) { var cu = S.ents.length ? S.ents[S.ents.length - 1].capa : S.capas[S.capas.length - 1].n; if (capaDe(cu)) S.capa = capaDe(cu).n; }
     if (!(S.rej > 0)) {                 // rejilla por defecto: ~1/20 de lo dibujado, redonda (1, 2, 5 × 10ⁿ)
       var b = null; S.ents.forEach(function (e) { var c = caja(e); if (c) b = b ? [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[2]), Math.max(b[3], c[3])] : c; });

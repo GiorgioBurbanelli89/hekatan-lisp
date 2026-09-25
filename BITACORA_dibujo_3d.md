@@ -18,7 +18,7 @@ Base: `LispCad.js`; los 38 checks 2D de `test_ordenes_cad.py --local` pasaban AN
 - DXF R12: faltaban POLYLINE 3D y 3DFACE en `EscribirDxf` → añadidos (ezdxf: POLYLINE 9 con VERTEX 32 y 3DFACE, z = 3).
   DWG (acadrust) leído de vuelta: LINE, POLYLINE d3 y la 3DFACE (el lector la da como 4 aristas d3), TEXT con z.
 - Ejemplo 83 (pórtico con losa): motor SBCL y escritorio dan L_col 12, P_vig 18, A_los 20, riostra 5.830952.
-- Tests: `test_dibujo_3d.py` 43 ✓ web (40 local), `test_ventana_escritorio_3d.py` 10 ✓.
+- Tests: `test_dibujo_3d.py` 43 ✓ web (38 local), `test_ventana_escritorio_3d.py` 10 ✓.
 
 ## ❌ No funcionó (y por qué)
 - `(= "VERTEX" s)` en el motor: el `=` de AutoLISP con cadenas no está (es el `=` de CL). Arreglarlo pide recompilar

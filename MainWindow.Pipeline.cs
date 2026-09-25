@@ -1343,6 +1343,38 @@ dib();})();";
         /// <summary>Hoja numérica: cada bloque for/while/if/function (y su forma Calcpad) se pliega en
         /// UNA línea marcador «#hkbloque:k». Su texto (ya con los nombres preparados) va a <paramref name="bloques"/>;
         /// NO se ejecuta aquí: lo corre HojaNumerica junto con el resto de la hoja, en orden.</summary>
+        /// <summary>24-sep-2026 (Jorge: «falta un code line como Calcpad, una flecha que indique dónde está
+        /// en el código»). Cada lista de resultados lleva, aparte, la línea del EDITOR de la que sale cada
+        /// elemento. Tabla débil: no toca la firma de ComputeResult ni se cruza entre cálculos.</summary>
+        internal static readonly System.Runtime.CompilerServices.ConditionalWeakTable<List<string>, int[]> LineaDeResultado = new();
+
+        /// <summary>Actualiza el mapa (línea procesada → línea del editor) tras un paso que cambia el texto.
+        /// Mismo número de líneas → cada una sigue siendo la suya (renombrar no mueve líneas). Si el paso
+        /// PLIEGA (un bloque for/if, una matriz en varias líneas → una línea), la línea nueva hereda la
+        /// primera del tramo y se avanza hasta volver a encontrar líneas iguales.</summary>
+        private static void Paso(ref int[] mapa, string antes, string despues)
+        {
+            if (mapa == null) return;
+            var a = (antes ?? "").Replace("\r", "").Split('\n');
+            var d = (despues ?? "").Replace("\r", "").Split('\n');
+            if (mapa.Length != a.Length) { mapa = null; return; }
+            if (a.Length == d.Length) return;
+            var r = new int[d.Length]; int p = 0;
+            for (int k = 0; k < d.Length; k++)
+            {
+                int pp = Math.Min(p, a.Length - 1);
+                r[k] = pp >= 0 ? mapa[pp] : -1;
+                if (p < a.Length && d[k] == a[p]) { p++; continue; }
+                // línea nueva (plegada): se salta el tramo hasta la siguiente línea igual
+                string sig = k + 1 < d.Length ? d[k + 1] : null;
+                int q = p + 1;
+                if (sig != null) { while (q < a.Length && a[q] != sig) q++; if (q >= a.Length) q = p + 1; }
+                else q = a.Length;
+                p = q;
+            }
+            mapa = r;
+        }
+
         private static string PlegarNumerico(string text, out List<List<string>> bloques)
         {
             bloques = new List<List<string>>();
@@ -1527,7 +1559,9 @@ dib();})();";
             _ranProgram = false;
             if (string.IsNullOrWhiteSpace(text)) return new List<string>();
             // #anim(n = a:b) … #finanim: el bloque se repite por cuadro ANTES que nada (LispAnim.cs)
-            text = LispAnim.ExpandirBloques(text);
+            // mapa línea procesada → línea del editor (0-based); se actualiza en cada paso que pliega o parte
+            int[] mapaT = Enumerable.Range(0, text.Replace("\r", "").Split('\n').Length).ToArray();
+            { var a0 = text; text = LispAnim.ExpandirBloques(text); Paso(ref mapaT, a0, text); }
             // un PROGRAMA LISP corre con SU texto: PrepareNames es para la matemática de la hoja y
             // renombraba también dentro de las cadenas "…" del programa («La» → «lahkq6»).
             string textoPrograma = text;
@@ -1549,11 +1583,11 @@ dib();})();";
             _numRes = null; _numBlocks = null; _numGrids = null; _numMeshes = null; _numModels = null;
             if (_numMode)
             {
-                text = RxNumerico.Replace(text, "");
+                { var a0 = text; text = RxNumerico.Replace(text, ""); Paso(ref mapaT, a0, text); }
                 // palabras de bloque de Calcpad (#for … #loop) → MATLAB, antes de preparar nombres
                 text = string.Join("\n", text.Replace("\r", "").Split('\n').Select(HojaNumerica.PalabraCalcpad));
-                text = LispConverter.PrepareNames(text);
-                text = PlegarNumerico(text, out _numBlocks);
+                { var a0 = text; text = LispConverter.PrepareNames(text); Paso(ref mapaT, a0, text); }
+                { var a0 = text; text = PlegarNumerico(text, out _numBlocks); Paso(ref mapaT, a0, text); }
                 _srcPrepared = text;
             }
             else
@@ -1562,7 +1596,7 @@ dib();})();";
             // matemática: si no, un (setq …) convertía la hoja entera en programa) y dejan su marcador.
             _alHtml = null;
             if (LispAutoLisp.RxInicio.IsMatch(text) || System.Text.RegularExpressions.Regex.IsMatch(text, @"(?im)^\s*#(\s*autolisp|dibujar)\b"))
-                text = LispAutoLisp.Plegar(text, CorrerAutoLisp, GuardarDibujo, out _alHtml);
+                { var a0 = text; text = LispAutoLisp.Plegar(text, CorrerAutoLisp, GuardarDibujo, out _alHtml); Paso(ref mapaT, a0, text); }
             // (antes esta regex llevaba un RETROCESO (0x08) literal donde iba \b: no casaba nunca y
             //  los bloques for/if de una hoja se pintaban como texto, sin ejecutarse)
             if (!LooksLikeLisp(text) &&
@@ -1577,9 +1611,9 @@ dib();})();";
                     try { return new List<string> { RunLispClean(MatlabToLisp.Translate(text).Executable) }; }
                     catch (Exception ex) { return new List<string> { "...  (" + ex.Message + ")" }; }
                 }
-                text = PlegarBloques(text, out _salidasProg);
+                { var a0 = text; text = PlegarBloques(text, out _salidasProg); Paso(ref mapaT, a0, text); }
             }
-            text = LispConverter.PrepareNames(text);
+            { var a0 = text; text = LispConverter.PrepareNames(text); Paso(ref mapaT, a0, text); }
             _srcPrepared = text;
             }
 
@@ -1619,6 +1653,20 @@ dib();})();";
             // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
             // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
             var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'), out var contLine);
+            int[] mapaL = null;
+            if (mapaT != null)
+            {
+                var mJ = mapaT; Paso(ref mJ, text, JoinBracketLines(text));
+                if (mJ != null)
+                {
+                    mapaL = new int[lines.Length]; int kL = -1;
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        if (!(i < contLine.Count && contLine[i])) kL++;
+                        mapaL[i] = kL >= 0 && kL < mJ.Length ? mJ[kL] : -1;
+                    }
+                }
+            }
             // TABLAS de TEXTO escritas a mano (markdown, comentario #|…|):  #| Iteración | Residuo |
             // seguida de la fila separadora #|---|---:| → tabla; consume las filas y las deja en
             // blanco (las demás líneas del bloque quedan vacías, como cualquier hueco de la hoja).
@@ -2115,6 +2163,19 @@ dib();})();";
                     merged[merged.Count - 1] += LispConverter.SbsSep + display[i];
                 else
                     merged.Add(display[i]);
+            }
+            // 24-sep-2026: de qué línea del EDITOR viene cada línea del resultado (flecha al código)
+            if (mapaL != null)
+            {
+                var mapa = new List<int>();
+                for (int i = 0; i < display.Count; i++)
+                {
+                    if (display[i].StartsWith(NumOculta, StringComparison.Ordinal)) continue;
+                    bool cont = i < contLine.Count && contLine[i];
+                    if (cont && mapa.Count > 0 && Mergeable(display[i]) && Mergeable(merged[mapa.Count - 1])) continue;
+                    mapa.Add(i < mapaL.Length ? mapaL[i] : -1);
+                }
+                if (mapa.Count == merged.Count) LineaDeResultado.AddOrUpdate(merged, mapa.ToArray());
             }
             return merged;
         }

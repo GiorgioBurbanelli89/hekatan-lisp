@@ -54,6 +54,25 @@ namespace HekatanLisp
         {
             LispAutoLisp.EscritorDwg = DwgConNode;
             Viewer.CoreWebView2.WebMessageReceived += OnMensajeDibujo;
+            // editor → resultado: al mover el cursor se marca su bloque en el render (flecha al código)
+            var espera = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+            espera.Tick += (s2, e2) =>
+            {
+                espera.Stop();
+                try { if (IsRenderView && _webReady) _ = Viewer.ExecuteScriptAsync("window.hkMarcaLinea&&hkMarcaLinea(" + Editor.TextArea.Caret.Line + ")"); } catch { }
+            };
+            Editor.TextArea.Caret.PositionChanged += (s2, e2) => { espera.Stop(); espera.Start(); };
+        }
+
+        /// <summary>Clic en la flecha «▶ n» del resultado: el editor va a la línea n y la selecciona.</summary>
+        void IrALinea(int n)
+        {
+            if (n < 1 || n > Editor.Document.LineCount) return;
+            var ln = Editor.Document.GetLineByNumber(n);
+            Editor.Select(ln.Offset, ln.Length);
+            Editor.TextArea.Caret.Offset = ln.Offset;
+            Editor.ScrollToLine(n);
+            Editor.Focus();
         }
 
         async void OnMensajeDibujo(object s, CoreWebView2WebMessageReceivedEventArgs e)
@@ -67,6 +86,8 @@ namespace HekatanLisp
                     string url = r.GetProperty("datos").GetString();
                     File.WriteAllBytes(ruta.GetString(), Convert.FromBase64String(url.Substring(url.IndexOf(',') + 1)));
                 }
+                else if (r.TryGetProperty("hkGoto", out var lg))      // la flecha «▶ n» del resultado
+                    IrALinea(lg.GetInt32());
                 else if (r.TryGetProperty("hkCad", out var qc))       // la ventana de dibujo de #dibujar (LispCad.js)
                 {
                     string que = qc.GetString();

@@ -1700,11 +1700,21 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                    "<span class=\"deq-tag\">(" + System.Net.WebUtility.HtmlEncode(tag) + ")</span></div>";
         }
 
-        public static string RenderPage(string text, bool fromLisp)
+        public static string RenderPage(string text, bool fromLisp) => RenderPage(text, fromLisp, null);
+
+        /// <summary>srcLinea[k] = línea del EDITOR (0-based) de la línea k de <paramref name="text"/>, o −1.
+        /// Antes de cada bloque va un marcador invisible <a class="hk-src" data-src="n"> que usa la flecha
+        /// «▶ n» (HK_SRC_JS): 24-sep-2026, Jorge — «un code line como Calcpad, una flecha que indique ese
+        /// renderizado dónde está en el código».</summary>
+        public static string RenderPage(string text, bool fromLisp, int[] srcLinea)
         {
             var body = new StringBuilder();
-            foreach (var raw0 in text.Replace("\r", "").Split('\n'))
+            var todas = text.Replace("\r", "").Split('\n');
+            if (srcLinea != null && srcLinea.Length != todas.Length) srcLinea = null;
+            int kLinea = -1;
+            foreach (var raw0 in todas)
             {
+                kLinea++;
                 // #deq: la línea trae la ecuación y, tras \x02, la ETIQUETA que va a la derecha.
                 string raw = raw0, deqTag = null;
                 int ds = raw0.IndexOf(DeqSep);
@@ -1720,12 +1730,41 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                     if (desc != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDesc(div, desc);
                 }
                 if (deqTag != null && div.StartsWith("<div class=\"ws-eq")) div = InjectDeqTag(div, deqTag);
+                if (srcLinea != null && srcLinea[kLinea] >= 0 && !string.IsNullOrEmpty(div))
+                    body.Append("<a class=\"hk-src\" data-src=\"").Append(srcLinea[kLinea] + 1).Append("\"></a>");
                 body.Append(div);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
                    (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
-                   "</style></head><body>" + body + MAT_JS + HK_MAT_JS + "</body></html>";
+                   "</style></head><body>" + body + MAT_JS + HK_MAT_JS + (srcLinea != null ? HK_SRC_JS : "") + "</body></html>";
         }
+
+        // LA FLECHA AL CÓDIGO (como Calcpad): al pasar el ratón por un bloque aparece «▶ n» en el margen
+        // con su línea del editor; clic en la flecha (o doble clic en el bloque) → el editor va a esa
+        // línea. Y al revés: window.hkMarcaLinea(n), que llama el editor al mover el cursor, marca el
+        // bloque de esa línea (la última con número ≤ n) y lo trae a la vista.
+        const string HK_SRC_JS = @"<style>
+.hk-flecha{position:absolute;left:0;z-index:60;font:600 11px/15px Consolas,monospace;color:#fff;background:var(--acc,#b08a2e);
+ border-radius:0 8px 8px 0;padding:1px 6px 1px 3px;cursor:pointer;opacity:.92;display:none;user-select:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.hk-flecha:hover{opacity:1}
+@media screen{body{padding-left:34px !important}}   /* el margen de la flecha: no pisa la primera letra */
+.hk-marcado{box-shadow:inset 3px 0 0 var(--acc,#b08a2e);background:rgba(176,138,46,.08);transition:background .2s}
+</style><script>(function(){
+var fl=document.createElement('div');fl.className='hk-flecha';fl.title='Ir a esta línea del código';document.body.appendChild(fl);
+var fijo=null;
+function bloque(el){while(el&&el.parentElement&&el.parentElement!==document.body)el=el.parentElement;
+  return(el&&el.parentElement===document.body&&el!==fl)?el:null;}
+function marca(b){var m=b;while(m&&!(m.classList&&m.classList.contains('hk-src')))m=m.previousElementSibling;return m;}
+function pon(b,l){var r=b.getBoundingClientRect();fl.style.top=(r.top+window.scrollY+Math.min(r.height/2,16)-8)+'px';
+  fl.textContent='▶ '+l;fl.dataset.l=l;fl.style.display='block';}
+document.addEventListener('mousemove',function(e){if(e.target===fl)return;var b=bloque(e.target);if(!b)return;var m=marca(b);if(m)pon(b,m.dataset.src);});
+function ir(l){try{window.chrome.webview.postMessage(JSON.stringify({hkGoto:+l}));}catch(x){}}
+fl.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();ir(fl.dataset.l);});
+document.addEventListener('dblclick',function(e){var b=bloque(e.target);var m=b&&marca(b);if(m)ir(m.dataset.src);});
+window.hkMarcaLinea=function(n){var best=null,bv=-1;document.querySelectorAll('a.hk-src').forEach(function(m){var v=+m.dataset.src;if(v<=n&&v>bv){bv=v;best=m;}});
+  if(!best)return;var b=best.nextElementSibling;if(!b)return;if(fijo)fijo.classList.remove('hk-marcado');fijo=b;b.classList.add('hk-marcado');pon(b,bv);
+  var r=b.getBoundingClientRect();if(r.bottom<0||r.top>window.innerHeight)b.scrollIntoView({block:'center',behavior:'smooth'});};
+})();</script>";
 
         // Varias asignaciones de la MISMA línea (a=2; b=3) → una sola fila .ws-eq con las celdas lado a lado,
         // igual que Hekatan Lab. Renderiza cada parte como ecuación y le quita su envoltura <div> para meterlas

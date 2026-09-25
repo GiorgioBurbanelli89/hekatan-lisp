@@ -281,7 +281,8 @@ namespace HekatanLisp
                     html = LispConverter.LearnPage(string.Join("\n", forms), fromLisp: true);
                 else
                 {
-                    html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true);
+                    html = LispConverter.RenderPage(string.Join("\n", forms), fromLisp: true,
+                        LineaDeResultado.TryGetValue(forms, out var srcLin) ? srcLin : null);   // flecha al código
                     // Gráficas INTERCALADAS: cada una en su posición del documento (marcador → HTML), en orden.
                     var plots = BuildPlotsOrdered(_srcPrepared ?? text, forms, _dark, out bool anySurf);
                     // La gráfica va DENTRO de su hk-plotslot: antes el hueco se reemplazaba entero, la

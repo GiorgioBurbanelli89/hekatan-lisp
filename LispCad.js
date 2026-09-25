@@ -468,6 +468,14 @@
     var an = Math.atan2(uy, ux); if (an > Math.PI / 2 || an < -Math.PI / 2) an += Math.PI;
     g.save(); g.translate((p[0] + q[0]) / 2, (p[1] + q[1]) / 2); g.rotate(an); g.font = '12px "Segoe UI",Arial,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(textoCota(e), 0, -3); g.restore();
   }
+  function cajaDin(g, txt, cx, cy, borde, sel, tinta) {   // caja de la entrada dinámica (estilo del CAD de Struct)
+    g.save(); g.font = 'bold 14px Consolas,"Cascadia Mono",monospace'; var w = g.measureText(txt).width, pw = w + (sel ? 36 : 16), ph = 26;
+    var x = Math.round(cx - pw / 2), y = Math.round(cy - ph / 2);
+    g.fillStyle = 'rgba(14,22,40,.95)'; g.strokeStyle = borde; g.lineWidth = 1.6;
+    g.beginPath(); if (g.roundRect) g.roundRect(x, y, pw, ph, 4); else g.rect(x, y, pw, ph); g.fill(); g.stroke();
+    if (sel) { g.fillStyle = '#1d4fa8'; g.fillRect(Math.round(cx - w / 2) - 2, y + 4, w + 4, ph - 8); }
+    g.fillStyle = tinta || '#fff'; g.textBaseline = 'middle'; g.fillText(txt, Math.round(cx - w / 2), y + ph / 2 + 1); g.restore();
+  }
   function marca(g, s) {                // marcador de OSNAP (formas de AutoCAD) + su nombre
     var p = aPant(s.p), r = 6; g.save(); g.strokeStyle = S.cMarca; g.lineWidth = 2; g.beginPath();
     switch (s.modo) {
@@ -504,8 +512,10 @@
       var sel = S.sel.indexOf(e) >= 0 || (S.req && S.req.marcar && S.req.marcar.indexOf(e) >= 0);
       if (sel) { g.setLineDash([5, 3]); trazar(g, e, S.cSel, 2); g.setLineDash([]); } else trazar(g, e, colorDe(e), 1.4);
     });
-    if (S.req && S.req.prev && S.cur) { g.setLineDash([4, 3]); (S.req.prev(S.cur) || []).forEach(function (e) { trazar(g, e, S.cPrev, 1.2); }); g.setLineDash([]); }
-    if (S.req && S.req.base && S.cur && !S.req.prev) { var b0 = aPant(S.req.base), c0 = aPant(S.cur); g.strokeStyle = S.cPrev; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(b0[0], b0[1]); g.lineTo(c0[0], c0[1]); g.stroke(); g.setLineDash([]); }
+    if (S.req && S.req.prev && S.cur) { g.setLineDash([10, 8]); (S.req.prev(S.cur) || []).forEach(function (e) { trazar(g, e, '#1f8aa0', 2); }); g.setLineDash([]); }   // vista previa a rayas teal, como la goma de Struct
+    // GOMA como el CAD de Hekatan Struct: cuadro naranja en el punto base, trazo teal a rayas hasta el cursor
+    if (S.req && S.req.base && S.cur && !S.req.prev) { var b0 = aPant(S.req.base), c0 = aPant(S.snap ? S.snap.p : S.cur); g.save(); g.strokeStyle = '#1f8aa0'; g.lineWidth = 2; g.setLineDash([10, 8]); g.beginPath(); g.moveTo(b0[0], b0[1]); g.lineTo(c0[0], c0[1]); g.stroke(); g.setLineDash([]); g.restore(); }
+    if (S.req && S.req.base && S.cur) { var bq = aPant(S.req.base); g.fillStyle = '#f0a020'; g.fillRect(bq[0] - 4, bq[1] - 4, 8, 8); }
     if (S.ventana && S.q) {             // ventana (azul, continua) o captura (verde, a trazos)
       var v0 = S.ventana, cr = S.q[0] < v0[0];
       g.fillStyle = cr ? 'rgba(60,180,90,.12)' : 'rgba(60,110,220,.12)'; g.strokeStyle = cr ? '#3cb45a' : '#3c6edc';
@@ -514,17 +524,32 @@
     if (S.snap) marca(g, S.snap);
     if (S.pol && S.req && S.req.base && S.q) {   // rastreo polar: el rayo de alineación y su rótulo (distancia < ángulo)
       var pb = aPant(S.req.base), far = 4 * (S.W + S.H);
-      g.save(); g.strokeStyle = '#2e9e4f'; g.lineWidth = 1; g.setLineDash([2, 4]); g.beginPath(); g.moveTo(pb[0], pb[1]);
+      g.save(); g.strokeStyle = '#39c93a'; g.lineWidth = 1.5; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(pb[0], pb[1]);
       g.lineTo(pb[0] + far * Math.cos(S.pol.ang), pb[1] - far * Math.sin(S.pol.ang)); g.stroke(); g.setLineDash([]);
       var tp = 'Polar: ' + fmt(S.pol.L) + ' < ' + fmt(S.pol.ang * 180 / Math.PI) + '°', cq = aPant(S.cur);
       g.font = '11px "Segoe UI",Arial,sans-serif'; var wp = g.measureText(tp).width;
-      g.fillStyle = '#2e9e4f'; g.fillRect(cq[0] + 12, cq[1] + 12, wp + 8, 16); g.fillStyle = '#fff'; g.fillText(tp, cq[0] + 16, cq[1] + 24); g.restore();
+      cajaDin(g, tp, cq[0] + 70 + wp / 2, cq[1] - 34, '#2ecc71', false, '#2ecc71'); g.restore();
     }
     if (S.q && S.cur) {                 // mirilla: cruz + cuadro de designación
       // IMÁN de AutoSnap (AUTOSNAP = 63 en AutoCAD 2027, bit 4): la mira salta al punto enganchado
-      var c = S.snap ? aPant(S.snap.p) : aPant(S.cur); g.strokeStyle = S.cFg; g.lineWidth = 1; g.beginPath();
-      g.moveTo(c[0] - 22, c[1]); g.lineTo(c[0] + 22, c[1]); g.moveTo(c[0], c[1] - 22); g.lineTo(c[0], c[1] + 22); g.stroke();
-      if (!S.req || S.req.t === 'sel' || S.req.t === 'obj') g.strokeRect(c[0] - PICK, c[1] - PICK, 2 * PICK, 2 * PICK);
+      var c = S.snap ? aPant(S.snap.p) : aPant(S.cur), w0 = S.snap ? S.snap.p : S.cur;
+      // mira del CAD de Hekatan Struct: brazos cortos (24 px) + cuadrito blanco en el centro
+      g.save(); g.strokeStyle = S.oscuro ? 'rgba(215,220,228,.9)' : 'rgba(40,44,52,.85)'; g.lineWidth = 1.5; g.beginPath();
+      g.moveTo(c[0] - 24, c[1]); g.lineTo(c[0] + 24, c[1]); g.moveTo(c[0], c[1] - 24); g.lineTo(c[0], c[1] + 24); g.stroke();
+      g.fillStyle = S.oscuro ? '#fff' : '#222'; g.fillRect(c[0] - 3.5, c[1] - 3.5, 7, 7); g.restore();
+      if (!S.req || S.req.t === 'sel' || S.req.t === 'obj') { g.strokeStyle = S.cFg; g.lineWidth = 1; g.strokeRect(c[0] - PICK, c[1] - PICK, 2 * PICK, 2 * PICK); }
+      // ENTRADA DINÁMICA (como Struct): sin punto base, la coordenada junto al cursor; con base, la
+      // longitud en el medio de la goma y el ángulo bajo el cursor
+      if (S.req && S.req.t === 'punto') {
+        if (S.req.base) {
+          var bb = aPant(S.req.base), dx = w0[0] - S.req.base[0], dy = w0[1] - S.req.base[1], L = Math.hypot(dx, dy);
+          if (L > 1e-9) {
+            cajaDin(g, L.toFixed(2) + ' ' + S.ud, (bb[0] + c[0]) / 2, (bb[1] + c[1]) / 2, '#25b7d3', true);
+            var an = Math.atan2(dy, dx) * 180 / Math.PI; if (an < 0) an += 360;
+            cajaDin(g, Math.round(an) % 360 + '°', c[0], c[1] + 58, '#25b7d3', false, '#35c6e0');
+          }
+        } else cajaDin(g, w0[0].toFixed(2) + ',' + w0[1].toFixed(2), c[0] + 40, c[1] - 52, '#25b7d3', true);
+      }
     }
     estado();
   }
@@ -1322,6 +1347,7 @@
     var fondo = css('--bg', '#ffffff');
     S = { raiz: raiz, velo: velo, id: id, nombre: dat.nombre, ud: dat.ud || 'm', pal: dat.pal || {}, capas: dat.capas && dat.capas.length ? dat.capas : [{ n: '0', c: 7 }],
       ents: (dat.ents || []).map(desdePares), capa: '0', color: 256, rej: +dat.rejilla || 0, th: 0,
+      oscuro: (function (c) { var m = /#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(c) || /(\d+)\D+(\d+)\D+(\d+)/.exec(c); if (!m) return false; var v = m.slice(1, 4).map(function (t) { return /^[0-9a-f]{2}$/i.test(t) && m[0][0] === '#' ? parseInt(t, 16) : +t; }); return 0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2] < 128; })(fondo),
       rejilla: true, forzc: true, orto: false, osnapOn: true, modos: { fin: 1, medio: 1, centro: 1, inter: 1, perp: 1, nodo: 1, cuad: 1, tan: 1 },
       polar: false, polarAng: 90, desf: 0, radio: 0, cha: [0, 0],
       undo: [], redo: [], sel: [], cmd: null, req: null, v: { k: 1, x0: 0, y0: 0 }, ovf: document.documentElement.style.overflow,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Abre cada archivo que escribió (guardar "x.ext") y dice si está sano.
-  DXF → ezdxf.readfile + audit · DWG → AutoCAD 2027 (accoreconsole: AUDIT + DXFOUT, contar entidades)
+  DXF → ezdxf.readfile + audit · DWG → acadrust (hekatan_dwg.read_dwg: se lee de vuelta y se cuentan entidades)
   PDF → PyMuPDF a PNG · SVG → Chromium (Playwright) a PNG.   Los PNG quedan junto al archivo para MIRARLOS.
 Uso: python tests/autolisp/verificar_formatos.py "C:/…/dibujos/zapata Z-1"   (sin extensión)
 """
@@ -9,7 +9,6 @@ from collections import Counter
 sys.stdout.reconfigure(encoding="utf-8")
 base = sys.argv[1]
 TMP = "C:/Temp/hkal"; os.makedirs(TMP, exist_ok=True)
-ACAD = r"C:\Program Files\Autodesk\AutoCAD 2027\accoreconsole.exe"
 
 if os.path.exists(base + ".dxf"):
     import ezdxf
@@ -17,19 +16,13 @@ if os.path.exists(base + ".dxf"):
     print(f"DXF {doc.dxfversion}: {len(a.errors)} errores, {len(a.fixes)} arreglos ·", dict(Counter(e.dxftype() for e in doc.modelspace())))
 
 if os.path.exists(base + ".dwg"):
-    import ezdxf
-    shutil.copy(base + ".dwg", TMP + "/v.dwg")
-    out = TMP + "/v_dwg.dxf"
-    if os.path.exists(out): os.remove(out)
-    open(TMP + "/v.scr", "w").write(f"FILEDIA\n0\n_.AUDIT\nN\n_.DXFOUT\n{out}\n16\n_.QUIT\nY\n\n")
-    r = subprocess.run([ACAD, "/i", TMP.replace("/", "\\") + "\\v.dwg", "/s", TMP.replace("/", "\\") + "\\v.scr"], capture_output=True, timeout=600, cwd=TMP)
-    log = r.stdout.decode("utf-16-le", "ignore")
-    aud = [l.strip() for l in log.replace("\r", "").split("\n") if "errors found" in l.lower() or "errores" in l.lower()]
-    if os.path.exists(out):
-        d2 = ezdxf.readfile(out)
-        print("DWG abierto por AutoCAD:", aud[-1] if aud else "(AUDIT sin línea de resumen)", "·", dict(Counter(e.dxftype() for e in d2.modelspace())))
-    else:
-        print("DWG: AutoCAD NO lo abrió\n", log[-1500:])
+    # DWG leído de vuelta con acadrust (hekatan-dwg, el mismo que lo escribe): sin AutoCAD
+    import json, hekatan_dwg
+    d = hekatan_dwg.read_dwg(base + ".dwg")
+    d = json.loads(d) if isinstance(d, str) else d
+    ents = d.get("entities", d.get("entidades", [])) if isinstance(d, dict) else d
+    tipos = Counter((e.get("type") or e.get("tipo") or e.get("0") or "?") if isinstance(e, dict) else "?" for e in ents)
+    print("DWG leído por acadrust:", len(ents), "entidades ·", dict(tipos))
 
 if os.path.exists(base + ".pdf"):
     import fitz

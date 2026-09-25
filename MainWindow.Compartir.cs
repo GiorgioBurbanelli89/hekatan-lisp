@@ -75,6 +75,7 @@ namespace HekatanLisp
             var linea = doc.GetLineByOffset(pos);
             if (pos != linea.Offset) { pos = linea.EndOffset; bloque = "\n" + bloque; }   // en una línea nueva
             doc.Insert(pos, bloque);
+            _debounce.Stop();   // el AutoRun de esta inserción recalcularía DESPUÉS y cerraría la ventana recién abierta
             if (tipo != "2d" && tipo != "3d") { ShowResult(); return; }
             ShowResult();
             try { await _showTask; } catch { }
@@ -82,7 +83,16 @@ namespace HekatanLisp
             {
                 await System.Threading.Tasks.Task.Delay(150);
                 string r = await Viewer.ExecuteScriptAsync("(function(){var b=[...document.querySelectorAll('.hk-cad-btn')].find(function(x){return (x.textContent||'').indexOf('«" + nombre + "»')>=0})||[...document.querySelectorAll('.hk-cad-btn')].pop();if(!b)return 0;b.scrollIntoView({block:'center'});b.click();" + (tipo == "3d" ? "setTimeout(function(){try{hkCad.vista('ISOSO')}catch(e){}},300);" : "") + "return 1})()");
-                if (r == "1") break;
+                if (r == "1")
+                {
+                    if (tipo == "3d")   // la ventana se arma en el siguiente cuadro: se espera a hkCad y se pone Iso SO
+                        for (int j = 0; j < 20; j++)
+                        {
+                            await System.Threading.Tasks.Task.Delay(150);
+                            if (await Viewer.ExecuteScriptAsync("(function(){try{if(!document.querySelector('.hkcad'))return 0;hkCad.vista('ISOSO');return 1}catch(e){return 0}})()") == "1") break;
+                        }
+                    break;
+                }
             }
         }
 

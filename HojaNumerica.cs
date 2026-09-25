@@ -34,6 +34,7 @@ namespace HekatanLisp
             public int Bloque = -1;  // ≥0: la línea es el marcador de un bloque plegado
             public string Mapa;      // #map(...): lo de dentro de los paréntesis
             public string Malla;     // #malla(x, y, elementos[, apoyos]) con datos del modelo
+            public string Modelo3D;  // #modelo3d(X, cascaras, barras, valor_nudo, valor_barra[, U, escala])
         }
 
         public sealed class Rejilla { public double Xa, Xb, Ya, Yb; public int N; public double[,] Z; }
@@ -47,6 +48,7 @@ namespace HekatanLisp
             public readonly Dictionary<int, List<string>> Salida = new();   // línea (bloque) → disp(...)
             public readonly Dictionary<int, Rejilla> Mapa = new();          // línea #map → rejilla
             public readonly Dictionary<int, MallaDatos> Malla = new();      // línea #malla → nudos y elementos
+            public readonly Dictionary<int, List<string>> Modelo3D = new(); // línea #modelo3d → literales de sus datos
             public readonly HashSet<int> Calculada = new();                 // líneas que entraron al programa
             public double Segundos;          // todo: traducir, compilar (SBCL), correr y leer
             public double SegundosMotor;     // solo correr el programa ya compilado
@@ -134,7 +136,7 @@ namespace HekatanLisp
             foreach (var ln in lineas)
             {
                 if (ln.Bloque >= 0) { RecogeBloque(bloques[ln.Bloque], ctx); continue; }
-                if (ln.Mapa != null || ln.Malla != null) continue;
+                if (ln.Mapa != null || ln.Malla != null || ln.Modelo3D != null) continue;
                 var t = Normaliza(ln.Texto).Trim();
                 if (!EsNumerica(t)) continue;
                 var fd = RxFuncDef.Match(t);
@@ -145,7 +147,7 @@ namespace HekatanLisp
             foreach (var f in ctx.PorDefinir) if (!ctx.Vars.Contains(f)) ctx.SheetFuncs.Add(f);
             foreach (var ln in lineas)                     // A(i) = … con A ya variable: asignación indexada
             {
-                if (ln.Bloque >= 0 || ln.Mapa != null || ln.Malla != null) continue;
+                if (ln.Bloque >= 0 || ln.Mapa != null || ln.Malla != null || ln.Modelo3D != null) continue;
                 var t = Normaliza(ln.Texto).Trim();
                 var fd = RxFuncDef.Match(t);
                 if (fd.Success && ctx.Vars.Contains(fd.Groups[1].Value)) ctx.SheetFuncs.Remove(fd.Groups[1].Value);
@@ -161,6 +163,15 @@ namespace HekatanLisp
                 {
                     if (ln.Bloque >= 0) code = TraduceBloque(bloques[ln.Bloque], ctx, defuns, ln.Idx);
                     else if (ln.Mapa != null) code = TraduceMapa(ln.Mapa, ctx, ln.Idx);
+                    else if (ln.Modelo3D != null)
+                    {
+                        // 24-sep, Jorge: «como Python que tiene el 3D … con el cursor del mouse hover».
+                        // Los datos salen como literales separados por ;: la losa, las barras y sus valores.
+                        var tr = new Tr(ctx);
+                        var args = PartirNivel0(Normaliza(ln.Modelo3D), ',').Select(a => tr.Expr(a)).ToList();
+                        if (args.Count < 5) throw new FormatException("#modelo3d(X, cascaras, barras, valor_nudo, valor_barra[, U, escala]): faltan datos");
+                        code = "(hn-emit " + ln.Idx + " \"#m3d\" (format nil \"~{~a~^;~}\" (mapcar #'hn-lit (list " + string.Join(" ", args) + "))))";
+                    }
                     else if (ln.Malla != null)
                     {
                         var tr = new Tr(ctx);
@@ -754,6 +765,8 @@ namespace HekatanLisp
                     if (!res.Salida.TryGetValue(idx, out var l)) res.Salida[idx] = l = new List<string>();
                     l.Add(text);
                 }
+                else if (tag == "#m3d")
+                    res.Modelo3D[idx] = text.Split(';').ToList();
                 else if (tag == "#mesh")
                 {
                     var ps = text.Split(';');

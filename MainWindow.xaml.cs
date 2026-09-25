@@ -291,7 +291,7 @@ namespace HekatanLisp
                         html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>",
                             ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
                     html = LispAnim.PostProcesar(html);   // #anim(n = a:b) … #finanim: los cuadros en su reproductor
-                    if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + "</body>");   // orbit + hover de mapas, una vez
+                    if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + SurfacePlot.Modelo3DScript + "</body>");   // orbit + hover de mapas, una vez
                 }
                 _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)
                 // Recalcular NO debe mandar arriba: se guarda dónde estaba el lector y se repone en la

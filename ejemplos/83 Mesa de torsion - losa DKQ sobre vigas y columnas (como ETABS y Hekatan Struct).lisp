@@ -4,8 +4,104 @@
 #: El benchmark **Mesa de Torsión** de Hekatan Struct, resuelto aquí de principio a fin: losa de 6 × 6 m y 10 cm sobre 4 vigas perimetrales V30×50 y 4 columnas C40×40 de 4 m, con carga viva de 0.5 tonf/m². Es el mismo modelo del e2k de ETABS, nudo a nudo (malla 5 × 5, sin diafragma, base articulada).
 #: **Elementos** (los de ETABS *Shell-Thin* y Hekatan Struct): losa = membrana **Q6** (modos incompatibles de Wilson) + flexión **DKQ** (Batoz, Kirchhoff discreto) + un giro en el plano muy blando; vigas y columnas = barra 3D de **Timoshenko**, 6 grados de libertad por nudo.
 #: **Unidades:** kN y m al calcular; los resultados se pasan a tonf dividiendo por g = 9.80665.
+#: **Orden:** en la parte **A** se deduce todo en símbolos, una sola vez: funciones de forma, Jacobiano, Gauss y las matrices de rigidez de cada formulación. En la parte **B** entran los números y solo se muestran resultados.
 
-## 1 · Datos
+## A · Formulación algebraica (una sola vez)
+#: Todo en símbolos: el motor deriva, integra y multiplica las matrices. Los números entran recién en la parte B. Cada matriz de rigidez se arma UNA vez aquí; después solo se usan sus resultados.
+
+### A.1 · Funciones de forma del cuadrilátero Q4
+#: En el cuadrado natural −1 ≤ ξ, η ≤ 1. Cada una vale 1 en su nudo y 0 en los otros tres (nudos 1 a 4 en sentido antihorario, desde la esquina (−1, −1)):
+N_1 = Expand{(1-xi)*(1-eta)/4}
+N_2 = Expand{(1+xi)*(1-eta)/4}
+N_3 = Expand{(1+xi)*(1+eta)/4}
+N_4 = Expand{(1-xi)*(1+eta)/4}
+#: Suman 1 en todo punto (partición de la unidad): así el elemento se mueve como cuerpo rígido sin deformarse.
+N_suma = Simplify{(1-xi)*(1-eta)/4 + (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 + (1-xi)*(1+eta)/4}
+#: Sus derivadas en coordenadas naturales:
+dN_ξ = Simplify{[Partial{(1-xi)*(1-eta)/4 @ xi}, Partial{(1+xi)*(1-eta)/4 @ xi}, Partial{(1+xi)*(1+eta)/4 @ xi}, Partial{(1-xi)*(1+eta)/4 @ xi}]}
+dN_η = Simplify{[Partial{(1-xi)*(1-eta)/4 @ eta}, Partial{(1+xi)*(1-eta)/4 @ eta}, Partial{(1+xi)*(1+eta)/4 @ eta}, Partial{(1-xi)*(1+eta)/4 @ eta}]}
+
+### A.2 · Jacobiano
+#: La geometría se interpola con las mismas funciones (isoparamétrico). Un elemento cuadrado de lado 2·a centrado en el origen tiene sus nudos en x = ∓a, y = ∓a:
+x_ξ = Simplify{a*(-(1-xi)*(1-eta)/4 + (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 - (1-xi)*(1+eta)/4)}
+y_η = Simplify{a*(-(1-xi)*(1-eta)/4 - (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 + (1-xi)*(1+eta)/4)}
+J = Simplify{[Partial{a*xi @ xi}, Partial{a*xi @ eta}; Partial{a*eta @ xi}, Partial{a*eta @ eta}]}
+det_J = Simplify{det([a, 0; 0, a])}
+#: Regla de la cadena: ∂N/∂x = (1/a)·∂N/∂ξ y ∂N/∂y = (1/a)·∂N/∂η; y el área: dx·dy = det J·dξ·dη.
+
+### A.3 · Cuadratura de Gauss
+#: La integral se cambia por una suma en los puntos ξ = ±1/√3 con peso 1. Con 2 puntos es EXACTA hasta grado 3:
+I_2 = Area{xi^2 @ xi = -1 : 1}
+G_2 = Simplify{(1/sqrt(3))^2 + (-1/sqrt(3))^2}
+#: Con grado 4 ya no lo es (esto importa en el DKQ, que tiene términos (2 − ξ² − η²)²):
+I_4 = Area{xi^4 @ xi = -1 : 1}
+G_4 = Simplify{(1/sqrt(3))^4 + (-1/sqrt(3))^4}
+#: En 2D es la doble integral, con 2 × 2 = 4 puntos:
+I_22 = Area{Area{xi^2*eta^2 @ xi = -1 : 1} @ eta = -1 : 1}
+G_22 = Simplify{4*(1/sqrt(3))^2*(1/sqrt(3))^2}
+
+### A.4 · Membrana Q6 (8 × 8)
+#: **Deformaciones:** ε = [∂u/∂x; ∂v/∂y; ∂u/∂y + ∂v/∂x] = B_{m}·[u₁ v₁ u₂ v₂ u₃ v₃ u₄ v₄]. **Ley constitutiva** (tensión plana):
+D_m = Simplify{E/(1-nu^2)*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]}
+#: **Matriz B**: fila 1 = ∂N/∂x bajo cada u; fila 2 = ∂N/∂y bajo cada v; fila 3 = las dos cruzadas. Con la regla de la cadena de A.2:
+B_m(xi, eta) = Simplify{[-(1-eta)/(4*a), 0, (1-eta)/(4*a), 0, (1+eta)/(4*a), 0, -(1+eta)/(4*a), 0; 0, -(1-xi)/(4*a), 0, -(1+xi)/(4*a), 0, (1+xi)/(4*a), 0, (1-xi)/(4*a); -(1-xi)/(4*a), -(1-eta)/(4*a), -(1+xi)/(4*a), (1-eta)/(4*a), (1+xi)/(4*a), (1+eta)/(4*a), (1-xi)/(4*a), -(1+eta)/(4*a)]}
+#: **Modos incompatibles de Wilson**: u = Σ Nᵢ·uᵢ + (1 − ξ²)·α₁ + (1 − η²)·α₂, y v con α₃, α₄. Sus derivadas dan otra matriz G (3 × 4):
+G_m(xi, eta) = Simplify{[Partial{1-xi^2 @ xi}/a, 0, 0, 0; 0, 0, 0, Partial{1-eta^2 @ eta}/a; 0, Partial{1-eta^2 @ eta}/a, Partial{1-xi^2 @ xi}/a, 0]}
+#: **Rigidez**: K = t·∫∫ Bᵀ·D·B·det J dξ dη. Los integrandos son de grado 2: Gauss 2 × 2 da lo mismo que la integral exacta.
+K_uu = Simplify{t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*B_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+K_ua = Simplify{t*a^2*Area{Area{transpose(B_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+K_aa = Simplify{t*a^2*Area{Area{transpose(G_m(xi, eta))*D_m*G_m(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+#: **Condensación estática**: los α no son grados de nudo; se eliminan con K_{αα}·α = −K_{αu}·u, y queda
+K_Q6 = Simplify{K_uu - K_ua*inv(K_aa)*transpose(K_ua)}
+
+### A.5 · Placa DKQ (12 × 12)
+#: **Kirchhoff discreto** (Batoz y Tahar 1982): los giros β se interpolan con 8 nudos y la condición β = ∇w se impone solo en los nudos y en el medio de los lados. Las curvaturas κ = [∂β_{x}/∂x; ∂β_{y}/∂y; ∂β_{x}/∂y + ∂β_{y}/∂x] quedan B_{f}·u con u = [w₁ β_{x1} β_{y1} …]. **Ley constitutiva** (D = E·t³/(12·(1 − ν²))):
+D_f = Simplify{D*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]}
+D_t = Simplify{E*t^3/(12*(1-nu^2))}
+#: **Matriz B** del DKQ rectangular de lado d (la de Hekatan Struct, python_dkq.py):
+B_f(xi, eta) = Simplify{[3*xi*(1-eta)/d^2, 0, (1-eta)*(3*xi-1)/(2*d), -3*xi*(1-eta)/d^2, 0, (1-eta)*(1+3*xi)/(2*d), -3*xi*(1+eta)/d^2, 0, (1+eta)*(1+3*xi)/(2*d), 3*xi*(1+eta)/d^2, 0, (1+eta)*(3*xi-1)/(2*d); 3*(1-xi)*eta/d^2, -(1-xi)*(3*eta-1)/(2*d), 0, 3*(1+xi)*eta/d^2, -(1+xi)*(3*eta-1)/(2*d), 0, -3*(1+xi)*eta/d^2, -(1+xi)*(1+3*eta)/(2*d), 0, -3*(1-xi)*eta/d^2, -(1-xi)*(1+3*eta)/(2*d), 0; 3*(2-xi^2-eta^2)/(2*d^2), -(1-eta)*(1+3*eta)/(4*d), (1-xi)*(1+3*xi)/(4*d), -3*(2-xi^2-eta^2)/(2*d^2), (1-eta)*(1+3*eta)/(4*d), (1+xi)*(1-3*xi)/(4*d), 3*(2-xi^2-eta^2)/(2*d^2), -(1+eta)*(3*eta-1)/(4*d), (1+xi)*(3*xi-1)/(4*d), -3*(2-xi^2-eta^2)/(2*d^2), -(1+eta)*(1-3*eta)/(4*d), -(1-xi)*(1+3*xi)/(4*d)]}
+#: **Rigidez con Gauss 2 × 2** (det J = (d/2)²), exactamente como la calcula el programa. No es la integral exacta: el término (2 − ξ² − η²)² es de grado 4 (ver A.3).
+K_DKQ = Simplify{(d/2)^2*(transpose(B_f(-1/sqrt(3), -1/sqrt(3)))*D_f*B_f(-1/sqrt(3), -1/sqrt(3)) + transpose(B_f(1/sqrt(3), -1/sqrt(3)))*D_f*B_f(1/sqrt(3), -1/sqrt(3)) + transpose(B_f(1/sqrt(3), 1/sqrt(3)))*D_f*B_f(1/sqrt(3), 1/sqrt(3)) + transpose(B_f(-1/sqrt(3), 1/sqrt(3)))*D_f*B_f(-1/sqrt(3), 1/sqrt(3)))}
+#: El DKQ usa β_{x} = θ_{y} y β_{y} = −θ_{x}: en la losa se multiplica por P = diag(1, −1, −1, …) a los dos lados, K_{placa} = P·K_{DKQ}·P.
+
+### A.6 · Giro en el plano (drilling)
+#: La cáscara plana no tiene rigidez propia para θz. Hekatan Struct pone un muelle de 10⁻⁶ veces el promedio de la diagonal de la membrana:
+#: k_{θz} = 10⁻⁶ · (suma de la diagonal de K_{Q6}) / 8, puesto en el θz de cada nudo.
+#: Así el elemento de losa es de 24 × 24: en cada nudo, u y v de K_{Q6}, w, θx y θy de K_{placa}, y θz del muelle.
+
+### A.7 · Barra 3D de Timoshenko (12 × 12)
+#: Cuatro físicas que no se mezclan, en s = x/L de 0 a 1. **Axial** y **torsión**: funciones lineales.
+N_ax = Simplify{[1-s, s]}
+k_ax = Simplify{E*A_b/L*Area{transpose([Partial{1-s @ s}, Partial{s @ s}])*[Partial{1-s @ s}, Partial{s @ s}] @ s = 0 : 1}}
+k_tor = Simplify{G*J_b/L*Area{transpose([Partial{1-s @ s}, Partial{s @ s}])*[Partial{1-s @ s}, Partial{s @ s}] @ s = 0 : 1}}
+#: **Flexión** (Euler-Bernoulli): las cuatro Hermite cúbicas, desplazamiento y giro en cada extremo.
+N_fl = Simplify{[1-3*s^2+2*s^3, L*(s-2*s^2+s^3), 3*s^2-2*s^3, L*(s^3-s^2)]}
+B_fl = Simplify{[Partial{Partial{1-3*s^2+2*s^3 @ s} @ s}, Partial{Partial{L*(s-2*s^2+s^3) @ s} @ s}, Partial{Partial{3*s^2-2*s^3 @ s} @ s}, Partial{Partial{L*(s^3-s^2) @ s} @ s}]}
+k_EB = Simplify{E*I/L^3*Area{transpose(B_fl)*B_fl @ s = 0 : 1}}
+#: **Timoshenko**: con la deformación por cortante (área de corte A_{s} = 5/6·A), las mismas posiciones con el parámetro φ:
+φ_s = Simplify{12*E*I/(G*A_s*L^2)}
+k_Ti = Simplify{E*I/(L^3*(1+phi))*[12, 6*L, -12, 6*L; 6*L, (4+phi)*L^2, -6*L, (2-phi)*L^2; -12, -6*L, 12, -6*L; 6*L, (2-phi)*L^2, -6*L, (4+phi)*L^2]}
+#: Con φ = 0 vuelve exacto a la de Euler-Bernoulli:
+k_Ti0 = Simplify{E*I/(L^3*(1+0))*[12, 6*L, -12, 6*L; 6*L, (4+0)*L^2, -6*L, (2-0)*L^2; -12, -6*L, 12, -6*L; 6*L, (2-0)*L^2, -6*L, (4+0)*L^2]}
+#: En la matriz de 12 × 12 (orden u, v, w, θx, θy, θz de cada extremo): k_{ax} va en (u₁, u₂), k_{tor} en (θx₁, θx₂), la flexión con I_{z} en (v, θz) y con I_{y} en (w, θy); en este último plano los términos cruzados cambian de signo porque θy = −∂w/∂x.
+
+### A.8 · De ejes locales a globales
+#: Cada barra se gira con sus cosenos directores. En una columna vertical x_{local} = Z global:
+λ_c = Simplify{[0, 0, 1; 0, 1, 0; -1, 0, 0]}
+#: y la matriz de 12 × 12 es la de 3 × 3 repetida 4 veces en la diagonal:
+#noc
+K_global = transpose(Rot)·k·Rot
+#equ
+#: La losa es plana y sus ejes son los globales: su matriz no se gira.
+
+### A.9 · De los puntos de Gauss a los nudos
+#: Los momentos se calculan donde la B es buena, en los 4 puntos de Gauss: M = D_{f}·B_{f}(ξ_{g}, η_{g})·u_{e}. Para llevarlos a los nudos se ve el cuadrado de los puntos de Gauss como un Q4 cuyas esquinas están en ±1/√3: los nudos quedan en ±√3 de ese Q4. La primera fila de la matriz de extrapolación, que es el nudo 1 en (−√3, −√3):
+A_1 = Simplify{[(1+sqrt(3))*(1+sqrt(3))/4, (1-sqrt(3))*(1+sqrt(3))/4, (1-sqrt(3))*(1-sqrt(3))/4, (1+sqrt(3))*(1-sqrt(3))/4]}
+#: Las otras tres filas son la misma, rotada. En cada nudo se guarda el mayor |M| de los elementos que llegan (la envolvente).
+
+## B · Resultados numéricos
+
+### B.1 · Datos
 L_x = 6 'luz de la losa en x y en y (m)
 H_c = 4 'altura de las columnas (m)
 t = 0.1 'espesor de la losa (m)
@@ -29,7 +125,7 @@ I_yv = b_v·h_v^3/12 'inercia fuerte de la viga (flexión vertical)
 I_zv = h_v·b_v^3/12
 J_v = stv(b_v, h_v)
 
-## 2 · Malla
+### B.2 · Malla
 #: 5 × 5 elementos de losa de 1.2 m (el automallado de ETABS a ≤ 1.25 m). Nudos: 4 en la base de las columnas y 36 en la losa, a la altura H.
 n_e = 5 'elementos por lado
 n_1 = n_e + 1 'nudos por lado
@@ -88,33 +184,35 @@ n_s = n_e^2 'elementos de losa
 n_c = 4 'columnas
 n_b = 4·n_e 'tramos de viga (cada viga se parte en los nudos de la losa)
 
-## 3 · Elemento de losa (24 × 24)
-#: Cada nudo tiene 6 grados de libertad: u, v, w, θx, θy, θz. La losa es plana y sus ejes locales son los globales, así que su matriz no se gira.
-a_e = d/2 'medio lado: ξ = x/a, η = y/a
-#: **Membrana Q6** (Wilson, Taylor 1976): u = Σ Nᵢ·uᵢ + (1 − ξ²)·α₁ + (1 − η²)·α₂, y lo mismo para v. Los 4 modos α se condensan: K_{m} = K_{uu} − K_{uα}·K_{αα}⁻¹·K_{αu}. Sin ellos, la Q4 bilineal se traba en flexión en el plano.
+### B.3 · Matrices de los elementos
+#: Son las fórmulas de la parte A con los datos de la mesa. No se vuelven a escribir: se comprueba un término de cada una contra su expresión algebraica.
+a_e = d/2 'medio lado del elemento de losa (m)
+#hide
 K_m = memb_q6(E, ν, t, a_e)
-#: **Flexión DKQ** (Batoz y Tahar 1982): la hipótesis de Kirchhoff se impone en puntos discretos del borde, y la matriz B de curvaturas queda explícita en ξ y η. Integración de Gauss 2 × 2, con det J = a_{e}².
 D_b = E·t^3/(12·(1 - ν^2))·[1, ν, 0; ν, 1, 0; 0, 0, (1 - ν)/2]
 K_b = dkq_K(D_b, d)
-#: El DKQ usa β_x = θ_y y β_y = −θ_x; la matriz P = diag(1, −1, −1, …) pasa sus grados de libertad a (w, θx, θy) de la hoja.
-#hide
 P_d = zeros(12, 12)
 for k = 1:4
   P_d(3·k - 2, 3·k - 2) = 1
   P_d(3·k - 1, 3·k - 1) = -1
   P_d(3·k, 3·k) = -1
 end
-#show
 K_p = P_d·K_b·P_d
-#: **Giro en el plano θz** (el «drilling» de Hekatan Struct): un muelle de 10⁻⁶ veces el promedio de la diagonal de la membrana, solo para que la matriz no sea singular.
-#hide
 s_m = 0
 for k = 1:8
   s_m = s_m + K_m(k, k)
 end
 #show
-k_θ = s_m/8·1e-6
-#: Las tres piezas en la matriz del elemento, en el orden u, v, w, θx, θy, θz de cada nudo:
+#: **Membrana Q6** (A.4):
+K_m11 = K_m(1, 1) 'del programa (kN/m)
+K_m11f = E·t·(11 - 3·ν - 2·ν^2)/(24·(1 - ν^2)) 'fórmula K_Q6(1, 1)
+#: **Placa DKQ** (A.5):
+D_p = E·t^3/(12·(1 - ν^2)) 'rigidez a flexión (kN·m)
+K_b11 = K_b(1, 1) 'del programa (kN/m)
+K_b11f = 10·D_p/d^2 'fórmula K_DKQ(1, 1), Gauss 2 × 2
+K_b11e = (51 - ν)·D_p/(5·d^2) 'con la integral exacta: el DKQ NO la usa
+#: **Giro en el plano** (A.6):
+k_θ = s_m/(8·10^6) 'muelle de θz (kN·m/rad)
 #hide
 K_s = zeros(24, 24)
 for a = 1:4
@@ -132,16 +230,23 @@ for a = 1:4
   end
   K_s(6·a, 6·a) = k_θ
 end
-#show
-K_s(3:5, 3:5) 'bloque de flexión del nudo 1 (w, θx, θy)
-
-## 4 · Barras (12 × 12)
-#: **Timoshenko 3D**: área de corte 5/6·A, φ = 12·E·I/(G·A_s·L²). Cuatro físicas que no se mezclan: axial E·A/L, torsión G·J/L y flexión en los dos planos de la barra.
-#: **Ejes locales** (los de Hekatan Struct): x a lo largo de la barra; en una columna vertical, λ = [0 0 1; 0 1 0; −1 0 0]. La matriz global es Rotᵀ·k·Rot.
 k_col = frame_K(E, G_c, A_c, I_yc, I_zc, J_c, H_c)
 k_vig = frame_K(E, G_c, A_v, I_yv, I_zv, J_v, d)
+#show
+#: **Columna** de Timoshenko (A.7), L = H:
+φ_c = 12·E·I_zc/(G_c·5/6·A_c·H_c^2) 'parámetro de cortante
+k_c11 = k_col(1, 1) 'axial, del programa
+k_c11f = E·A_c/H_c 'fórmula E·A/L
+k_c22 = k_col(2, 2) 'flexión, del programa
+k_c22f = 12·E·I_zc/(H_c^3·(1 + φ_c)) 'fórmula 12·E·I/(L³·(1 + φ))
+#: **Tramo de viga** (L = d), flexión vertical con I_{y} y torsión:
+φ_v = 12·E·I_yv/(G_c·5/6·A_v·d^2)
+k_v33 = k_vig(3, 3) 'del programa
+k_v33f = 12·E·I_yv/(d^3·(1 + φ_v)) 'fórmula
+k_v44 = k_vig(4, 4) 'torsión, del programa
+k_v44f = G_c·J_v/d 'fórmula G·J/L
 
-## 5 · Ensamblaje, apoyos y solución
+### B.4 · Ensamblaje, apoyos y solución
 d_n(j) = 6·(j - 1) + (1:6)
 #hide
 K = zeros(n_d, n_d)
@@ -193,7 +298,7 @@ n_f = k 'ecuaciones libres
 #: Cholesky sobre las ecuaciones libres:
 U(l_f) = clsolve(K(l_f, l_f), F(l_f))
 
-## 6 · Flecha de la losa
+### B.5 · Flecha de la losa
 #hide
 W_g = zeros(n_1, n_1)
 for i = 0:n_e
@@ -209,7 +314,7 @@ w_c = W_g(3, 3) 'flecha en el nudo central (mm)
 w_z(x, y) = bil(W_g, x, y, d, n_e)
 #map(w_z(x, y), [0 L_x], [0 L_x])
 
-## 7 · Momentos de la losa (recovery DKQ)
+### B.6 · Momentos de la losa (recovery DKQ)
 #: En cada elemento: M = D_{b}·B(ξ, η)·u_{e} en los 4 puntos de Gauss (±1/√3), con la MISMA B del DKQ; luego se extrapola a los nudos con la matriz de √3. En cada nudo se guarda el valor de MAYOR |M| de los elementos que llegan (la envolvente, como la tabla element-joint de ETABS). Con el promedio de nudo Mxy saldría 0.170 en vez de 0.189.
 s_3 = sqrt(3)
 A_x = [1 + s_3/2, -0.5, 1 - s_3/2, -0.5; -0.5, 1 + s_3/2, -0.5, 1 - s_3/2; 1 - s_3/2, -0.5, 1 + s_3/2, -0.5; -0.5, 1 - s_3/2, -0.5, 1 + s_3/2]
@@ -266,7 +371,7 @@ M_xy(x, y) = bil(M_sg, x, y, d, n_e)
 M_11 = max(abs(M_xg)) 'max |Mxx| (tonf·m/m)
 M_12 = max(abs(M_sg)) 'max |Mxy| (tonf·m/m)
 
-## 8 · Fuerzas en columnas y vigas
+### B.7 · Fuerzas en columnas y vigas
 #: En cada barra: f = k·Rot·u_{e} (ejes locales, orden P, V₂, V₃, T, M₂, M₃ en el nudo i y luego en el j), en tonf y tonf·m.
 f_c = transpose(k_col·rot_frame(X_n(1, :), X_n(p(0, 0), :))·U([d_n(1), d_n(p(0, 0))]))/g_0
 #: Columna de la esquina (0, 0). El momento en el nudo de arriba es 2.434, pero ETABS lo reporta en la CARA de la viga, medio metro más abajo: M_{cara} = M_{nudo} − V·o_{f}.
@@ -287,10 +392,73 @@ P_v = abs(f_b(1, 1)) 'axial (tonf)
 V_v = abs(f_b(1, 3)) 'cortante vertical en el apoyo (tonf)
 T_v = abs(f_b(1, 4)) 'torsión: la losa hace girar a la viga (tonf·m)
 M_v = abs(f_b(3, 5)) 'momento al centro de la luz (tonf·m)
+#: **Todas las barras**: filas 1 a 4 las columnas, 5 a 24 los tramos de viga; columnas P, V₂, V₃, T, M₂, M₃ en el nudo i y luego en el j (tonf, tonf·m).
+#hide
+n_r = n_c + n_b
+e_f = zeros(n_r, 2)
+f_t = zeros(n_r, 12)
+for e = 1:n_r
+  if e <= n_c
+    e_f(e, 1) = c_e(e, 1)
+    e_f(e, 2) = c_e(e, 2)
+    k_e = k_col
+  else
+    e_f(e, 1) = b_e(e - n_c, 1)
+    e_f(e, 2) = b_e(e - n_c, 2)
+    k_e = k_vig
+  end
+  g = [d_n(e_f(e, 1)), d_n(e_f(e, 2))]
+  f_t(e, :) = transpose(k_e·rot_frame(X_n(e_f(e, 1), :), X_n(e_f(e, 2), :))·U(g))/g_0
+end
+M_f = zeros(n_r, 2)
+V_f = zeros(n_r, 2)
+T_f = zeros(n_r, 2)
+P_f = zeros(n_r, 2)
+for e = 1:n_r
+  M_f(e, 1) = f_t(e, 5)
+  M_f(e, 2) = -f_t(e, 11)
+  V_f(e, 1) = f_t(e, 3)
+  V_f(e, 2) = -f_t(e, 9)
+  T_f(e, 1) = f_t(e, 4)
+  T_f(e, 2) = -f_t(e, 10)
+  P_f(e, 1) = f_t(e, 1)
+  P_f(e, 2) = -f_t(e, 7)
+end
+w_n = zeros(n_j, 1)
+Mxx_n = zeros(n_j, 1)
+Myy_n = zeros(n_j, 1)
+Mxy_n = zeros(n_j, 1)
+for i = 0:n_e
+  for j = 0:n_e
+    w_n(p(i, j)) = W_g(i + 1, j + 1)
+    Mxx_n(p(i, j)) = M_xg(i + 1, j + 1)
+    Myy_n(p(i, j)) = M_yg(i + 1, j + 1)
+    Mxy_n(p(i, j)) = M_sg(i + 1, j + 1)
+  end
+end
+U_3 = zeros(n_j, 3)
+for j = 1:n_j
+  for k = 1:3
+    U_3(j, k) = U(6·(j - 1) + k)
+  end
+end
+#show
+f_t
+#: **Diagramas por barra** (valor en el nudo i y en el j, con el signo del diagrama):
+M_f 'momento de flexión M₂ (tonf·m): en la viga, negativo junto a la columna y 3.14 al centro
+T_f 'torsión (tonf·m): la losa hace girar a la viga, 1.15 en los extremos
+#: **El modelo en 3D.** Arrastra para girar, rueda para acercar y pasa el cursor para leer el valor de la losa o de la barra. Deformada ×80 con w y el momento de las barras:
+#modelo3d(X_n, e_s, e_f, w_n, M_f, U_3, 80)
+#: Torsión de la losa (Mxy) y de las barras (T):
+#modelo3d(X_n, e_s, e_f, Mxy_n, T_f)
+#: Mxx de la losa y cortante vertical de las barras (V₃):
+#modelo3d(X_n, e_s, e_f, Mxx_n, V_f)
+#: Myy de la losa y axial de las barras (P): las columnas bajan la carga, 4.5 tonf cada una.
+#modelo3d(X_n, e_s, e_f, Myy_n, P_f)
 #: **Equilibrio**: la suma de las 4 reacciones verticales de la base tiene que ser la carga total.
 R_z = (K(3, :)·U + K(9, :)·U + K(15, :)·U + K(21, :)·U)/g_0 'suma de reacciones (tonf)
 
-## 9 · Verificación
+### B.8 · Verificación
 #: **Referencias.** ETABS 22 (mismo e2k) y el motor de Hekatan Struct en Python (hekatan-fem-py, mesa_hekatan.py con DKQ), mismo modelo nudo a nudo. El +2.6 % de w es de ETABS: rigidiza la viga en la zona de junta con la columna (0.40 m); aquí la viga va de nudo a nudo (6.0 m).
 w_py = -6.670544 'Hekatan Struct (Python)
 M_11py = 0.653683

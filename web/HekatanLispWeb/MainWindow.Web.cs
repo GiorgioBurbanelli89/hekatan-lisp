@@ -30,7 +30,7 @@ namespace HekatanLisp
                     html = ReplaceFirst(html, "<div class=\"hk-plotslot\"></div>",
                         ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
                 html = LispAnim.PostProcesar(html);
-                if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + "</body>");
+                if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + SurfacePlot.Modelo3DScript + "</body>");
                 return html;
             }
             var sb = new StringBuilder();

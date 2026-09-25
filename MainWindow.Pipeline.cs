@@ -467,7 +467,7 @@ namespace HekatanLisp
         // Construye TODAS las gráficas EN ORDEN de aparición (fplot / surf / map mezclados), una por
         // directiva. El resultado va, en ese orden, a rellenar los huecos hk-plotslot del documento.
         private static readonly System.Text.RegularExpressions.Regex RxAnyPlot = new System.Text.RegularExpressions.Regex(
-            @"^\s*(?!#+[ \t]+\w+[ \t]+[^\s(])[;#]+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|newpage)\b(.*)$",
+            @"^\s*(?!#+[ \t]+\w+[ \t]+[^\s(])[;#]+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|salto|pagebreak|nuevapagina|pagina|solido|solid|hexa|solidmesh|modelo3d|newpage)\b(.*)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static List<string> BuildPlotsOrdered(string editorText, List<string> forms, bool dark, out bool anySurf)
@@ -501,6 +501,7 @@ namespace HekatanLisp
             }
             int surfId = 0;
             var vecesG = new Dictionary<string, int>(); var vecesM = new Dictionary<string, int>();   // n.º de aparición de cada #map/#malla (ClaveNum)
+            var veces3D = new Dictionary<string, int>();   // n.º de aparición de cada #modelo3d
             int Vez(Dictionary<string, int> d, string k) { d[k] = d.TryGetValue(k, out var c) ? c + 1 : 0; return d[k]; }
             bool enFila = false; int idxFila = -1;   // #fila … #finfila: gráficas lado a lado
             void CerrarFila()
@@ -639,6 +640,26 @@ namespace HekatanLisp
                                              isFrame ? "esquema del pórtico (sin deformar)" : "esquema de la viga (sin deformar)"));
                     }
                     catch { outList.Add(""); }
+                }
+                else if (kw is "modelo3d")
+                {
+                    // hoja numérica: el modelo en 3D (losa coloreada + diagramas de barras), gira con el
+                    // ratón y dice el valor bajo el cursor (SurfacePlot.Modelo3DHtml + Modelo3DScript)
+                    var pm3 = System.Text.RegularExpressions.Regex.Match(rest, @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    string k3 = pm3.Success ? pm3.Groups[1].Value.Trim() : "";
+                    if (pm3.Success && _numModels != null && _numModels.TryGetValue(ClaveNum(k3, Vez(veces3D, k3)), out var lits))
+                    {
+                        try
+                        {
+                            var nombres = SplitTop(k3).Select(a => a.Trim()).ToList();
+                            string cap = "losa: " + (nombres.Count > 3 ? nombres[3] : "") + "  ·  barras: " + (nombres.Count > 4 ? nombres[4] : "") +
+                                         "  ·  <span style=\"opacity:.7\">arrastra para girar, rueda para acercar, cursor para leer</span>";
+                            outList.Add(PlotWrap(SurfacePlot.Modelo3DHtml(lits, nombres, surfId++), cap));
+                            anySurf = true;
+                        }
+                        catch { outList.Add(""); }
+                    }
+                    else outList.Add("");
                 }
                 else if (kw is "malla" or "mallado")
                 {
@@ -1314,6 +1335,7 @@ dib();})();";
         private HojaNumerica.Resultado _numRes;
         private List<List<string>> _numBlocks;
         private static Dictionary<string, HojaNumerica.Rejilla> _numGrids;   // #map de la hoja numérica: texto → rejilla
+        private static Dictionary<string, List<string>> _numModels;   // #modelo3d(…) → literales de sus datos
         private static Dictionary<string, HojaNumerica.MallaDatos> _numMeshes;   // #malla(x, y, e, s) → datos del modelo
         private static string ClaveNum(string texto, int vez) => texto + "\u0001" + vez;
         private const string NumOculta = "\u0002hkoculta";                   // línea #hide: no se dibuja
@@ -1516,7 +1538,7 @@ dib();})();";
             // Aquí los nombres se preparan ANTES de plegar, para que los bloques usen los mismos
             // nombres que la hoja (ν → nu, E/e distintos…); el plegado deja una línea marcador.
             _numMode = RxNumerico.IsMatch(text);
-            _numRes = null; _numBlocks = null; _numGrids = null; _numMeshes = null;
+            _numRes = null; _numBlocks = null; _numGrids = null; _numMeshes = null; _numModels = null;
             if (_numMode)
             {
                 text = RxNumerico.Replace(text, "");
@@ -1636,7 +1658,7 @@ dib();})();";
                                LispAnim.RxVoz.IsMatch(s) || s.StartsWith("#hkan") ||
                                s.StartsWith("#<") || s.StartsWith("#|") || s.StartsWith(";") || s.StartsWith("%") ||
                                System.Text.RegularExpressions.Regex.IsMatch(s,
-                                   @"^(?!#+[ \t]+\w+[ \t]+[^\s(])#\s*(autolispout|anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                                   @"^(?!#+[ \t]+\w+[ \t]+[^\s(])#\s*(autolispout|anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|modelo3d|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                                System.Text.RegularExpressions.Regex.IsMatch(s, @"^#\s*(?:tabla|table)\s*\(",
                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -1689,6 +1711,9 @@ dib();})();";
                         progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Bloque = numBloque[i], Visible = !oculta });
                         continue;
                     }
+                    var m3 = System.Text.RegularExpressions.Regex.Match(lines[i], @"^\s*#\s*modelo3d\s*\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (m3.Success)
+                    { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Modelo3D = m3.Groups[1].Value, Visible = true }); continue; }
                     var mz = System.Text.RegularExpressions.Regex.Match(lines[i], @"^\s*#\s*(malla|mallado)\s*\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                     if (mz.Success && !System.Text.RegularExpressions.Regex.IsMatch(mz.Groups[2].Value, @"^\s*\d+\s*,"))
                     { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Malla = mz.Groups[2].Value, Visible = true }); continue; }
@@ -1709,6 +1734,14 @@ dib();})();";
                     {
                         string kt = pl.Mapa.Trim(); vecesG[kt] = vecesG.TryGetValue(kt, out var c0) ? c0 + 1 : 0;
                         if (_numRes.Mapa.TryGetValue(pl.Idx, out var g)) _numGrids[ClaveNum(kt, vecesG[kt])] = g;
+                    }
+                _numModels = new Dictionary<string, List<string>>();
+                var veces3 = new Dictionary<string, int>();
+                foreach (var pl in progLines)
+                    if (pl.Modelo3D != null)
+                    {
+                        string kt = pl.Modelo3D.Trim(); veces3[kt] = veces3.TryGetValue(kt, out var c0) ? c0 + 1 : 0;
+                        if (_numRes.Modelo3D.TryGetValue(pl.Idx, out var md3)) _numModels[ClaveNum(kt, veces3[kt])] = md3;
                     }
                 _numMeshes = new Dictionary<string, HojaNumerica.MallaDatos>();
                 var vecesM = new Dictionary<string, int>();
@@ -1744,7 +1777,7 @@ dib();})();";
                 if (manualTables[i] != null) { textOf[i] = ("table", "left", manualTables[i]); continue; }   // tabla de TEXTO (#|…|)
                 var exprText = lines[i];
                 if (System.Text.RegularExpressions.Regex.IsMatch(lines[i],
-                        @"^\s*(?!#+[ \t]+\w+[ \t]+[^\s(])[;#]+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|salto|pagebreak|nuevapagina|pagina|newpage)\b",
+                        @"^\s*(?!#+[ \t]+\w+[ \t]+[^\s(])[;#]+\s*(anim|animar|animacion|slider|barra_deslizante|deslizador|gauss|cuadratura|gausslegendre|fila|finfila|fplot|plot|ezplot|graficas?|grafico|surf|superficie|plot3d|mesh|malla|mallado|map|mapa|heatmap|contourf?|beam|viga|esquema|frame|portico|framedef|porticodef|slice|trozo|elemento|defl|diag|vmd|bar1d|barra|elem1d|punto|dotprod|producto|dot|recta|ab|interceptopendiente|mapa1d|xdexi|mapnatural|solido|solid|hexa|solidmesh|modelo3d|salto|pagebreak|nuevapagina|pagina|newpage)\b",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { isPlot[i] = true; continue; }
                 var tspec = ParseTablaDirective(lines[i]);
                 if (tspec != null) { isTabla[i] = true; tablaSpecOf[i] = tspec; continue; }
@@ -1808,16 +1841,21 @@ dib();})();";
                 if (treeOf[i] == null) continue;
                 // hoja numérica: lo calculado por el programa (o #noc) no pasa por el motor simbólico
                 if (_numMode && (numOculta[i] || numModo[i] == 'n' || (_numRes != null && _numRes.Calculada.Contains(i)))) continue;
+                // 24-sep-2026: la etiqueta se guarda con las funciones de la hoja YA expandidas. Antes se
+                // guardaba el árbol crudo: K_ua = ∫∫ B_m(ξ, η)ᵀ·D·G_m(ξ, η) reusada en
+                // K_uu − K_ua·inv(K_aa)·K_uaᵀ llegaba con B_m(ξ, η) sin expandir y la integral daba «?».
+                LispConverter.N appL = treeOf[i];
                 try
                 {
                     var app = (funcMap.Count > 0 || vecMap.Count > 0)
                               ? LispConverter.SubstFuncs(treeOf[i], funcMap, vecMap) : treeOf[i];  // f(3)→3²+1, v(2)→componente
+                    appL = app;
                     var sub = _sinSustituir ? app : LispConverter.SubstLabels(app, prevLabels, labels[i], new HashSet<string>());
                     formOf[i] = barraOf[i] ?? LispConverter.ToLisp(sub);
                 }
                 catch { formOf[i] = barraOf[i]; }
                 if (formOf[i] != null) { forms.Add(formOf[i]); idx.Add(i); }
-                if (labels[i] != null && !prevLabels.ContainsKey(labels[i])) prevLabels[labels[i]] = treeOf[i];
+                if (labels[i] != null && !prevLabels.ContainsKey(labels[i])) prevLabels[labels[i]] = appL;
                 if (aliasOf[i] != null) foreach (var a in aliasOf[i]) if (!prevLabels.ContainsKey(a)) prevLabels[a] = treeOf[i];
             }
             bool hasVar = !string.IsNullOrWhiteSpace(dvar);   // dvar = variable de la parcial (∂/∂), o null = auto

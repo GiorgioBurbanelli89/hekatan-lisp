@@ -762,5 +762,121 @@ namespace HekatanLisp
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',todos);else todos();
 })();
 </script>";
+    
+        // ================= #modelo3d: el modelo en 3D con hover (hoja numérica) =================
+        // 24-sep-2026, Jorge: «como Python que tiene el 3D y con un cursor del mouse hacer hover».
+        // Datos (literales del motor numérico): X (n×3), cáscaras (m×4, nudos desde 1), barras (b×2),
+        // valor por nudo (n) para colorear la losa, valor en los extremos de cada barra (b×2) para su
+        // diagrama, y opcionales U (n×3 o n×6, desplazamientos) y escala de la deformada.
+        static readonly System.Text.RegularExpressions.Regex RxNum3 =
+            new(@"(?<![\w.])-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?(?![\w.])");
+        static double[] Nums3(string lit) => RxNum3.Matches(lit ?? "").Select(m => double.Parse(m.Value, NumberStyles.Float, CultureInfo.InvariantCulture)).ToArray();
+        static double[][] Rows3(string lit)
+        {
+            var ms = System.Text.RegularExpressions.Regex.Matches(lit ?? "", @"\(vector ([^()]*)\)");
+            return ms.Select(m => Nums3(m.Groups[1].Value)).ToArray();
+        }
+        static string J3(double v) => double.IsFinite(v) ? Math.Round(v, 6).ToString("0.######", CultureInfo.InvariantCulture) : "0";
+
+        public static string Modelo3DHtml(List<string> lits, List<string> nombres, int id)
+        {
+            var X = Rows3(lits[0]); var S = Rows3(lits[1]); var B = Rows3(lits[2]);
+            var vN = Nums3(lits[3]);
+            var vB = Rows3(lits[4]);
+            if (vB.Length != B.Length || vB.Any(r => r.Length < 2))
+            {   // venía como vector plano: 2 valores por barra
+                var f = Nums3(lits[4]);
+                vB = Enumerable.Range(0, B.Length).Select(k => new[] { 2 * k + 1 < f.Length ? f[2 * k] : 0, 2 * k + 1 < f.Length ? f[2 * k + 1] : 0 }).ToArray();
+            }
+            var U = lits.Count > 5 ? Rows3(lits[5]) : new double[0][];
+            double esc = lits.Count > 6 && Nums3(lits[6]).Length > 0 ? Nums3(lits[6])[0] : 0;
+            string M(IEnumerable<double[]> rows) => "[" + string.Join(",", rows.Select(r => "[" + string.Join(",", r.Select(J3)) + "]")) + "]";
+            var sb = new System.Text.StringBuilder("{");
+            sb.Append("\"X\":").Append(M(X));
+            sb.Append(",\"S\":").Append(M(S)).Append(",\"B\":").Append(M(B));
+            sb.Append(",\"vN\":[").Append(string.Join(",", vN.Select(J3))).Append("]");
+            sb.Append(",\"vB\":").Append(M(vB));
+            if (U.Length == X.Length) sb.Append(",\"U\":").Append(M(U.Select(r => r.Take(3).ToArray())));
+            sb.Append(",\"esc\":").Append(J3(esc));
+            string nS = nombres.Count > 3 ? nombres[3] : "", nB = nombres.Count > 4 ? nombres[4] : "";
+            sb.Append(",\"nS\":\"").Append(System.Web.HttpUtility.JavaScriptStringEncode(nS)).Append("\"");
+            sb.Append(",\"nB\":\"").Append(System.Web.HttpUtility.JavaScriptStringEncode(nB)).Append("\"}");
+            string json = System.Net.WebUtility.HtmlEncode(sb.ToString());
+            return "<div class=\"hk-m3d\" style=\"position:relative;display:inline-block;max-width:100%\">" +
+                   "<canvas id=\"hkm3d" + id + "\" width=\"900\" height=\"600\" style=\"max-width:100%;height:auto;cursor:grab;touch-action:none\" data-m3d=\"" + json + "\"></canvas>" +
+                   "<div class=\"hk-m3d-tip\" style=\"position:absolute;display:none;pointer-events:none;background:rgba(255,255,255,.95);color:#111;border:1px solid #888;border-radius:4px;padding:3px 7px;font:12px monospace;white-space:pre\"></div></div>";
+        }
+
+        // Script del visor 3D (una vez por página): arrastrar = girar, rueda = zoom, cursor = valor.
+        public const string Modelo3DScript = @"<script>
+(function(){
+function jet(t){t=Math.max(0,Math.min(1,t));var r=Math.min(Math.max(1.5-Math.abs(4*t-3),0),1),g=Math.min(Math.max(1.5-Math.abs(4*t-2),0),1),b=Math.min(Math.max(1.5-Math.abs(4*t-1),0),1);return [r*255|0,g*255|0,b*255|0];}
+function css(c,a){return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';}
+function fmt(v){var a=Math.abs(v);return (a!==0&&(a<1e-3||a>=1e5))?v.toExponential(3):v.toFixed(4);}
+function init(cv){
+ if(cv._m3d)return;cv._m3d=1;
+ var D=JSON.parse(cv.getAttribute('data-m3d'));
+ var g=cv.getContext('2d'),W=cv.width,H=cv.height,tip=cv.parentNode.querySelector('.hk-m3d-tip');
+ var n=D.X.length,P=[],i,k;
+ for(i=0;i<n;i++){var u=(D.U&&D.U[i])?D.U[i]:[0,0,0],e=D.esc||0;P.push([D.X[i][0]+e*u[0],D.X[i][1]+e*u[1],D.X[i][2]+e*u[2]]);}
+ var lo=[1e99,1e99,1e99],hi=[-1e99,-1e99,-1e99];
+ for(i=0;i<n;i++)for(k=0;k<3;k++){lo[k]=Math.min(lo[k],D.X[i][k]);hi[k]=Math.max(hi[k],D.X[i][k]);}
+ var c=[(lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2],R=Math.max(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2])/2||1;
+ var used={},smin=1e99,smax=-1e99;D.S.forEach(function(q){q.forEach(function(j){used[j-1]=1;});});
+ for(i in used){var v=D.vN[i]||0;smin=Math.min(smin,v);smax=Math.max(smax,v);}
+ if(!(smax>smin)){smax=smin+1;}
+ var bmax=0;D.vB.forEach(function(r){bmax=Math.max(bmax,Math.abs(r[0]),Math.abs(r[1]));});
+ var bs=bmax>0?0.22*R/bmax:0;
+ var yaw=-0.65,pitch=0.5,zoom=1,drag=null,hov=null,prims=[],samp=[];
+ function pr(p){var x=p[0]-c[0],y=p[1]-c[1],z=p[2]-c[2];var cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  var x1=x*cy-y*sy,y1=x*sy+y*cy;var y2=y1*cp-z*sp,z2=y1*sp+z*cp;var s=0.42*Math.min(W,H)/R*zoom;return [W/2-40+x1*s,H/2-z2*s,y2];}
+ function lerp(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+ function build(){prims=[];samp=[];var ns=4;
+  D.S.forEach(function(q,e){var a=P[q[0]-1],b=P[q[1]-1],cc=P[q[2]-1],d=P[q[3]-1],va=D.vN[q[0]-1]||0,vb=D.vN[q[1]-1]||0,vc=D.vN[q[2]-1]||0,vd=D.vN[q[3]-1]||0;
+   function pt(r,s){return lerp(lerp(a,b,r),lerp(d,cc,r),s);}
+   function vl(r,s){return (1-r)*(1-s)*va+r*(1-s)*vb+r*s*vc+(1-r)*s*vd;}
+   var ii,jj;
+   for(ii=0;ii<ns;ii++)for(jj=0;jj<ns;jj++){var r0=ii/ns,r1=(ii+1)/ns,s0=jj/ns,s1=(jj+1)/ns;
+    prims.push({t:'s',p:[pt(r0,s0),pt(r1,s0),pt(r1,s1),pt(r0,s1)],v:(vl(r0,s0)+vl(r1,s0)+vl(r1,s1)+vl(r0,s1))/4});}
+   var o=D.X[q[0]-1],o2=D.X[q[2]-1];
+   for(ii=0;ii<=ns;ii++)for(jj=0;jj<=ns;jj++){var r=ii/ns,s=jj/ns;
+    samp.push({p:pt(r,s),txt:D.nS+' = '+fmt(vl(r,s))+'\nx = '+fmt(o[0]+(o2[0]-o[0])*r)+'   y = '+fmt(o[1]+(o2[1]-o[1])*s)+'\ncascara '+(e+1)});}
+  });
+  D.B.forEach(function(br,e){var a=P[br[0]-1],b=P[br[1]-1],v0=D.vB[e][0],v1=D.vB[e][1];
+   var dv=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],L=Math.hypot(dv[0],dv[1],dv[2])||1,o;
+   if(Math.abs(dv[2])>0.9*L){var mx=(a[0]+b[0])/2-c[0],my=(a[1]+b[1])/2-c[1],h=Math.hypot(mx,my)||1;o=[mx/h,my/h,0];}else o=[0,0,-1];
+   var q0=[a[0]+o[0]*v0*bs,a[1]+o[1]*v0*bs,a[2]+o[2]*v0*bs],q1=[b[0]+o[0]*v1*bs,b[1]+o[1]*v1*bs,b[2]+o[2]*v1*bs];
+   prims.push({t:'b',p:[a,b,q1,q0],v:(v0+v1)/2});prims.push({t:'l',p:[a,b]});
+   for(var t=0;t<=10;t++){var tt=t/10,vv=v0+(v1-v0)*tt,lab=D.nB+' = '+fmt(vv)+'\nbarra '+(e+1)+' (nudos '+br[0]+' a '+br[1]+'), '+Math.round(tt*100)+' %';
+    samp.push({p:lerp(a,b,tt),txt:lab});samp.push({p:lerp(q0,q1,tt),txt:lab});}
+  });}
+ function draw(){g.clearRect(0,0,W,H);var fg=getComputedStyle(cv.parentNode).color||'#222';
+  var L=prims.map(function(p){var sc=p.p.map(pr),d=0;sc.forEach(function(q){d+=q[2];});return {p:p,sc:sc,d:d/sc.length};});
+  L.sort(function(a,b){return b.d-a.d;});
+  L.forEach(function(o){var p=o.p,sc=o.sc,m;g.beginPath();g.moveTo(sc[0][0],sc[0][1]);for(m=1;m<sc.length;m++)g.lineTo(sc[m][0],sc[m][1]);
+   if(p.t==='s'){g.closePath();var col=jet((p.v-smin)/(smax-smin));g.fillStyle=css(col,1);g.fill();g.strokeStyle=css(col,1);g.lineWidth=0.6;g.stroke();}
+   else if(p.t==='b'){g.closePath();var cb=jet(bmax>0?(p.v/bmax+1)/2:0.5);g.fillStyle=css(cb,0.55);g.fill();g.strokeStyle=css(cb,0.9);g.lineWidth=1;g.stroke();}
+   else{g.strokeStyle=fg;g.lineWidth=2.5;g.stroke();}});
+  D.S.forEach(function(q){var sc=q.map(function(j){return pr(P[j-1]);}),m;g.beginPath();g.moveTo(sc[0][0],sc[0][1]);for(m=1;m<4;m++)g.lineTo(sc[m][0],sc[m][1]);g.closePath();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=0.7;g.stroke();});
+  var x0=W-62,y0=60,hh=H-140,m;for(m=0;m<hh;m++){g.fillStyle=css(jet(1-m/hh),1);g.fillRect(x0,y0+m,18,1);}
+  g.strokeStyle=fg;g.lineWidth=1;g.strokeRect(x0,y0,18,hh);g.fillStyle=fg;g.font='12px sans-serif';g.textAlign='right';
+  g.fillText(fmt(smax),x0+44,y0-6);g.fillText(fmt(smin),x0+44,y0+hh+16);g.fillText(D.nS,x0+44,y0-22);
+  g.textAlign='left';g.fillText('barras: '+D.nB+'   max |valor| = '+fmt(bmax),12,H-12);
+  if(hov){var q=pr(hov.p);g.beginPath();g.arc(q[0],q[1],5,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#000';g.lineWidth=1.5;g.stroke();}}
+ function pos(ev){var r=cv.getBoundingClientRect();return [(ev.clientX-r.left)*W/r.width,(ev.clientY-r.top)*H/r.height,r];}
+ cv.addEventListener('pointerdown',function(ev){drag=[ev.clientX,ev.clientY,yaw,pitch];try{cv.setPointerCapture(ev.pointerId);}catch(x){}cv.style.cursor='grabbing';});
+ cv.addEventListener('pointerup',function(){drag=null;cv.style.cursor='grab';});
+ cv.addEventListener('pointermove',function(ev){
+  if(drag){yaw=drag[2]+(ev.clientX-drag[0])*0.01;pitch=Math.max(-1.5,Math.min(1.5,drag[3]+(ev.clientY-drag[1])*0.01));tip.style.display='none';hov=null;draw();return;}
+  var m=pos(ev),best=null,bd=14;samp.forEach(function(s){var q=pr(s.p),d=Math.hypot(q[0]-m[0],q[1]-m[1]);if(d<bd){bd=d;best=s;}});
+  hov=best;draw();
+  if(best){var r=m[2];tip.textContent=best.txt;tip.style.display='block';tip.style.left=(m[0]*r.width/W+14)+'px';tip.style.top=(m[1]*r.height/H+14)+'px';}else tip.style.display='none';});
+ cv.addEventListener('pointerleave',function(){hov=null;tip.style.display='none';draw();});
+ cv.addEventListener('wheel',function(ev){ev.preventDefault();zoom*=ev.deltaY<0?1.1:1/1.1;draw();},{passive:false});
+ build();draw();}
+function todos(){document.querySelectorAll('canvas[data-m3d]').forEach(init);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',todos);else todos();
+})();
+</script>";
     }
 }

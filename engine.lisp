@@ -1837,6 +1837,11 @@
     ((eq (car e) 'partial)  (partial  (meval (second e)) (meval (third e))))
     ((eq (car e) 'derive-x) (if (cddr e) (derive-x (meval (second e)) (meval (third e)))
                                 (derive-x (meval (second e)))))
+    ;; pendiente EN UN PUNTO dentro de una matriz: la losa (Hermite) arma su matriz de
+    ;; condiciones A = [p(0); Slope{x^k @ x = 0}/L; p(1); Slope{… @ x = 1}/L]. Slope está
+    ;; en *op-calls* pero meval no tenía rama para él: la A salía con (slope-at …) sin
+    ;; resolver y la inversa devolvía d/dx crudos. Misma razón que la rama de partial.
+    ((eq (car e) 'slope-at) (slope-at (meval (second e)) (meval (third e)) (meval (fourth e))))
     ((eq (car e) 'mrange)  (apply #'mrange (mapcar #'meval (cdr e))))
     ((eq (car e) 'area-under)          ; ∫ de una MATRIZ (entrada por entrada) o escalar
      (let* ((fa (second e)) (va (third e))
@@ -3540,6 +3545,42 @@ Lo escribe la app (escritorio: junto a la hoja; web: botón de descarga)."
         (let ((tras (member 93 d :key #'car)))
           (loop for p in (cdr tras) while (/= (car p) 97) when (= (car p) 10) collect (cdr p)))
         (loop for p in d when (eql (car p) 10) collect (cdr p)))))))
+;; ---- la sección leída del dibujo, como FUNCIONES (la hoja no lleva defun ni bucles) ----
+(defun primera (capa &optional tipo)
+  "La primera entidad de la capa (y del tipo, si se da): (primera \"SECCION\")."
+  (let ((ss (ssget "_X" (if tipo (list (cons 0 tipo) (cons 8 capa)) (list (cons 8 capa))))))
+    (and ss (> (sslength ss) 0) (entget (ssname ss 0)))))
+(defun hk-al-green (ent)
+  "Green sobre el contorno: (A Sx Sy Ix Iy) respecto al origen, con A > 0."
+  (let* ((v (vertices ent)) (n (length v)) (a 0d0) (sx 0d0) (sy 0d0) (ix 0d0) (iy 0d0))
+    (dotimes (i n)
+      (let* ((p (nth i v)) (q (nth (mod (1+ i) n) v))
+             (xp (float (first p) 1d0)) (yp (float (second p) 1d0))
+             (xq (float (first q) 1d0)) (yq (float (second q) 1d0))
+             (c (- (* xp yq) (* xq yp))))
+        (incf a (/ c 2)) (incf sx (/ (* (+ yp yq) c) 6)) (incf sy (/ (* (+ xp xq) c) 6))
+        (incf ix (/ (* (+ (* yp yp) (* yp yq) (* yq yq)) c) 12))
+        (incf iy (/ (* (+ (* xp xp) (* xp xq) (* xq xq)) c) 12))))
+    (if (< a 0) (mapcar #'- (list a sx sy ix iy)) (list a sx sy ix iy))))
+(defun centroide-x (ent) "x del centroide de la sección." (let ((g (hk-al-green ent))) (/ (third g) (first g))))
+(defun centroide-y (ent) "y del centroide de la sección." (let ((g (hk-al-green ent))) (/ (second g) (first g))))
+(defun inercia-x (ent) "I_x centroidal (eje horizontal por el centroide)."
+  (let ((g (hk-al-green ent))) (- (fourth g) (* (first g) (expt (/ (second g) (first g)) 2)))))
+(defun inercia-y (ent) "I_y centroidal (eje vertical por el centroide)."
+  (let ((g (hk-al-green ent))) (- (fifth g) (* (first g) (expt (/ (third g) (first g)) 2)))))
+(defun ancho (ent) "Ancho total (x máx − x mín) de los vértices."
+  (let ((xs (mapcar #'first (vertices ent)))) (- (reduce #'max xs) (reduce #'min xs))))
+(defun alto (ent) "Alto total (y máx − y mín) de los vértices."
+  (let ((ys (mapcar #'second (vertices ent)))) (- (reduce #'max ys) (reduce #'min ys))))
+(defun ancho-en (ent y)
+  "Ancho de la sección cortada por la horizontal a altura Y (suma de los tramos dentro)."
+  (let* ((v (vertices ent)) (n (length v)) (xs nil))
+    (dotimes (i n)
+      (let* ((p (nth i v)) (q (nth (mod (1+ i) n) v)) (y1 (second p)) (y2 (second q)))
+        (when (and (/= y1 y2) (<= (min y1 y2) y) (< y (max y1 y2)))
+          (push (+ (first p) (* (- y y1) (/ (- (first q) (first p)) (- y2 y1)))) xs))))
+    (setf xs (sort xs #'<))
+    (loop for (a b) on xs by #'cddr while b sum (- b a))))
 (defun hk-al-bulges (d)
   (let ((r nil) (vio nil))
     (dolist (p d) (cond ((eql (car p) 10) (when vio (push 0d0 r)) (setf vio t))

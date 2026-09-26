@@ -21,6 +21,18 @@ namespace HekatanLisp
         /// igual que CompressionStream('deflate-raw')) + base64url.</summary>
         public static string EnlaceWeb(string hoja)
         {
+            // hoja idéntica a un ejemplo publicado → enlace CORTO (#ej=nombre): no lleva la hoja dentro,
+            // así no lo cortan WhatsApp/Telegram/LinkedIn (la hoja 83 daba 16 000 caracteres)
+            try
+            {
+                string Norm(string t) => (t ?? "").Replace("\r\n", "\n").TrimEnd();
+                var dir = Path.Combine(AppContext.BaseDirectory, "ejemplos");
+                if (Directory.Exists(dir))
+                    foreach (var f in Directory.GetFiles(dir, "*.lisp"))
+                        if (Norm(File.ReadAllText(f)) == Norm(hoja))
+                            return WebBase + "#ej=" + Uri.EscapeDataString(Path.GetFileName(f)) + "&solo=1";
+            }
+            catch { /* sin carpeta de ejemplos: enlace largo */ }
             using var ms = new MemoryStream();
             using (var ds = new DeflateStream(ms, CompressionLevel.SmallestSize, leaveOpen: true))
             {

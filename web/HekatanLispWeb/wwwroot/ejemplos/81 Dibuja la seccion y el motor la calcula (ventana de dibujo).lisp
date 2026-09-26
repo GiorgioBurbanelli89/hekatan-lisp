@@ -21,32 +21,10 @@
 
 #: El bloque siguiente sigue sobre el MISMO dibujo: **ssget** busca la polilínea de la capa SECCION, **entget** la da como lista y sus pares **(10 x y)** son los vértices. Con ellos, el teorema de Green da el área, los momentos estáticos y las inercias de cualquier polígono (una línea de LISP por fórmula). Los resultados se rotulan sobre el dibujo y vuelven a la hoja con **exporta**.
 #autolisp("La sección leída del dibujo: centroide y ejes principales", ancho = 110, alto = 95, exporta = A x_c y_c I_x I_y b h b_w t_f)
-(setq e (entget (ssname (ssget "_X" '((0 . "LWPOLYLINE") (8 . "SECCION"))) 0)))
-(setq V nil)
-(foreach g e (if (= (car g) 10) (setq V (append V (list (cdr g))))))
-;; Green, tramo p → q:  c = xp·yq − xq·yp ;  A = Σc/2 ;  Sx = Σ(yp+yq)·c/6 ;  Ix = Σ(yp²+yp·yq+yq²)·c/12
-;; (AutoLISP no distingue mayúsculas: dentro de la función el área se llama Ar, no A)
-(defun seccion (V / n i p q c Ar Sx Sy Ix Iy)
-  (setq n (length V) i 0 Ar 0.0 Sx 0.0 Sy 0.0 Ix 0.0 Iy 0.0)
-  (repeat n
-    (setq p (nth i V) q (nth (rem (1+ i) n) V)
-          c (- (* (car p) (cadr q)) (* (car q) (cadr p)))
-          Ar (+ Ar (/ c 2.0))
-          Sx (+ Sx (/ (* (+ (cadr p) (cadr q)) c) 6.0))
-          Sy (+ Sy (/ (* (+ (car p) (car q)) c) 6.0))
-          Ix (+ Ix (/ (* (+ (* (cadr p) (cadr p)) (* (cadr p) (cadr q)) (* (cadr q) (cadr q))) c) 12.0))
-          Iy (+ Iy (/ (* (+ (* (car p) (car p)) (* (car p) (car q)) (* (car q) (car q))) c) 12.0))
-          i (1+ i)))
-  (if (< Ar 0) (mapcar '- (list Ar Sx Sy Ix Iy)) (list Ar Sx Sy Ix Iy)))   ; horario → se cambia el signo
-(setq s (seccion V) A (nth 0 s) x_c (/ (nth 2 s) A) y_c (/ (nth 1 s) A))
-(setq I_x (- (nth 3 s) (* A y_c y_c)) I_y (- (nth 4 s) (* A x_c x_c)))
-;; las medidas de la T, leídas de los vértices: ancho, alto, alma (borde de abajo) y ala (primer escalón bajo el borde de arriba)
-(setq xs (mapcar 'car V) ys (mapcar 'cadr V))
-(setq b (- (apply 'max xs) (apply 'min xs)) h (- (apply 'max ys) (apply 'min ys)) y0 (apply 'min ys) y1 (apply 'max ys))
-(setq bajos nil ym y0)
-(foreach p V (if (< (abs (- (cadr p) y0)) 1e-9) (setq bajos (cons (car p) bajos))))
-(foreach y ys (if (and (< y (- y1 1e-9)) (> y ym)) (setq ym y)))
-(setq b_w (- (apply 'max bajos) (apply 'min bajos)) t_f (- y1 ym))
+;; la sección la leen las funciones del motor (Green sobre los vértices): sin defun ni bucles
+(setq S (primera "SECCION" "LWPOLYLINE"))
+(setq A (area S) x_c (centroide-x S) y_c (centroide-y S) I_x (inercia-x S) I_y (inercia-y S))
+(setq b (ancho S) h (alto S) b_w (ancho-en S 0.001) t_f (/ (- A (* b_w h)) (- b b_w)))
 ;; rótulos sobre el dibujo: el centroide, sus ejes y los valores
 (capa "EJES" :color 1 :tipo "eje")
 (linea (list (- x_c (* 0.62 b)) y_c) (list (+ x_c (* 0.62 b)) y_c))
@@ -57,7 +35,7 @@
 (formula (list (* 0.03 b) (* 0.36 h)) A :nombre "A" :altura (* 0.04 h))
 (formula (list (* 0.03 b) (* 0.28 h)) y_c :nombre "y_c" :altura (* 0.04 h))
 (formula (list (* 0.03 b) (* 0.20 h)) I_x :nombre "I_x" :altura (* 0.04 h))
-(princ (strcat "Polilínea de " (itoa (length V)) " vértices leída del dibujo"))
+(princ (strcat "Polilínea de " (itoa (length (vertices S))) " vértices leída del dibujo"))
 #fin
 
 #: El área, el centroide y la inercia leídos del dibujo (unidades del dibujo: m, m², m⁴):

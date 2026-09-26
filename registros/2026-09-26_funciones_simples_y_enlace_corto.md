@@ -26,3 +26,12 @@
 - ✅ Sección 9: `Db`, `Bb` (κxx = θy,x; κyy = −θx,y; 2κxy = θy,y − θx,x), `Kb`, `K_placa = Kb + Ks_mitc` (Gs → 5Eh/12(1+ν)). Renderiza sin errores (10 págs.).
 - ✅ Validación de lo TECLEADO en la hoja: `verificar_hoja87_vs_opensees.py` parsea gx, gy, Bb, Bm, bd de la hoja, arma K con numpy y compara con OpenSees: placa 1.6e-16, plano 2.1e-16 (rectángulo 1×0.5, h=0.1).
 - ⏳ Falta: cuadrilátero general (J no diagonal, base local g1,g2,g3; sin forma cerrada → Gauss con símbolos/números) y el conjunto 24×24.
+
+## Hoja 87 — cuadrilátero general (sección 10)
+- ✅ Membrana + drilling + flexión con J general (gradiente = inv(J)·dN, dvol = det J, 4 puntos de Gauss): 4e-16 vs OpenSees (cuadrilátero de la hoja 72, ejes locales computeBasis).
+- ✅ HALLAZGO: el cortante de OpenSees en un cuadrilátero distorsionado NO es el MITC4 de libro (covariante con J⁻¹): esa versión da 6.8 % de diferencia. OpenSees usa G_m (deformación a lo largo de cada lado), Ms (1±ξ, 1±η), escala r/(8 detJ) y giro R(α, β) → 1.6e-16.
+- ✅ La hoja (numérica, sin Simplify) da k_p11 = 9444.938184, k_p12 = 2857.407799, k_p33 = 2283.974359, k_b11 = 4594.724, k_b22 = 1196.357295, k_b25 = 734.564877 = OpenSees a 10 cifras. 0 ⚠, 0 errores JS (render_html.py).
+- ❌ `Simplify{}` NO ve variables numéricas de la hoja (x_l, etc. quedan sin resolver): la parte con números va SIN Simplify. `A(1, :)` y un literal `[a, b, c]` son COLUMNAS → `transpose(...)` para filas. `K_plano` simbólico y numérico no pueden compartir nombre (sale «función desconocida»).
+- ⚠ La hoja tarda ~10–16 s: `--pdf`/`--shot` salen «calculando…»; usar `--html` + render_html.py.
+- Script: hekatan-opensees/opensees_port/shellmitc4/verificar_cuadrilatero_general_hoja87.py (repo privado, sin commit).
+- ⏳ Falta: ensamblar los 24×24 en ejes globales (rotación con g1, g2, g3) y el cuadrilátero alabeado (hoja 72 ya lo tiene en números).

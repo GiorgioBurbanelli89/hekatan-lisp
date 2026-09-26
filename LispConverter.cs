@@ -1310,8 +1310,11 @@ namespace HekatanLisp
   .ws-tbl-wrap{break-inside:avoid;page-break-inside:avoid;overflow-x:visible;}
   /* en papel una tabla ancha NO debe salir con barra de desplazamiento: las celdas se parten */
   table.ws-table td,table.ws-table th{white-space:normal;} }
-body{margin:0;padding:10px 1.5em;background:var(--bg);color:var(--fg);
-  font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:11pt;line-height:150%;overflow-x:hidden;}
+body{margin:0;padding:1px 1.5em 10px;background:var(--bg);color:var(--fg);
+  font-family:'Segoe UI','Arial Nova',Helvetica,sans-serif;font-size:15px;line-height:150%;overflow-x:hidden;}
+/* la letra base es 15px = la del editor (Consolas 15) y el primer bloque no lleva margen
+   arriba: la primera linea del resultado queda a la altura de la primera del editor (Jorge) */
+body>*:first-child,body>a.hk-src:first-child+*{margin-top:0 !important;}
 .ws-eq{margin:0.4em 0;padding:.4em 0 .25em;
   font-family:Georgia,'Times New Roman',Times,serif;font-size:11.5pt;
   font-variant-numeric:lining-nums;font-feature-settings:'lnum' 1;
@@ -1541,8 +1544,43 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // el resto del texto se escapa normal. Una @ suelta queda literal.
         // (bal) = una llave con UN nivel de anidamiento: así @{Factor{x^2+3*x}} agarra todo el interior.
         const string Bal = @"(?:[^{}]|\{[^{}]*\})*";
-        public static string FormatInlineText(string t, Func<string, string> varLookup, Func<string, bool> isVec = null)
+        // ☞{contenido} — INDICADOR con mano: el globo (texto, valores o imagen) solo aparece al
+        // pasar el ratón. Se extrae ANTES de todo el resto (el contenido puede traer @{} y { }),
+        // se formatea aparte y se vuelve a insertar al final con un marcador \x07n\x07 que el
+        // resto de las reglas no toca. 24-sep-2026, Jorge: «una mano con un índice… los valores
+        // de la tabla o la imagen al lado, pero cuando se necesite».
+        static readonly Regex RxMano = new Regex(@"☞\{(" + Bal + @")\}", RegexOptions.Compiled);
+        static string ManoGlobo(string contenido, Func<string, string> varLookup, Func<string, bool> isVec, Func<string, string> imgSrc)
         {
+            var c = (contenido ?? "").Trim();
+            string cuerpo;
+            var mt = Regex.Match(c, @"^(?:tabla|valores|valor)\s+(.+)$", RegexOptions.IgnoreCase);
+            var mi = Regex.Match(c, @"^(?:imagen|img|fig(?:ura)?)\s+(.+)$", RegexOptions.IgnoreCase);
+            if (mt.Success)
+            {   // ☞{tabla K} → el VALOR de esa variable (matriz/vector ya calculado), como tabla
+                var nom = mt.Groups[1].Value.Trim();
+                var v = varLookup?.Invoke(nom);
+                cuerpo = string.IsNullOrEmpty(v)
+                    ? "<span style=\"color:#a33\">⚠ no se ve «" + System.Net.WebUtility.HtmlEncode(nom) + "»</span>"
+                    : "<div class=\"m-expr hk-globo-tabla\">" + v + "</div>";
+            }
+            else if (mi.Success)
+            {   // ☞{imagen malla.png} → data URI (ruta relativa a la hoja); si no está, aviso
+                var ruta = mi.Groups[1].Value.Trim();
+                var src = imgSrc?.Invoke(ruta);
+                cuerpo = src == null
+                    ? "<span style=\"color:#a33\">⚠ imagen no disponible: " + System.Net.WebUtility.HtmlEncode(ruta) + "</span>"
+                    : "<img src=\"" + src + "\" alt=\"\">";
+            }
+            else
+                cuerpo = FormatInlineText(c, varLookup, isVec, imgSrc);   // texto: prosa normal (@{}, *negrita*…)
+            return "<span class=\"hk-mano\">☞<span class=\"hk-globo\">" + cuerpo + "</span></span>";
+        }
+        public static string FormatInlineText(string t, Func<string, string> varLookup, Func<string, bool> isVec = null, Func<string, string> imgSrc = null)
+        {
+            var manos = new List<string>();
+            if (t != null && t.IndexOf('☞') >= 0)
+                t = RxMano.Replace(t, m => { manos.Add(ManoGlobo(m.Groups[1].Value, varLookup, isVec, imgSrc)); return "\x07" + (manos.Count - 1) + "\x07"; });
             t = System.Net.WebUtility.HtmlEncode(t ?? "");
             // subindice/superindice EXPLICITOS:  x^{2}  ·  N_{1}  — ANTES que @{expr}/{expr}: si no,
             // "{2}" (sin @ ni ^/_ real) se confunde con el alias de VALOR de abajo y {2} se sustituye
@@ -1594,6 +1632,8 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             t = Regex.Replace(t, @"__([^_]+)__", "<b>$1</b>");
             t = Regex.Replace(t, @"\*([^*]+)\*", "<i>$1</i>");
             t = Regex.Replace(t, @"_([^_]+)_", "<i>$1</i>");
+            if (manos.Count > 0)
+                t = Regex.Replace(t, "\x07(\\d+)\x07", m => { int k = int.Parse(m.Groups[1].Value); return k < manos.Count ? manos[k] : ""; });
             return t;
         }
 
@@ -1700,6 +1740,19 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                    "<span class=\"deq-tag\">(" + System.Net.WebUtility.HtmlEncode(tag) + ")</span></div>";
         }
 
+        // El GLOBO de la mano ☞ (FormatInlineText): oculto, se abre al pasar el ratón; en la
+        // impresión no aparece (solo sirve «cuando se necesite», en pantalla).
+        const string CSS_MANO = @"
+.hk-mano{position:relative;display:inline-block;cursor:help;color:var(--acc,#b08a2e);font-weight:700;user-select:none}
+.hk-globo{display:none;position:absolute;left:0;top:1.6em;z-index:70;width:max-content;max-width:min(34em,80vw);
+ background:var(--bg,#fffef8);color:var(--fg,#171310);border:1px solid var(--acc,#b08a2e);border-radius:8px;
+ padding:.5em .8em;box-shadow:0 4px 14px rgba(0,0,0,.22);font-weight:400;text-align:left;white-space:normal}
+.hk-mano:hover .hk-globo{display:block}
+.hk-globo img{max-width:30em;max-height:24em;display:block}
+.hk-globo .m-expr{display:block}
+@media print{.hk-globo{display:none!important}.hk-mano{cursor:default}}
+";
+
         public static string RenderPage(string text, bool fromLisp) => RenderPage(text, fromLisp, null);
 
         /// <summary>srcLinea[k] = línea del EDITOR (0-based) de la línea k de <paramref name="text"/>, o −1.
@@ -1735,7 +1788,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                 body.Append(div);
             }
             return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" +
-                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS +
+                   (Dark ? ROOT_DARK : ROOT_LIGHT) + CSS + CSS_MANO +
                    "</style></head><body>" + body + MAT_JS + HK_MAT_JS + (srcLinea != null ? HK_SRC_JS : "") + "</body></html>";
         }
 

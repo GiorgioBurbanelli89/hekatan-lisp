@@ -169,8 +169,16 @@ namespace HekatanLisp
             if (sender is ICSharpCode.AvalonEdit.TextEditor ed)
             {
                 ZoomTexto(ed, Math.Sign(e.Delta));
+                if (ReferenceEquals(ed, Editor)) SincronizarZoomResultado();
                 e.Handled = true;
             }
+        }
+
+        /// <summary>El resultado (WebView2) sigue al editor: su letra base es 15px = Consolas 15,
+        /// asi que el zoom del render es FontSize/15 y los dos lados tienen la misma letra (Jorge).</summary>
+        private void SincronizarZoomResultado()
+        {
+            try { if (_webReady && Viewer.CoreWebView2 is not null) Viewer.ZoomFactor = Editor.FontSize / 15.0; } catch { }
         }
 
         /// <summary>+2 / −2 puntos, entre 6 y 40 (los pasos y topes de Hekatan Lab). Devuelve el tamaño.</summary>
@@ -318,13 +326,68 @@ namespace HekatanLisp
                 return;
             }
             var sb = new StringBuilder();
-            foreach (var f in forms)
+            bool saltaHtml = false;   // tras un bloque HTML (tabla, dibujo, gráfica) se ignoran sus líneas sueltas
+            foreach (var f0 in forms)
             {
+                var f = f0;
+                if (f.IndexOf('') >= 0 || (saltaHtml && (f.Contains('<') || f.Contains("script"))) || saltaHtml && !System.Text.RegularExpressions.Regex.IsMatch(f, @"^\p{L}[\p{L}\p{N}_]* = "))
+                {
+                    // marca interna del motor («Th1centerTítulo»): en texto plano solo cuentan títulos y párrafos
+                    var pz = f.Split('');
+                    bool marca = f.IndexOf('') >= 0;
+                    if (marca && pz.Length >= 5 && pz[1] == "T" && (pz[2] is "h1" or "h2" or "h3" or "p") && !pz[4].Contains('<'))
+                    {
+                        saltaHtml = false;
+                        var t = System.Net.WebUtility.HtmlDecode(pz[4]);
+                        sb.AppendLine(pz[2] == "p" ? t : "# " + t);
+                    }
+                    else if (marca || saltaHtml) saltaHtml = true;
+                    continue;
+                }
+                saltaHtml = false;
                 if (_view == "lisp") { var lv = ToLispView(f); if (lv != null) sb.AppendLine(lv); continue; }   // (setf name form)
                 if (f.StartsWith("= ")) sb.AppendLine("= " + ToMathView(f.Substring(2)));
                 else sb.AppendLine(ToMathView(f));
             }
+            if (_view == "math")
+            {
+                // el cálculo de los bloques #autolisp, como funciones: (setq A (area S)) → A = area(S)
+                var fs = new StringBuilder();
+                foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(text, @"(?m)^\(setq\s+(.*)\)\s*$"))
+                    foreach (var l in SetqComoFunciones(m.Groups[1].Value)) fs.AppendLine(l);
+                if (fs.Length > 0) sb.AppendLine().AppendLine("Cálculo con funciones:").Append(fs);
+            }
             Output.Text = sb.ToString().TrimEnd();
+        }
+
+        /// <summary>«A (area S) x_c (centroide-x S)» → «A = area(S)», «x_c = centroide_x(S)» (pares nombre/forma de un setq).</summary>
+        private static List<string> SetqComoFunciones(string cuerpo)
+        {
+            var r = new List<string>(); int i = 0, n = cuerpo.Length;
+            string Forma()
+            {
+                while (i < n && cuerpo[i] == ' ') i++;
+                if (i < n && cuerpo[i] == '(')
+                {
+                    i++; var partes = new List<string>();
+                    while (i < n && cuerpo[i] != ')') { partes.Add(Forma()); while (i < n && cuerpo[i] == ' ') i++; }
+                    i++;
+                    if (partes.Count == 0) return "()";
+                    string f = partes[0].Length == 1 ? partes[0] : partes[0].Replace('-', '_');
+                    if (f.Length == 1 && "+-*/".Contains(f)) return "(" + string.Join(" " + f + " ", partes.Skip(1)) + ")";
+                    return f + "(" + string.Join(", ", partes.Skip(1)) + ")";
+                }
+                int a = i; while (i < n && cuerpo[i] != ' ' && cuerpo[i] != ')' && cuerpo[i] != '(') i++;
+                return cuerpo.Substring(a, i - a);
+            }
+            while (i < n)
+            {
+                var nom = Forma(); if (nom.Length == 0) break;
+                var val = Forma(); if (val.Length == 0) break;
+                if (val.StartsWith("(") && val.EndsWith(")") && !val.Contains(",") && val.Count(c => c == '(') > 1) val = val.Substring(1, val.Length - 2);
+                r.Add(nom + " = " + val);
+            }
+            return r;
         }
 
         // ---------- ▶ Ejecutar (manual) + AutoRun (en vivo), como Hekatan Lab ----------
@@ -659,6 +722,7 @@ namespace HekatanLisp
                         int pasos = doc.RootElement.TryGetProperty("steps", out var sp) ? sp.GetInt32() : 1;
                         double fs = Editor.FontSize;
                         for (int k = 0; k < Math.Abs(pasos); k++) fs = ZoomTexto(Editor, Math.Sign(pasos));
+                        SincronizarZoomResultado();
                         return "{\"ok\":true,\"fontSize\":" + fs.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
                     }
                 // Anchos editor | divisor | resultado y DÓNDE está el divisor en pantalla (px físicos),

@@ -10,3 +10,8 @@
 
 ## ⏳ Falta
 - (hecho) Web recompilada y publicada en gh-pages; #ej=86 verificado con puppeteer (dibujo + A=0.2025).
+
+## Hoja 87 — ShellMITC4 en símbolos (cortante MITC4)
+- ✅ `ejemplos/87 ShellMITC4 en simbolos - cortante MITC4 de la placa (OpenSees).lisp`: N, J, dNx/dNy, γ directo y MITC4 (4 puntos de amarre), Ks = Gs·a·b·∫BsᵀBs, Ks_dir−Ks_mitc ≠ 0 (fuente del bloqueo), K·rígido = 0 (w=x y w=1). Renderiza sin errores.
+- ❌ Vector plano `[a, b]` es FILA (usar `;`); `x_1` se lee como subíndice numérico (usar `rig_w`); matriz literal sin `Simplify{}` no se asigna; `K − Kᵀ` simbólico sale en blanco.
+- ⏳ Convención de signos = mano derecha (γxz = w,x + θy; γyz = w,y − θx); falta compararla contra la hoja 72 (OpenSees) con números y añadir membrana/drilling en símbolos.

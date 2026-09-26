@@ -154,7 +154,7 @@ de vuelta para seguir calculando. Semántica real de AutoCAD: el bloque AutoLISP
 |---|---|
 | AutoLISP (portable) | `entmake` `entmakex` `entget` `entmod` `entdel` `entlast` `entnext` `entupd` `handent` · `ssget "_X"` (filtros, comodines, `-4`) `sslength` `ssname` `ssadd` `ssdel` `ssmemb` · `tblsearch` `getvar` `setvar` · `polar` `distance` `angle` `inters` · `strcat` `itoa` `atoi` `atof` `rtos` `angtos` `strlen` `substr` `strcase` `wcmatch` `fix` · `repeat` `foreach` `while` · `(defun f (a / locales) …)`, `'(lambda …)`, `(princ)` |
 | Entidades | POINT, LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE 2D/3D (+VERTEX, SEQEND), 3DFACE, TEXT, MTEXT, SOLID, HATCH, DIMENSION; capas con `(0 . "LAYER")` |
-| Capa simple (español) | `punto` `linea` `circulo` `arco` (grados) `poli` `rect` `texto` `formula` (rótulo con la matemática de la hoja) `cota` `achurado` `curva` `curva-par` `ejes` `capa` · 3D: `poli3` `cara3` `flecha3` `vista` · listas: `desplazar` `rotar` `escalar` · medir: `longitud` `area` `vertices` `dxf` · `vertical` `guardar` |
+| Capa simple (español) | `punto` `linea` `circulo` `arco` (grados) `poli` `rect` `texto` `formula` (rótulo con la matemática de la hoja) `cota` `achurado` `curva` `curva-par` `ejes` `capa` · 3D: `poli3` `cara3` `flecha3` `vista` · sólidos como AutoCAD (mallas 3DFACE): `caja` `cilindro` `cono` `esfera` `toro` `extruir` `revolucion` `superficie` `losa` `perfil-i` `tubo-rect` (ej. 90 y 91) · listas: `desplazar` `rotar` `escalar` · medir: `longitud` `area` `vertices` `dxf` · `vertical` `guardar` |
 
 Las definiciones de la hoja de arriba (`L = 6`, `f(x) = x^2`) llegan al bloque; las de `exporta` vuelven como `n = …`.
 El dibujo sale en SVG con encuadre automático, colores ACI y capas; con z se ve en 3D y se gira con el ratón

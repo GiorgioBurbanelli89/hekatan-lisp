@@ -15,3 +15,9 @@
 - ✅ `ejemplos/87 ShellMITC4 en simbolos - cortante MITC4 de la placa (OpenSees).lisp`: N, J, dNx/dNy, γ directo y MITC4 (4 puntos de amarre), Ks = Gs·a·b·∫BsᵀBs, Ks_dir−Ks_mitc ≠ 0 (fuente del bloqueo), K·rígido = 0 (w=x y w=1). Renderiza sin errores.
 - ❌ Vector plano `[a, b]` es FILA (usar `;`); `x_1` se lee como subíndice numérico (usar `rig_w`); matriz literal sin `Simplify{}` no se asigna; `K − Kᵀ` simbólico sale en blanco.
 - ⏳ Convención de signos = mano derecha (γxz = w,x + θy; γyz = w,y − θx); falta compararla contra la hoja 72 (OpenSees) con números y añadir membrana/drilling en símbolos.
+
+## Hoja 87 — signos comparados con OpenSees y membrana
+- ✅ Cortante MITC4: K de 1 elemento en OpenSees 3.7.1 (rect. 1×0.5, h=1e-4 para que la flexión no pese; dofs uz, rx, ry) vs mi Ks: γxz = w,x + θy y γyz = w,y − θx → error 2.5e-9; las otras 3 combinaciones de signo: 0.2–2.4. La convención de la hoja era la correcta.
+- ✅ Membrana Q4 + drilling: Bm (3×12) y bd = [−½N,y, ½N,x, −N], Ktt = G·h, Gauss 2×2 → error 2e-16 vs OpenSees (dofs ux, uy, rz). En la hoja: `K_plano = Km + Kd`; entradas K(1,1) y K(1,2) simbólicas evaluadas con números = OpenSees (10576.923077, 3245.192308).
+- Scripts: hekatan-opensees/opensees_port/shellmitc4/verificar_cortante_mitc4_rect.py y verificar_membrana_drilling_rect.py (repo privado, sin commit).
+- ⏳ Falta: flexión (DKQ/placa de sección) en símbolos y cuadrilátero general (J no diagonal, base local g1,g2,g3).

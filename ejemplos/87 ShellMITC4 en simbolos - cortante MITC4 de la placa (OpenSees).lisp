@@ -1,8 +1,8 @@
-# ShellMITC4 de OpenSees en símbolos: las funciones de forma y el cortante MITC4
+# ShellMITC4 de OpenSees en símbolos: cortante MITC4, membrana y giro en el plano
 #numerico
 
-#: Es la parte de **placa** del elemento **ShellMITC4** de OpenSees (ShellMITC4.cpp, getInitialStiff y computeBasis; la hoja 72 lo traduce con números). Aquí el motor hace la deducción con símbolos, con un rectángulo de lados **2a × 2b** y los cuatro nudos en el orden de OpenSees. Cada nudo lleva tres grados de libertad de la placa: la flecha w y los giros θx y θy.
-#: **Convención de la hoja:** giros con la regla de la mano derecha, así que el cortante es γxz = ∂w/∂x + θy y γyz = ∂w/∂y − θx. OpenSees puede llevar otros signos en su base local; el signo se fija al comparar con la hoja 72.
+#: Es el elemento **ShellMITC4**: la parte de **placa** (cortante MITC4), la **membrana** y el **giro en el plano** de OpenSees (ShellMITC4.cpp, getInitialStiff y computeBasis; la hoja 72 lo traduce con números). Aquí el motor hace la deducción con símbolos, con un rectángulo de lados **2a × 2b** y los cuatro nudos en el orden de OpenSees. Cada nudo lleva tres grados de libertad de la placa: la flecha w y los giros θx y θy.
+#: **Convención de la hoja:** giros con la regla de la mano derecha, así que el cortante es γxz = ∂w/∂x + θy y γyz = ∂w/∂y − θx. Está COMPROBADA contra OpenSees 3.7.1 corriendo (K de un elemento, giros rx y ry): con estos signos el cortante coincide a 2.5e-9; con cualquier otra combinación de signos el error es 0.2 a 2.4.
 #: **Por qué MITC4.** Si el cortante se calcula con las funciones de forma tal cual, la losa delgada se pone rígida de más (bloqueo por cortante). MITC4 mide γ solo en cuatro puntos de amarre y lo interpola con (1 ± ξ) y (1 ± η).
 
 ## 1 · Funciones de forma y sus derivadas
@@ -43,3 +43,17 @@ r_w = Simplify{Ks_mitc*rig_w}
 ## 6 · Con números: el elemento de la hoja 72
 #: El cortante de la sección: Gs = (5/6)·G·h, con E = 210 000 kN/m², ν = 0.3 y h = 0.1. Los lados a y b quedan libres: la matriz de arriba vale para cualquier rectángulo.
 Gsn = (5/6)·0.5·210000/(1 + 0.3)·0.1
+
+## 7 · Membrana: el cuadrilátero de esfuerzo plano
+#: La membrana es el Q4 isoparamétrico de siempre, integrado en 2 × 2 (ShellMITC4.cpp, assembleB). Por nudo, tres grados de libertad en el plano local: [u, v, θz]; el giro no entra en la membrana (su columna es cero). La matriz constitutiva es la del esfuerzo plano, ya multiplicada por el espesor h:
+Dm = Simplify{E*h/(1-nu^2)*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]}
+Bm(xi, eta) = Simplify{[-(1-eta)/(4*a), 0, 0, (1-eta)/(4*a), 0, 0, (1+eta)/(4*a), 0, 0, -(1+eta)/(4*a), 0, 0; 0, -(1-xi)/(4*b), 0, 0, -(1+xi)/(4*b), 0, 0, (1+xi)/(4*b), 0, 0, (1-xi)/(4*b), 0; -(1-xi)/(4*b), -(1-eta)/(4*a), 0, -(1+xi)/(4*b), (1-eta)/(4*a), 0, (1+xi)/(4*b), (1+eta)/(4*a), 0, (1-xi)/(4*b), -(1+eta)/(4*a), 0]}
+Km = Simplify{a*b*Area{Area{transpose(Bm(xi, eta))*Dm*Bm(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+
+## 8 · El giro en el plano (drilling)
+#: El Q4 no tiene rigidez para θz. OpenSees le pone una rigidez ficticia Ktt que amarra el giro θz a la rotación media del campo (½(∂v/∂x − ∂u/∂y)). Por nudo, la fila del giro es [−½·∂N/∂y, +½·∂N/∂x, −N] sobre [u, v, θz] (computeBdrill), y Ktt es el menor autovalor del bloque de membrana, que en un material isótropo es el cortante G·h:
+Ktt = Simplify{E*h/(2*(1+nu))}
+bd(xi, eta) = Simplify{[(1-xi)/(8*b), -(1-eta)/(8*a), -(1-xi)*(1-eta)/4, (1+xi)/(8*b), (1-eta)/(8*a), -(1+xi)*(1-eta)/4, -(1+xi)/(8*b), (1+eta)/(8*a), -(1+xi)*(1+eta)/4, -(1-xi)/(8*b), -(1+eta)/(8*a), -(1-xi)*(1+eta)/4]}
+Kd = Simplify{Ktt*a*b*Area{Area{transpose(bd(xi, eta))*bd(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+#: La rigidez del plano del elemento es la suma de las dos, con el cortante de la sección 4 y la flexión en su bloque:
+K_plano = Simplify{Km + Kd}

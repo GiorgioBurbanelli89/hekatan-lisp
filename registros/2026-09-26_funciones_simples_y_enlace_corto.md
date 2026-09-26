@@ -9,4 +9,4 @@
 - `(length V)` en el `princ` tras quitar V → «variable v is unbound» (AutoLISP no distingue mayúsculas). Ahora `(length (vertices S))`.
 
 ## ⏳ Falta
-- Web: recompilar el motor (WSL, pasos 3-5) y publicar (paso 6) para que las funciones nuevas corran en el sitio.
+- (hecho) Web recompilada y publicada en gh-pages; #ej=86 verificado con puppeteer (dibujo + A=0.2025).

@@ -21,3 +21,8 @@
 - ✅ Membrana Q4 + drilling: Bm (3×12) y bd = [−½N,y, ½N,x, −N], Ktt = G·h, Gauss 2×2 → error 2e-16 vs OpenSees (dofs ux, uy, rz). En la hoja: `K_plano = Km + Kd`; entradas K(1,1) y K(1,2) simbólicas evaluadas con números = OpenSees (10576.923077, 3245.192308).
 - Scripts: hekatan-opensees/opensees_port/shellmitc4/verificar_cortante_mitc4_rect.py y verificar_membrana_drilling_rect.py (repo privado, sin commit).
 - ⏳ Falta: flexión (DKQ/placa de sección) en símbolos y cuadrilátero general (J no diagonal, base local g1,g2,g3).
+
+## Hoja 87 — flexión y placa completa
+- ✅ Sección 9: `Db`, `Bb` (κxx = θy,x; κyy = −θx,y; 2κxy = θy,y − θx,x), `Kb`, `K_placa = Kb + Ks_mitc` (Gs → 5Eh/12(1+ν)). Renderiza sin errores (10 págs.).
+- ✅ Validación de lo TECLEADO en la hoja: `verificar_hoja87_vs_opensees.py` parsea gx, gy, Bb, Bm, bd de la hoja, arma K con numpy y compara con OpenSees: placa 1.6e-16, plano 2.1e-16 (rectángulo 1×0.5, h=0.1).
+- ⏳ Falta: cuadrilátero general (J no diagonal, base local g1,g2,g3; sin forma cerrada → Gauss con símbolos/números) y el conjunto 24×24.

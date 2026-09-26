@@ -57,3 +57,12 @@ bd(xi, eta) = Simplify{[(1-xi)/(8*b), -(1-eta)/(8*a), -(1-xi)*(1-eta)/4, (1+xi)/
 Kd = Simplify{Ktt*a*b*Area{Area{transpose(bd(xi, eta))*bd(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
 #: La rigidez del plano del elemento es la suma de las dos, con el cortante de la sección 4 y la flexión en su bloque:
 K_plano = Simplify{Km + Kd}
+
+## 9 · Flexión de la placa y rigidez completa de la placa
+#: La sección da momentos M = D_b·κ con las curvaturas κxx = ∂θy/∂x, κyy = −∂θx/∂y y 2κxy = ∂θy/∂y − ∂θx/∂x (con la regla de la mano derecha de esta hoja). D_b lleva la rigidez a flexión D = E·h³/12/(1 − ν²):
+Db = Simplify{E*h^3/(12*(1-nu^2))*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]}
+Bb(xi, eta) = Simplify{[0, 0, -(1-eta)/(4*a), 0, 0, (1-eta)/(4*a), 0, 0, (1+eta)/(4*a), 0, 0, -(1+eta)/(4*a); 0, (1-xi)/(4*b), 0, 0, (1+xi)/(4*b), 0, 0, -(1+xi)/(4*b), 0, 0, -(1-xi)/(4*b), 0; 0, (1-eta)/(4*a), -(1-xi)/(4*b), 0, -(1-eta)/(4*a), -(1+xi)/(4*b), 0, -(1+eta)/(4*a), (1+xi)/(4*b), 0, (1+eta)/(4*a), (1-xi)/(4*b)]}
+Kb = Simplify{a*b*Area{Area{transpose(Bb(xi, eta))*Db*Bb(xi, eta) @ xi = -1 : 1} @ eta = -1 : 1}}
+#: La placa completa es la flexión más el cortante MITC4, con G_s = (5/6)·G·h = 5·E·h/(12·(1 + ν)) en lugar del símbolo:
+K_placa = Simplify{Kb + 5*E*h/(12*(1+nu))/Gs*Ks_mitc}
+

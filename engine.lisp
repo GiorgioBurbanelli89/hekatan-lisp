@@ -3514,6 +3514,113 @@ Lo escribe la app (escritorio: junto a la hoja; web: botón de descarga)."
     (when el (setvar "HKEL" (hk-al-d el)))
     m))
 
+;; ---- sólidos como AutoCAD (BOX, CYLINDER, SPHERE, EXTRUDE, REVOLVE) y superficie z = f(x, y) ----
+;; Funciones SIMPLES para la hoja (Jorge: el lenguaje no debe asustar al cliente; nada de defun/car/cadr
+;; en la hoja). Cada una arma una malla cerrada de 3DFACE en su capa y color y devuelve cuántas caras
+;; dibujó. Un 3DSOLID real de AutoCAD es ACIS propietario: esto se ve, gira y exporta a DXF/DWG, y en
+;; AutoCAD se abre como caras.
+(defun hk-sol-mas (p dx dy dz) (list (+ (first p) dx) (+ (second p) dy) (+ (third p) dz)))
+(defun caja (p dx dy dz &key color capa)
+  "Caja (BOX): esquina P (x y z) y lados DX DY DZ. Devuelve 6 (caras)."
+  (let* ((a (hk-al-pt p 3)) (dx (hk-al-d dx)) (dy (hk-al-d dy)) (dz (hk-al-d dz))
+         (b (hk-sol-mas a dx 0 0)) (c (hk-sol-mas a dx dy 0)) (d (hk-sol-mas a 0 dy 0))
+         (e (hk-sol-mas a 0 0 dz)) (f (hk-sol-mas b 0 0 dz)) (g (hk-sol-mas c 0 0 dz)) (h (hk-sol-mas d 0 0 dz)))
+    (dolist (q (list (list a d c b) (list e f g h) (list a b f e) (list b c g f) (list c d h g) (list d a e h)))
+      (cara3 q :color color :capa capa))
+    6))
+(defun cilindro (c r h &key (lados 24) color capa)
+  "Cilindro (CYLINDER): centro de la base C, radio R, altura H; LADOS caras alrededor. Devuelve 3·LADOS."
+  (let* ((c (hk-al-pt c 3)) (r (hk-al-d r)) (h (hk-al-d h)) (n lados) (top (hk-sol-mas c 0 0 h)))
+    (dotimes (i n)
+      (let* ((a0 (/ (* 2 +hk-al-pi+ i) n)) (a1 (/ (* 2 +hk-al-pi+ (1+ i)) n))
+             (p0 (hk-sol-mas c (* r (cos a0)) (* r (sin a0)) 0)) (p1 (hk-sol-mas c (* r (cos a1)) (* r (sin a1)) 0))
+             (q0 (hk-sol-mas p0 0 0 h)) (q1 (hk-sol-mas p1 0 0 h)))
+        (cara3 (list p0 p1 q1 q0) :color color :capa capa)
+        (cara3 (list c p1 p0) :color color :capa capa)
+        (cara3 (list top q0 q1) :color color :capa capa)))
+    (* 3 n)))
+(defun esfera (c r &key (meridianos 24) (paralelos 12) color capa)
+  "Esfera (SPHERE): centro C y radio R; malla de MERIDIANOS × PARALELOS caras."
+  (let ((c (hk-al-pt c 3)) (r (hk-al-d r)) (nu meridianos) (nv paralelos))
+    (flet ((pt (th ph) (hk-sol-mas c (* r (cos ph) (cos th)) (* r (cos ph) (sin th)) (* r (sin ph)))))
+      (dotimes (j nv)
+        (let ((ph0 (- (/ (* +hk-al-pi+ j) nv) (/ +hk-al-pi+ 2))) (ph1 (- (/ (* +hk-al-pi+ (1+ j)) nv) (/ +hk-al-pi+ 2))))
+          (dotimes (i nu)
+            (let ((th0 (/ (* 2 +hk-al-pi+ i) nu)) (th1 (/ (* 2 +hk-al-pi+ (1+ i)) nu)))
+              (cara3 (list (pt th0 ph0) (pt th1 ph0) (pt th1 ph1) (pt th0 ph1)) :color color :capa capa))))))
+    (* nu nv)))
+(defun hk-sol-cruz (a b c)
+  (- (* (- (first b) (first a)) (- (second c) (second a))) (* (- (second b) (second a)) (- (first c) (first a)))))
+(defun hk-sol-orejas (pts)
+  "Triangula un polígono simple (también cóncavo: L, U, T) por «orejas». Lista de triángulos."
+  (let* ((n0 (length pts))
+         (area (loop for i below n0 for a = (nth i pts) for b = (nth (mod (1+ i) n0) pts)
+                     sum (- (* (first a) (second b)) (* (first b) (second a)))))
+         (v (if (< area 0) (reverse pts) (copy-list pts))) (tris nil))
+    (loop while (> (length v) 3)
+          do (let ((n (length v)) (hallada nil))
+               (loop for i below n until hallada
+                     do (let ((a (nth (mod (+ i n -1) n) v)) (b (nth i v)) (c (nth (mod (1+ i) n) v)))
+                          (when (and (> (hk-sol-cruz a b c) 1d-9)
+                                     (notany (lambda (q) (and (not (eq q a)) (not (eq q b)) (not (eq q c))
+                                                              (>= (hk-sol-cruz a b q) 0) (>= (hk-sol-cruz b c q) 0)
+                                                              (>= (hk-sol-cruz c a q) 0)))
+                                             v))
+                            (push (list a b c) tris)
+                            (setf v (append (subseq v 0 i) (subseq v (1+ i))) hallada t))))
+               (unless hallada (setf v (subseq v 0 3)))))
+    (when (= (length v) 3) (push v tris))
+    tris))
+(defun extruir (contorno h &key color capa)
+  "Extrusión (EXTRUDE): CONTORNO ((x y) …) en el plano de la base y altura H. Paredes + dos tapas."
+  (let* ((pts (mapcar (lambda (p) (hk-al-pt p 3)) contorno)) (h (hk-al-d h)) (n (length pts)) (cnt 0))
+    (loop for i below n for a = (nth i pts) for b = (nth (mod (1+ i) n) pts)
+          do (cara3 (list a b (hk-sol-mas b 0 0 h) (hk-sol-mas a 0 0 h)) :color color :capa capa) (incf cnt))
+    (dolist (tr (hk-sol-orejas pts))
+      (cara3 tr :color color :capa capa)
+      (cara3 (mapcar (lambda (p) (hk-sol-mas p 0 0 h)) tr) :color color :capa capa)
+      (incf cnt 2))
+    cnt))
+(defun revolucion (c perfil &key (lados 24) color capa)
+  "Revolución (REVOLVE): PERFIL ((r z) …) girado alrededor del eje z que pasa por C."
+  (let* ((c (hk-al-pt c 3)) (n lados) (cnt 0))
+    (flet ((pt (rz th) (hk-sol-mas c (* (hk-al-d (first rz)) (cos th)) (* (hk-al-d (first rz)) (sin th))
+                                   (hk-al-d (second rz)))))
+      (loop for (a b) on perfil while b
+            do (dotimes (i n)
+                 (let ((th0 (/ (* 2 +hk-al-pi+ i) n)) (th1 (/ (* 2 +hk-al-pi+ (1+ i)) n)))
+                   (cara3 (list (pt a th0) (pt a th1) (pt b th1) (pt b th0)) :color color :capa capa)
+                   (incf cnt)))))
+    cnt))
+(defun hk-al-funcion2 (f)
+  "F → función de dos números (x, y): función, lambda, o expresión/función de la hoja en x e y."
+  (cond ((functionp f) f)
+        ((and (symbolp f) f (boundp f) (functionp (symbol-value f))) (symbol-value f))
+        ((and (symbolp f) f (boundp f) (consp (symbol-value f))) (hk-al-funcion2 (symbol-value f)))
+        ((and (symbolp f) f (fboundp f) (not (macro-function f)) (not (special-operator-p f))) (symbol-function f))
+        ((and (consp f) (eq (car f) 'lambda)) (coerce f 'function))
+        (t (lambda (xv yv)
+             (handler-case (let ((e1 (nval (hk-al-sust f 'y) 'y yv))) (if (realp e1) e1 (nval e1 'x xv)))
+               (error () (progv '(x y) (list xv yv) (hk-al-d (eval f)))))))))
+(defun superficie (f c x0 x1 y0 y1 &key (nx 20) (ny 20) desde capa)
+  "Superficie z = F(x, y) sobre [X0 X1]×[Y0 Y1] apoyada en C; NX×NY caras coloreadas por altura.
+DESDE: z mínimo (lo de abajo se recorta a ese valor, p. ej. una cúpula que no baja de 0)."
+  (let* ((c (hk-al-pt c 3)) (x0 (hk-al-d x0)) (x1 (hk-al-d x1)) (y0 (hk-al-d y0)) (y1 (hk-al-d y1))
+         (fn (hk-al-funcion2 f)) (zs nil) (caras nil))
+    (dotimes (j ny)
+      (dotimes (i nx)
+        (let ((q (loop for (di dj) in '((0 0) (1 0) (1 1) (0 1))
+                       collect (let* ((x (+ x0 (* (- x1 x0) (/ (+ i di) nx)))) (y (+ y0 (* (- y1 y0) (/ (+ j dj) ny))))
+                                      (z (or (ignore-errors (hk-al-d (funcall fn x y))) 0d0)))
+                                 (hk-sol-mas c x y (if desde (max (hk-al-d desde) z) z))))))
+          (push q caras) (push (/ (reduce #'+ (mapcar #'third q)) 4) zs))))
+    (let ((zmin (reduce #'min zs)) (zmax (reduce #'max zs)))
+      (loop for q in caras for z in zs
+            do (cara3 q :capa capa
+                      :color (let ((u (if (> zmax zmin) (/ (- z zmin) (- zmax zmin)) 0)))
+                               (cond ((< u 0.2) 5) ((< u 0.4) 4) ((< u 0.6) 3) ((< u 0.8) 2) (t 1))))))
+    (* nx ny)))
+
 ;; ---- transformar LISTAS (no tocan el dibujo: se devuelve otra lista para entmake / entmod) ----
 (defun hk-al-mapa-puntos (ent fn)
   (mapcar (lambda (p) (if (and (integerp (car p)) (<= 10 (car p) 18) (hk-al-ptp (cdr p)))
@@ -3628,3 +3735,47 @@ Lo escribe la app (escritorio: junto a la hoja; web: botón de descarga)."
           ((string-equal tp "SOLID")
            (abs (hk-al-shoelace (list (cdr (assoc 10 d)) (cdr (assoc 11 d)) (cdr (assoc 13 d)) (cdr (assoc 12 d))))))
           (t nil))))
+
+;;;; ===================== MÁS SÓLIDOS: cono, toro, losa, perfil-i, tubo-rect (26-sep-2026) =====================
+;;;; Se suman a caja / cilindro / esfera / extruir / revolucion / superficie de arriba, con las mismas claves
+;;;; (:lados, :meridianos, :paralelos, :color, :capa) y devuelven el número de caras. Mallas cerradas de 3DFACE.
+(defun cono (c r1 h &key (r2 0) (lados 24) color capa)
+  "Cono (CONE) o tronco: centro de la base C, radio R1 abajo, radio R2 arriba (0 = punta) y altura H."
+  (let* ((c (hk-al-pt c 3)) (r1 (hk-al-d r1)) (r2 (hk-al-d r2)) (h (hk-al-d h)) (n lados)
+         (top (hk-sol-mas c 0 0 h)) (cnt 0))
+    (dotimes (i n cnt)
+      (let* ((a0 (/ (* 2 +hk-al-pi+ i) n)) (a1 (/ (* 2 +hk-al-pi+ (1+ i)) n))
+             (p0 (hk-sol-mas c (* r1 (cos a0)) (* r1 (sin a0)) 0)) (p1 (hk-sol-mas c (* r1 (cos a1)) (* r1 (sin a1)) 0))
+             (q0 (hk-sol-mas c (* r2 (cos a0)) (* r2 (sin a0)) h)) (q1 (hk-sol-mas c (* r2 (cos a1)) (* r2 (sin a1)) h)))
+        (cara3 (list p0 p1 q1 q0) :color color :capa capa)
+        (cara3 (list c p1 p0) :color color :capa capa)
+        (incf cnt 2)
+        (when (> r2 0) (cara3 (list top q0 q1) :color color :capa capa) (incf cnt))))))
+(defun toro (c r-mayor r-menor &key (meridianos 32) (paralelos 16) color capa)
+  "Toro (TORUS): centro C, radio del aro R-MAYOR y radio del tubo R-MENOR. MERIDIANOS × PARALELOS caras."
+  (let* ((c (hk-al-pt c 3)) (rm (hk-al-d r-mayor)) (rt (hk-al-d r-menor)) (nu meridianos) (nv paralelos))
+    (flet ((pt (th ph) (let ((rr (+ rm (* rt (cos ph)))))
+                         (hk-sol-mas c (* rr (cos th)) (* rr (sin th)) (* rt (sin ph))))))
+      (dotimes (j nv)
+        (dotimes (i nu)
+          (let ((th0 (/ (* 2 +hk-al-pi+ i) nu)) (th1 (/ (* 2 +hk-al-pi+ (1+ i)) nu))
+                (ph0 (/ (* 2 +hk-al-pi+ j) nv)) (ph1 (/ (* 2 +hk-al-pi+ (1+ j)) nv)))
+            (cara3 (list (pt th0 ph0) (pt th1 ph0) (pt th1 ph1) (pt th0 ph1)) :color color :capa capa))))
+      (* nu nv))))
+(defun losa (p dx dy espesor &key color capa)
+  "Losa (o muro) como caja: esquina P, dos lados y el espesor. 6 caras."
+  (caja p dx dy espesor :color color :capa capa))
+(defun perfil-i (p d bf tf tw largo &key color capa)
+  "Perfil I de acero como sólido, a lo largo de +X desde P (centro del ancho del ala, cara inferior):
+peralte D, ancho de ala BF, espesor de ala TF, de alma TW y LARGO. 18 caras."
+  (let* ((p (hk-al-pt p 3)) (d (hk-al-d d)) (bf (hk-al-d bf)) (tf (hk-al-d tf)) (tw (hk-al-d tw)) (l (hk-al-d largo)))
+    (+ (caja (hk-sol-mas p 0 (- (/ bf 2)) 0) l bf tf :color color :capa capa)
+       (caja (hk-sol-mas p 0 (- (/ tw 2)) tf) l tw (- d (* 2 tf)) :color color :capa capa)
+       (caja (hk-sol-mas p 0 (- (/ bf 2)) (- d tf)) l bf tf :color color :capa capa))))
+(defun tubo-rect (p b h espesor largo &key color capa)
+  "Tubo rectangular hueco a lo largo de +X desde P (centro del ancho, cara inferior): B × H, ESPESOR y LARGO. 24 caras."
+  (let* ((p (hk-al-pt p 3)) (b (hk-al-d b)) (h (hk-al-d h)) (e (hk-al-d espesor)) (l (hk-al-d largo)))
+    (+ (caja (hk-sol-mas p 0 (- (/ b 2)) 0) l b e :color color :capa capa)
+       (caja (hk-sol-mas p 0 (- (/ b 2)) (- h e)) l b e :color color :capa capa)
+       (caja (hk-sol-mas p 0 (- (/ b 2)) e) l e (- h (* 2 e)) :color color :capa capa)
+       (caja (hk-sol-mas p 0 (- (/ b 2) e) e) l e (- h (* 2 e)) :color color :capa capa))))

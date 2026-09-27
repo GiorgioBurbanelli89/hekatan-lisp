@@ -1418,11 +1418,32 @@ dib();})();";
             return f != null && f != v ? f + " = " + v : v;
         }
 
+        /// <summary>☞{imagen ruta.png} en la prosa: la ruta es relativa a la hoja abierta (o absoluta);
+        /// solo extensiones de imagen y se embebe como data URI para que el HTML exportado se lleve
+        /// la foto encima. null = no está / no toca → el globo muestra el aviso en rojo.</summary>
+        private string ManoImagen(string ruta)
+        {
+            try
+            {
+                ruta = (ruta ?? "").Trim().Trim('"');
+                if (!System.Text.RegularExpressions.Regex.IsMatch(ruta, @"\.(png|jpe?g|gif|svg|webp)$",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return null;
+                var full = System.IO.Path.IsPathRooted(ruta) ? ruta
+                    : System.IO.Path.Combine(string.IsNullOrEmpty(_currentFile) ? "" : System.IO.Path.GetDirectoryName(_currentFile), ruta);
+                if (!System.IO.File.Exists(full)) return null;
+                var ext = System.IO.Path.GetExtension(full).ToLowerInvariant();
+                var mime = ext == ".jpg" || ext == ".jpeg" ? "image/jpeg" : ext == ".gif" ? "image/gif"
+                        : ext == ".svg" ? "image/svg+xml" : ext == ".webp" ? "image/webp" : "image/png";
+                return "data:" + mime + ";base64," + Convert.ToBase64String(System.IO.File.ReadAllBytes(full));
+            }
+            catch { return null; }
+        }
+
         /// <summary>@nombre / @{nombre} en el TEXTO de una hoja numérica (párrafos y tablas #|…|): el valor
         /// que el programa dio a esa variable en la última línea visible ANTES de este texto (si no hay,
         /// la primera después). Antes buscaba en el pipeline simbólico, que en #numerico está vacío,
         /// y el texto salía con «@{w_c}» literal.</summary>
-        private string NumInline(string name, int linea)
+        private string NumInline(string name, int linea, string[] srcLines = null)
         {
             if (_numRes == null || string.IsNullOrWhiteSpace(name)) return null;
             name = name.Trim();
@@ -1443,6 +1464,17 @@ dib();})();";
                     bool antes = kv.Key < linea, mejorAntes = mejor >= 0 && mejor < linea;
                     if (mejor < 0 || (antes && (!mejorAntes || kv.Key > mejor)) || (!antes && !mejorAntes && kv.Key < mejor)) mejor = kv.Key;
                 }
+            // eco VISIBLE sin nombre (p. ej. «transpose(W_z)»: W_z se llenó en un #hide y su tabla sale
+            // como eco anónimo): la prosa puede citar la variable que ese eco enseña — se toma el eco más
+            // CERCANO a la línea del texto, que es la tabla que la hoja ya muestra debajo.
+            if (mejor < 0 && srcLines != null)
+                foreach (var kv in _numRes.Valor)
+                    if (_numRes.Nombre.TryGetValue(kv.Key, out var nm2) && string.IsNullOrEmpty(nm2)
+                        && kv.Key < srcLines.Length
+                        && System.Text.RegularExpressions.Regex.IsMatch(srcLines[kv.Key] ?? "",
+                            @"(?<![A-Za-z0-9_.])" + System.Text.RegularExpressions.Regex.Escape(name) + @"(?![A-Za-z0-9_.])")
+                        && (mejor < 0 || Math.Abs(kv.Key - linea) < Math.Abs(mejor - linea)))
+                        mejor = kv.Key;
             if (mejor < 0) return null;
             var v = HojaNumerica.FormatoLiteral(_numRes.Valor.TryGetValue(mejor, out var vis) ? vis : _numRes.Oculta[mejor].Valor);
             try { return LispConverter.ToHtml(LispConverter.ParseLisp(v)); }
@@ -1992,8 +2024,9 @@ dib();})();";
                     if (kind == "voz" && !string.IsNullOrEmpty(align))   // {k} de la voz: lo pone el reproductor, cuadro a cuadro
                         raw2 = raw2.Replace("{" + align + "}", "⟦" + align + "⟧");
                     string html = LispConverter.FormatInlineText(raw2,
-                        name => _numMode ? NumInline(name, iTxt) : LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
-                        name => vecMap.TryGetValue(name, out var vt) && vt.Op == "vec");   // @v → flecha solo si v es VECTOR
+                        name => _numMode ? NumInline(name, iTxt, lines) : LookupVarHtml(name, labels, resOf, formOf, funcMap, vecMap),
+                        name => vecMap.TryGetValue(name, out var vt) && vt.Op == "vec",   // @v → flecha solo si v es VECTOR
+                        ManoImagen);                                                     // ☞{imagen ruta} → data URI
                     if (kind == "table") html = RebuildManualTable(html);   // tabla de TEXTO: rearma <table> ya con cada celda formateada
                     if (kind == "voz") { display.Add(LispConverter.TxtLine("table", "left", LispAnim.VozHtml(html, align != null))); continue; }
                     display.Add(LispConverter.TxtLine(kind, align, html));

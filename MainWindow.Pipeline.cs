@@ -652,7 +652,10 @@ namespace HekatanLisp
                         try
                         {
                             var nombres = SplitTop(k3).Select(a => a.Trim()).ToList();
-                            string cap = "losa: " + (nombres.Count > 3 ? nombres[3] : "") + "  ·  barras: " + (nombres.Count > 4 ? nombres[4] : "") +
+                            // sin barras (un muro de membranas) el rótulo no las nombra
+                            bool hayBarras = lits.Count > 2 && System.Text.RegularExpressions.Regex.IsMatch(lits[2] ?? "", @"\d");
+                            string cap = (hayBarras ? "losa: " : "") + (nombres.Count > 3 ? nombres[3] : "") +
+                                         (hayBarras ? "  ·  barras: " + (nombres.Count > 4 ? nombres[4] : "") : "") +
                                          "  ·  <span style=\"opacity:.7\">arrastra para girar, rueda para acercar, cursor para leer</span>";
                             outList.Add(PlotWrap(SurfacePlot.Modelo3DHtml(lits, nombres, surfId++), cap));
                             anySurf = true;

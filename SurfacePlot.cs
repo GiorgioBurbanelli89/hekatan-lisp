@@ -840,6 +840,9 @@ function init(cv){
  var bmax=0;D.vB.forEach(function(r){bmax=Math.max(bmax,Math.abs(r[0]),Math.abs(r[1]));});
  var bs=bmax>0?0.22*R/bmax:0;
  var yaw=-0.65,pitch=0.5,zoom=1,drag=null,hov=null,prims=[],samp=[];
+ // modelo PLANO (un muro o una viga pared: todos los nudos con la misma z): de frente, que es como se lee;
+ // en perspectiva un plano se ve de canto. Arrastrando se gira igual.
+ if(hi[2]-lo[2]<1e-9*R){yaw=0;pitch=1.5;}
  function pr(p){var x=p[0]-c[0],y=p[1]-c[1],z=p[2]-c[2];var cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
   var x1=x*cy-y*sy,y1=x*sy+y*cy;var y2=y1*cp-z*sp,z2=y1*sp+z*cp;var s=0.42*Math.min(W,H)/R*zoom;return [W/2-40+x1*s,H/2-z2*s,y2];}
  function lerp(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
@@ -873,7 +876,7 @@ function init(cv){
   var x0=W-62,y0=60,hh=H-140,m;for(m=0;m<hh;m++){g.fillStyle=css(jet(1-m/hh),1);g.fillRect(x0,y0+m,18,1);}
   g.strokeStyle=fg;g.lineWidth=1;g.strokeRect(x0,y0,18,hh);g.fillStyle=fg;g.font='12px sans-serif';g.textAlign='right';
   g.fillText(fmt(smax),x0+44,y0-6);g.fillText(fmt(smin),x0+44,y0+hh+16);g.fillText(D.nS,x0+44,y0-22);
-  g.textAlign='left';g.fillText('barras: '+D.nB+'   max |valor| = '+fmt(bmax),12,H-12);
+  if(D.B.length){g.textAlign='left';g.fillText('barras: '+D.nB+'   max |valor| = '+fmt(bmax),12,H-12);}
   if(hov){var q=pr(hov.p);g.beginPath();g.arc(q[0],q[1],5,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#000';g.lineWidth=1.5;g.stroke();}}
  function pos(ev){var r=cv.getBoundingClientRect();return [(ev.clientX-r.left)*W/r.width,(ev.clientY-r.top)*H/r.height,r];}
  cv.addEventListener('pointerdown',function(ev){drag=[ev.clientX,ev.clientY,yaw,pitch];try{cv.setPointerCapture(ev.pointerId);}catch(x){}cv.style.cursor='grabbing';});

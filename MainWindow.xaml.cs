@@ -117,7 +117,7 @@ namespace HekatanLisp
                     if ((ex_ == ".lisp" || ex_ == ".hlisp" || ex_ == ".m" || ex_ == ".txt") && File.Exists(a_))
                     { inFile = a_; break; }
                 }
-            if (inFile != null) { try { if (File.Exists(inFile)) { var it = File.ReadAllText(inFile); if (string.Equals(Path.GetExtension(inFile), ".m", StringComparison.OrdinalIgnoreCase)) it = LispConverter.MatlabToHlisp(it); Editor.Text = it; SetCurrentFile(inFile); } } catch { } }
+            if (inFile != null) { try { if (File.Exists(inFile)) { var it = File.ReadAllText(inFile); if (string.Equals(Path.GetExtension(inFile), ".m", StringComparison.OrdinalIgnoreCase)) it = LispConverter.MatlabToHlisp(it); Editor.Text = it; SetCurrentFile(inFile); SincronizarModoEscribo(); } } catch { } }
             if (string.IsNullOrWhiteSpace(Editor.Text))
             {
                 // arranque normal: recupera el trabajo NO guardado del respaldo temporal (si existe)
@@ -567,6 +567,24 @@ namespace HekatanLisp
         }
 
         /// <summary>Resalta en dorado el botón de sintaxis activo (MATLAB o LISP).</summary>
+        /// <summary>El botón «escribo:» dice lo que HAY en el editor: si el texto es LISP (un programa, o una
+        /// hoja con un bloque <c>#autolisp</c> / <c>(defun …)</c>), marca «LISP» y no «matemática». Lo llaman TODAS
+        /// las rutas que cargan texto (archivo por línea de órdenes, --ctl, ejemplos): antes solo lo hacía
+        /// CargarArchivo, y un .lisp abierto al arrancar mostraba «matemática» sobre código LISP
+        /// (Jorge, 26-sep-2026: «eso es lisp, no puede decir lisp en matemática; eso ahuyenta a los clientes»).
+        /// No toca los modos forzados a mano (LISP completo, Hekatan Lab).</summary>
+        private void SincronizarModoEscribo()
+        {
+            if (_synFull || _transliterated) return;
+            var t = Editor.Text ?? "";
+            _syntaxLisp = LooksLikeLisp(t) ||
+                System.Text.RegularExpressions.Regex.IsMatch(t, @"(^|\n)[ \t]*#autolisp\b");
+            LblIn.Text = _syntaxLisp
+                ? "escribes: LISP (programa o expresión; se ejecuta con ▶ Ejecutar)"
+                : "escribes: texto plano";
+            HighlightSyntax();
+        }
+
         private void HighlightSyntax()
         {
             if (BtnSynMath == null || BtnSynLisp == null) return;
@@ -626,6 +644,7 @@ namespace HekatanLisp
             {
                 case "settext":
                     Editor.Text = doc.RootElement.GetProperty("text").GetString();
+                    SincronizarModoEscribo();
                     ShowResult();
                     return "{\"ok\":true}";
                 case "js":       // ejecutar JS en el WebView2 (p.ej. arrastrar la manija de una matriz)
@@ -642,6 +661,7 @@ namespace HekatanLisp
                 // pasa aunque el AutoRun esté muerto.
                 case "escribe":
                     Editor.Text = doc.RootElement.GetProperty("text").GetString();
+                    SincronizarModoEscribo();
                     return "{\"ok\":true,\"autorun\":" + (_autoRun ? "true" : "false") + "}";
                 case "view":     // formato de la derecha: render|lisp|math
                     SetView(doc.RootElement.GetProperty("name").GetString());

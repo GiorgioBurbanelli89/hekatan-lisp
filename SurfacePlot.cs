@@ -342,10 +342,17 @@ namespace HekatanLisp
             if (xb - xa < 1e-12) xb = xa + 1; if (yb - ya < 1e-12) yb = ya + 1;
             // misma escala en x y en y: la losa se ve con su proporción real
             double k = Math.Min((W - pL - pR) / (xb - xa), (H - pT - pB) / (yb - ya));
-            float pw = (float)(k * (xb - xa)), ph = (float)(k * (yb - ya));
+            // modelo esbelto (la pantalla de un muro: 0.4 × 4 m): con la misma escala el lado corto queda
+            // en 35 px y los nudos se pisan. El lado corto se amplía hasta el 45 % del hueco y se avisa.
+            double kx = k, ky = k;
+            const double minLado = 0.45;
+            if (k * (xb - xa) < minLado * (W - pL - pR)) kx = minLado * (W - pL - pR) / (xb - xa);
+            if (k * (yb - ya) < minLado * (H - pT - pB)) ky = minLado * (H - pT - pB) / (yb - ya);
+            bool ampliada = kx != ky;
+            float pw = (float)(kx * (xb - xa)), ph = (float)(ky * (yb - ya));
             float ox = pL + (W - pL - pR - pw) / 2, oy = pT + (H - pT - pB - ph) / 2;
-            float X(double u) => ox + (float)((u - xa) * k);
-            float Y(double v) => oy + ph - (float)((v - ya) * k);
+            float X(double u) => ox + (float)((u - xa) * kx);
+            float Y(double v) => oy + ph - (float)((v - ya) * ky);
             SKColor bg = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
             SKColor fg = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
             SKColor lin = dark ? new SKColor(0x6E, 0xA8, 0x86) : new SKColor(0x2E, 0x8B, 0x57);
@@ -417,6 +424,11 @@ namespace HekatanLisp
             }
             ax.TextAlign = SKTextAlign.Center; ax.TextSize = 12;
             cv.DrawText($"{elems.Length} elementos   ·   {xs.Length} nudos" + (apoyos != null && apoyos.Length > 0 ? $"   ·   {apoyos.Length} apoyados" : ""), W / 2f, 16, ax);
+            if (ampliada && restr == null)
+            {
+                ax.TextSize = 10.5f;
+                cv.DrawText(kx > ky ? "escala horizontal ampliada" : "escala vertical ampliada", W / 2f, H - 8, ax);
+            }
             if (restr != null)   // leyenda de los apoyos, abajo
             {
                 var ley = new List<string>();

@@ -1423,6 +1423,9 @@ dib();})();";
         /// la foto encima. null = no está / no toca → el globo muestra el aviso en rojo.</summary>
         private string ManoImagen(string ruta)
         {
+#if HEKATAN_WEB
+            return null;   // en la web no hay disco local ni hoja abierta en una carpeta: el globo avisa en rojo
+#else
             try
             {
                 ruta = (ruta ?? "").Trim().Trim('"');
@@ -1437,6 +1440,7 @@ dib();})();";
                 return "data:" + mime + ";base64," + Convert.ToBase64String(System.IO.File.ReadAllBytes(full));
             }
             catch { return null; }
+#endif
         }
 
         /// <summary>@nombre / @{nombre} en el TEXTO de una hoja numérica (párrafos y tablas #|…|): el valor

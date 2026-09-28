@@ -332,7 +332,7 @@ namespace HekatanLisp
                     }
                 }
                 catch { }
-                Viewer.NavigateToString(html);
+                MostrarPagina(html);
                 return;
             }
             var sb = new StringBuilder();
@@ -562,6 +562,31 @@ namespace HekatanLisp
         private bool _reprSwitch = false;     // true = solo cambia la representación izquierda (no recalcular)
         private bool _exprEditado = false;    // en «expr LISP» el usuario escribió: el original hay que rehacerlo
         private bool _verMotor = false;       // el editor enseña el motor (menú Motor): se lee, no se ejecuta
+
+        /// <summary>Pone la página en el resultado. WebView2 no admite más de 2 MB por NavigateToString: una
+        /// hoja con una animación de 40 cuadros pesa más, la llamada fallaba y el panel se quedaba en
+        /// «calculando…» para siempre, sin ningún aviso. Las páginas grandes van por un archivo temporal
+        /// (dentro de la carpeta del perfil de ESTA ventana, que se limpia sola al arrancar otra vez).</summary>
+        private void MostrarPagina(string html)
+        {
+            if (html.Length < 1_500_000) { Viewer.NavigateToString(html); return; }
+            try
+            {
+                var dir = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
+                Directory.CreateDirectory(dir);
+                var ruta = Path.Combine(dir, "hoja.html");
+                File.WriteAllText(ruta, html, new UTF8Encoding(true));
+                // el número cambia cada vez: si no, la misma dirección no recarga la página
+                Viewer.CoreWebView2.Navigate(new Uri(ruta).AbsoluteUri + "?v=" + (++_paginaN));
+            }
+            catch (Exception ex)
+            {
+                Viewer.NavigateToString("<html><body style='font-family:Segoe UI;padding:24px'><h3>No se pudo mostrar la hoja</h3><p>" +
+                    System.Net.WebUtility.HtmlEncode(ex.Message) + "</p><p>La página pesa " + (html.Length / 1024) +
+                    " kB. Reduce los cuadros de la animación.</p></body></html>");
+            }
+        }
+        private int _paginaN;
 
         /// <summary>Se cargó OTRA hoja (archivo, ejemplo, Nuevo): lo guardado de la anterior ya no vale.
         /// Poner el texto en el editor dispara el mismo aviso que teclear, así que se limpia después.</summary>

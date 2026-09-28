@@ -2163,6 +2163,12 @@ dib();})();";
                         bool refsVec = opF != formOf[i] && ReferencesVecVar(opF, vecMap);
                         display.Add(lbl + " = " + (refsVec ? opF : formOf[i]) + " = " + r);
                     }
+                    // simplify/expand con nombre: lo escrito Y su resultado (y = x + x = 2·x), igual que la
+                    // línea sin nombre (x + x = 2·x). Antes solo salía y = 2·x y no se veía de dónde venía.
+                    else if (_op != "auto" && hasR && !_numMode && !MismaEscritura(formOf[i], r))
+                    {
+                        display.Add(lbl + " = " + formOf[i] + " = " + r);
+                    }
                     else
                     {
                         string rhs = (_op == "auto" || !hasR) ? formOf[i] : r;
@@ -2171,7 +2177,7 @@ dib();})();";
                 }
                 else                    // sin nombre → "entrada = resultado" EN UNA LÍNEA
                 {
-                    display.Add(hasR ? formOf[i] + " = " + r : formOf[i]);
+                    display.Add(hasR && !MismaEscritura(formOf[i], r) ? formOf[i] + " = " + r : formOf[i]);
                 }
             }
             // alias del medio:  Fx = <F_1 = > expresión = resultado
@@ -2702,6 +2708,110 @@ dib();})();";
                 sb.AppendLine(conv);
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Qué hay escrito en modo «expr LISP»: 1 = expresiones ((setf nombre expr) y formas sueltas),
+        /// que se calculan SIMBÓLICAS; 0 = un programa (defun, loop, print…), que se ejecuta; 2 = una línea a
+        /// medio escribir (paréntesis sin cerrar).</summary>
+        private static int ClaseExprLisp(string t)
+        {
+            if (string.IsNullOrWhiteSpace(t) || !LooksLikeLisp(t)) return 0;
+            if (System.Text.RegularExpressions.Regex.IsMatch(t,
+                @"(?<![A-Za-z0-9_.])\(\s*(defun|defparameter|defvar|let\*?|setq|loop|progn|format|print|dolist|dotimes|lambda|cond|when|unless)\s"))
+                return 0;
+            int clase = 1;
+            foreach (var raw in t.Replace("\r", "").Split('\n'))
+            {
+                var l = raw.Trim();
+                if (l.Length == 0 || l.StartsWith(";")) continue;
+                // una directiva (#numerico, #autolisp, #fplot…) o una línea de matemática (D = E·t^3/12·[1, nu; …])
+                // dicen que es una HOJA: no se toca. Convertirla partía las matrices por el «;» de sus filas
+                // y pasaba a matemática el LISP de los bloques #autolisp (seis ejemplos rotos al abrirlos).
+                if (l.StartsWith("#")) return 0;
+                int p = l.IndexOf(';');
+                if (p > 0) l = l.Substring(0, p).TrimEnd();
+                if (!l.StartsWith("("))
+                {
+                    if (System.Text.RegularExpressions.Regex.IsMatch(l, @"^-?[\w.]+$")) continue;   // x, 3.5: vale en los dos idiomas
+                    return 0;
+                }
+                if (!Balanced(l) || !l.EndsWith(")")) { clase = 2; continue; }
+                if (l.StartsWith("(setf") && !System.Text.RegularExpressions.Regex.IsMatch(l, @"^\(setf\s+[A-Za-z]\w*\s+.+\)$")) clase = 2;
+            }
+            return clase;
+        }
+
+        /// <summary>De lo escrito en «expr LISP» a la hoja en matemática, que es de donde calcula el panel del
+        /// resultado. Las líneas que NO se tocaron (cabeza y cola iguales a la conversión del original) conservan
+        /// su texto original, así no se pierden los títulos ni las gráficas; solo lo cambiado se convierte.</summary>
+        private static string ExprLispAMatematica(string editor, string original)
+        {
+            var ed = editor.Replace("\r", "").Split('\n');
+            string[] orig = null, conv = null;
+            if (original != null && !(!LooksLikeLisp(original) &&
+                System.Text.RegularExpressions.Regex.IsMatch(original, @"(^|\n)\s*(for|while|if|function)\b")))
+            {
+                orig = ExpandMathSemicolons(original.Replace("\r", "").Split('\n'));
+                conv = ConvertEditor(original, true).Replace("\r", "").Split('\n');
+                if (conv.Length > orig.Length) { orig = null; conv = null; }
+            }
+            int pre = 0, suf = 0;
+            if (orig != null)
+            {
+                while (pre < ed.Length && pre < conv.Length && ed[pre].Trim() == conv[pre].Trim()) pre++;
+                while (suf < ed.Length - pre && suf < conv.Length - pre &&
+                       ed[ed.Length - 1 - suf].Trim() == conv[conv.Length - 1 - suf].Trim()) suf++;
+            }
+            var sal = new List<string>();
+            for (int i = 0; i < pre; i++) sal.Add(orig[i]);
+            for (int i = pre; i < ed.Length - suf; i++) sal.Add(LineaExprAMatematica(ed[i]));
+            if (orig != null) for (int k = conv.Length - suf; k < conv.Length; k++) sal.Add(orig[k]);
+            return string.Join("\n", sal);
+        }
+
+        // una línea de «expr LISP» → matemática; la unidad «; [m]» y la etiqueta «; (1)» vuelven a su sitio
+        private static string LineaExprAMatematica(string linea)
+        {
+            var l = linea.Trim();
+            if (l.Length == 0 || l.StartsWith(";") || l.StartsWith("#")) return l;
+            string com = null;
+            int p = l.IndexOf(';');
+            if (p > 0) { com = l.Substring(p); l = l.Substring(0, p).TrimEnd(); }
+            string m = ConvertEqLine(l, false);
+            if (com != null)
+                foreach (var c in com.Split(';'))
+                {
+                    var cc = c.Trim();
+                    if (cc.Length == 0) continue;
+                    m += (cc.StartsWith("[") && cc.EndsWith("]")) ? " " + cc : " @@(" + cc + ")";
+                }
+            return m;
+        }
+
+        // ¿dos formas LISP se escriben IGUAL en matemática?  (/ P (* B L)) y (* P (expt (* B L) -1)) → sí
+        private static bool MismaEscritura(string a, string b)
+        {
+            if (a == b) return true;
+            try
+            {
+                // el motor devuelve en minúsculas (p, b, l): la comparación no mira mayúsculas
+                string Norma(string f) => LispConverter.ToLab(LispConverter.ParseLisp(f), 0).Replace(" ", "").ToLowerInvariant();
+                string na = Norma(a), nb = Norma(b);
+                if (na == nb) return true;
+                // lo MISMO en otro orden (a0 + a1·s ↔ a1·s + a0,  P·L³ ↔ L³·P): las mismas piezas, las mismas
+                // veces. Enseñar «a = lo mismo al revés» no dice nada; cuenta como igual.
+                string Piezas(string t)
+                {
+                    var p = new List<string>();
+                    foreach (System.Text.RegularExpressions.Match m in
+                             System.Text.RegularExpressions.Regex.Matches(t, @"[a-z_][a-z0-9_]*|\d+(?:\.\d+)?|[^\s()]"))
+                        p.Add(m.Value);
+                    p.Sort(StringComparer.Ordinal);
+                    return string.Join(" ", p);
+                }
+                return Piezas(na) == Piezas(nb);
+            }
+            catch { return false; }
         }
 
         // convierte UNA ecuación entre matemática y LISP:  (setf N f)↔N=math ,  N=expr↔(setf N f) ,  o expr suelta.

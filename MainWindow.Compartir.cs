@@ -48,8 +48,8 @@ namespace HekatanLisp
             string url;
             try { url = EnlaceWeb(Editor.Text); }
             catch (Exception ex) { MessageBox.Show(this, "No se pudo crear el enlace: " + ex.Message, "Compartir"); return; }
-            try { Clipboard.SetText(url); } catch { /* portapapeles ocupado: igual se abre */ }
-            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+            try { AlPortapapeles(url); } catch { /* portapapeles ocupado: igual se abre */ }
+            try { AbrirFuera(url); } catch { }
             ctlUltimoEnlace = url;
         }
 
@@ -64,7 +64,7 @@ namespace HekatanLisp
                 var local = Path.Combine(AppContext.BaseDirectory, "manual", nombre);
                 if (File.Exists(local)) destino = local;
             }
-            try { Process.Start(new ProcessStartInfo(destino) { UseShellExecute = true }); }
+            try { AbrirFuera(destino); }
             catch (Exception ex) { MessageBox.Show(this, "No se pudo abrir el manual: " + ex.Message, "Manual"); }
         }
 

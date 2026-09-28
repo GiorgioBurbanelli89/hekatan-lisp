@@ -68,6 +68,7 @@ namespace HekatanLisp
             try { SetOp(_op); } catch { }
 
             var profile = Path.Combine(Path.GetTempPath(), $"HekatanLispWV2_{Environment.ProcessId}");
+            LimpiarPerfilesHuerfanos();
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             await Viewer.EnsureCoreWebView2Async(env);
             Viewer.CoreWebView2.Profile.PreferredColorScheme =
@@ -79,6 +80,10 @@ namespace HekatanLisp
             {
                 if (_reprSwitch) return;   // solo cambió la REPRESENTACIÓN izquierda → NO recalcular la derecha
                 _transliterated = false;
+                _verMotor = false;
+                // 27-sep-2026: en «expr LISP» el resultado salía del texto GUARDADO al pulsar el botón, no de
+                // lo que se escribe después: (* 3 x) seguía dando 2·x. Si el usuario escribe, manda el editor.
+                if (_syntaxLisp && !_synFull) _exprEditado = true;
                 if (LblIn != null && LblIn.Text.Contains("aprox"))   // quita la etiqueta pegada de "MATLAB aprox"
                     LblIn.Text = _syntaxLisp ? "escribes: expresión LISP (símbolo — NO ejecutable; para correr usa «LISP completo»)" : "escribes: texto plano";
                 _debounce.Stop(); _debounce.Start();
@@ -257,7 +262,9 @@ namespace HekatanLisp
             Viewer.Visibility = IsRenderView ? Visibility.Visible : Visibility.Collapsed;
 
             // el cálculo pesado (SBCL) fuera del hilo de UI
-            var calc = System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
+            // el motor a la vista (menú Motor) es para LEERLO: ejecutarlo como hoja daba un error en rojo
+            var calc = _verMotor ? System.Threading.Tasks.Task.FromResult(NotaMotor())
+                                 : System.Threading.Tasks.Task.Run(() => ComputeResult(text, dvar));
             // Si tarda (hojas con mallas grandes: 1–3 s), un aviso «calculando…» sobre lo que se ve;
             // antes el panel se quedaba quieto (o en blanco) sin decir nada. Lo borra la página nueva.
             if (IsRenderView && _webReady && Viewer.CoreWebView2 is not null)
@@ -276,6 +283,9 @@ namespace HekatanLisp
             }
             var forms = await calc;
             if (gen != _showGen) return;                   // llegó algo más nuevo → descarta este
+            // La página nueva ya no tiene la ventana de dibujo: vuelve el editor. Antes, con la ventana
+            // abierta, «Nuevo» o un ejemplo dejaban la app SIN editor ni calculadora y sin forma de recuperarlos.
+            AmpliarResultado(false);
 
             if (IsRenderView)
             {
@@ -465,6 +475,31 @@ namespace HekatanLisp
             SetOp(_op);   // reaplica el resaltado de operación con el fondo del nuevo tema (y refresca render)
         }
 
+        /// <summary>Cada arranque crea su carpeta de WebView2 en Temp (HekatanLispWV2_&lt;pid&gt;, ~10 MB) y al
+        /// cerrar no se puede borrar: el navegador aún la tiene abierta. Quedaban para siempre (27-sep-2026:
+        /// 215 carpetas, 1.9 GB, disco lleno). Al arrancar se borran las de procesos que ya no existen.</summary>
+        private static void LimpiarPerfilesHuerfanos()
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    foreach (var d in Directory.GetDirectories(Path.GetTempPath(), "HekatanLispWV2_*"))
+                    {
+                        var cola = Path.GetFileName(d).Substring("HekatanLispWV2_".Length);
+                        if (!int.TryParse(cola, out int id) || id == Environment.ProcessId) continue;
+                        // si ALGÚN proceso tiene ese número, la carpeta no se toca (puede ser otra ventana)
+                        bool vivo = true;
+                        try { using var p = System.Diagnostics.Process.GetProcessById(id); }
+                        catch (ArgumentException) { vivo = false; }
+                        if (vivo) continue;
+                        try { Directory.Delete(d, true); } catch { }   // en uso o sin permiso: se deja
+                    }
+                }
+                catch { }
+            });
+        }
+
         private bool _synFull = false;   // el editor muestra el LISP COMPLETO (ejecutable)
 
         // izquierda: MATLAB · expresión LISP · LISP (completo). El activo se resalta.
@@ -525,6 +560,21 @@ namespace HekatanLisp
         private bool _transliterated = false; // el editor muestra código NO-LISP (no se ejecuta aquí)
         private string _transNote = "";       // nota que se muestra a la derecha en ese estado
         private bool _reprSwitch = false;     // true = solo cambia la representación izquierda (no recalcular)
+        private bool _exprEditado = false;    // en «expr LISP» el usuario escribió: el original hay que rehacerlo
+        private bool _verMotor = false;       // el editor enseña el motor (menú Motor): se lee, no se ejecuta
+
+        /// <summary>Se cargó OTRA hoja (archivo, ejemplo, Nuevo): lo guardado de la anterior ya no vale.
+        /// Poner el texto en el editor dispara el mismo aviso que teclear, así que se limpia después.</summary>
+        private void HojaNueva() { _lispBackup = null; _exprEditado = false; _verMotor = false; }
+
+        private static List<string> NotaMotor() => new List<string>
+        {
+            LispConverter.TxtLine("h2", "left", "Motor de Hekatan LISP"),
+            LispConverter.TxtLine("p", "left", "A la izquierda está el código del motor: las " + Catalogo().Length +
+                " funciones con las que Hekatan LISP deriva, integra, simplifica y expande."),
+            LispConverter.TxtLine("p", "left", "Es para leerlo. No se ejecuta aquí: el motor ya está cargado y lo usa cada hoja."),
+            LispConverter.TxtLine("p", "left", "Para volver a tu hoja: Archivo → Abrir, o Archivo → Nuevo."),
+        };
 
         // El texto ORIGINAL del usuario (no el derivado). Detecta el derivado por su ENCABEZADO,
         // así es robusto aunque las banderas se desincronicen.
@@ -533,13 +583,32 @@ namespace HekatanLisp
             var t = Editor.Text ?? "";
             var ts = t.TrimStart();
             // expr-LISP: el editor muestra (setf …); el ORIGINAL matemática vive en _lispBackup
-            if (_syntaxLisp && !_synFull && !_transliterated && _lispBackup != null) return _lispBackup;
+            if (_syntaxLisp && !_synFull && !_transliterated)
+            {
+                if (_exprEditado)
+                {
+                    // el usuario ESCRIBIÓ en LISP: el original se rehace de lo que hay en el editor
+                    int clase = ClaseExprLisp(t);
+                    if (clase == 2) return t;                      // línea a medio escribir: aún no se toca nada
+                    // solo si se vino del botón (hay original) o hay un (setf …): las formas sueltas ya las
+                    // entiende el motor tal cual
+                    bool convertir = clase == 1 && (_lispBackup != null || IsLispProgram(t));
+                    _lispBackup = convertir ? ExprLispAMatematica(t, _lispBackup) : null;   // si no, manda el editor
+                    _exprEditado = false;
+                }
+                if (_lispBackup != null) return _lispBackup;
+            }
+            // (setf y (+ x x)) escrito o abierto sin pasar por el botón: son EXPRESIONES, no un programa.
+            // Ejecutarlo daba «la variable x no tiene valor»; se calcula simbólico, igual que y = x + x.
+            if (!_synFull && !_transliterated && IsLispProgram(t) && ClaseExprLisp(t) == 1)
+                return ExprLispAMatematica(t, null);
             bool derivado = ts.StartsWith(";;;; Script LISP") || ts.StartsWith("% Hekatan Lab") || ts.StartsWith("% =====");
             return (derivado && _lispBackup != null) ? _lispBackup : t;
         }
 
         private void SetSyntax(bool toLisp)
         {
+            if (_exprEditado) SourceText();   // se escribió en LISP: primero se rehace el original
             _reprSwitch = true;   // solo cambia la representación izquierda → la derecha NO se recalcula
             try
             {
@@ -556,7 +625,7 @@ namespace HekatanLisp
                 }
                 // al ENTRAR a expr-LISP guardo el matemática original: el editor mostrará (setf …)
                 // pero el panel derecho debe seguir computando del ORIGINAL (vía SourceText).
-                if (toLisp && !_syntaxLisp) _lispBackup = Editor.Text;
+                if (toLisp && !_syntaxLisp) { _lispBackup = Editor.Text; _exprEditado = false; }
                 Editor.Text = ConvertEditor(Editor.Text, toLisp);
                 _syntaxLisp = toLisp;
                 HighlightSyntax();
@@ -577,8 +646,11 @@ namespace HekatanLisp
         {
             if (_synFull || _transliterated) return;
             var t = Editor.Text ?? "";
-            _syntaxLisp = LooksLikeLisp(t) ||
-                System.Text.RegularExpressions.Regex.IsMatch(t, @"(^|\n)[ \t]*#autolisp\b");
+            // «parece LISP» no basta: una hoja de matemática con «(= MN/m²)» en un párrafo lo parece (el
+            // ejemplo 94 abría con el botón «expr LISP» encendido y la calculadora escribiendo en LISP).
+            // Es LISP si es un programa, o si TODAS sus líneas son formas LISP, o si lleva un bloque #autolisp.
+            _syntaxLisp = System.Text.RegularExpressions.Regex.IsMatch(t, @"(^|\n)[ \t]*#autolisp\b") ||
+                (LooksLikeLisp(t) && (IsLispProgram(t) || ClaseExprLisp(t) != 0));
             LblIn.Text = _syntaxLisp
                 ? "escribes: LISP (programa o expresión; se ejecuta con ▶ Ejecutar)"
                 : "escribes: texto plano";
@@ -603,6 +675,7 @@ namespace HekatanLisp
             HighlightSyntax();
             LblIn.Text = "escribes: texto plano";
             Editor.Text = EJ_LOOP;
+            HojaNueva();
             SetView(_view);
         }
 
@@ -644,6 +717,7 @@ namespace HekatanLisp
             {
                 case "settext":
                     Editor.Text = doc.RootElement.GetProperty("text").GetString();
+                    HojaNueva();
                     SincronizarModoEscribo();
                     ShowResult();
                     return "{\"ok\":true}";
@@ -652,9 +726,22 @@ namespace HekatanLisp
                     try { jr = await Viewer.ExecuteScriptAsync(doc.RootElement.GetProperty("code").GetString()); }
                     catch { }
                     return "{\"ok\":true,\"result\":" + (string.IsNullOrEmpty(jr) ? "null" : jr) + "}";
-                case "capture":  // PNG de la ventana SIN cerrar la app (frames de una secuencia)
-                    await Capture(doc.RootElement.GetProperty("path").GetString());
+                case "capture":  // PNG del resultado SIN cerrar la app; con "ventana":true, la ventana entera
+                    if (doc.RootElement.TryGetProperty("ventana", out var pv) && pv.GetBoolean())
+                        await CapturaVentana(doc.RootElement.GetProperty("path").GetString());
+                    else
+                        await Capture(doc.RootElement.GetProperty("path").GetString());
                     return "{\"ok\":true}";
+                case "botones":  // todo lo que se puede pulsar en la ventana
+                    return CtlBotones();
+                case "pulsa":    // pulsa un botón o menú: {"indice":n} | {"nombre":"BtnRun"} | {"texto":"…"}
+                    return CtlPulsa(doc.RootElement);
+                case "reposo":   // espera a que no quede nada por calcular ni por pintar: {"tope": ms}
+                    return await CtlReposo(doc.RootElement.TryGetProperty("tope", out var ptp) ? ptp.GetInt32() : 120000);
+                case "estado":   // lo que se ve: editor, modos, tema, rótulos
+                    return CtlEstado();
+                case "fuera":    // lo que se habría abierto o copiado fuera de la app
+                    return CtlFuera(!doc.RootElement.TryGetProperty("vaciar", out var pvz) || pvz.GetBoolean());
                 // Escribir SIN forzar el cálculo: es el camino del usuario (TextChanged →
                 // debounce → AutoRun). `settext` llama a ShowResult a mano, así que sirve
                 // para probar el motor pero NUNCA para probar el AutoRun: con él el test
@@ -908,8 +995,8 @@ namespace HekatanLisp
                 "operaciones (derivar, simplificar) sólo recorren y reescriben esa lista.",
                 "Reglas de LISP");
 
-        private void MenuNuevo(object s, RoutedEventArgs e) { Editor.Text = ""; SetCurrentFile(null); }
-        private void MenuEjemplo(object s, RoutedEventArgs e) => Editor.Text = _syntaxLisp ? EJ_LISP : EJ_MATH;
+        private void MenuNuevo(object s, RoutedEventArgs e) { Editor.Text = ""; HojaNueva(); SetCurrentFile(null); }
+        private void MenuEjemplo(object s, RoutedEventArgs e) { Editor.Text = _syntaxLisp ? EJ_LISP : EJ_MATH; HojaNueva(); }
         private void MenuSalir(object s, RoutedEventArgs e) => Close();
 
         /// <summary>Genera un script LISP COMPLETO y EJECUTABLE a partir de lo que hay en el editor:
@@ -921,12 +1008,12 @@ namespace HekatanLisp
             if (string.IsNullOrWhiteSpace(text)) return;
             var script = BuildFullLisp(text);
             // (1) copia el script completo al portapapeles  (2) lo abre en el bloc de notas para VERLO todo
-            try { Clipboard.SetText(script); } catch { }
+            try { AlPortapapeles(script); } catch { }
             try
             {
                 var tmp = Path.Combine(Path.GetTempPath(), "hekatan_script.lisp");
                 File.WriteAllText(tmp, script);
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tmp) { UseShellExecute = true });
+                AbrirFuera(tmp);
             }
             catch { }
         }
@@ -1024,10 +1111,9 @@ namespace HekatanLisp
                 if (string.Equals(Path.GetExtension(path), ".m", StringComparison.OrdinalIgnoreCase))
                     txt = LispConverter.MatlabToHlisp(txt);
                 Editor.Text = txt;
+                HojaNueva();
                 _synFull = false; _transliterated = false;
-                _syntaxLisp = LooksLikeLisp(Editor.Text);
-                HighlightSyntax();
-                LblIn.Text = _syntaxLisp ? "escribes: expresión LISP (símbolo — NO ejecutable; para correr usa «LISP completo»)" : "escribes: texto plano";
+                SincronizarModoEscribo();   // el botón «escribo:» dice lo que HAY en el editor
                 SetCurrentFile(path);     // recuerda el archivo abierto
                 ShowResult();
             }
@@ -1140,6 +1226,8 @@ namespace HekatanLisp
                 _synFull = false; _syntaxLisp = true; _transliterated = false;
                 HighlightSyntax();
                 LblIn.Text = "MOTOR — funciones LISP (derive-x, simplify, expand*, integ-x, infix…)";
+                HojaNueva();
+                _verMotor = true; _debounce.Stop(); ShowResult();
             }
             catch (Exception ex) { MessageBox.Show("No pude leer engine.lisp: " + ex.Message); }
         }
@@ -1150,11 +1238,13 @@ namespace HekatanLisp
             try
             {
                 var src = Editor.Text;
+                bool delMotor = _verMotor;
                 if (string.IsNullOrWhiteSpace(src) || !(LooksLikeLisp(src) && IsLispProgram(src)))
-                    src = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "engine.lisp"));
+                { src = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "engine.lisp")); delMotor = true; }
                 _lispBackup = src;
                 Editor.Text = LispPseudoMat.Translate(src);
                 _transliterated = true; _synFull = false; _syntaxLisp = false;
+                if (delMotor) { _verMotor = true; _debounce.Stop(); ShowResult(); }
                 _transNote = "PSEUDOCÓDIGO estilo MATLAB — traducido del LISP solo para ENTENDER. NO es MATLAB real (falta 'syms'), no lo copies para correr. Menú Motor → Ver funciones (LISP) para volver.";
                 HighlightSyntax();
                 LblIn.Text = "PSEUDOCÓDIGO estilo MATLAB (no corre; para entender). Menú Motor → Ver funciones (LISP) para volver.";

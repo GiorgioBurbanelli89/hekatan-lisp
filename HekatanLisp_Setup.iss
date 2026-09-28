@@ -1,9 +1,16 @@
 ﻿; Instalador de Hekatan LISP (Inno Setup 6)
 #define MyAppName "Hekatan LISP"
-#define MyAppVersion "1.29.7"
+#define MyAppVersion "1.29.8"
 #define MyAppPublisher "Hekatan Engineers"
 #define MyAppExeName "HekatanLisp.exe"
+; otra carpeta de salida (bin\Release ocupada por una ventana abierta):  ISCC /DMyOut="C:\...\carpeta"
+#ifndef MyOut
 #define MyOut "C:\Users\j-b-j\Documents\Hekatan Calc 1.0.0\hekatan-lisp\bin\Release\net8.0-windows"
+#endif
+; dejar algo fuera sin borrarlo del disco:  ISCC /DMyFuera=",ejemplos\94 *.lisp"
+#ifndef MyFuera
+#define MyFuera ""
+#endif
 
 [Setup]
 AppId={{D5B1F2A7-3C9E-4A1B-9E7C-2F6A8B4C1D30}
@@ -31,7 +38,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; Todo el output: exe, DLLs, engine.lisp, sbcl\ (motor embebido) y runtimes\
 ; las hojas «_*.lisp» de ejemplos/ son pruebas (Hekatan School las lee del repo): no se instalan
-Source: "{#MyOut}\*"; DestDir: "{app}"; Excludes: "ejemplos\_*.lisp"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MyOut}\*"; DestDir: "{app}"; Excludes: "ejemplos\_*.lisp{#MyFuera}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

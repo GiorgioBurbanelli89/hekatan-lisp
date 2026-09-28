@@ -46,6 +46,21 @@ namespace HekatanLisp
             {
                 i++;
                 if (i < s.Length && s[i] == '\'') { i++; return new List<object> { "function", Read(s, ref i) }; }
+                // carácter literal  #\(  #\)  #\;  #\Newline : el carácter que sigue a la barra es DATO, no
+                // un paréntesis ni un comentario. Sin esto el motor entero se descuadraba, quedaba un ')'
+                // suelto y el lector daba vueltas sin avanzar hasta agotar la memoria.
+                if (i + 1 < s.Length && s[i] == '\\')
+                {
+                    int c0 = i; i += 2;
+                    while (i < s.Length && char.IsLetterOrDigit(s[i])) i++;
+                    return "#" + s.Substring(c0, i - c0);
+                }
+                if (i < s.Length && s[i] == '|')    // comentario de bloque  #| … |#
+                {
+                    int fin = s.IndexOf("|#", i + 1, StringComparison.Ordinal);
+                    i = fin < 0 ? s.Length : fin + 2;
+                    return Read(s, ref i);
+                }
                 // otros # : trátalo como parte de un átomo
             }
             if (c == '"')
@@ -57,6 +72,7 @@ namespace HekatanLisp
             }
             int st = i;
             while (i < s.Length && !char.IsWhiteSpace(s[i]) && s[i] != '(' && s[i] != ')' && s[i] != ';') i++;
+            if (i == st && i < s.Length) i++;   // un ')' suelto: se salta, el lector SIEMPRE avanza
             return s.Substring(st, i - st);
         }
 
@@ -78,9 +94,23 @@ namespace HekatanLisp
             try { forms = ParseAll(lispSrc); } catch (Exception ex) { return sb + "% (no pude parsear: " + ex.Message + ")"; }
             foreach (var f in forms)
             {
-                if (Head(f) == "defun") { EmitDefun(L(f), sb); sb.AppendLine(); }
-                else if (IsAtom(f) && A(f).StartsWith(";")) { }        // comentario suelto
-                else { sb.AppendLine("% " + Compact(f)); }              // top-level no-defun: como comentario
+                // cada forma por separado: una que el traductor no entienda (lambda-list rara, macro…)
+                // se deja anotada y se sigue; antes una sola tumbaba las 500 funciones del motor.
+                var una = new StringBuilder();
+                try
+                {
+                    if (Head(f) == "defun") { EmitDefun(L(f), una); una.AppendLine(); }
+                    else if (IsAtom(f) && (A(f).Length == 0 || A(f).StartsWith(";"))) { }   // comentario o resto suelto
+                    else { una.AppendLine("% " + Compact(f)); }          // top-level no-defun: como comentario
+                }
+                catch (Exception)
+                {
+                    una.Clear();
+                    string nombre = L(f) != null && L(f).Count > 1 ? A(L(f)[1]) : null;
+                    una.AppendLine("% (sin traducir: " + (nombre ?? Head(f) ?? "forma") + ")");
+                    una.AppendLine();
+                }
+                sb.Append(una);
             }
             return sb.ToString().TrimEnd();
         }

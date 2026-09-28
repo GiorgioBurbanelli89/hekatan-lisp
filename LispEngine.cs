@@ -121,7 +121,45 @@ namespace HekatanLisp
 
         /// <summary>Ejecuta código LISP arbitrario (lo que el usuario escribió) en SBCL.
         /// Aquí es donde el usuario define SUS funciones, las llama, y se ejecutan.</summary>
-        public static string RunScript(string code) => Run(code);
+        public static string RunScript(string code)
+        {
+            var r = Run(code);
+#if !HEKATAN_WEB
+            // El servidor SBCL sigue vivo entre hojas. Si la hoja define una función con el NOMBRE de una
+            // del motor (el ejemplo 80 define `capa`; el 88 `linea`, `superficie`, `texto`), la del motor
+            // queda pisada y la hoja SIGUIENTE falla («invalid number of arguments») hasta cerrar el
+            // programa. Tras una hoja así el servidor se reinicia: la próxima arranca con el motor limpio.
+            try
+            {
+                var motor = NombresDelMotor();
+                foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                             code, @"\(\s*(?:defun|defmacro|defparameter|defvar|defconstant)\s+([^\s()]+)",
+                             System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    if (motor.Contains(m.Groups[1].Value)) { lock (_srvLock) KillServer(); break; }
+            }
+            catch { }
+#endif
+            return r;
+        }
+
+#if !HEKATAN_WEB
+        private static HashSet<string> _nombresMotor;
+        private static HashSet<string> NombresDelMotor()
+        {
+            if (_nombresMotor != null) return _nombresMotor;
+            var s = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                if (File.Exists(Lib))
+                    foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                                 File.ReadAllText(Lib), @"^\((?:defun|defmacro|defparameter|defvar|defconstant)\s+([^\s()]+)",
+                                 System.Text.RegularExpressions.RegexOptions.Multiline))
+                        s.Add(m.Groups[1].Value);
+            }
+            catch { }
+            return _nombresMotor = s;
+        }
+#endif
 
         /// <summary>Despeja 'var' de la ecuación  lhs = rhs. Devuelve la forma LISP de la solución.</summary>
         public static string RunDespejar(string lhs, string rhs, string var)

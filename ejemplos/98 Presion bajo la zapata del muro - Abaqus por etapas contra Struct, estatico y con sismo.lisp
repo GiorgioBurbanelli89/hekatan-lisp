@@ -1,4 +1,4 @@
-# Presión bajo la zapata del muro: Abaqus por tongadas contra Struct, estático y con sismo
+# Presión bajo la zapata del muro: Abaqus por etapas contra Struct, estático y con sismo
 #numerico
 
 #: **Qué se calcula.** El muro de contención de Manabí (fuste de 2.60 m, zapata de 3.00 × 0.40 m) apoyado en arena. Se quiere la **presión del suelo bajo la zapata**: su resultante N, dónde cae (excentricidad e) y los valores en la puntera y en el talón. Es lo que se compara con la capacidad portante.
@@ -6,21 +6,21 @@
 #: **Cómo se comparan.** Esta hoja toma los 7 valores de Abaqus, integra la resultante y su momento con la regla del trapecio, y saca la **recta equivalente**: la presión lineal que tiene la misma N y el mismo momento. Esa recta sí se compara con Struct.
 #: **Unidades.** kN, m y kPa, por metro de muro.
 
-## 1 · Por qué el muro se construyó por tongadas en Abaqus
+## 1 · Por qué el muro se construyó por etapas en Abaqus
 #: Si el muro y el relleno se ponen **de una vez**, el peso del relleno hunde el terreno detrás del muro y arrastra el talón hacia abajo: la presión sale al revés (76.2 kPa en la puntera y 91.8 en el talón), mayor en el talón. En obra no pasa: primero se hace el muro, después se rellena por capas y cada capa asienta antes de la siguiente.
-#: En Abaqus/Explicit todo el suelo está desde el principio, pero **sin peso**; el peso de cada parte entra en su turno con una rampa suave de 1.6 s (turnos de 2 s): terreno de apoyo → muro y tierra de delante → banda detrás del talón → cuatro tongadas de relleno de 0.65 m. Al final de cada turno la energía cinética es prácticamente cero frente a la interna: el cálculo es casi estático.
+#: En Abaqus/Explicit todo el suelo está desde el principio, pero **sin peso**; el peso de cada parte entra en su turno con una rampa suave de 1.6 s (turnos de 2 s): terreno de apoyo → muro y tierra de delante → banda detrás del talón → cuatro capas de relleno de 0.65 m. Al final de cada turno la energía cinética es prácticamente cero frente a la interna: el cálculo es casi estático.
 #| Final del turno | N en la base [kN/m] | Empuje en el trasdós [kN/m] | Coronación u_{x} [mm] |
 #|---|---:|---:|---:|
 #| muro y tierra de delante (4 s) | 47.57 | 0.00 | −3.60 |
-#| tongada 2 (10 s) | 87.24 | 10.01 | +1.06 |
-#| tongada 4, final (16 s) | 128.58 | 24.10 | +2.21 |
+#| capa 2 (10 s) | 87.24 | 10.01 | +1.06 |
+#| capa 4, final (16 s) | 128.58 | 24.10 | +2.21 |
 #: Números **citados** de Abaqus (muro_pesos.py, 29-sep-2026), no calculados aquí.
 
 ## 2 · Datos
 B = 3 [m] 'ancho de la zapata
 #: Abscisa de cada nudo del suelo bajo la zapata, medida desde la punta de la puntera. Son los nudos del **suelo** (malla de 0.50 m), la superficie esclava del contacto: en el lado del muro (malla de 0.10 m) Abaqus da picos falsos de 60 a 67 kPa justo donde caen los nudos del suelo.
 x = [0; 0.5; 1; 1.5; 2; 2.5; 3] [m]
-#: Presión de contacto de Abaqus, estático (peso por tongadas), en kPa:
+#: Presión de contacto de Abaqus, estático (peso por etapas), en kPa:
 p_e = [65.243; 45.628; 38.794; 39.803; 38.195; 40.663; 42.934]
 #: Presión de contacto de Abaqus con el sismo seudoestático encima (k_{h} = 0.336 como fuerza de volumen k_{h}·γ), en kPa:
 p_s = [81.951; 67.584; 53.279; 49.103; 42.539; 39.069; 18.068]
@@ -122,7 +122,7 @@ r_s2 = round(p_s2, 1)
 r_ee = round(e_e, 3)
 r_es = round(e_s, 3)
 #show
-#| | Abaqus por tongadas | Struct (muelles) | Diferencia [%] | Recta equivalente de Abaqus |
+#| | Abaqus por etapas | Struct (muelles) | Diferencia [%] | Recta equivalente de Abaqus |
 #|---|---:|---:|---:|---:|
 #| **Estático**: N [kN/m] | @{r_ne} | 144.78 | @{d_ne} | — |
 #| presión máxima (puntera) [kPa] | @{m_e1} | 58.5 | @{d_e1} | @{r_e1} |
@@ -138,5 +138,5 @@ r_es = round(e_s, 3)
 ## 7 · Lo que hay que decir de este modelo
 #: • El sismo de Abaqus es **seudoestático aplicado a todo el terreno** (k_{h}·γ en los 30 m de la caja). El suelo plastifica en el borde derecho de la caja, lejos del muro (deformación plástica equivalente de hasta 0.93), y bajo la punta de la puntera (0.86): allí el suelo cede.
 #: • El desplazamiento de −53 mm del muro con sismo es casi todo del **terreno**: el pie y la coronación se mueven casi igual y el muro solo se inclina 2.2 mm.
-#: • Una tongada que aún no pesa ya está allí y tiene rigidez. Contra el muro casi no cuenta, porque el contacto se abre cuando el muro se aleja del relleno.
-#: **Lo siguiente:** el mismo muro por tongadas con el **registro del sismo de Portoviejo** (APO1, 16-abr-2016) en la base, en lugar del k_{h}.
+#: • Una capa que aún no pesa ya está allí y tiene rigidez. Contra el muro casi no cuenta, porque el contacto se abre cuando el muro se aleja del relleno.
+#: **Lo siguiente:** el mismo muro por etapas con el **registro del sismo de Portoviejo** (APO1, 16-abr-2016) en la base, en lugar del k_{h}.

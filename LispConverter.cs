@@ -2031,7 +2031,7 @@ window.hkMarcaLinea=function(n,mover){var best=null,bv=-1;document.querySelector
         // Y NO se achica por debajo de 0.72 (Jorge: «que no sea muy pequeño, no va a ser visible»): si aun
         // así no cabe, la ecuación se desplaza dentro de su caja (barra horizontal) sin salirse de la hoja.
         const string MAT_JS =
-            "<script>(function(){var SMIN=0.72;" +
+            "<script>(function(){var SMIN=0.72;function smin(){return window.hkSMIN||SMIN;}" +
             // 24-sep-2026: se puede REPETIR (antes quedaba marcado con data-fit y, si el panel del WebView aún
             // no tenía su ancho final, nunca se corregía: la matriz se salía de la hoja). Primero deshace lo anterior.
             "function uno(eq){var w=eq.clientWidth;if(w<8)return;" +
@@ -2040,10 +2040,10 @@ window.hkMarcaLinea=function(n,mover){var best=null,bv=-1;document.querySelector
             "inner.style.transform='';inner.style.marginRight='';eq.style.height='';eq.style.overflowX='';eq.style.overflowY='';" +
             "var cw=inner.scrollWidth;if(cw<=w+2)return;" +
             // matriz grande con índices: antes de encoger por debajo de SMIN se muestran MENOS columnas (⋯ y la última)
-            "if(w/cw<SMIN&&window.hkPintaMat){var ms=inner.querySelectorAll('.m-matx[data-hk-cells]');" +
-            "for(var k=0;k<60&&w/cw<SMIN;k++){var m=null,mc=0;ms.forEach(function(x){var v=+x.dataset.visCols;if(v>3&&x.scrollWidth>mc){mc=x.scrollWidth;m=x;}});" +
+            "if(w/cw<smin()&&window.hkPintaMat){var ms=inner.querySelectorAll('.m-matx[data-hk-cells]');" +
+            "for(var k=0;k<60&&w/cw<smin();k++){var m=null,mc=0;ms.forEach(function(x){var v=+x.dataset.visCols;if(v>3&&x.scrollWidth>mc){mc=x.scrollWidth;m=x;}});" +
             "if(!m)break;m.dataset.visCols=(+m.dataset.visCols)-1;window.hkPintaMat(m);cw=inner.scrollWidth;}if(cw<=w+2)return;}" +
-            "var s=w/cw,sc=s<SMIN;if(sc)s=SMIN;inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';" +
+            "var s=w/cw,sc=s<smin();if(sc)s=smin();inner.style.verticalAlign='top';inner.style.transform='scale('+s+')';" +
             "eq.style.height=Math.ceil(inner.getBoundingClientRect().height+(sc?18:4))+'px';eq.style.overflowX=sc?'auto':'clip';eq.style.overflowY=sc?'hidden':'visible';" +
             "if(sc)inner.style.marginRight=(-(cw*(1-s)))+'px';}" +
             "function fit(){document.querySelectorAll('.ws-eq,.deq-body').forEach(function(eq){try{if(!eq.classList.contains('ws-deq'))uno(eq);}catch(e){}});}" +

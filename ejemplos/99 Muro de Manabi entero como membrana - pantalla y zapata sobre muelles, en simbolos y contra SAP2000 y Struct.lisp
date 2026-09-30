@@ -101,7 +101,7 @@ K_c1 = Simplify{(K_uu - K_ua*inv(K_aa)*transpose(K_ua))*24*(1+nu)*(1-2*nu)/(E*t)
 #: **Elemento distorsionado (la pantalla).** Con J variable, G se calcula con el Jacobiano del centro, J_{0} = J(0, 0), y se multiplica por det J_{0}/det J. Es la corrección de Taylor: sin ella, un trapecio no pasaría la prueba de la parcela (deformación constante).
 
 ## 4 · En símbolos: los muelles y el sistema
-#: Cada nudo de la base lleva un muelle vertical del suelo: el módulo de balasto por el área que le toca (la mitad de cada tramo vecino por el metro de muro): **k_{j} = k_{s}·A_{j}**. La presión del suelo en ese nudo es el hundimiento por el módulo de balasto, q_{j} = −k_{s}·w_{j}. La rigidez del muelle se suma en la diagonal, en el grado vertical del nudo:
+#: Cada nudo de la base lleva un muelle vertical del suelo: el módulo de balasto por el área que le toca (la mitad de cada tramo vecino por el metro de muro): **k_{j} = k_{s}·A_{j}**. La presión del suelo en ese nudo es el descenso por el módulo de balasto, q_{j} = −k_{s}·w_{j}. La rigidez del muelle se suma en la diagonal, en el grado vertical del nudo:
 #: (K + K_{s})·U = F
 #: con K la suma de las rigideces de los elementos, K_{s} la diagonal de los muelles y U los desplazamientos. El apoyo horizontal de la puntera quita la fila y la columna de su u_{x}: se resuelven los grados **libres**, U_{L} = K_{LL}⁻¹·F_{L}.
 
@@ -363,7 +363,7 @@ R_z
 F_z = -(F_pp + F_rel + E_z + S_z)
 
 ### Deformada y mapa de color
-#: El muro con sismo, con los desplazamientos ampliados 300 veces y pintado con el desplazamiento horizontal u_{x} en mm. Al pasar el cursor sale el valor en cada punto. Se ve el giro de todo el muro sobre los muelles: la zapata se hunde más en la puntera que en el talón, y la pantalla se dobla hacia delante.
+#: El muro con sismo, con los desplazamientos ampliados 300 veces y pintado con el desplazamiento horizontal u_{x} en mm. Al pasar el cursor sale el valor en cada punto. Se ve el giro de todo el muro sobre los muelles: la zapata desciende más en la puntera que en el talón, y la pantalla flecta hacia delante.
 #hide
 X_n = zeros(n_j, 3)
 U_3 = zeros(n_j, 3)

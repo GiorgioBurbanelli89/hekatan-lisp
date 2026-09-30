@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -169,7 +169,7 @@ namespace HekatanLisp
 
         /// <summary>PNG de la VENTANA ENTERA: los botones y el editor (WPF) con el resultado (WebView2) puesto
         /// en su sitio. El WebView2 no sale en un RenderTargetBitmap, así que se pide aparte y se compone.</summary>
-        private async Task CapturaVentana(string path)
+        private async Task CapturaVentana(string path, double esc = 1)
         {
             try
             {
@@ -185,7 +185,9 @@ namespace HekatanLisp
                     web.BeginInit(); web.CacheOption = BitmapCacheOption.OnLoad; web.StreamSource = new MemoryStream(bytes); web.EndInit();
                 }
                 int w = Math.Max(1, (int)raiz.ActualWidth), h = Math.Max(1, (int)raiz.ActualHeight);
-                var wpf = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                // esc > 1: la ventana a más resolución (para vídeo: se reduce después, nunca se amplía)
+                int W = Math.Max(1, (int)Math.Round(w * esc)), H = Math.Max(1, (int)Math.Round(h * esc));
+                var wpf = new RenderTargetBitmap(W, H, 96 * esc, 96 * esc, PixelFormats.Pbgra32);
                 wpf.Render(raiz);
                 var dv = new DrawingVisual();
                 using (var dc = dv.RenderOpen())
@@ -197,7 +199,7 @@ namespace HekatanLisp
                         dc.DrawImage(web, new Rect(p.X, p.Y, Viewer.ActualWidth, Viewer.ActualHeight));
                     }
                 }
-                var fin = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                var fin = new RenderTargetBitmap(W, H, 96 * esc, 96 * esc, PixelFormats.Pbgra32);
                 fin.Render(dv);
                 var enc = new PngBitmapEncoder();
                 enc.Frames.Add(BitmapFrame.Create(fin));

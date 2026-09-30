@@ -855,7 +855,7 @@ function init(cv){
     prims.push({t:'s',p:[pt(r0,s0),pt(r1,s0),pt(r1,s1),pt(r0,s1)],v:(vl(r0,s0)+vl(r1,s0)+vl(r1,s1)+vl(r0,s1))/4});}
    var o=D.X[q[0]-1],o2=D.X[q[2]-1];
    for(ii=0;ii<=ns;ii++)for(jj=0;jj<=ns;jj++){var r=ii/ns,s=jj/ns;
-    samp.push({p:pt(r,s),txt:D.nS+' = '+fmt(vl(r,s))+'\nx = '+fmt(o[0]+(o2[0]-o[0])*r)+'   y = '+fmt(o[1]+(o2[1]-o[1])*s)+'\ncascara '+(e+1)});}
+    samp.push({p:pt(r,s),txt:D.nS+' = '+fmt(vl(r,s))+'\nx = '+fmt(o[0]+(o2[0]-o[0])*r)+'   y = '+fmt(o[1]+(o2[1]-o[1])*s)+'\nelemento '+(e+1)});}
   });
   D.B.forEach(function(br,e){var a=P[br[0]-1],b=P[br[1]-1],v0=D.vB[e][0],v1=D.vB[e][1];
    var dv=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],L=Math.hypot(dv[0],dv[1],dv[2])||1,o;

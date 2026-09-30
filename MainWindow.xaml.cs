@@ -770,7 +770,8 @@ namespace HekatanLisp
                     return "{\"ok\":true,\"result\":" + (string.IsNullOrEmpty(jr) ? "null" : jr) + "}";
                 case "capture":  // PNG del resultado SIN cerrar la app; con "ventana":true, la ventana entera
                     if (doc.RootElement.TryGetProperty("ventana", out var pv) && pv.GetBoolean())
-                        await CapturaVentana(doc.RootElement.GetProperty("path").GetString());
+                        await CapturaVentana(doc.RootElement.GetProperty("path").GetString(),
+                            doc.RootElement.TryGetProperty("escala", out var pes) ? pes.GetDouble() : 1);
                     else
                         await Capture(doc.RootElement.GetProperty("path").GetString());
                     return "{\"ok\":true}";
@@ -980,7 +981,16 @@ namespace HekatanLisp
             var st = Viewer.CoreWebView2.Environment.CreatePrintSettings();
             st.ShouldPrintBackgrounds = true;                 // conserva el fondo crema y los colores
             st.MarginTop = 0.4; st.MarginBottom = 0.4; st.MarginLeft = 0.55; st.MarginRight = 0.55;
+            // En el PAPEL la hoja mide menos que en la pantalla y una barra de desplazamiento es un
+            // recorte (la K condensada de 8×8 de la hoja 99 salía con 6 de sus 8 columnas): antes de
+            // imprimir se ajusta al ancho útil del papel (8.5 − 1.1 pulgadas) y se deja encoger más.
+            const string AJUSTA = "(function(){window.hkSMIN=0.35;document.body.dataset.hkAncho=document.body.style.width||'';" +
+                "document.body.style.width='7.4in';if(window.hkFit)window.hkFit();return 1;})()";
+            const string DEVUELVE = "(function(){window.hkSMIN=null;document.body.style.width=document.body.dataset.hkAncho||'';" +
+                "if(window.hkFit)window.hkFit();return 1;})()";
+            try { await Viewer.ExecuteScriptAsync(AJUSTA); await Task.Delay(200); } catch { }
             await Viewer.CoreWebView2.PrintToPdfAsync(path, st);
+            try { await Viewer.ExecuteScriptAsync(DEVUELVE); } catch { }
         }
 
         // Botón/menu «Exportar PDF»: pregunta dónde guardar y escribe el PDF de la hoja.

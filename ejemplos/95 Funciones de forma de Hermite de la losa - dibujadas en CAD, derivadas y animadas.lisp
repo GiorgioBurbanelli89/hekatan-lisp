@@ -151,7 +151,20 @@ giro_42 = Simplify{Slope{Φ_4a(ξ) @ ξ = 1}*(1/a_1)} 'Φ_4a en el nudo 2
 ## 5 · Primera derivada: la pendiente, que es el giro
 #: La derivada de una curva es su **pendiente** en cada punto (la m de y = m·x + b). En la losa la pendiente de la flecha es el **giro**.
 #: **Por qué aparece 1/a_{1}.** Las funciones están escritas en ξ, pero el giro es la pendiente en metros. Como ξ = x/a_{1}, avanzar 1 en ξ es avanzar a_{1} metros: la pendiente en metros es la pendiente en ξ **dividida por a_{1}** (regla de la cadena).
-#: El motor deriva y divide:
+#: **Paso 1 · la regla de la cadena.** Φ está escrita en ξ, y ξ depende de x. La derivada respecto a x es la derivada respecto a ξ por lo que cambia ξ cuando cambia x: dΦ/dx = dΦ/dξ · dξ/dx. Y dξ/dx sale de ξ = x/a_{1}:
+ξ_x = Diff{x/a_1 @ x}
+#: Por eso toda derivada en x es la derivada en ξ **multiplicada por 1/a_{1}**.
+#: **Paso 2 · cada función, desarrollada** en potencias de ξ (se quitan los paréntesis):
+Φ_1d = Expand{1 - ξ^2*(3 - 2*ξ)}
+Φ_2d = Expand{ξ*a_1*(1 - ξ*(2 - ξ))}
+Φ_3d = Expand{ξ^2*(3 - 2*ξ)}
+Φ_4d = Expand{ξ^2*a_1*(-1 + ξ)}
+#: **Paso 3 · se deriva término a término** con la regla de la potencia, d(ξⁿ)/dξ = n·ξⁿ⁻¹: la constante da 0, ξ da 1, ξ² da 2·ξ y ξ³ da 3·ξ². En Φ_{1a}: 1 → 0, −3·ξ² → −6·ξ, 2·ξ³ → 6·ξ².
+dΦ_1 = Diff{1 - 3*ξ^2 + 2*ξ^3 @ ξ}
+dΦ_2 = Diff{a_1*ξ - 2*a_1*ξ^2 + a_1*ξ^3 @ ξ}
+dΦ_3 = Diff{3*ξ^2 - 2*ξ^3 @ ξ}
+dΦ_4 = Diff{a_1*ξ^3 - a_1*ξ^2 @ ξ}
+#: **Paso 4 · se multiplica por 1/a_{1}** (paso 1). En Φ′_{2a} y Φ′_{4a} el a_{1} que ya llevaban se cancela. El motor hace los cuatro pasos de una vez, directamente sobre las funciones:
 Φprime_1a = Simplify{Diff{Φ_1a(ξ) @ ξ}*(1/a_1)}
 Φprime_2a = Simplify{Diff{Φ_2a(ξ) @ ξ}*(1/a_1)}
 Φprime_3a = Simplify{Diff{Φ_3a(ξ) @ ξ}*(1/a_1)}

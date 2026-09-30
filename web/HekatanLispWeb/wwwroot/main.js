@@ -296,10 +296,23 @@ const ACCIONES = {
     'quien abra el enlace la ve igual, ya calculada.<br><br>' +
     '<span style="font-size:12px;color:var(--muted)">Motor: ECL (Common Lisp) compilado a WebAssembly · Render: el mismo código de la app de escritorio.</span>'),
 };
-// ---------- enlace para compartir: la hoja viaja en el #hash (no pasa por ningún servidor) ----------
-//   #ej=<ejemplo>            ejemplo sin cambios (enlace corto)
-//   #h=<texto comprimido>    hoja propia: deflate-raw + base64url
+// ---------- enlace para compartir ----------
+//   #ej=99                   ejemplo publicado sin cambios, por su número (o su nombre de archivo)
+//   #s=<clave>               hoja propia guardada en hekatan-compartir (Cloudflare): ~60 caracteres
+//   #h=<texto comprimido>    hoja propia DENTRO del enlace (deflate-raw + base64url): si no hay red
 //   &op=deriv&v=lisp         operación y vista, si no son las de siempre
+const COMPARTIR = 'https://hekatan-compartir.j-b-jazz.workers.dev';
+async function guardarEnNube(t) {
+  const r = await fetch(COMPARTIR + '/h', { method: 'POST', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: t });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+  return (await r.json()).k;
+}
+// «99 Muro de Manabi….lisp» → «99» si ningún otro ejemplo empieza por ese número
+function numeroDeEjemplo(f) {
+  const n = (f.match(/^(\d+)\s/) || [])[1];
+  if (!n || !window.hkEjemplos) return f;
+  return window.hkEjemplos.filter(x => x.startsWith(n + ' ')).length === 1 ? n : f;
+}
 async function comprimir(t) {
   const s = new Blob([t]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   const b = new Uint8Array(await new Response(s).arrayBuffer());
@@ -315,8 +328,11 @@ async function descomprimir(c) {
 async function compartir() {
   const t = sourceText();
   const p = new URLSearchParams();
-  if (archivo && ejemploTexto !== null && t === ejemploTexto) p.set('ej', archivo);
-  else p.set('h', await comprimir(t));
+  if (archivo && ejemploTexto !== null && t === ejemploTexto) p.set('ej', numeroDeEjemplo(archivo));
+  else {
+    try { p.set('s', await guardarEnNube(t)); }
+    catch { p.set('h', await comprimir(t)); }    // sin red o sin servicio: la hoja va dentro
+  }
   if (op !== 'simplify') p.set('op', op);
   if (view !== 'render') p.set('v', view);
   if (document.body.classList.contains('solo')) p.set('solo', '1');   // quien lo abra ve solo el resultado
@@ -327,7 +343,7 @@ async function compartir() {
     Tu navegador no dejó copiarlo solo: cópialo de aquí (ya está seleccionado):<br>
     <input id="url-compartir" readonly value="${url.replace(/"/g, '&quot;')}"
       style="width:100%;margin-top:8px;padding:6px;font:12px Consolas,monospace;background:var(--editor);color:var(--text);border:1px solid var(--btn-border)">
-    <div style="margin-top:6px;font-size:11px;color:var(--muted)">${url.length.toLocaleString()} caracteres · la hoja va dentro del enlace</div>`);
+    <div style="margin-top:6px;font-size:11px;color:var(--muted)">${url.length.toLocaleString()} caracteres${p.get('h') ? ' · la hoja va dentro del enlace' : ''}</div>`);
   const i = $('url-compartir'); i.focus(); i.select();
 }
 // aviso corto abajo al centro, se va solo
@@ -345,10 +361,20 @@ async function abrirDesdeEnlace() {
   // embebido en otra pagina: se esconde toda la aplicacion y queda el papel
   if (p.get('embed') === '1') { setSolo(true); document.body.classList.add('embebido'); }
   if (p.get('ej')) {
-    const f = p.get('ej'), t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
+    let f = p.get('ej');
+    if (/^\d+$/.test(f)) {                // #ej=99 → el archivo que empieza por «99 »
+      const l = window.hkEjemplos || await (await fetch('ejemplos.json')).json();
+      f = l.find(x => x.startsWith(f + ' ')) || f;
+    }
+    const t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
     ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
     setSolo(true);                       // abierto por enlace: se ve el resultado, no el código
     return true;
+  }
+  if (p.get('s')) {
+    const r = await fetch(COMPARTIR + '/h/' + encodeURIComponent(p.get('s')));
+    if (!r.ok) { aviso('No se encontró la hoja de este enlace (' + p.get('s') + ').'); return false; }
+    ponerEditor(await r.text()); setSolo(true); return true;
   }
   if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); return true; }
   return false;
@@ -451,6 +477,7 @@ let ejemploTexto = null;   // texto del ejemplo cargado: si no se tocó, el enla
 // un ejemplo se abre SIEMPRE con el resultado solo y a pantalla completa (Esc o ✎ para ver el código)
 const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); setSolo(true); });
 fetch('ejemplos.json').then(r => r.json()).then(l => {
+  window.hkEjemplos = l;                 // para los enlaces #ej=99 (por número)
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
   for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));
   if (archivo && l.includes(archivo)) $('sel-ejemplos').value = archivo;   // abierto por enlace antes de que llegara la lista

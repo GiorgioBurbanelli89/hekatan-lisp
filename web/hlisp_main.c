@@ -10,6 +10,8 @@ extern void init_hlisp(cl_object);      /* módulo del motor: engine.lisp + hlis
 /* límites de la zona de datos estáticos de WASM (los define wasm-ld) */
 extern char __global_base[], __data_end[];
 extern void GC_add_roots(void *low, void *high_plus_1);   /* bdwgc (libeclgc.a) */
+extern void GC_set_free_space_divisor(unsigned long);
+extern int GC_expand_hp(size_t);
 
 static char *g_out = NULL;
 
@@ -18,7 +20,7 @@ int main(int argc, char **argv) {
      recolectar; en WASM, cuando la memoria ya no puede crecer, Emscripten ABORTA (no devuelve
      NULL) y el recolector nunca llega a correr: 26 formas seguidas de la hoja 34 → OOM.
      Con tope, al llegar a él bdwgc RECOLECTA. Debe quedar por debajo de INITIAL_MEMORY. */
-  ecl_set_option(ECL_OPT_HEAP_SIZE, 160u * 1024u * 1024u);
+  ecl_set_option(ECL_OPT_HEAP_SIZE, 900u * 1024u * 1024u);
   cl_boot(argc, argv);
   /* RAÍCES ESTÁTICAS. El código Lisp compilado guarda sus constantes (listas citadas, símbolos)
      en arreglos C estáticos VV[]. En Linux bdwgc escanea toda la zona de datos estáticos; en
@@ -26,6 +28,16 @@ int main(int argc, char **argv) {
      liberaba esas constantes y el motor leía memoria reutilizada: (a11 a22) en vez de 0.
      Se registra aquí, DESPUÉS de cl_boot (init_alloc hace GC_clear_roots). */
   GC_add_roots(__global_base, __data_end);
+  /* RECOLECCIÓN A MITAD DE UN CÁLCULO (30-sep-2026). En WASM las variables locales que guardan
+     punteros no las ve el recolector: --spill-pointers copia casi todas a la pila, pero no todas
+     (bdwgc solo las escanea de verdad con -sASYNCIFY, que infla el wasm de 7 a 402 MB). Si el
+     recolector salta a MITAD de una simplificación simbólica larga, libera algo vivo: la K
+     condensada de la hoja 99 salía con ceros, con otra forma o con «function signature
+     mismatch». Remedio: que casi nunca salte a mitad. El montón arranca en 320 MB y el
+     recolector solo actúa solo tras asignar otro montón entero (divisor 1); entre forma y forma
+     de la hoja se recolecta a mano (hlisp_web.lisp), en un punto seguro. */
+  GC_set_free_space_divisor(1);
+  GC_expand_hp(320u * 1024u * 1024u);
   ecl_init_module(NULL, init_hlisp);
   return 0;                              /* el runtime sigue vivo (EXIT_RUNTIME=0) */
 }

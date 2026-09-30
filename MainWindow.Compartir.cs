@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Windows;
 
@@ -28,9 +29,18 @@ namespace HekatanLisp
                 string Norm(string t) => (t ?? "").Replace("\r\n", "\n").TrimEnd();
                 var dir = Path.Combine(AppContext.BaseDirectory, "ejemplos");
                 if (Directory.Exists(dir))
-                    foreach (var f in Directory.GetFiles(dir, "*.lisp"))
+                {
+                    var todos = Directory.GetFiles(dir, "*.lisp");
+                    foreach (var f in todos)
                         if (Norm(File.ReadAllText(f)) == Norm(hoja))
-                            return WebBase + "#ej=" + Uri.EscapeDataString(Path.GetFileName(f)) + "&solo=1";
+                        {
+                            // por su número (#ej=99) si ningún otro ejemplo empieza igual; si no, por el nombre
+                            var nombre = Path.GetFileName(f);
+                            var num = System.Text.RegularExpressions.Regex.Match(nombre, @"^(\d+)\s").Groups[1].Value;
+                            bool unico = num.Length > 0 && todos.Count(g => Path.GetFileName(g).StartsWith(num + " ")) == 1;
+                            return WebBase + "#ej=" + (unico ? num : Uri.EscapeDataString(nombre)) + "&solo=1";
+                        }
+                }
             }
             catch { /* sin carpeta de ejemplos: enlace largo */ }
             using var ms = new MemoryStream();
@@ -43,10 +53,37 @@ namespace HekatanLisp
             return WebBase + "#h=" + c;
         }
 
-        private void MenuCompartirWeb(object sender, RoutedEventArgs e)
+        /// <summary>Servicio de enlaces cortos (Cloudflare Worker, carpeta Documents\hekatan-compartir):
+        /// guarda la hoja y devuelve su clave (la huella del texto). El enlace queda #s=clave, ~60
+        /// caracteres, en vez de la hoja entera dentro (#h=…, 10 000 caracteres en la hoja 99).</summary>
+        public const string ServicioCompartir = "https://hekatan-compartir.j-b-jazz.workers.dev";
+        static readonly System.Net.Http.HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+        /// <summary>El enlace a compartir: ejemplo publicado → #ej; hoja propia → se guarda en el
+        /// servicio (#s=clave); sin red o si el servicio falla → la hoja dentro del enlace (#h=).</summary>
+        public static async System.Threading.Tasks.Task<string> EnlaceCortoAsync(string hoja)
+        {
+            var largo = EnlaceWeb(hoja);
+            if (largo.Contains("#ej=")) return largo;
+            try
+            {
+                using var cuerpo = new System.Net.Http.StringContent(hoja ?? "", Encoding.UTF8, "text/plain");
+                using var r = await _http.PostAsync(ServicioCompartir + "/h", cuerpo);
+                if (r.IsSuccessStatusCode)
+                {
+                    using var j = System.Text.Json.JsonDocument.Parse(await r.Content.ReadAsStringAsync());
+                    if (j.RootElement.TryGetProperty("k", out var k) && k.GetString() is string clave && clave.Length > 0)
+                        return WebBase + "#s=" + clave + "&solo=1";
+                }
+            }
+            catch { /* sin red: enlace largo */ }
+            return largo;
+        }
+
+        private async void MenuCompartirWeb(object sender, RoutedEventArgs e)
         {
             string url;
-            try { url = EnlaceWeb(Editor.Text); }
+            try { url = await EnlaceCortoAsync(Editor.Text); }
             catch (Exception ex) { MessageBox.Show(this, "No se pudo crear el enlace: " + ex.Message, "Compartir"); return; }
             try { AlPortapapeles(url); } catch { /* portapapeles ocupado: igual se abre */ }
             try { AbrirFuera(url); } catch { }

@@ -16,6 +16,12 @@
                   ((equal form '(hlisp-done)))                            ; marcador: se ignora
                   ;; serious-condition (no solo error): en WASM también atrapa la falta de
                   ;; memoria (storage-condition) de UNA forma, y las demás siguen.
-                  (t (handler-case (eval form)
+                  ;; Recolección ENTRE formas, en un punto seguro (30-sep-2026): si la recolección
+                  ;; salta a MITAD de un cálculo simbólico largo, en WASM se liberaba algo vivo y el
+                  ;; motor caía con «function signature mismatch» (hoja 99: la K condensada, 14.ª
+                  ;; forma, solo fallaba tras las 13 anteriores; con (si:gc t) entre formas, nunca).
+                  ;; Cuesta ~11 ms por forma.
+                  (t (si:gc t)
+                     (handler-case (eval form)
                        (serious-condition (e)
                          (format t "; error: ~a~%" e)))))))))))

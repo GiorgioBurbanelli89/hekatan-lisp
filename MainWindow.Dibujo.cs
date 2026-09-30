@@ -98,6 +98,8 @@ namespace HekatanLisp
                 {
                     string que = qc.GetString();
                     if (que == "abrir") AmpliarResultado(true);
+                    else if (que == "struct")    // 🏗 Struct: el dibujo como modelo de Hekatan Struct, en el navegador
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(r.GetProperty("url").GetString()) { UseShellExecute = true });
                     else if (que == "cerrar") AmpliarResultado(false);
                     else if (que == "guardar")
                     {

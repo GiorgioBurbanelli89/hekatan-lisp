@@ -1623,6 +1623,56 @@
       msg('Sin aplicación anfitriona: copie el bloque del recuadro a la hoja.');
     }
   }
+  // ------------------------------------------------------------------ a Hekatan Struct (30-sep-2026)
+  // El dibujo pasa a un .heks: LINE y polilíneas → barras (frame), 3DFACE de 4 lados → cáscaras (shell), los nudos
+  // de la cota z más baja → empotrados. Las unidades del dibujo se llevan a metros. Se abre Hekatan Struct con el
+  // modelo en el enlace (#h= .heks comprimido deflate-raw + base64url, el mismo formato del botón Compartir de Struct).
+  var STRUCT_URL = 'https://giorgioburbanelli89.github.io/hekatan-struct-lineal/workspace/';
+  function heksDelDibujo() {
+    var f = { mm: 0.001, cm: 0.01, m: 1, km: 1000 }[String(S.ud || 'm').toLowerCase()] || 1;
+    var nudos = [], idx = {}, barras = [], caras = [], tri = 0;
+    function nudo(p) {
+      var q = [+(p[0] * f).toFixed(6), +(p[1] * f).toFixed(6), +((p[2] || 0) * f).toFixed(6)], k = q.join(',');
+      if (!(k in idx)) { idx[k] = nudos.length + 1; nudos.push(q); }
+      return idx[k];
+    }
+    function barra(a, b) { var i = nudo(a), j = nudo(b); if (i !== j) barras.push([i, j]); }
+    S.ents.forEach(function (e) {
+      if (e.t === 'LINE') barra(e.a, e.b);
+      else if (e.t === 'POLY3D' || e.t === 'LWPOLYLINE') {
+        for (var k = 0; k + 1 < e.pts.length; k++) barra(e.pts[k], e.pts[k + 1]);
+        if (e.cerr && e.pts.length > 2) barra(e.pts[e.pts.length - 1], e.pts[0]);
+      } else if (e.t === 'FACE3D') {
+        var ids = e.pts.map(nudo), dist = ids.filter(function (v, i) { return ids.indexOf(v) === i; });
+        if (dist.length === 4) caras.push(ids); else tri++;
+      }
+    });
+    if (!nudos.length) return null;
+    var zmin = Math.min.apply(null, nudos.map(function (q) { return q[2]; })), zmax = Math.max.apply(null, nudos.map(function (q) { return q[2]; }));
+    var L = ['# Dibujo «' + S.nombre + '» de Hekatan LISP (' + barras.length + ' barras, ' + caras.length + ' cáscaras). Sección y espesor por defecto: cámbielos en Struct.'];
+    nudos.forEach(function (q, i) { L.push('node ' + (i + 1) + ' ' + q[0] + ' ' + q[1] + ' ' + q[2]); });
+    barras.forEach(function (b, i) { L.push('frame ' + (i + 1) + ' ' + b[0] + ' ' + b[1] + ' 25000000 0.09 0.000675 0.000675'); });
+    caras.forEach(function (c, i) { L.push('shell ' + (i + 1) + ' ' + c.join(' ') + ' 0.2 25000000'); });
+    var apoyos = 0;
+    if (zmax - zmin > 1e-9) nudos.forEach(function (q, i) { if (Math.abs(q[2] - zmin) < 1e-6) { L.push('support ' + (i + 1) + ' fixed'); apoyos++; } });
+    return { txt: L.join(String.fromCharCode(10)) + String.fromCharCode(10), barras: barras.length, caras: caras.length, nudos: nudos.length, apoyos: apoyos, tri: tri };
+  }
+  async function comprimir(txt) {
+    var flujo = new Blob([txt]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    var buf = new Uint8Array(await new Response(flujo).arrayBuffer()), bin = '';
+    for (var i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  async function aStruct() {
+    if (S.cmd) cancelar();
+    var h = heksDelDibujo();
+    if (!h || !(h.barras + h.caras)) { msg('Nada que llevar a Struct: dibuje líneas, polilíneas o 3DCARA de 4 lados.'); return; }
+    var url = STRUCT_URL + '#h=' + await comprimir(h.txt);
+    window.hkCadStructUltimo = { url: url, heks: h.txt };
+    msg('A Hekatan Struct: ' + h.nudos + ' nudos, ' + h.barras + ' barras, ' + h.caras + ' cáscaras, ' + h.apoyos + ' apoyos' +
+      (h.apoyos ? ' (cota más baja)' : ' (dibujo plano: ponga los apoyos en Struct)') + (h.tri ? ' · ' + h.tri + ' 3DCARA de 3 lados sin llevar' : '') + '.');
+    if (!anfitrion({ hkCad: 'struct', url: url })) window.open(url, '_blank');
+  }
   function cerrar() {
     if (S && S.sucio && !confirm('Hay cambios sin guardar en «' + S.nombre + '». ¿Cerrar sin guardar?')) return;
     document.removeEventListener('keydown', S.tecla, true); window.removeEventListener('resize', S.resize);
@@ -1669,6 +1719,7 @@
       '<span class="hkcad-g hkcad-vistas">' + [['PLANTA', 'Planta'], ['FRENTE', 'Frente'], ['LATERAL', 'Lateral'], ['ISOSO', 'Iso SO'], ['ISOSE', 'Iso SE']].map(function (v) {
         return '<button type="button" data-v="' + v[0] + '" title="Vista ' + v[1] + (v[0] === 'PLANTA' ? ' (la de 2D; PLANTA)' : v[0].indexOf('ISO') === 0 ? ' (isométrica)' : ' (pone su SCP, como AutoCAD)') + ' · Mayús + botón central: órbita (3DO)">' + v[1] + '</button>'; }).join('') + '</span>' +
       '<button type="button" class="hkcad-enc" title="Zoom a la extensión (doble clic con la rueda)">⤢ Encuadre</button>' +
+      '<button type="button" class="hkcad-struct" title="Abre este dibujo como modelo en Hekatan Struct: líneas y polilíneas → barras, 3DCARA de 4 lados → cáscaras, nudos de la cota más baja → empotrados">🏗 Struct</button>' +
       '<button type="button" class="hkcad-guardar" title="Escribe el dibujo en la hoja como listas DXF (entmake) y recalcula">💾 Guardar en la hoja</button>' +
       '<button type="button" class="hkcad-cerrar" title="Cerrar sin guardar">✕ Cerrar</button></div>' +
       '<div class="hkcad-herr"><span class="hkcad-g">' + hb + '</span>' +
@@ -1774,6 +1825,7 @@
       else if (b.dataset.v) { vista(b.dataset.v); S.inp.focus(); }
       else if (b.classList.contains('hkcad-enc')) encuadre();
       else if (b.classList.contains('hkcad-guardar')) guardar();
+      else if (b.classList.contains('hkcad-struct')) aStruct();
       else if (b.classList.contains('hkcad-cerrar')) cerrar();
       else if (b.classList.contains('hkcad-nueva')) { if (S.cmd) cancelar(); orden('LA'); S.inp.focus(); }
     });

@@ -267,9 +267,12 @@ window.hkVoz=function(cb){if(VOZ){cb(VOZ);return;}listos.push(cb);if(buscada)ret
  if(!S){setTimeout(fin,0);return;}if(elige()){setTimeout(fin,0);return;}
  var hecho=false;S.addEventListener&&S.addEventListener('voiceschanged',function(){if(!hecho&&elige()){hecho=true;fin();}});
  setTimeout(function(){if(!hecho){hecho=true;fin();}},2500);};
-window.hkHabla=function(txt,alFin){if(!S||!VOZ||!txt){if(alFin)alFin();return null;}S.cancel();
- var u=new SpeechSynthesisUtterance(txt);u.voice=VOZ;u.lang=VOZ.lang;u.rate=1;var ok=false;
- function f(){if(ok)return;ok=true;if(alFin)alFin();}u.onend=f;u.onerror=f;S.speak(u);return u;};
+window.hkHabla=function(txt,alFin){if(!S||!VOZ||!txt){if(alFin)alFin();return null;}var habia=S.speaking||S.pending;S.cancel();
+ var u=new SpeechSynthesisUtterance(txt);u.voice=VOZ;u.lang=VOZ.lang;u.rate=1;var ok=false,tope=null;
+ function f(){if(ok)return;ok=true;clearTimeout(tope);if(alFin)alFin();}u.onend=f;u.onerror=f;
+ /* la voz no puede dejar parada la animacion: si el navegador no avisa del final (pasa tras un cancel seguido de speak), se sigue igual */
+ tope=setTimeout(f,Math.max(5000,110*txt.length)+2500);
+ if(habia)setTimeout(function(){if(!ok)S.speak(u);},90);else S.speak(u);return u;};
 window.hkCalla=function(){if(S)S.cancel();};
 function txt(el){var c=el.cloneNode(true);c.querySelectorAll('script,style,button').forEach(function(x){x.remove();});return (c.textContent||'').replace(/\s+/g,' ').trim();}
 window.hkVozSuelta=function(d){if(!d)return;var b=d.querySelector('.hk-voz-btn'),t=d.querySelector('.hk-voz-txt');var on=false;
@@ -301,7 +304,9 @@ window.hkAnimInit=function(R){if(!R||R.hkAnim)return;
   else for(var k=0;k<fr.length;k++)fr[k].style.visibility=(k===i0?'visible':'hidden');
   if(bar)bar.value=i0;if(L)L.innerHTML=esc(lbl[i0]||'')+' <span style=""color:var(--mut);font-size:.85em"">('+(i0+1)+'/'+N+')</span>';
   if(sub)sub.innerHTML=voz[i0]||'';}
- function dur(i){return plano[i]?Math.max(dt,55*plano[i].length):dt;}
+ /* tiempo de lectura solo si la frase es NUEVA: la misma frase con otro numero («Flecha: 3 decimas») no hay que volver a leerla. Antes cada cuadro esperaba 3.6 s y la animacion parecia parada (hoja 95). */
+ function forma(t){return (t||'').replace(/-?\d+(?:[.,]\d+)?/g,'#');}
+ function dur(i){if(!plano[i])return dt;if(N>1&&forma(plano[i])===forma(plano[(i-1+N)%N]))return dt;return Math.max(dt,55*plano[i].length);}
  function para(){jugando=false;clearTimeout(tm);if(bp)bp.textContent='▶';}
  function paso(){clearTimeout(tm);if(!jugando)return;
   if(conVoz&&plano[i0]){var yo=i0;hkHabla(plano[i0],function(){if(!jugando||!conVoz||i0!==yo)return;tm=setTimeout(sig,350);});}
@@ -316,7 +321,7 @@ window.hkAnimInit=function(R){if(!R||R.hkAnim)return;
  R.hkAnim={n:N,show:show,juega:juega,para:para,voz:plano,sub:voz,get i(){return i0;},get jugando(){return jugando;}};
  window.addEventListener('beforeprint',function(){para();show(0);});
  show(0);if(bp)bp.textContent='▶';
- setTimeout(function(){if(!jugando&&i0===0)juega();},1600);};
+ setTimeout(function(){if(!jugando&&i0===0)juega();},900);};
 var st=document.createElement('style');st.textContent='@media print{.hk-anim-ctl{display:none!important}.hk-anim .hkfr{visibility:hidden!important}.hk-anim .hkfr[data-i=""0""]{visibility:visible!important}.hk-voz-btn{display:none!important}}';
 (document.head||document.documentElement).appendChild(st);
 })();}

@@ -260,16 +260,35 @@ try:
     cmd("settext", text=HOJA2)
     for b in (por_nombre("BtnCompartir"), por_texto("Compartir enlace web…  (Hekatan LISP web)")):
         pulsa(b)
-        f = cmd("fuera").get("fuera", [])
-        url = next((x.split("\t", 1)[1] for x in f if x.startswith("abrir\t")), "")
+        # desde la 1.30.1 el enlace corto se pide por la red (#s=clave): llega un poco después
+        url, f = "", []
+        for _ in range(30):
+            f = cmd("fuera", vaciar=False).get("fuera", [])
+            url = next((x.split("\t", 1)[1] for x in f if x.startswith("abrir\t")), "")
+            if url:
+                break
+            time.sleep(0.5)
+        cmd("fuera")
         copia = any(x.startswith("copiar\t") for x in f)
-        hoja = ""
+        hoja, tipo = "", "?"
         m = re.search(r"#h=([A-Za-z0-9_\-]+)$", url)
-        if m:
+        if m:                                   # la hoja va DENTRO del enlace (sin red)
             c = m.group(1)
             hoja = zlib.decompress(base64.urlsafe_b64decode(c + "=" * (-len(c) % 4)), -15).decode("utf-8")
-        nota("fuera", b["texto"], url.startswith("https://giorgioburbanelli89.github.io/hekatan-lisp/#h=") and copia and norm(hoja) == HOJA2,
-             "enlace de %d caracteres; la hoja que lleva dentro %s" % (len(url), "es la del editor" if norm(hoja) == HOJA2 else "NO coincide"))
+            tipo = "largo (#h)"
+        m = re.search(r"#s=([0-9A-Za-z]+)", url)
+        if m:                                   # enlace corto: la hoja está en el servicio
+            import urllib.request
+            try:
+                pet = urllib.request.Request("https://hekatan-compartir.j-b-jazz.workers.dev/h/" + m.group(1),
+                                             headers={"User-Agent": "Mozilla/5.0 (prueba de Hekatan LISP)"})   # sin esto Cloudflare da 403
+                hoja = urllib.request.urlopen(pet, timeout=15).read().decode("utf-8")
+            except Exception as ex:
+                hoja = "(el servicio no contesta: %s)" % ex
+            tipo = "corto (#s)"
+        igual = norm(hoja).strip() == HOJA2.strip()
+        nota("fuera", b["texto"], url.startswith("https://giorgioburbanelli89.github.io/hekatan-lisp/#") and copia and igual,
+             "enlace %s de %d caracteres; la hoja a la que lleva %s" % (tipo, len(url), "es la del editor" if igual else "NO coincide: %r" % hoja[:60]))
     for b in (por_texto("📋 LISP completo"), por_texto("Copiar como LISP ejecutable (portapapeles)")):
         pulsa(b)
         f = cmd("fuera").get("fuera", [])

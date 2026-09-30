@@ -251,6 +251,7 @@ ight\}";
                 case "abs":  return @"\left|" + A(0) + @"\right|";
                 case "ceil":  return @"\left\lceil " + A(0) + @"\right\rceil";
                 case "floor": return @"\left\lfloor " + A(0) + @"\right\rfloor";
+                case "round" when args.Count == 1: return @"\left\lfloor " + A(0) + @"\right\rceil";
                 case "sin": case "cos": case "tan": case "log": case "ln":
                 case "sinh": case "cosh": case "tanh":
                     return "\\" + nombre + @"\left(" + A(0) + @"\right)";

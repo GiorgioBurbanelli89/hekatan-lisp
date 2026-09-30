@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -1452,6 +1452,26 @@ dib();})();";
         /// y el texto salía con «@{w_c}» literal.</summary>
         private string NumInline(string name, int linea, string[] srcLines = null)
         {
+            var v = NumLiteral(name, linea, srcLines);
+            if (v == null) return null;
+            try { return LispConverter.ToHtml(LispConverter.ParseLisp(v)); }
+            catch { return System.Net.WebUtility.HtmlEncode(v); }
+        }
+
+        /// <summary>#dibujo en una hoja #numerico: los nombres del dibujo toman el valor que el programa
+        /// les dio (la misma búsqueda que @{nombre}). Antes el dibujo buscaba en las etiquetas del modo
+        /// simbólico, vacías en #numerico, y cada nombre salía «no está definida».</summary>
+        private double[] NumDibujo(string name, int linea, string[] srcLines)
+        {
+            var v = NumLiteral(name, linea, srcLines);
+            if (v == null) return null;
+            try { return LispDibujo.Eval(LispConverter.ParseLisp(v), _ => null); }
+            catch { return null; }
+        }
+
+        /// <summary>El literal LISP del valor de «name» visto desde la línea «linea» (ver NumInline).</summary>
+        private string NumLiteral(string name, int linea, string[] srcLines = null)
+        {
             if (_numRes == null || string.IsNullOrWhiteSpace(name)) return null;
             name = name.Trim();
             string mang = LispConverter.MangleExpr(name);
@@ -1483,9 +1503,7 @@ dib();})();";
                         && (mejor < 0 || Math.Abs(kv.Key - linea) < Math.Abs(mejor - linea)))
                         mejor = kv.Key;
             if (mejor < 0) return null;
-            var v = HojaNumerica.FormatoLiteral(_numRes.Valor.TryGetValue(mejor, out var vis) ? vis : _numRes.Oculta[mejor].Valor);
-            try { return LispConverter.ToHtml(LispConverter.ParseLisp(v)); }
-            catch { return System.Net.WebUtility.HtmlEncode(v); }
+            return HojaNumerica.FormatoLiteral(_numRes.Valor.TryGetValue(mejor, out var vis) ? vis : _numRes.Oculta[mejor].Valor);
         }
 
         /// <summary>El bloque en la hoja: el código plegable (como Calcpad lo esconde con #hide, pero a
@@ -2012,7 +2030,9 @@ dib();})();";
                 if (dibujos[i] != null)   // #dibujo … #fin: SVG técnico con los valores YA calculados de la hoja
                 {
                     string svg;
-                    try { svg = LispDibujo.Render(dibujos[i], name => NumLookup(name, labels, resOf, formOf, 0)); }
+                    int iDib = i;
+                    try { svg = LispDibujo.Render(dibujos[i], name => _numMode ? NumDibujo(name, iDib, lines) ?? NumLookup(name, labels, resOf, formOf, 0)
+                                                                           : NumLookup(name, labels, resOf, formOf, 0)); }
                     catch (Exception ex) { svg = "<div class=\"hk-dib-err\">⚠ #dibujo: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div>"; }
                     display.Add(LispConverter.TxtLine("table", "left", svg));
                     continue;

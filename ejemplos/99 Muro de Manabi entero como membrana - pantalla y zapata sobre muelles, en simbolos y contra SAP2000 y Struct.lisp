@@ -6,28 +6,49 @@
 #: **Cómo está hecha la hoja.** Primero todo con **símbolos** (secciones 1 a 4): empujes, carga en los nudos, matriz constitutiva, funciones de forma, Jacobiano, rigidez del elemento y muelles. Después, los **números** (secciones 5 a 9) y la comparación con SAP2000 y Hekatan Struct.
 #: **Unidades.** kN, m y kPa (kN/m²), por metro de muro.
 
-## 1 · El muro, las cargas y los apoyos
-#dibujo("Sección del muro de Manabí: empuje del relleno (azul), incremento sísmico (naranja), peso del relleno sobre el talón (verde) y muelles bajo la zapata", ud = m, cotas = m, ancho = 150, alto = 120)
-#  polilinea([0, 3, 3, 1.1, 1.1, 0.85, 0.7, 0, 0], [0, 0, 0.4, 0.4, 3, 3, 0.4, 0.4, 0], "gruesa")
-#  carga(1.1, 3, 1.1, 0.4, 0, 0.8, "", "azul", n = 8)
-#  carga(1.1, 3, 1.1, 0.4, 0.9, 0, "", "naranja", n = 8)
-#  carga(1.1, 0.4, 3, 0.4, 0.5, 0.5, "", "verde", n = 10)
-#  texto(2.35, 2.2, "empuje de Coulomb", 2.4, "c", estilo = "azul")
-#  texto(2.35, 3.15, "sismo, Mononobe-Okabe", 2.4, "c", estilo = "naranja")
-#  texto(2.6, 1.05, "relleno γ·H_f", 2.4, "c", estilo = "verde")
-#  polilinea([0.3, 0.3, 0.22, 0.38, 0.22, 0.38, 0.3, 0.3], [0, -0.08, -0.12, -0.18, -0.24, -0.3, -0.34, -0.42], "media")
-#  polilinea([1.5, 1.5, 1.42, 1.58, 1.42, 1.58, 1.5, 1.5], [0, -0.08, -0.12, -0.18, -0.24, -0.3, -0.34, -0.42], "media")
-#  polilinea([2.7, 2.7, 2.62, 2.78, 2.62, 2.78, 2.7, 2.7], [0, -0.08, -0.12, -0.18, -0.24, -0.3, -0.34, -0.42], "media")
-#  linea(-0.1, -0.42, 3.1, -0.42, "trazos gris")
-#  texto(1.5, -0.62, "muelles de balasto k_{s} en toda la base", 2.4, "c")
-#  empotramiento(-0.03, 0, -0.03, 0.4, 1)
-#  texto(-0.3, 0.2, "u_{x} = 0", 2.4, "d")
-#  cota(0, 0, 3, 0, -0.95, "B = 3.00")
-#  cota(0, 0, 0.7, 0, -0.75, "0.70")
-#  cota(1.1, 0.4, 1.1, 3, 1.35, "H_f = 2.60")
-#  cota(0.85, 3, 1.1, 3, 0.25, "0.25")
+## 1 · El muro: medidas y dibujo
+#: Las medidas del muro, en m. **Cambia cualquiera y el dibujo, la malla y todo el cálculo cambian con ella** (con AutoRun, al escribir):
+H_f = 2.6 'alto de la pantalla (fuste)
+t_f = 0.4 'canto de la zapata
+t_c = 0.25 'pantalla en la coronación
+t_b = 0.4 'pantalla en el pie
+p_t = 0.7 'puntera
+t_l = 1.9 'talón
+x_b = p_t + t_b 'abscisa del trasdós
+B = x_b + t_l 'ancho de la zapata
+Z_t = t_f + H_f 'cota de la coronación
+#hide
+x_c = x_b - t_c
+q_d = 0.4·t_l
+q_s = 0.45·t_l
+q_r = 0.16·t_l
+y_e = t_f + 0.45·H_f
+x_t = B + 0.75
+y_s = Z_t - 0.1·H_f
+y_r = t_f + 0.12·H_f
+k_1 = B/10
+k_2 = B/2
+k_3 = 9·B/10
+#show
+#dibujo("Sección del muro: empuje del relleno (azul), incremento sísmico (naranja), peso del relleno sobre el talón (verde) y muelles bajo la zapata", ud = m, cotas = m, ancho = 150, alto = 120)
+#  polilinea([0, B, B, x_b, x_b, x_c, p_t, 0, 0], [0, 0, t_f, t_f, Z_t, Z_t, t_f, t_f, 0], "gruesa")
+#  carga(x_b, Z_t, x_b, t_f, 0, q_d, "", "azul", n = 8)
+#  carga(x_b, Z_t, x_b, t_f, q_s, 0, "", "naranja", n = 8)
+#  carga(x_b, t_f, B, t_f, q_r, q_r, "", "verde", n = 10)
+#  texto(x_t, y_e, "empuje de Coulomb", 2.4, "i", estilo = "azul")
+#  texto(x_t, y_s, "sismo, Mononobe-Okabe", 2.4, "i", estilo = "naranja")
+#  texto(x_t, y_r, "relleno γ·H_f", 2.4, "i", estilo = "verde")
+#  polilinea([k_1, k_1, k_1 - 0.08, k_1 + 0.08, k_1 - 0.08, k_1 + 0.08, k_1, k_1], [0, -0.08, -0.12, -0.18, -0.24, -0.3, -0.34, -0.42], "media")
+#  polilinea([k_2, k_2, k_2 - 0.08, k_2 + 0.08, k_2 - 0.08, k_2 + 0.08, k_2, k_2], [0, -0.08, -0.12, -0.18, -0.24, -0.3, -0.34, -0.42], "media")
+#  polilinea([k_3, k_3, k_3 - 0.08, k_3 + 0.08, k_3 - 0.08, k_3 + 0.08, k_3, k_3], [0, -0.08, -0.12, -0.18, -0.24, -0.3, -0.34, -0.42], "media")
+#  linea(-0.1, -0.42, B + 0.1, -0.42, "trazos gris")
+#  empotramiento(-0.03, 0, -0.03, t_f, 1)
+#  cotas([0, p_t, x_b, B], 0, -0.75)
+#  cota(0, 0, B, 0, -1.1)
+#  cotasy([0, t_f, Z_t], B, -0.45)
+#  cota(x_c, Z_t, x_b, Z_t, 0.3)
 #fin
-#: Pantalla (fuste) de 2.60 m, de 0.25 m en la coronación a 0.40 m en el pie; la cara del relleno es vertical y la de delante, inclinada. Zapata de 3.00 × 0.40 m: puntera de 0.70 m y talón de 1.90 m.
+#: La cara del relleno (el trasdós) es vertical y la de delante, inclinada. La base lleva muelles de balasto k_{s} en todos sus nudos y el apoyo u_{x} = 0 en la punta de la puntera.
 
 ## 2 · En símbolos: empujes y carga en los nudos
 ### 2.1 · Coeficientes de empuje
@@ -84,13 +105,8 @@ K_c1 = Simplify{(K_uu - K_ua*inv(K_aa)*transpose(K_ua))*24*(1+nu)*(1-2*nu)/(E*t)
 #: (K + K_{s})·U = F
 #: con K la suma de las rigideces de los elementos, K_{s} la diagonal de los muelles y U los desplazamientos. El apoyo horizontal de la puntera quita la fila y la columna de su u_{x}: se resuelven los grados **libres**, U_{L} = K_{LL}⁻¹·F_{L}.
 
-## 5 · Y ahora los números: datos
-H_f = 2.6 'alto de la pantalla, m
-t_f = 0.4 'canto de la zapata, m
-t_c = 0.25 'pantalla en la coronación, m
-t_b = 0.4 'pantalla en el pie, m
-p_t = 0.7 'puntera, m
-t_l = 1.9 'talón, m
+## 5 · Y ahora los números: material, suelo y sismo
+#: Las medidas del muro están en la sección 1. Longitud de muro y lado del elemento:
 L = 1 'metro de muro
 m_s = 0.1 'lado del elemento, m
 #: f'_{c} = 21 MPa (el mínimo de la NEC-SE-HM) y E = 4700·√f'_{c} en MPa (ACI 318-19, 19.2.2.1.b), pasado a kN/m²:
@@ -104,9 +120,6 @@ k_h = 0.336 'NEC-SE-GC: 0.6·Z·F_a = 0.6·0.50·1.12
 k_v = 0
 #: Módulo de balasto del estudio de suelos (tramo −2.55 a −3.00 m): 6.59 kg/cm³, en kN/m³:
 k_s = 6.59·9.80665·1000
-x_b = p_t + t_b 'abscisa del trasdós, m
-B = x_b + t_l 'ancho de la zapata, m
-Z_t = t_f + H_f 'cota de la coronación, m
 #: Los coeficientes de empuje, con las fórmulas de la sección 2:
 K_a = K_C(φ, δ)
 ψ = atan(k_h/(1 - k_v))
@@ -114,7 +127,7 @@ K_ae = K_MO(φ, δ, ψ)
 ψ_g = ψ·180/pi 'en grados
 
 ## 6 · Malla
-#: Todas las medidas son múltiplos de 0.10 m, así que en x hay 30 elementos (7 en la puntera, 4 bajo la pantalla, 19 en el talón) y en z, 4 en la zapata y 26 en la pantalla. En la pantalla cada fila de nudos se reparte en 4 partes iguales entre la cara inclinada y el trasdós.
+#: Las medidas de la sección 1 tienen que ser múltiplos del lado del elemento m_{s}. Número de elementos en x (n_{x}), en la zapata (n_{f}) y en la pantalla (n_{h}); en la pantalla cada fila de nudos se reparte en n_{p} partes iguales entre la cara inclinada y el trasdós.
 n_x = round(B/m_s)
 n_f = round(t_f/m_s)
 n_h = round(H_f/m_s)
@@ -368,6 +381,7 @@ v_f = zeros(0, 2)
 #modelo3d(X_n, e_j, e_f, u_x, v_f, U_3, 300)
 
 ## 10 · Comparación con SAP2000 y con Hekatan Struct
+#: Los números de SAP2000 y de Struct son los del muro con las medidas y los datos de esta hoja tal como vienen; si se cambian, la tabla compara con otro muro.
 #: **SAP2000 24** (por OAPI): elemento Plane de **deformación plana con modos incompatibles**, los mismos 285 nudos, los mismos muelles, el mismo apoyo y las mismas fuerzas nodales. Es el elemento de esta hoja. **Hekatan Struct**: el mismo muro con su cáscara usada como membrana, con el giro en el plano (Ibrahimbegović, Taylor y Wilson, 1990) y tensión plana con E' y ν'. Es otro elemento: por eso Struct no coincide en todas las cifras.
 #hide
 a_1 = round(100·(u_c0 - 0.0372081247)/0.0372081247, 6)

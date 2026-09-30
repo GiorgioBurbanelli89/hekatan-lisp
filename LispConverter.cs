@@ -640,6 +640,13 @@ namespace HekatanLisp
         static string Paren(string s) =>
             "<span class=\"m-paren\"><span class=\"m-pl\"></span>" + FlexSafe(s) + "<span class=\"m-pr\"></span></span>";
 
+        /// <summary>⌈x⌉, ⌊x⌋ y ⌊x⌉ con bordes, como los paréntesis: se estiran al alto de lo que
+        /// encierran (con el carácter ⌊ quedaban bajitos al lado de una fracción). izq/der: "bb" =
+        /// raya abajo (piso), "bt" = raya arriba (techo).</summary>
+        static string Corchete(string s, string izq, string der) =>
+            "<span class=\"m-cor\"><span class=\"m-bl m-" + izq + "\"></span>" + FlexSafe(s) +
+            "<span class=\"m-br m-" + der + "\"></span></span>";
+
         /// <summary>Dentro de un inline-flex (paréntesis, transpuesta) cada hijo es una CAJA: el
         /// &lt;sub&gt; de u₁ dejaba de bajar y salía «u1» (y en Tₑᵀ la e quedaba arriba). Con un span
         /// que lo envuelva, el subíndice vuelve a vivir en su línea de texto.</summary>
@@ -1085,9 +1092,12 @@ namespace HekatanLisp
                         return ToHtml(n.Items[0], 5) + "<span class=\"m-op\"> × </span>" + ToHtml(n.Items[1], 5);
                     goto default;
                 case "ceil":    // techo ⌈x⌉ (n = ⌈As/Ab⌉, regla de SAFE para el número de varillas)
-                    return "<span class=\"m-detbar\">⌈</span>" + arg0 + "<span class=\"m-detbar\">⌉</span>";
+                    return Corchete(arg0, "bt", "bt");
                 case "floor":   // piso ⌊x⌋
-                    return "<span class=\"m-detbar\">⌊</span>" + arg0 + "<span class=\"m-detbar\">⌋</span>";
+                    return Corchete(arg0, "bb", "bb");
+                case "round":   // entero más cercano ⌊x⌉; con decimales, round(x, n), se queda la palabra
+                    if (n.Items.Count == 1) return Corchete(arg0, "bb", "bt");
+                    goto default;
                 case "abs":     // valor absoluto / módulo: |x|
                     return "<span class=\"m-detbar\">|</span>" + arg0 + "<span class=\"m-detbar\">|</span>";
                 case "norm":    // norma: ‖v‖
@@ -1405,6 +1415,12 @@ table.hk-obs td:nth-child(3){min-width:22em;}
 .m-detl{border-left:1.4px solid currentColor;}
 .m-detr{border-right:1.4px solid currentColor;}
 .m-detbar{color:currentColor;margin:0 .08em;}
+.m-cor{display:inline-flex;align-items:stretch;vertical-align:middle;}
+.m-cor>.m-bl,.m-cor>.m-br{width:.28em;flex:0 0 auto;border:0 solid var(--mut);}
+.m-cor>.m-bl{border-left-width:.075em;margin-right:.12em;}
+.m-cor>.m-br{border-right-width:.075em;margin-left:.12em;}
+.m-cor>.m-bb{border-bottom-width:.075em;}
+.m-cor>.m-bt{border-top-width:.075em;}
 .m-mgrid{display:inline-grid;padding:.15em .35em;gap:.15em .7em;text-align:center;align-items:center;}
 .m-cell{color:var(--num);white-space:nowrap;}
 /* matriz GRANDE: índices en los bordes + centro colapsado (… ⋮ ⋱), como Hekatan Calc */
@@ -1814,9 +1830,9 @@ document.addEventListener('mousemove',function(e){if(e.target===fl)return;var b=
 function ir(l){try{window.chrome.webview.postMessage(JSON.stringify({hkGoto:+l}));}catch(x){}}
 fl.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();ir(fl.dataset.l);});
 document.addEventListener('dblclick',function(e){var b=bloque(e.target);var m=b&&marca(b);if(m)ir(m.dataset.src);});
-window.hkMarcaLinea=function(n){var best=null,bv=-1;document.querySelectorAll('a.hk-src').forEach(function(m){var v=+m.dataset.src;if(v<=n&&v>bv){bv=v;best=m;}});
+window.hkMarcaLinea=function(n,mover){var best=null,bv=-1;document.querySelectorAll('a.hk-src').forEach(function(m){var v=+m.dataset.src;if(v<=n&&v>bv){bv=v;best=m;}});
   if(!best)return;var b=best.nextElementSibling;if(!b)return;if(fijo)fijo.classList.remove('hk-marcado');fijo=b;b.classList.add('hk-marcado');pon(b,bv);
-  var r=b.getBoundingClientRect();if(r.bottom<0||r.top>window.innerHeight)b.scrollIntoView({block:'center',behavior:'smooth'});};
+  var r=b.getBoundingClientRect();if(mover!==false&&(r.bottom<0||r.top>window.innerHeight))b.scrollIntoView({block:'center',behavior:'smooth'});};
 })();</script>";
 
         // Varias asignaciones de la MISMA línea (a=2; b=3) → una sola fila .ws-eq con las celdas lado a lado,

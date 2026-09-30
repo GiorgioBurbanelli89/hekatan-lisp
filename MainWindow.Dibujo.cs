@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -54,12 +54,18 @@ namespace HekatanLisp
         {
             LispAutoLisp.EscritorDwg = DwgConNode;
             Viewer.CoreWebView2.WebMessageReceived += OnMensajeDibujo;
-            // editor → resultado: al mover el cursor se marca su bloque en el render (flecha al código)
+            // editor → resultado: al mover el cursor se marca su bloque en el render (flecha al código).
+            // Si el cursor se movió porque se ESCRIBE, solo se marca: el resultado no se desplaza (se
+            // cambia un dato y se mira el dibujo, que está en otra parte de la hoja). Con clic o flechas
+            // sí se lleva la vista al bloque: sirve para encontrar la línea.
             var espera = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+            DateTime ultimaEdicion = DateTime.MinValue;
+            Editor.TextChanged += (s2, e2) => ultimaEdicion = DateTime.Now;
             espera.Tick += (s2, e2) =>
             {
                 espera.Stop();
-                try { if (IsRenderView && _webReady) _ = Viewer.ExecuteScriptAsync("window.hkMarcaLinea&&hkMarcaLinea(" + Editor.TextArea.Caret.Line + ")"); } catch { }
+                bool mover = (DateTime.Now - ultimaEdicion).TotalMilliseconds > 600;
+                try { if (IsRenderView && _webReady) _ = Viewer.ExecuteScriptAsync("window.hkMarcaLinea&&hkMarcaLinea(" + Editor.TextArea.Caret.Line + (mover ? "" : ",false") + ")"); } catch { }
             };
             Editor.TextArea.Caret.PositionChanged += (s2, e2) => { espera.Stop(); espera.Start(); };
         }

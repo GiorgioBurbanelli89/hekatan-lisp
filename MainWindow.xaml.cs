@@ -317,16 +317,33 @@ namespace HekatanLisp
                 // página nueva; si estaba al final (escribiendo la última línea), se queda al final.
                 try
                 {
+                    // Se guarda el ANCLA de código que está arriba de la vista (a.hk-src, una por línea) y lo
+                    // que se había bajado desde ella. Con solo scrollY la vista se corría cuando algo de más
+                    // arriba cambiaba de alto al recalcular (una matriz, un dibujo, una gráfica tardía).
                     var pos = await Viewer.ExecuteScriptAsync(
-                        "(function(){var d=document.documentElement;return JSON.stringify([window.scrollY||0,(window.innerHeight+(window.scrollY||0))>=d.scrollHeight-40&&d.scrollHeight>window.innerHeight+40]);})()");
+                        "(function(){var d=document.documentElement,y=window.scrollY||0,a=null,dy=0;" +
+                        "var L=document.querySelectorAll('a.hk-src[data-src]');for(var i=0;i<L.length;i++){var t=L[i].getBoundingClientRect().top;if(t<=1){a=L[i].getAttribute('data-src');dy=-t;}else break;}" +
+                        "return JSON.stringify([y,(window.innerHeight+y)>=d.scrollHeight-40&&d.scrollHeight>window.innerHeight+40,a,dy]);})()");
                     if (gen != _showGen) return;
-                    var arr = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Deserialize<string>(pos) ?? "[0,false]").RootElement;
+                    var arr = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Deserialize<string>(pos) ?? "[0,false,null,0]").RootElement;
                     double y = arr[0].GetDouble(); bool alFinal = arr[1].GetBoolean();
+                    string ancla = arr.GetArrayLength() > 2 && arr[2].ValueKind == System.Text.Json.JsonValueKind.String ? arr[2].GetString() : null;
+                    double dy = arr.GetArrayLength() > 3 ? arr[3].GetDouble() : 0;
                     if (y > 0 || alFinal)
                     {
+                        var ic = System.Globalization.CultureInfo.InvariantCulture;
+                        // al ancla (la misma línea, o la última anterior si ya no existe); sin ancla, a la altura
                         string ir = alFinal ? "window.scrollTo(0,document.documentElement.scrollHeight)"
-                                            : "window.scrollTo(0," + y.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
-                        string js = "<script>" + ir + ";addEventListener('load',function(){" + ir + "});</script>";
+                            : ancla != null
+                                ? "(function(){var n=" + int.Parse(ancla, ic) + ",b=null,L=document.querySelectorAll('a.hk-src[data-src]');" +
+                                  "for(var i=0;i<L.length;i++){if(+L[i].getAttribute('data-src')<=n)b=L[i];else break;}" +
+                                  "if(b)window.scrollTo(0,b.getBoundingClientRect().top+window.scrollY+" + dy.ToString(ic) + ");else window.scrollTo(0," + y.ToString(ic) + ");})()"
+                                : "window.scrollTo(0," + y.ToString(ic) + ")";
+                        // se repite mientras la página termina de crecer (gráficas y dibujos que llegan tarde),
+                        // hasta que el lector mueva la rueda o pasen 2 s
+                        string js = "<script>(function(){function ir(){" + ir + "}ir();addEventListener('load',ir);var fin=Date.now()+2000,parar=false;" +
+                            "['wheel','keydown','mousedown','touchstart'].forEach(function(e){addEventListener(e,function(){parar=true},{once:true,passive:true})});" +
+                            "(function paso(){if(parar||Date.now()>fin)return;ir();setTimeout(paso,150)})();})();</script>";
                         int cb = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
                         html = cb >= 0 ? html.Insert(cb, js) : html + js;
                     }

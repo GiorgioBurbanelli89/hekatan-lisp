@@ -64,6 +64,8 @@ try:
     for h in hojas:
         comparte(os.path.basename(h)[:34], io.open(h, encoding="utf-8").read())
     comparte("hoja propia corta", "# Prueba de enlace corto\nL = 3 [m]\nq = L^2\n")
+    # sin título ni comentario: el servicio la rechazaba («no parece una hoja») y salía el enlace largo
+    comparte("dos fórmulas sin título", "y = x + x\n2*x\n")
     comparte("hoja propia larga", "# Prueba de enlace corto (hoja larga)\n" + "".join(
         "k_%d = %d*x^2 + %d*x + %d 'fila %d de una hoja larga de prueba\n" % (i, i, i + 1, i + 2, i) for i in range(1, 121)))
 finally:

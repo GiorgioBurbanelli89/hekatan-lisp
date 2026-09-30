@@ -1,0 +1,4 @@
+SetPlane 0
+run 0
+estatico SAP ux cor 0.0372081 mm | python 0.0372081 | peor nudo 2.11e-10 % del max
+sismico SAP ux cor -2.3739109 mm | python -2.3739109 | peor nudo 1.41e-09 % del max

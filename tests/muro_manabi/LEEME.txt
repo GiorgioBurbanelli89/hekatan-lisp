@@ -1,0 +1,5 @@
+Hoja 99 (muro de Manabi entero como membrana). Juez: SAP2000 24.
+1) node hekatan-struct-limpio/cli/muro_manabi_dump.mjs <carpeta>  -> muro_membrana_*.json (malla, muelles, cargas de Struct)
+2) python q4ref.py sismico 1   -> Q4 + modos incompatibles (Taylor), deformacion plana, numpy
+3) python sap_plane.py         -> SAP2000 Plane, def. plana, incompatibles ON, mismos nudos/muelles/cargas
+Resultado (sap.log): SAP = numpy a 1.4e-9 % (sismo) y 2.1e-10 % (estatico); la hoja da las mismas cifras.

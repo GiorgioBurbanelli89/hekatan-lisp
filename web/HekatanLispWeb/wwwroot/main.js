@@ -363,7 +363,7 @@ async function abrirDesdeEnlace() {
   if (p.get('ej')) {
     let f = p.get('ej');
     if (/^\d+$/.test(f)) {                // #ej=99 → el archivo que empieza por «99 »
-      const l = window.hkEjemplos || await (await fetch('ejemplos.json')).json();
+      const l = window.hkEjemplos || await (await fetch('ejemplos.json', { cache: 'no-cache' })).json();
       f = l.find(x => x.startsWith(f + ' ')) || f;
     }
     const t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
@@ -476,7 +476,7 @@ $('griegas').innerHTML = GR.map(([g, t]) => `<button class="sym gr" data-ins="${
 let ejemploTexto = null;   // texto del ejemplo cargado: si no se tocó, el enlace lo nombra (corto)
 // un ejemplo se abre SIEMPRE con el resultado solo y a pantalla completa (Esc o ✎ para ver el código)
 const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); setSolo(true); });
-fetch('ejemplos.json').then(r => r.json()).then(l => {
+fetch('ejemplos.json', { cache: 'no-cache' }).then(r => r.json()).then(l => {
   window.hkEjemplos = l;                 // para los enlaces #ej=99 (por número)
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
   for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));

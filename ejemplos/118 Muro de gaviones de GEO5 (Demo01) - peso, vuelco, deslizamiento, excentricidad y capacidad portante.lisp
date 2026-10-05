@@ -119,6 +119,50 @@ t_sb = round(s_b/9.80665, 2)
 #show
 #: **En tonf:** M_{res} = @{t_Mr} y M_{ovr} = @{t_Mo} tonf·m/m, normal @{t_N} tonf/m, presión @{t_sb} tonf/m².
 
+## 6b · El cuerpo libre: fuerzas, brazos y presión en la base
+
+#: **Cómo se lee el dibujo.** El muro de gaviones (los seis bloques de 1 m de alto, con su relleno de piedra) a escala, en metros, con el origen en el **frente de la base** (el pie del muro): es el punto alrededor del cual vuelca. **Naranja:** el peso propio del muro W y el de la cuña de tierra W_{c}, verticales, en sus centros de gravedad. **Rojo:** el empuje activo E_{a} (con el coeficiente 0.500 que fija el ejemplo) descompuesto en horizontal (empuja hacia el frente) y vertical (hacia abajo), y el empuje de la sobrecarga S. **Verde:** la resistencia del suelo delante del muro, pequeña. **Azul bajo la base:** la presión de apoyo, repartida uniforme en el ancho comprimido b − 2e. Escala de flechas: 1 m = 100 kN; de la presión: 1 m = 100 kPa. Las cotas de abajo son los **brazos** de las fuerzas verticales respecto del frente; las de la izquierda, la **altura** de las horizontales: son los números que multiplican en el vuelco (sección 4).
+w_s = b_1 - 2·e_b 'ancho comprimido de la base [m]
+r_FSo = round(FS_o, 2) 'FS al vuelco, para el rótulo
+r_FSs = round(FS_s, 2) 'FS al deslizamiento, para el rótulo
+r_eb = round(e_b, 3) 'excentricidad, para el rótulo
+r_ws = round(w_s, 2) 'ancho comprimido, para el rótulo
+r_sb = round(s_b, 1) 'presión en la base, para el rótulo
+#dibujo("Cuerpo libre del muro de gaviones: fuerzas, brazos respecto del frente y presión en la base", ud = m, escala = auto, cotas = m, ancho = 190, alto = 190)
+#  rect(0, 0, 3.5, 1, "gruesa")
+#  rect(0, 1, 3.5, 1, "gruesa")
+#  rect(0, 2, 2.5, 1, "gruesa")
+#  rect(0, 3, 2.5, 1, "gruesa")
+#  rect(0, 4, 2, 1, "gruesa")
+#  rect(0, 5, 1, 1, "gruesa")
+#  achurado(0, 0, 3.5, 2, "cruzado")
+#  achurado(0, 2, 2.5, 2, "cruzado")
+#  achurado(0, 4, 2, 1, "cruzado")
+#  achurado(0, 5, 1, 1, "cruzado")
+#  polilinea(t_x, t_y, "media verde")
+#  linea(3.5, 0, 9.5, 0, "media")
+#  flecha(x_g, y_g + W_g/100, x_g, y_g, "naranja")
+#  texto(x_g - 0.1, y_g + W_g/100 + 0.2, "W = 255 kN/m", 2.4, "d", estilo = "naranja")
+#  flecha(x_c, y_c + W_c/100, x_c, y_c, "naranja")
+#  texto(x_c + 0.1, y_c + W_c/100 + 0.1, "Wc = 41.5", 2.4, "i", estilo = "naranja")
+#  flecha(x_a, y_a + k_a·E_az/100, x_a, y_a, "rojo")
+#  flecha(x_a + k_a·E_ax/100, y_a, x_a, y_a, "rojo")
+#  texto(x_a + k_a·E_ax/100 + 0.1, y_a - 0.1, "0.5·Ea = 56.2 / 48.6", 2.4, "i", estilo = "rojo")
+#  flecha(x_s + 0.2, y_s + S_z/100, x_s, y_s, "rojo")
+#  flecha(x_s + S_x/100, y_s, x_s, y_s, "rojo")
+#  flecha(-F_ff/100 - 0.3, y_ff, 0, y_ff, "verde")
+#  carga(w_s, 0, 0, 0, s_b/100, s_b/100, "", "azul", n = 7)
+#  texto(w_s/2, -1.3, "presión {r_sb} kPa en {r_ws} m", 2.4, "c", estilo = "azul")
+#  cota(0, -1.7, 1.40, -1.7, -0.05, "1.40")
+#  cota(0, -2.1, 2.18, -2.1, -0.05, "2.18")
+#  cota(0, -2.5, 3.01, -2.5, -0.05, "3.01")
+#  cota(0, -2.9, 3.5, -2.9, -0.05, "3.50")
+#  cota(-0.6, 0, -0.6, 2.43, 0.1, "2.43")
+#  cota(-1.3, 0, -1.3, 2.11, 0.1, "2.11")
+#  cota(-2.0, 0, -2.0, 6, 0.1, "6.00")
+#fin
+#: **Qué dice cada número.** Con los brazos de las cotas, M_{res} = @{t_Mr} tonf·m/m (verticales × brazo) contra M_{ovr} = @{t_Mo} tonf·m/m (horizontales × altura − resistencia frontal): FS al vuelco = @{r_FSo}. El deslizamiento (FS = @{r_FSs}) compara el rozamiento N·tan φ + c·(b − 2e) con la suma de horizontales. La normal se corre e = @{r_eb} m del centro hacia el frente y la presión se concentra en @{r_ws} m de los 3.50 m de la base.
+
 ## 7 · Hekatan contra GEO5
 
 #hide

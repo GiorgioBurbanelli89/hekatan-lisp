@@ -669,7 +669,16 @@ M_fem = max(Pf(4), Pf(5)) 'momento de voladizo por unidad de ancho (FEM) [kN·m/
 t_fem = 1000·sqrt(4·M_fem/(0.9·F_y)) 'espesor necesario (FEM) [mm]
 M_aisc = max(A_r(6), A_r(7)) 'momento de voladizo por unidad de ancho (AISC) [kN·m/m]
 #: **Qué dice cada método.** AISC: bloque uniforme de presión sobre la longitud de apoyo Y y, si e > e_crít, tracción en los pernos. Elementos finitos: la placa se deforma, la presión es lineal y los pernos se activan a medida que la placa los levanta. Los dos dan el espesor con la misma regla (voladizo plástico t² F_y/4 = M).
-#: **Qué comprobó Abaqus.** Con el mismo modelo, los pernos, el hormigón, los desplazamientos y las fuerzas de soldadura del modelo por elementos finitos coinciden con Abaqus (registro de la hoja); la diferencia con AISC es de método, no de cálculo.
+#: **Comparación con otros dos programas** (mismo modelo: mismos 161 nudos, mismas cargas, hormigón solo a compresión y pernos solo a tracción). **Abaqus**: cáscara S4 y muelles no lineales, corrido por línea de órdenes. **IDEA StatiCa**: su solver de elementos finitos CBFEM (k2fem64, cáscara CQUAD4 y contacto con elementos gap), corrido sin conexión y sin su programa; **no es el modelo propio de IDEA de la conexión**, es su solver con este mismo modelo. La columna de la hoja es el cálculo de arriba; las otras dos se dan como referencia, no se usan en el cálculo.
+#: - **Tracción total de los pernos** (kN): hoja 56.96 · Abaqus 57.07 · IDEA 57.45 · AISC 0 (supone la placa rígida y sin despegue: e < e_crít)
+#: - **Reacción total del hormigón** (kN): hoja 356.96 · Abaqus 357.07 · IDEA 357.45
+#: - **Flecha máxima hacia arriba de la placa** (mm): hoja 0.2869 · Abaqus 0.2939 · IDEA 0.2957
+#: - **Flecha máxima hacia abajo de la placa** (mm): hoja -0.1598 · Abaqus -0.1607 · IDEA -0.1648
+#: - **Elevación del perno más cargado** (mm): hoja 0.1153 · Abaqus 0.1155 · IDEA 0.1162
+#: - **Equilibrio vertical** (suma de reacciones, con N = 300 kN): hoja 300.000 · Abaqus 300.000 · IDEA 300.0006
+#: - **Tensión de Von Mises máxima en la placa** (MPa): hoja 105.20 · Abaqus 103.34
+#: - **Fuerza de soldadura máxima por nudo** (kN): hoja 81.96 · Abaqus 81.47
+#: Los tres modelos de elementos finitos coinciden dentro de 1 % en las fuerzas (pernos, hormigón, soldadura) y de 3 % en la flecha máxima; las diferencias salen de la formulación de la cáscara de cada programa. **AISC es de otra familia**: sin despegue de la placa no hay tracción en los pernos y el momento de voladizo es el de la sección 16 (M_aisc), más del doble del que da la cáscara.
 
 ## 13 · La unión dibujada
 
@@ -876,6 +885,115 @@ v_f = zeros(0, 2)
 ## 15 · Resumen
 
 #: Con N = 300 kN y M = 40 kN·m (excentricidad 0.133 m, mayor que N/6 = 0.067 m de la placa): la placa **se despega** por el lado traccionado, los pernos de ese lado trabajan, y el hormigón del lado comprimido soporta la carga concentrada. Por elementos finitos hacen falta menos milímetros de placa que por AISC, porque AISC supone un bloque plano de presión; AISC es más conservador.
+
+## 16 · Del símbolo al número: la franja de placa como viga de elementos finitos
+
+#: **Qué es.** El método de AISC trata el voladizo de la placa como una **viga empotrada en la cara del tubo** con la presión del hormigón como carga. Aquí esa viga se resuelve **por elementos finitos**: primero **todo en símbolos** (el motor deduce las funciones de forma, la curvatura, la rigidez y la solución, sin ningún dato de la placa) y después **con los números** de esta hoja, con gráficas. Es la reducción a una dimensión de la cáscara de las secciones 2 a 8; la cáscara en sí ya se calculó con números.
+
+### 16.1 · En símbolos: el elemento empotrado-libre
+#: El elemento mide L. Se mide x desde el empotramiento y se normaliza (de 0 a 1). Como en el empotramiento la flecha y el giro valen cero, la flecha es la suma de dos potencias, x² y x³. Sus dos coeficientes salen de las dos condiciones del extremo libre: flecha w y giro θ (la fila del giro va dividida por L):
+A_c = Simplify{[1, 1; 2/L, 3/L]}
+#: La inversa son los coeficientes de las dos funciones de forma (cada columna es una función):
+C_c = Simplify{inv(A_c)}
+#: Las funciones de forma (flecha por cada unidad de w y de θ en el extremo libre):
+Phi_c = Simplify{[x^2, x^3]*C_c}
+#: La curvatura es la segunda derivada de la flecha (el motor deriva cada potencia dos veces; el 1/L² pasa de x normalizada a x real):
+d2p_c = [Partial{Partial{x^2 @ x} @ x}, Partial{Partial{x^3 @ x} @ x}]
+B_c = Simplify{d2p_c*C_c*(1/L^2)}
+#: **La rigidez** es la energía de flexión: K = EI·∫ Bᵀ·B dx sobre la longitud L. El motor integra con L y EI como letras:
+K_c = Simplify{EI*L*Integral{transpose(B_c)*B_c @ x = 0 : 1}}
+#: **La carga.** Una presión uniforme q (carga por metro de ancho) se reparte a los nudos con las mismas funciones de forma, F = q·L·∫ Φᵀ dx:
+F_c = Simplify{q*L*Integral{transpose(Phi_c) @ x = 0 : 1}}
+#: **La solución.** Se resuelve K·u = F, también en símbolos. Salen la flecha y el giro del borde libre de la placa, fórmulas exactas de un voladizo con carga uniforme:
+u_c = Simplify{inv(K_c)*F_c}
+#: **El momento en el empotramiento** (la cara del tubo) sale del equilibrio, M = q·L²/2. Es la fórmula de AISC, M_c = f_p·m²/2: el elemento finito la reproduce exactamente.
+M_c_s = Simplify{q*L^2/2}
+
+### 16.2 · Con los números de la hoja
+#: La presión de contacto es la del método de AISC de la sección 10 (bloque uniforme f_p) y el voladizo es m. Se arma la viga con n elementos iguales: la rigidez del elemento es la deducida arriba, EI/L³·[12, 6L, −12, 6L; …], con L la longitud de cada elemento.
+EI_p = E·t_p^3/(12·(1 - ν^2)) 'rigidez a flexión de la placa por metro de ancho [kN·m]
+q_s = A_r(5) 'presión de contacto por metro de ancho [kN/m]
+L_v = m_c 'voladizo desde la cara del tubo [m]
+#hide
+function R = franja(n, Lv, EI, q)
+  Le = Lv/n
+  nd = 2·(n + 1)
+  Ke = EI/Le^3·[12, 6·Le, -12, 6·Le; 6·Le, 4·Le^2, -6·Le, 2·Le^2; -12, -6·Le, 12, -6·Le; 6·Le, 2·Le^2, -6·Le, 4·Le^2]
+  Fe = q·Le·[0.5; Le/12; 0.5; -Le/12]
+  K0 = zeros(nd, nd)
+  F0 = zeros(nd, 1)
+  for e = 1:n
+    for i = 1:4
+      F0(2·(e - 1) + i) = F0(2·(e - 1) + i) + Fe(i)
+      for j = 1:4
+        K0(2·(e - 1) + i, 2·(e - 1) + j) = K0(2·(e - 1) + i, 2·(e - 1) + j) + Ke(i, j)
+      end
+    end
+  end
+  Kb = K0
+  Fb = F0
+  for i = 1:2
+    for j = 1:nd
+      Kb(i, j) = 0
+      Kb(j, i) = 0
+    end
+    Kb(i, i) = 1
+    Fb(i) = 0
+  end
+  Ug = clsolve(Kb, Fb)
+  R = zeros(n + 1, 3)
+  Re = K0·Ug - F0
+  for k = 1:n + 1
+    R(k, 1) = (k - 1)·Le
+    R(k, 2) = Ug(2·k - 1)
+  end
+  R(1, 3) = abs(Re(2))
+  for e = 1:n
+    ue = zeros(4, 1)
+    for i = 1:4
+      ue(i) = Ug(2·(e - 1) + i)
+    end
+    me = Ke·ue - Fe
+    R(e + 1, 3) = abs(me(4))
+  end
+end
+w_ex = zeros(21, 2)
+m_ex = zeros(21, 2)
+for s = 1:21
+  xx = (s - 1)·L_v/20
+  w_ex(s, 1) = xx
+  w_ex(s, 2) = 1000·q_s·xx^2·(6·L_v^2 - 4·L_v·xx + xx^2)/(24·EI_p)
+  m_ex(s, 1) = xx
+  m_ex(s, 2) = q_s·(L_v - xx)^2/2
+end
+F_4 = franja(4, L_v, EI_p, q_s)
+W_4 = zeros(5, 2)
+M_4 = zeros(5, 2)
+for k = 1:5
+  W_4(k, 1) = F_4(k, 1)
+  W_4(k, 2) = 1000·F_4(k, 2)
+  M_4(k, 1) = F_4(k, 1)
+  M_4(k, 2) = F_4(k, 3)
+end
+Mr_n = zeros(4, 1)
+nn_v = [1, 2, 4, 8]
+for k = 1:4
+  Rk = franja(nn_v(k), L_v, EI_p, q_s)
+  Mr_n(k) = Rk(1, 3)
+end
+#show
+M_exacto = q_s·L_v^2/2 'momento en la cara del tubo, fórmula de AISC [kN·m/m]
+w_exacto = 1000·q_s·L_v^4/(8·EI_p) 'flecha del borde libre, fórmula simbólica [mm]
+w_fe = W_4(5, 2) 'flecha del borde libre por elementos finitos, 4 elementos [mm]
+M_fe_1 = Mr_n(1) 'momento en la cara del tubo con 1 elemento [kN·m/m]
+M_fe_4 = Mr_n(3) 'con 4 elementos [kN·m/m]
+M_fe_8 = Mr_n(4) 'con 8 elementos [kN·m/m]
+#: **Gráfica 4. La flecha del voladizo de la placa** (mm; x desde la cara del tubo). Puntos naranjas: los 5 nudos de la viga de elementos finitos (4 elementos); azules: la fórmula exacta. Pasa el cursor sobre la gráfica para leer x y la flecha.
+#fplot(Exacta = w_ex, FEM = W_4, [0 0.10500000000000001])
+#: **Gráfica 5. El momento flector** (kN·m por metro de ancho) en cada nudo. Puntos naranjas: elementos finitos (momento de extremo de elemento); azules: q·(L − x)²/2. En x = 0 está el momento de AISC.
+#fplot(Exacta = m_ex, FEM = M_4, [0 0.10500000000000001])
+#: **Qué dice la comparación.** La viga de elementos finitos da en la cara del tubo **{M_exacto} kN·m/m**, el mismo momento de AISC (sección 10), con 1, 2, 4 u 8 elementos: la cúbica de Hermite es exacta para carga uniforme. En cambio la cáscara de las secciones 2 a 8 da M_fem de la sección 12, bastante menor: la presión real bajo la placa **no es uniforme** (es más baja junto al tubo, que rigidiza la placa) y la placa apoya también sobre las paredes del tubo; por eso AISC es conservador. La diferencia es de modelo, no de cálculo.
+
 #: Los 966 desplazamientos y giros (u_x, u_y, u_z, θ_x, θ_y, θ_z de cada nudo, en m y rad) para compararlos con Abaqus:
 U_f = U 'desplazamientos y giros de los 161 nudos
 sig_el_f = sig_el 'tensión de Von Mises en el centro de cada elemento de la placa [MPa]

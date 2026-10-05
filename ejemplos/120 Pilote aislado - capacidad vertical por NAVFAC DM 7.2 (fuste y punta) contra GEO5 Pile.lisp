@@ -76,6 +76,20 @@ R_si = [R_s1a, R_s1b, R_s2] 'fuste de cada tramo, sin factores [kN]
 R_sid = R_si/gamma_s 'fuste de cada tramo, de cálculo [kN]
 #tabla("Tramo","Desde [m]:2","Hasta [m]:2","Suelo","Rozamiento unitario [kPa]:2","R_si sin factor [kN]:2","R_si de cálculo [kN]:2")({"1","2","3"}; z_de; z_a; {"arcilla (α·cu)","arcilla (α·cu)","arena (K·σ·tanδ)"}; q_si; R_si; R_sid)
 
+## 3b · Gráfica: cuánto fuste aporta cada metro de pilote
+
+#: **Cómo se lee.** Eje x: profundidad z desde la cabeza [m]. Eje y: resistencia del fuste acumulada hasta esa profundidad R_{s}(z) [kN], sin factores. Los **puntos** son el cálculo de Hekatan (cada 0.5 m) y el **punto aislado** es el R_{su} de la tabla de arriba. La curva tiene **dos pendientes**: en los primeros 6 m (arcilla) crece con la adherencia constante α·c_{u} = 30 kPa; a partir de ahí (arena) la pendiente **baja** porque el rozamiento unitario de la arena es solo 9.50 kPa (la profundidad crítica de 1 m le impide crecer con la presión del terreno). El **quiebre** a los 6 m es el contacto arcilla-arena del dibujo.
+#hide
+Rz = zeros(25, 2)
+for j = 1:25
+  zj = (j - 1)·0.5
+  Rz(j, 1) = zj
+  Rz(j, 2) = q_s1·u_p·min(zj, h_1) + q_s2·u_p·max(zj - h_1, 0)
+end
+#show
+#fplot(Fuste = Rz, R_su = [12 R_su], [0 12])
+#: Esta curva dice también **dónde conviene empotrar**: los 6 m de arcilla dan casi todo el fuste; los 6 m de arena apenas añaden lo que se ve en la pendiente final. La **punta** (sección 4) suma una sola vez, al final, y es la mayor parte de la resistencia total.
+
 ## 4 · Punta (R_b)
 
 #: El suelo bajo la punta es la arena (no cohesiva). Ayuda de GEO5: R_{b} = σ_{efb}·N_{q}·A_{b}, con N_{q} = 10 escrito a mano (la tabla de la ayuda da 10 para pilotes preexcavados con φ = 30°).

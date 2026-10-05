@@ -58,7 +58,7 @@ T_act = W_z·sin(a_r) - F_a·cos(a_r + b_r) 'fuerza que empuja el bloque [kN/m]
 ## 3 · Qué hace la ondulación
 
 #: **El ángulo de ondulación.** Si la superficie sube y baja alrededor del plano medio (inclinación α), con tramos de inclinaciones α_{i}, la ayuda de GEO5 lo define como ν = α − min(α_{i}): cuánto se aparta del plano medio el tramo más tendido. Es el ángulo que el bloque tiene que «remontar». Aquí GEO5 lo pide directamente: ν = 15°.
-#dibujo("La diaclasa ondulada: el bloque desliza a lo largo del plano medio pero tiene que remontar cada onda con el ángulo ν", ud = m, escala = auto, alto = 110)
+#dibujo("La diaclasa ondulada: el bloque desliza a lo largo del plano medio pero tiene que remontar cada onda con el ángulo ν", ud = m, cotas = m, escala = auto, alto = 110)
 #  linea(0, 0, 12, 0, "trazos gris")
 #  polilinea([0, 1.5, 3, 4.5, 6, 7.5, 9, 10.5, 12], [0, 0.4, 0, 0.4, 0, 0.4, 0, 0.4, 0], "gruesa rojo")
 #  rect(3.6, 0.42, 3.0, 1.4, "media")
@@ -70,6 +70,9 @@ T_act = W_z·sin(a_r) - F_a·cos(a_r + b_r) 'fuerza que empuja el bloque [kN/m]
 #  linea(6, 0, 7.5, 0, "fina")
 #  texto(7.6, 0.05, "plano medio (α)", 2.4, "i", estilo = "gris")
 #  texto(6.35, 0.17, "ν", 3.0, "c", estilo = "rojo")
+#  cota(0, -1.0, 3, -1.0, -0.05, "longitud de onda 3.0 m")
+#  cota(12.4, 0, 12.4, 0.4, 0.05, "0.4")
+#  cota(3.6, 2.05, 6.6, 2.05, 0.05, "bloque 3.0 m")
 #fin
 #: **El aumento de resistencia** (ayuda de GEO5, fórmula de la página «Undulated Slip Surface»): la ondulación suma a la tensión de corte resistente
 #: Δτ = σ_{n}·tan ν

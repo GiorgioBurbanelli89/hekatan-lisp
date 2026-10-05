@@ -250,6 +250,42 @@ t_Hr = round(H_res/9.80665, 2)
 #show
 #: **En tonf** (por metro de muro): empuje horizontal @{t_Ea} tonf/m, M_{res} = @{t_Mr} y M_{ovr} = @{t_Mo} tonf·m/m, H_{res} = @{t_Hr} tonf/m, presión en la base @{t_sb} tonf/m².
 
+## 9b · El cuerpo libre: las cinco fuerzas, sus brazos y la presión en la base
+
+#: **Cómo se lee el dibujo.** Es el muro del Demo01 a escala, en metros, con el origen en la **punta** de la zapata (la esquina de abajo a la izquierda): las fuerzas de la tabla de la sección 6 puestas donde actúan. **Naranja:** el peso del muro W (con el del dentellón) y el peso de la cuña de tierra W_{c}, verticales hacia abajo, en sus centros de gravedad. **Rojo:** el empuje activo de Coulomb, que se descompone en una parte **horizontal** E_{ax} (hacia la punta: tiende a **volcar** y a **deslizar** el muro) y una **vertical** E_{az} (hacia abajo: ayuda a estabilizar porque el relleno roza el muro), y la fuerza de 30 kN/m de la coronación. **Azul debajo de la base:** la presión del suelo sobre la zapata, que GEO5 reparte **uniforme** en el ancho comprimido (la base menos el doble de la excentricidad). Escala de flechas: 1 m = 100 kN; de la presión: 1 m = 100 kPa.
+x_R = B_z/2 - e_b 'dónde cae la resultante desde la punta (excentricidad hacia la punta) [m]
+w_s = L_b - 2·e_b 'ancho comprimido de la base [m]
+r_FSo = round(FS_o, 2) 'FS al vuelco, para el rótulo
+r_eb = round(e_b, 2) 'excentricidad, para el rótulo
+r_ws = round(w_s, 2) 'ancho comprimido, para el rótulo
+r_sb = round(s_b, 1) 'presión en la base, para el rótulo
+#dibujo("Cuerpo libre del muro del Demo01: fuerzas de la tabla de GEO5, brazos y presión en la base", ud = m, escala = auto, cotas = m, ancho = 180, alto = 190)
+#  poligono(0, 0, 3.6, 0, 3.6, -0.2, 4.1, -0.2, 4.1, 0.6, 1.6, 0.6, 1.6, 5.6, 1.4, 5.6, 1.0, 0.6, 0, 0.6, "gruesa")
+#  achurado(0, 0, 4.1, 0.6, "concreto")
+#  poligono(x_t, h_z, B_z, h_z, x_t, y_T, "verde tenue")
+#  linea(x_t, y_T, B_z, h_z, "trazos verde")
+#  flecha(x_m, y_m + W_m/100, x_m, y_m, "naranja")
+#  texto(x_m - 0.1, y_m + W_m/100 + 0.2, "W = 104.9 kN/m", 2.4, "d", estilo = "naranja")
+#  flecha(x_c, y_c + W_c/100, x_c, y_c, "naranja")
+#  texto(x_c + 0.15, y_c + W_c/100 - 0.1, "Wc = 99.2 kN/m", 2.4, "i", estilo = "naranja")
+#  flecha(x_a, y_a + E_az/100, x_a, y_a, "rojo")
+#  texto(x_a + 0.15, y_a + E_az/100 - 0.2, "Eaz = 118.7", 2.4, "i", estilo = "rojo")
+#  flecha(x_a + E_ax/100, y_a, x_a, y_a, "rojo")
+#  texto(x_a + E_ax/100 + 0.1, y_a + 0.2, "Eax = 84.3 kN/m", 2.4, "i", estilo = "rojo")
+#  flecha(1.6 + F_1/100 + 0.4, y_F, 1.6, y_F, "rojo")
+#  texto(2.35, y_F + 0.3, "F = 30 kN/m", 2.4, "i", estilo = "rojo")
+#  carga(w_s, 0, 0, 0, s_b/100, s_b/100, "", "azul", n = 7)
+#  circulo(x_R, 0, 0.07, "verde relleno")
+#  texto(x_R, -1.0, "resultante", 2.4, "c", estilo = "verde")
+#  cota(0, -1.35, 1.80, -1.35, -0.05, "1.80")
+#  cota(0, -1.75, 2.44, -1.75, -0.05, "2.44")
+#  cota(0, -2.15, 3.26, -2.15, -0.05, "3.26")
+#  cota(0, -2.55, B_z, -2.55, -0.05, "4.10")
+#  cota(-0.5, 0, -0.5, y_a, 0.1, "1.65")
+#  cota(-1.3, 0, -1.3, y_F, 0.1, "5.80")
+#fin
+#: **Cómo se calculan el vuelco y el deslizamiento con este dibujo.** El **vuelco** es girar alrededor de la punta (origen): cada fuerza vertical multiplicada por su brazo horizontal (las cotas de abajo: 1.80, 2.44 y 3.26 m) da el momento **resistente**; cada fuerza horizontal por su altura (1.65 m el empuje, 5.80 m la fuerza de la coronación) da el momento **volcador**. Su cociente es FS = @{r_FSo}. El **deslizamiento** compara el rozamiento de la base (N·tan φ más la adherencia) con la fuerza que empuja a lo largo de ella. La **excentricidad** e = @{r_eb} m es lo que se corre la resultante del centro de la base hacia la punta; la presión se concentra en el ancho w = @{r_ws} m y vale @{r_sb} kPa, que se compara con la capacidad portante de 180 kPa.
+
 ## 10 · Hekatan contra GEO5
 
 #hide

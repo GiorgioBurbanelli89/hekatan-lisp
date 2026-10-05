@@ -118,9 +118,17 @@ namespace HekatanLisp
 
         // resuelve UN token de columna: {"a","b"} texto · [1,2,3] vector literal · nombre = variable
         // YA definida en la hoja (busca la PRIMERA línea etiquetada con ese nombre y su resOf).
-        private static TablaCol ResolveTablaColumn(string tok, string[] labels, string[] resOf)
+        private static TablaCol ResolveTablaColumn(string tok, string[] labels, string[] resOf, Func<string, List<LispConverter.N>> numSel = null)
         {
             tok = (tok ?? "").Trim();
+            // hoja #numerico: el nombre (o la selección P(1:3, 2)) se busca en lo que calculó el programa;
+            // labels/resOf son del modo simbólico y ahí están vacíos → antes salía el texto «a» tal cual
+            if (numSel != null && !tok.StartsWith("[") && !tok.StartsWith("{"))
+            {
+                var sel = numSel(tok);
+                if (sel != null && sel.Count > 0)
+                    return new TablaCol { IsText = false, RawNum = sel.Select(it => it.IsAtom ? it.Atom : LispConverter.ToLisp(it)).ToList() };
+            }
             if (tok.Length >= 2 && tok[0] == '{' && tok[tok.Length - 1] == '}')
             {
                 var items = SplitTopQ(tok.Substring(1, tok.Length - 2), ',')
@@ -147,10 +155,10 @@ namespace HekatanLisp
         }
 
         // arma la tabla de resultados completa (columnas resueltas + broadcast de escalares + HTML).
-        private static string BuildTablaResultados(TablaSpec spec, string[] labels, string[] resOf)
+        private static string BuildTablaResultados(TablaSpec spec, string[] labels, string[] resOf, Func<string, List<LispConverter.N>> numSel = null)
         {
             if (spec == null) return "";
-            var cols = spec.ColTokens.Select(t => ResolveTablaColumn(t, labels, resOf)).ToList();
+            var cols = spec.ColTokens.Select(t => ResolveTablaColumn(t, labels, resOf, numSel)).ToList();
             int nCols = Math.Min(spec.Headers.Count, cols.Count);
             int nRows = 0;
             for (int c = 0; c < nCols; c++)
@@ -437,8 +445,43 @@ namespace HekatanLisp
                     if (v == "x" || ValorDeNombre(v, byName, 0) == null) protegidos.Add(v);
             sel = sel.Select(p => (p.Item1, ResolverNombres(p.Item2, byName, protegidos, null))).ToList();
             string var = forcedVar ?? (sel.Count > 0 ? LispConverter.FreeVar(sel[0].Item2) : "x");
-            return LispConverter.PlotSvg(var, lo, hi, sel, dots) ?? "";
+            // AVISO en vez de dibujar vacío o falso: nombres sin valor (además del eje), funciones que la
+            // gráfica no sabe evaluar, o una curva que no da ningún número en todo el rango.
+            var avisos = AvisosCurvas("#fplot", sel, new HashSet<string> { var }, lo, hi);
+            return avisos + (LispConverter.PlotSvg(var, lo, hi, sel, dots) ?? "");
         }
+
+        /// <summary>Avisos ⚠ de una gráfica: nombres sin valor numérico en la hoja (fuera de los ejes),
+        /// funciones que no se saben evaluar y curvas que no dan ningún número. "" si todo está bien.</summary>
+        private static string AvisosCurvas(string que, List<(string, LispConverter.N)> sel, ISet<string> ejes, double lo, double hi)
+        {
+            var faltan = new List<string>(); var fnx = new List<string>(); var vacias = new List<string>();
+            foreach (var (nom, t) in sel)
+            {
+                foreach (var v in LispConverter.VarsOf(t)) if (!ejes.Contains(v) && !faltan.Contains(v)) faltan.Add(v);
+                foreach (var f in LispConverter.FuncionesDesconocidas(t)) if (!fnx.Contains(f)) fnx.Add(f);
+                if (ejes.Count == 1)
+                {
+                    string e = ejes.First(); bool alguno = false;
+                    for (int k = 0; k <= 20 && !alguno; k++)
+                    {
+                        double y = LispConverter.Eval(t, e, lo + (hi - lo) * k / 20);
+                        alguno = !double.IsNaN(y) && !double.IsInfinity(y);
+                    }
+                    if (!alguno) vacias.Add(nom);
+                }
+            }
+            var sb = new StringBuilder();
+            if (faltan.Count > 0) sb.Append(AvisoGrafica(que, faltan));
+            if (fnx.Count > 0) sb.Append(AvisoTexto(que + ": la gráfica no sabe evaluar la función " + string.Join(", ", fnx.Select(LispConverter.OriginalName)) +
+                                                     " (las funciones propias se dibujan con #map o calculando una tabla)"));
+            if (vacias.Count > 0 && faltan.Count == 0 && fnx.Count == 0)
+                sb.Append(AvisoTexto(que + ": " + string.Join(", ", vacias.Select(LispConverter.OriginalName)) + " no da ningún valor numérico en el rango [" +
+                                     lo.ToString("G6", System.Globalization.CultureInfo.InvariantCulture) + " " + hi.ToString("G6", System.Globalization.CultureInfo.InvariantCulture) + "]"));
+            return sb.ToString();
+        }
+        private static string AvisoTexto(string s) =>
+            "<div style=\"color:#c0392b;margin:.4em 0\">⚠ " + System.Net.WebUtility.HtmlEncode(s) + "</div>";
 
         // "x1 y1; x2 y2" (o con comas) → dos vectores. Admite fracciones a/b. Cada fila = un punto.
         private static bool TryPuntos(string body, System.Globalization.CultureInfo inv, out double[] xs, out double[] ys)
@@ -486,7 +529,9 @@ namespace HekatanLisp
                 // #fplot no la encontraba y dibujaba la recta y = ξ.
                 // la línea trae detrás su descripción/unidad tras un separador de control (DescSep…):
                 // «a = 6␅largo de la losa» daba el átomo «6largo» y a no valía 6 en las gráficas
-                int corte = raw.IndexOfAny(new[] { LispConverter.DescSep, '\x06', '\x1f' });
+                // y la UNIDAD (UnitSep) y la etiqueta @@(…) (DeqSep): «a = 3000␄kN␅carga» o «Nb = x␂(N₂)» no se
+                // cortaban → el nombre no valía su número o el árbol era el átomo «xN₂»: curva vacía, sin aviso
+                int corte = raw.IndexOfAny(new[] { LispConverter.DeqSep, LispConverter.UnitSep, LispConverter.DescSep, '\x06', '\x1f' });
                 var m = System.Text.RegularExpressions.Regex.Match((corte >= 0 ? raw.Substring(0, corte) : raw).Trim(),
                     @"^(?:\(([A-Za-z][\w']*)\s[^()]*\)|([A-Za-z][\w']*)(?:\s*\([^()=]*\))?)\s*=\s*(?![=])(.+)$");
                 if (!m.Success) continue;
@@ -727,6 +772,29 @@ namespace HekatanLisp
                     f = ResolverNombres(f, byName, new HashSet<string>(ejes), faltanS);
                     if (faltanS.Count > 0) { outList.Add(AvisoGrafica("#" + kw, faltanS)); continue; }
                     string vx = ejes.Count > 0 ? ejes[0] : "x", vy = ejes.Count > 1 ? ejes[1] : "y";
+                    // #map(y, …): el único eje es y → x es el otro (antes vx = vy = "y": clave repetida y el mapa no salía)
+                    if (vx == vy) vx = vy == "x" ? "y" : "x";
+                    if (ejes.Count == 1 && ejes[0] == "y") { vx = "x"; vy = "y"; }
+                    // funciones que no sabe evaluar (antes atan/sign/min devolvían el argumento) o una
+                    // superficie sin ningún número en el rango → AVISO, no una superficie falsa o plana
+                    var fnS = LispConverter.FuncionesDesconocidas(f);
+                    if (fnS.Count > 0)
+                    {
+                        outList.Add(AvisoTexto("#" + kw + ": la gráfica no sabe evaluar la función " + string.Join(", ", fnS.Select(LispConverter.OriginalName)) +
+                                               (isMap ? " (en una hoja #numerico la calcula el programa: aquí no llegó su rejilla; mira el aviso del cálculo)"
+                                                      : " (las funciones propias se dibujan con #map o calculando una tabla)")));
+                        continue;
+                    }
+                    bool algunoS = false;
+                    for (int i = 0; i <= 10 && !algunoS; i++)
+                        for (int j = 0; j <= 10 && !algunoS; j++)
+                        {
+                            double z;
+                            try { z = SurfacePlot.Eval(f, new Dictionary<string, double> { [vx] = xa + (xb - xa) * i / 10, [vy] = ya + (yb - ya) * j / 10 }); }
+                            catch { z = double.NaN; }
+                            algunoS = !double.IsNaN(z) && !double.IsInfinity(z);
+                        }
+                    if (!algunoS) { outList.Add(AvisoTexto("#" + kw + ": " + (spec ?? "") + " no da ningún valor numérico en el rango")); continue; }
                     string enc = System.Net.WebUtility.HtmlEncode(spec ?? "");
                     try
                     {
@@ -846,6 +914,8 @@ namespace HekatanLisp
                 var faltan = new List<string>();
                 var fr = ResolverNombres(s.f, byName, new HashSet<string>(ejes), faltan);
                 if (faltan.Count > 0) return AvisoGrafica("#anim", faltan);
+                var fnA = LispConverter.FuncionesDesconocidas(fr);
+                if (fnA.Count > 0) return AvisoTexto("#anim: la gráfica no sabe evaluar la función " + string.Join(", ", fnA.Select(LispConverter.OriginalName)));
                 fs.Add(fr);
             }
             var labels = specs.Select(s => s.lbl).ToList();
@@ -1469,11 +1539,88 @@ dib();})();";
             catch { return null; }
         }
 
+        /// <summary>El literal de A(i) / A(i, j) (índices desde 1; un índice puede ser un nombre de la hoja).</summary>
+        private string ElementoLiteral(System.Text.RegularExpressions.Match mel, int linea, string[] srcLines)
+        {
+            var sel = SeleccionNum(mel.Value, linea, srcLines, out _);
+            if (sel == null || sel.Count != 1) return null;
+            var el = sel[0];
+            return el == null ? null : (el.IsAtom ? el.Atom : LispConverter.ToLisp(el));
+        }
+
+        /// <summary>Lo que la hoja numérica calculó para «tok»: un nombre (vector o matriz de una fila/columna)
+        /// o una selección A(i), A(i, j), A(:, j), A(a:b, j), A(i, end)… con índices desde 1, como en la hoja.
+        /// Devuelve los elementos en orden (por columnas) o null si no se puede. nFilas = filas de lo seleccionado.</summary>
+        private List<LispConverter.N> SeleccionNum(string tok, int linea, string[] srcLines, out int nFilas)
+        {
+            nFilas = 0;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            tok = (tok ?? "").Trim();
+            var m = System.Text.RegularExpressions.Regex.Match(tok, @"^([A-Za-z_]\w*)\s*(?:\(\s*([^,()]+?)\s*(?:,\s*([^,()]+?)\s*)?\))?$");
+            if (!m.Success) return null;
+            var lit = NumLiteral(m.Groups[1].Value, linea, srcLines);
+            if (lit == null) return null;
+            LispConverter.N t;
+            try { t = LispConverter.ParseLisp(lit); } catch { return null; }
+            if (t == null) return null;
+            // a rejilla filas × columnas (un vector es una columna)
+            var filas = t.Op == "vec" || t.Op == "mat" ? t.Items : new List<LispConverter.N> { t };
+            bool esMatriz = filas.Count > 0 && filas.All(r => r != null && (r.Op == "vec" || r.Op == "mat"));
+            List<List<LispConverter.N>> G = esMatriz ? filas.Select(r => r.Items).ToList()
+                                          : filas.Select(x => new List<LispConverter.N> { x }).ToList();
+            int nf = G.Count, nc = nf == 0 ? 0 : G.Max(r => r.Count);
+            if (nf == 0 || nc == 0) return null;
+            int? Uno(string q, int n)
+            {
+                q = q.Trim();
+                if (q == "end") return n;
+                if (int.TryParse(q, System.Globalization.NumberStyles.Integer, inv, out var k)) return k;
+                var lv = NumLiteral(q, linea, srcLines);
+                return lv != null && double.TryParse(lv, System.Globalization.NumberStyles.Float, inv, out var d) && Math.Abs(d - Math.Round(d)) < 1e-9 ? (int)Math.Round(d) : (int?)null;
+            }
+            List<int> Rango(string s, int n)
+            {
+                s = (s ?? "").Trim();
+                if (s == ":") return Enumerable.Range(1, n).ToList();
+                var p = s.Split(':');
+                if (p.Length == 1) { var k = Uno(p[0], n); return k == null ? null : new List<int> { k.Value }; }
+                if (p.Length == 2) { var a = Uno(p[0], n); var b = Uno(p[1], n); if (a == null || b == null || b < a) return null; return Enumerable.Range(a.Value, b.Value - a.Value + 1).ToList(); }
+                return null;
+            }
+            LispConverter.N En(int r, int c) => r >= 1 && r <= nf && c >= 1 && c <= G[r - 1].Count ? G[r - 1][c - 1] : null;
+            var o = new List<LispConverter.N>();
+            if (!m.Groups[2].Success)
+            {   // el nombre solo: vector o matriz de una fila/columna
+                if (nf > 1 && nc > 1) return null;
+                for (int r = 1; r <= nf; r++) for (int c = 1; c <= nc; c++) o.Add(En(r, c));
+                nFilas = o.Count;
+            }
+            else if (!m.Groups[3].Success)
+            {   // un índice: lineal por columnas (MATLAB); en un vector, su k-ésimo elemento
+                var ks = Rango(m.Groups[2].Value, nf * nc);
+                if (ks == null) return null;
+                foreach (var k in ks) { if (k < 1 || k > nf * nc) return null; o.Add(En((k - 1) % nf + 1, (k - 1) / nf + 1)); }
+                nFilas = o.Count;
+            }
+            else
+            {
+                var rs = Rango(m.Groups[2].Value, nf); var cs = Rango(m.Groups[3].Value, nc);
+                if (rs == null || cs == null) return null;
+                foreach (var c in cs) foreach (var r in rs) o.Add(En(r, c));
+                nFilas = rs.Count;
+            }
+            return o.Any(x => x == null) ? null : o;
+        }
+
         /// <summary>El literal LISP del valor de «name» visto desde la línea «linea» (ver NumInline).</summary>
         private string NumLiteral(string name, int linea, string[] srcLines = null)
         {
             if (_numRes == null || string.IsNullOrWhiteSpace(name)) return null;
             name = name.Trim();
+            // UN ELEMENTO: @{P(1, 2)}, @{v(3)}, @{P(i, 2)} con i de la hoja (índices desde 1, como en la hoja).
+            // Antes solo se buscaban nombres y el texto salía «@{P(1, 2)}» literal.
+            var mel = System.Text.RegularExpressions.Regex.Match(name, @"^([A-Za-z_]\w*)\s*\(\s*([^,()]+?)\s*(?:,\s*([^,()]+?)\s*)?\)$");
+            if (mel.Success) return ElementoLiteral(mel, linea, srcLines);
             string mang = LispConverter.MangleExpr(name);
             int mejor = -1;
             foreach (var kv in _numRes.Nombre)
@@ -2039,7 +2186,9 @@ dib();})();";
                 }
                 if (isTabla[i])   // #tabla(headers)(cols): resuelve las columnas YA calculadas (labels/resOf)
                 {
-                    string tblHtml = BuildTablaResultados(tablaSpecOf[i], labels, resOf);
+                    int iTab = i;
+                    string tblHtml = BuildTablaResultados(tablaSpecOf[i], labels, resOf,
+                        _numMode ? (Func<string, List<LispConverter.N>>)(tok => SeleccionNum(tok, iTab, lines, out _)) : null);
                     display.Add(LispConverter.TxtLine("table", "left", tblHtml));
                     continue;
                 }

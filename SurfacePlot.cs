@@ -19,7 +19,8 @@ namespace HekatanLisp
                 var s = n.Atom ?? "";
                 if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) return d;
                 if (v.TryGetValue(s, out var vv)) return vv;
-                return s == "pi" ? Math.PI : s == "e" ? Math.E : 0;
+                // nombre sin valor: NaN (antes 0 → superficie falsa sin aviso; quien grafica avisa)
+                return s == "pi" || s == "π" ? Math.PI : s == "e" ? Math.E : double.NaN;
             }
             switch (n.Op)
             {
@@ -30,13 +31,9 @@ namespace HekatanLisp
                 case "^": case "expt": return Math.Pow(Eval(n.A, v), Eval(n.B, v));
                 case "neg": return -Eval(n.A, v);
                 case "fn":
-                    double a = n.Items != null && n.Items.Count > 0 ? Eval(n.Items[0], v) : 0;
-                    return n.Atom switch
-                    {
-                        "sin" => Math.Sin(a), "cos" => Math.Cos(a), "tan" => Math.Tan(a),
-                        "sqrt" => Math.Sqrt(a), "exp" => Math.Exp(a), "log" or "ln" => Math.Log(a),
-                        "abs" => Math.Abs(a), _ => a
-                    };
+                    // la MISMA tabla que #fplot (antes atan/sign/min devolvían el argumento: gráfica falsa)
+                    var args = (n.Items ?? new List<LispConverter.N>()).Select(it => Eval(it, v)).ToList();
+                    return LispConverter.FnNum(n.Atom, args) ?? double.NaN;
                 default: return 0;
             }
         }

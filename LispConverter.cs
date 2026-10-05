@@ -1237,7 +1237,9 @@ namespace HekatanLisp
             return sb.Append(']').ToString();
         }
 
-        // dibuja UNA cuadrícula con índices en los bordes; cols/rws son los índices a mostrar (-1 = hueco … ⋮ ⋱)
+        // dibuja UNA cuadrícula con índices en los bordes; cols/rws son los índices a mostrar (-1 = hueco … ⋮ ⋱).
+        // Los RÓTULOS van desde 1, como se escribe en la hoja (v(1), A(i, j) con i = 1:n, MATLAB): antes salían
+        // desde 0 y el nudo 1 aparecía como «0». cols/rws siguen siendo posiciones 0-based internas.
         static string IndexedGrid(List<List<N>> rows, List<int> cols, List<int> rws, int ncols, int nrows,
                                   int visC = -1, int visR = -1)
         {
@@ -1272,11 +1274,11 @@ namespace HekatanLisp
             if (showCol)
                 for (int ci = 0; ci < cols.Count; ci++)
                     sb.Append("<span class=\"m-mh\" style=\"grid-row:1;grid-column:").Append(dataCol0 + ci)
-                      .Append("\">").Append(cols[ci] < 0 ? "⋯" : cols[ci].ToString()).Append("</span>");
+                      .Append("\">").Append(cols[ci] < 0 ? "⋯" : (cols[ci] + 1).ToString()).Append("</span>");
             if (showRow)
                 for (int ri = 0; ri < rws.Count; ri++)
                     sb.Append("<span class=\"m-mrh\" style=\"grid-row:").Append(dataRow0 + ri)
-                      .Append(";grid-column:1\">").Append(rws[ri] < 0 ? "⋮" : rws[ri].ToString()).Append("</span>");
+                      .Append(";grid-column:1\">").Append(rws[ri] < 0 ? "⋮" : (rws[ri] + 1).ToString()).Append("</span>");
             sb.Append("<span class=\"m-brk m-brl\" style=\"grid-row:").Append(dataRow0).Append(" / span ")
               .Append(rws.Count).Append(";grid-column:").Append(brkCol).Append("\"></span>");
             sb.Append("<span class=\"m-brk m-brr\" style=\"grid-row:").Append(dataRow0).Append(" / span ")
@@ -1597,6 +1599,22 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             var manos = new List<string>();
             if (t != null && t.IndexOf('☞') >= 0)
                 t = RxMano.Replace(t, m => { manos.Add(ManoGlobo(m.Groups[1].Value, varLookup, isVec, imgSrc)); return "\x07" + (manos.Count - 1) + "\x07"; });
+            // `código` LITERAL (rutas como curso_csi/masa_struct/leido.json) y \_ \* \` \@ \{ \} escapados: se
+            // apartan ANTES de todo; si no, el par _…_ se volvía cursiva y las comillas salían tal cual.
+            var literales = new List<string>();
+            if (t != null && (t.IndexOf('`') >= 0 || t.IndexOf('\\') >= 0))
+            {
+                t = Regex.Replace(t, @"`([^`]+)`", m =>
+                {
+                    literales.Add("<code style=\"font-family:Consolas,'Courier New',monospace;font-size:.92em\">" + System.Net.WebUtility.HtmlEncode(m.Groups[1].Value) + "</code>");
+                    return "\x0e" + (literales.Count - 1) + "\x0e";
+                });
+                t = Regex.Replace(t, @"\\([_*`@{}\\])", m =>
+                {
+                    literales.Add(System.Net.WebUtility.HtmlEncode(m.Groups[1].Value));
+                    return "\x0e" + (literales.Count - 1) + "\x0e";
+                });
+            }
             t = System.Net.WebUtility.HtmlEncode(t ?? "");
             // subindice/superindice EXPLICITOS:  x^{2}  ·  N_{1}  — ANTES que @{expr}/{expr}: si no,
             // "{2}" (sin @ ni ^/_ real) se confunde con el alias de VALOR de abajo y {2} se sustituye
@@ -1647,7 +1665,14 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             t = Regex.Replace(t, @"\*\*([^*]+)\*\*", "<b>$1</b>");
             t = Regex.Replace(t, @"__([^_]+)__", "<b>$1</b>");
             t = Regex.Replace(t, @"\*([^*]+)\*", "<i>$1</i>");
-            t = Regex.Replace(t, @"_([^_]+)_", "<i>$1</i>");
+            // _cursiva_ solo entre palabras (como Markdown): a_b_c o «N_1 y N_2» no son cursiva
+            t = Regex.Replace(t, @"(?<![\p{L}\p{N}])_([^_]+)_(?![\p{L}\p{N}])", "<i>$1</i>");
+            // y tras un SÍMBOLO de una o dos letras es SUBÍNDICE, como en las fórmulas: a_1, θ_B, M_base, K_e, x_CR
+            // (antes «a_1, a_2» daba «a<i>1, a</i>2»). Palabras y nombres de archivo no (sin_traccion, jet_r,
+            // SpreadFooting_5.dll, curso_csi/…): quedan tal cual; lo literal, mejor entre `comillas`.
+            t = Regex.Replace(t, @"(?<![\p{L}\p{N}_])(\p{L}{1,2})_([\p{L}\p{N}]{1,8})(?![\p{L}\p{N}_/\\]|\.\p{L})(?![^<]*>)", "$1<sub>$2</sub>");
+            if (literales.Count > 0)
+                t = Regex.Replace(t, "\x0e(\\d+)\x0e", m => { int k = int.Parse(m.Groups[1].Value); return k < literales.Count ? literales[k] : ""; });
             if (manos.Count > 0)
                 t = Regex.Replace(t, "\x07(\\d+)\x07", m => { int k = int.Parse(m.Groups[1].Value); return k < manos.Count ? manos[k] : ""; });
             return t;
@@ -1664,7 +1689,12 @@ table.hk-obs td:nth-child(3){min-width:22em;}
         // DESCRIPCION de una variable, como en Calcpad:  h = 6m|m 'Altura del objeto
         // Va a la derecha de la linea, en texto normal. Solo dibujo.
         public const char DescSep = '\x05';
+        // Descripción = lo que va tras el ÚLTIMO « '» sin apóstrofes (como siempre: en una línea de varias
+        // columnas «a = 1 'uno ; b = 2 'dos» cada columna lleva la suya). Si eso no casa porque el texto LLEVA
+        // un apóstrofe («'resistencia f'c»), la descripción empieza en el primer « '». Antes esa línea entera
+        // iba al cálculo: «sobra resistencia», la variable valía 0 y todo lo de abajo también.
         static readonly Regex RxDescFinal = new Regex(@"^(?<cuerpo>.*?)\s+'(?<d>[^']*)$", RegexOptions.Compiled);
+        static readonly Regex RxDescConApostrofe = new Regex(@"^(?<cuerpo>.*?)\s+'(?<d>.*)$", RegexOptions.Compiled);
         /// <summary>«# Elemento ShellMITC4 …», «# Cuadratura de Gauss»: '#', espacio, palabra, espacio y otra
         /// palabra = TÍTULO, aunque la primera palabra sea el nombre de una directiva (elemento, gauss, punto…).
         /// Las directivas van pegadas (#elemento(…)) o con paréntesis (#  fila(…)).</summary>
@@ -1674,7 +1704,14 @@ table.hk-obs td:nth-child(3){min-width:22em;}
             cuerpo = linea; desc = null;
             if (string.IsNullOrEmpty(linea)) return false;
             var m = RxDescFinal.Match(linea);
-            if (!m.Success) return false;
+            if (!m.Success)
+            {
+                m = RxDescConApostrofe.Match(linea);
+                if (!m.Success) return false;
+                var c0 = m.Groups["cuerpo"].Value.TrimEnd();
+                // s = 'texto' o disp( 'a b'): la comilla abre una CADENA, no una descripción
+                if (c0.Length == 0 || "=(,[;{".IndexOf(c0[c0.Length - 1]) >= 0) return false;
+            }
             var c = m.Groups["cuerpo"].Value.TrimEnd();
             if (c.Length == 0) return false;
             cuerpo = c; desc = m.Groups["d"].Value.Trim();
@@ -2069,9 +2106,9 @@ function pinta(el){
   var h='',ci,ri;
   if(showCol&&showRow) h+='<span class=""m-mh"" style=""grid-row:1;grid-column:1""></span>';
   if(showCol) for(ci=0;ci<cols.length;ci++)
-    h+='<span class=""m-mh"" style=""grid-row:1;grid-column:'+(dataCol0+ci)+'"">'+(cols[ci]<0?'⋯':cols[ci])+'</span>';
+    h+='<span class=""m-mh"" style=""grid-row:1;grid-column:'+(dataCol0+ci)+'"">'+(cols[ci]<0?'⋯':cols[ci]+1)+'</span>';
   if(showRow) for(ri=0;ri<rws.length;ri++)
-    h+='<span class=""m-mrh"" style=""grid-row:'+(dataRow0+ri)+';grid-column:1"">'+(rws[ri]<0?'⋮':rws[ri])+'</span>';
+    h+='<span class=""m-mrh"" style=""grid-row:'+(dataRow0+ri)+';grid-column:1"">'+(rws[ri]<0?'⋮':rws[ri]+1)+'</span>';
   h+='<span class=""m-brk m-brl"" style=""grid-row:'+dataRow0+' / span '+rws.length+';grid-column:'+brkCol+'""></span>';
   h+='<span class=""m-brk m-brr"" style=""grid-row:'+dataRow0+' / span '+rws.length+';grid-column:'+brkRCol+'""></span>';
   for(ri=0;ri<rws.length;ri++)for(ci=0;ci<cols.length;ci++){
@@ -2174,6 +2211,63 @@ document.addEventListener('mouseup',function(){
                    "</style></head><body>" + help + "</body></html>";
         }
 
+        // ---------- funciones que saben evaluar las GRÁFICAS (#fplot, #surf, #map, #anim) ----------
+        // Una sola tabla para los dos evaluadores (este y SurfacePlot.Eval). Antes cada uno tenía la
+        // suya: en #surf atan/sign/min devolvían el ARGUMENTO (gráfica falsa) y en #fplot atan daba
+        // NaN (curva vacía), las dos SIN aviso. null = función que no conoce → quien grafica avisa.
+        public static double? FnNum(string f, IList<double> a)
+        {
+            int n = a?.Count ?? 0;
+            double x = n > 0 ? a[0] : double.NaN, y = n > 1 ? a[1] : double.NaN;
+            switch (f)
+            {
+                case "min": return n == 0 ? (double?)null : a.Min();
+                case "max": return n == 0 ? (double?)null : a.Max();
+                case "atan2": return n == 2 ? Math.Atan2(x, y) : (double?)null;
+                case "atan" when n == 2: return Math.Atan2(x, y);
+                case "hypot": return n == 2 ? Math.Sqrt(x * x + y * y) : (double?)null;
+                case "mod": return n == 2 ? (y == 0 ? x : x - y * Math.Floor(x / y)) : (double?)null;
+                case "rem": return n == 2 ? (y == 0 ? double.NaN : x - y * Math.Truncate(x / y)) : (double?)null;
+                case "pow": return n == 2 ? Math.Pow(x, y) : (double?)null;
+                case "root": return n == 2 ? Math.Pow(x, 1.0 / y) : (double?)null;
+            }
+            if (n != 1) return null;
+            return f switch
+            {
+                "sin" => Math.Sin(x), "cos" => Math.Cos(x), "tan" => Math.Tan(x),
+                "cot" => 1 / Math.Tan(x), "sec" => 1 / Math.Cos(x), "csc" => 1 / Math.Sin(x),
+                "asin" => Math.Asin(x), "acos" => Math.Acos(x), "atan" => Math.Atan(x), "acot" => Math.Atan(1 / x),
+                "sinh" => Math.Sinh(x), "cosh" => Math.Cosh(x), "tanh" => Math.Tanh(x),
+                "asinh" => Math.Asinh(x), "acosh" => Math.Acosh(x), "atanh" => Math.Atanh(x),
+                "sqrt" => Math.Sqrt(x), "cbrt" => Math.Cbrt(x), "exp" => Math.Exp(x),
+                "log" or "ln" => Math.Log(x), "log10" or "lg" => Math.Log10(x), "log2" => Math.Log2(x),
+                "abs" => Math.Abs(x), "sign" or "sgn" => Math.Sign(x),
+                "floor" => Math.Floor(x + 1e-12), "ceil" or "ceiling" => Math.Ceiling(x - 1e-12),
+                "round" => Math.Round(x, MidpointRounding.AwayFromZero), "trunc" or "fix" => Math.Truncate(x),
+                _ => (double?)null
+            };
+        }
+
+        /// <summary>Funciones de la expresión que las gráficas NO saben evaluar (para el aviso ⚠).</summary>
+        public static List<string> FuncionesDesconocidas(N n)
+        {
+            var o = new List<string>();
+            void Rec(N t)
+            {
+                if (t == null || t.IsAtom) return;
+                if (t.Op == "fn" && t.Atom != null && !o.Contains(t.Atom))
+                {
+                    var prueba = new double[t.Items?.Count ?? 0];
+                    for (int i = 0; i < prueba.Length; i++) prueba[i] = 0.5;
+                    if (FnNum(t.Atom, prueba) == null) o.Add(t.Atom);
+                }
+                Rec(t.A); Rec(t.B);
+                if (t.Items != null) foreach (var it in t.Items) Rec(it);
+            }
+            Rec(n);
+            return o;
+        }
+
         // ---------- evaluador NUMERICO del arbol (para graficar) ----------
         // sustituye la variable por un numero y calcula. Devuelve NaN si hay algo que no sabe evaluar.
         public static double Eval(N n, string var, double x)
@@ -2191,21 +2285,9 @@ document.addEventListener('mouseup',function(){
             if (n.Op == "neg") return -Eval(n.A, var, x);
             if (n.Op == "fn")
             {
-                double a = (n.Items != null && n.Items.Count > 0) ? Eval(n.Items[0], var, x) : double.NaN;
-                // max/min de DOS argumentos (curvas por tramos: la placa base, Y ≥ m o Y < m)
-                if ((n.Atom == "max" || n.Atom == "min") && n.Items != null && n.Items.Count == 2)
-                {
-                    double b2 = Eval(n.Items[1], var, x);
-                    return n.Atom == "max" ? Math.Max(a, b2) : Math.Min(a, b2);
-                }
-                return n.Atom switch
-                {
-                    "sqrt" => Math.Sqrt(a), "sin" => Math.Sin(a), "cos" => Math.Cos(a), "tan" => Math.Tan(a),
-                    "exp" => Math.Exp(a), "log" => Math.Log(a), "abs" => Math.Abs(a),
-                    "floor" => Math.Floor(a + 1e-12), "ceil" => Math.Ceiling(a - 1e-12), "round" => Math.Round(a),
-                    "sign" => Math.Sign(a), "sinh" => Math.Sinh(a), "cosh" => Math.Cosh(a), "tanh" => Math.Tanh(a),
-                    _ => double.NaN
-                };
+                // max/min de varios argumentos (curvas por tramos: la placa base, Y ≥ m o Y < m), atan, sign…
+                var args = (n.Items ?? new List<N>()).Select(it => Eval(it, var, x)).ToList();
+                return FnNum(n.Atom, args) ?? double.NaN;
             }
             double l = Eval(n.A, var, x), r = Eval(n.B, var, x);
             return n.Op switch { "+" => l + r, "-" => l - r, "*" => l * r, "/" => l / r, "^" => Math.Pow(l, r), _ => double.NaN };

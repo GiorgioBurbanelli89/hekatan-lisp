@@ -78,7 +78,7 @@ T_n = 2·pi/omega_n 'periodo propio en X [s]
 f_n = 1/T_n 'frecuencia propia [Hz]
 #: **0.128 s**: el pórtico va y vuelve casi ocho veces por segundo. Es un periodo corto porque la losa se tomó rígida; con vigas reales la rigidez baja (Chopra ec. 1.3.5) y T sube.
 #: Soltado desde u_{0} = 1 cm (eje horizontal: t en s; vertical: u en cm):
-#fplot(u = cos(49.011586*x), [0 0.5])
+#fplot(u = cos(omega_n*x), [0 0.5])
 
 #dibujo("El pórtico de un piso es un oscilador: la losa es m, las columnas son k", ud = m, alto = 110)
 #  linea(-0.5, 0, 6.5, 0, "gruesa")
@@ -104,13 +104,13 @@ xi = 0.05 'fracción de amortiguamiento crítico de la NEC-15
 omega_D = omega_n·sqrt(1 - xi^2) 'frecuencia amortiguada, Chopra ec. 2.2.5 [rad/s]
 #: Con 5 % ω_{D} es casi igual a ω: el amortiguamiento **no cambia el periodo**, apaga la amplitud. La respuesta (Chopra ec. 2.2.4, soltada desde u_{0} sin velocidad):
 #: u(t) = u_{0}·e^{−ξ·ω·t}·[cos(ω_{D}·t) + ξ/√(1 − ξ²)·sen(ω_{D}·t)]
-#fplot(u = exp(-0.05*49.011586*x)*(cos(48.950283*x) + 0.050063*sin(48.950283*x)), envolvente = exp(-0.05*49.011586*x), [0 1])
+#fplot(u = exp(-xi*omega_n*x)*(cos(omega_D*x) + xi*omega_n/omega_D*sin(omega_D*x)), envolvente = exp(-xi*omega_n*x), [0 1])
 #: Eje horizontal: t en s; vertical: u/u_{0}. La curva de arriba es la **envolvente** e^{−ξ·ω·t}: los picos caen sobre ella.
 #: **Otra recta y = m·x + b.** El logaritmo de la envolvente es ln(u) = ln(u_{0}) − ξ·ω·t: una recta con pendiente **−ξ·ω**. Por eso, midiendo en obra dos picos sucesivos, se saca ξ (decremento logarítmico, Chopra ec. 2.2.11: δ ≈ 2·π·ξ).
 p_env = -xi·omega_n 'pendiente de ln(amplitud) contra t [1/s]
 N_50 = 0.11/xi 'ciclos para que la amplitud caiga a la mitad, Chopra ec. 2.2.13
 #: Con ξ = 0 a 20 % (n·5 %), el mismo pórtico:
-#anim fplot(u = exp(-(n/20)*49.011586*x)*cos(49.011586*x), [0 0.5]), n = 0:4
+#anim fplot(u = exp(-(n/20)*omega_n*x)*cos(omega_n*x), [0 0.5]), n = 0:4
 
 ## 6 · La resonancia: cuando la carga va al ritmo de la estructura
 
@@ -126,7 +126,7 @@ R_res = 1/(2·xi) 'amplificación en resonancia con ξ = 5 %
 T_res = T_n 'periodo de la carga que hace entrar en resonancia al pórtico [s]
 #: **Con 5 % el pórtico se mueve 10 veces lo estático.** Por eso importa el periodo del edificio frente al del suelo: un sismo con energía cerca de 0.128 s castiga a este pórtico.
 #: Y no llega de golpe: arrancando del reposo, la amplitud crece ciclo a ciclo hasta ese tope (Chopra ec. 3.2.8). Eje vertical: u/(p_{0}/k); horizontal: t en s.
-#fplot(u = 10*(exp(-0.05*49.011586*x) - 1)*cos(49.011586*x), envolvente = 10*(1 - exp(-0.05*49.011586*x)), [0 1.5])
+#fplot(u = R_res*(exp(-xi*omega_n*x) - 1)*cos(omega_n*x), envolvente = R_res*(1 - exp(-xi*omega_n*x)), [0 1.5])
 
 ## 7 · Lo que hay que llevarse
 

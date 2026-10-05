@@ -207,6 +207,17 @@ namespace HekatanLisp
             sw.Stop();
             res.Segundos = sw.Elapsed.TotalSeconds;
             Lee(outp ?? "", res);
+            // el programa no llegó al final (no hay marca #t): el motor se cayó a mitad («Heap exhausted» en la
+            // hoja 82) o se cortó por tiempo con el equipo cargado (107 con 2-3 exportaciones a la vez). Antes la
+            // hoja salía sin ningún número y sin decir por qué.
+            if ((outp ?? "").IndexOf("\x1f#t\x1f", StringComparison.Ordinal) < 0 && res.Error.Count == 0)
+            {
+                var primera = lineas.FirstOrDefault(l => l.Visible && l.Bloque < 0 && l.Mapa == null && l.Malla == null && l.Modelo3D == null)
+                              ?? lineas.FirstOrDefault();
+                if (primera != null)
+                    res.Error[primera.Idx] = "el cálculo numérico no terminó: el motor no devolvió resultados (" +
+                        (res.Valor.Count + res.Oculta.Count) + " valores): se cayó (sin memoria con matrices muy grandes) o tardó demasiado (equipo cargado). Vuelve a calcular.";
+            }
             return res;
         }
 

@@ -1663,6 +1663,11 @@ dib();})();";
                             @"(?<![A-Za-z0-9_.])" + System.Text.RegularExpressions.Regex.Escape(name) + @"(?![A-Za-z0-9_.])")
                         && (mejor < 0 || Math.Abs(kv.Key - linea) < Math.Abs(mejor - linea)))
                         mejor = kv.Key;
+            // valor FINAL de una matriz llenada en un bloque (for): manda sobre el eco de «A = zeros(…)» si es posterior
+            (int Idx, string Nombre, string Valor) fin = (-1, null, null);
+            foreach (var f in _numRes.Final)
+                if ((f.Nombre == name || f.Nombre == mang) && f.Idx < linea && f.Idx > fin.Idx) fin = f;
+            if (fin.Idx >= 0 && fin.Idx > mejor) return HojaNumerica.FormatoLiteral(fin.Valor);
             if (mejor < 0) return null;
             return HojaNumerica.FormatoLiteral(_numRes.Valor.TryGetValue(mejor, out var vis) ? vis : _numRes.Oculta[mejor].Valor);
         }

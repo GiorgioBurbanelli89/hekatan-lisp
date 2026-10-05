@@ -51,6 +51,7 @@ namespace HekatanLisp
             public readonly Dictionary<int, MallaDatos> Malla = new();      // línea #malla → nudos y elementos
             public readonly Dictionary<int, List<string>> Modelo3D = new(); // línea #modelo3d → literales de sus datos
             public readonly Dictionary<int, List<(string Nombre, double[] X, double[] Y)>> Serie = new(); // línea #fplot → series calculadas
+            public readonly List<(int Idx, string Nombre, string Valor)> Final = new();   // valor de una matriz DESPUÉS de un bloque que la llenó (A(i, j) = … en un for)
             public readonly Dictionary<int, (string Nombre, string Valor)> Oculta = new(); // línea #hide con número → para @{nombre}
             public readonly HashSet<int> Calculada = new();                 // líneas que entraron al programa
             public double Segundos;          // todo: traducir, compilar (SBCL), correr y leer
@@ -416,6 +417,16 @@ namespace HekatanLisp
                 if (Kw(sts[i]) == "function") { defuns.Append(Funcion(sts, ref i, ctx)).Append('\n'); continue; }
                 forms.Add(Sentencia(sts, ref i, ctx, new List<string>()));
             }
+            // matrices llenadas por asignación indexada dentro del bloque: se emite su valor FINAL (el eco de la
+            // línea «A = zeros(…)» solo tiene los ceros) para que #dibujo, #fplot y @{…} las vean llenas
+            var llenadas = new List<string>();
+            foreach (var s0 in sts)
+            {
+                var mi = Regex.Match(s0, @"^([A-Za-z_]\w*)\s*\(.*\)\s*=(?!=)");
+                if (mi.Success && ctx.Vars.Contains(mi.Groups[1].Value) && !llenadas.Contains(mi.Groups[1].Value)) llenadas.Add(mi.Groups[1].Value);
+            }
+            foreach (var nm in llenadas)
+                forms.Add("(let ((hn-l (hn-lit " + Sym(nm) + "))) (when hn-l (hn-emit " + idx + " \"#vf\" (format nil \"~a=~a\" \"" + nm + "\" hn-l))))");
             return forms.Count == 0 ? "nil" : string.Join("\n      ", forms);
         }
 
@@ -811,6 +822,11 @@ namespace HekatanLisp
                 }
                 else if (tag == "#m3d")
                     res.Modelo3D[idx] = text.Split(';').ToList();
+                else if (tag == "#vf")
+                {
+                    int q0 = text.IndexOf('=');
+                    if (q0 > 0) res.Final.Add((idx, text.Substring(0, q0), text.Substring(q0 + 1)));
+                }
                 else if (tag == "#ser")
                 {
                     var ps = text.Split(';'); var lista = new List<(string, double[], double[])>();

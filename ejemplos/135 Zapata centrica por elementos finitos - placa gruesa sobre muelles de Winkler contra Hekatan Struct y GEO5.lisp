@@ -28,6 +28,52 @@ V_d = N_1 + G_z + Z_r 'vertical total en el fondo [kN]
 e_x = (-M_y + H_x·t_z)/V_d 'excentricidad en x (GEO5: −0.021) [m]
 e_y = (M_x + H_y·t_z)/V_d 'excentricidad en y [m]
 
+## 1b · La zapata dibujada, con sus cargas y cotas
+
+#: **Cómo se lee.** Dos vistas a escala, en metros. **Planta:** el cuadrado grueso es la zapata de 1.20 × 1.20 m; el cuadro gris, la columna de 0.40 × 0.40 m (la columna está en el **centro** de la zapata). Las flechas rojas son las cargas horizontales de la carga 1 (H_{x} = 14 kN y H_{y} = 5 kN) y N = 3000 kN baja por el eje de la columna; M_{y} = 70 kN·m y M_{x} = −2 kN·m la giran. La cruz verde marca la **resultante** del fondo: está a e_{x} = -0.021 m y e_{y} = +0.000 m del centro. **Corte:** la zapata de 0.40 m enterrada a 1.20 m bajo la rasante, apoyada en **muelles de Winkler** (rayas azules verticales: cada nudo de la malla lleva uno y solo trabaja a compresión).
+#dibujo("Planta: zapata céntrica de 1.20 × 1.20 m, columna de 0.40 m, cargas de la carga 1 y resultante", ud = m, escala = auto, cotas = m, alto = 150)
+#  rect(-l_x/2, -l_y/2, l_x, l_y, "gruesa")
+#  achurado(-l_x/2, -l_y/2, l_x, l_y, "concreto")
+#  rect(-0.200, -0.200, c_x, c_x, "denso")
+#  linea(-0.8, 0, 0.8, 0, "eje")
+#  linea(0, -0.8, 0, 0.8, "eje")
+#  circulo(0.000, 0.000, 0.05, "rojo")
+#  flecha(0.000, 0.000, 0.280, 0.000, "rojo")
+#  flecha(0.000, 0.000, 0.000, 0.100, "rojo")
+#  texto(0.300, -0.100, "Hx", 2.5, "i")
+#  texto(0.050, 0.160, "Hy", 2.5, "i")
+#  texto(0.050, -0.280, "N = 3000 kN", 2.5, "i")
+#  linea(-0.061, 0.000, 0.019, 0.000, "media verde")
+#  linea(-0.021, -0.040, -0.021, 0.040, "media verde")
+#  texto(-0.021, -0.120, "resultante", 2.5, "c", estilo = "verde")
+#  cota(-l_x/2, -0.82, l_x/2, -0.82, -0.05, "1.20")
+#  cota(0.82, -l_y/2, 0.82, l_y/2, 0.05, "1.20")
+#  cota(-0.200, 0.82, 0.200, 0.82, 0.05, "0.40")
+#fin
+#dibujo("Corte: zapata de 0.40 m a 1.20 m de profundidad sobre muelles de Winkler (rayas azules)", ud = m, escala = auto, cotas = m, alto = 130)
+#  linea(-1.6, 0, 1.6, 0, "media verde")
+#  rect(-l_x/2, -d_f, l_x, t_z, "gruesa")
+#  achurado(-l_x/2, -d_f, l_x, t_z, "concreto")
+#  rect(-0.200, -d_f + t_z, c_x, d_f - t_z + 0.6, "gruesa")
+#  linea(-1.6, -d_f, -l_x/2, -d_f, "trazos")
+#  linea(l_x/2, -d_f, 1.6, -d_f, "trazos")
+#  linea(-0.55, -d_f, -0.55, -d_f - 0.3, "media azul")
+#  linea(-0.35, -d_f, -0.35, -d_f - 0.3, "media azul")
+#  linea(-0.15, -d_f, -0.15, -d_f - 0.3, "media azul")
+#  linea(0.05, -d_f, 0.05, -d_f - 0.3, "media azul")
+#  linea(0.25, -d_f, 0.25, -d_f - 0.3, "media azul")
+#  linea(0.45, -d_f, 0.45, -d_f - 0.3, "media azul")
+#  flecha(0.000, 0.95, 0.000, -d_f + t_z + 0.62, "rojo")
+#  texto(0.050, 1.0, "N = 3000 kN", 2.5, "i")
+#  flecha(-0.450, 0.4, -0.200, 0.4, "rojo")
+#  texto(-0.450, 0.5, "Hx = 14 kN", 2.5, "i")
+#  texto(0.9, -d_f - 0.2, "muelles k_s", 2.5, "i", estilo = "azul")
+#  cota(1.0, -d_f, 1.0, 0, 0.1, "1.20")
+#  cota(-0.8, -d_f, -0.8, -d_f + t_z, -0.1, "0.40")
+#  cota(-l_x/2, -d_f - 0.45, l_x/2, -d_f - 0.45, -0.05, "1.20")
+#fin
+#: **Qué muestran.** La planta dice dónde cae la carga respecto del centro: cuanto más excéntrica la resultante, menos área de suelo comprimido (en la zapata céntrica, la presión es casi uniforme porque e es pequeña). El corte dice por qué el modelo de elementos finitos se apoya en muelles solo a compresión: el fondo está a 1.20 m de profundidad y el suelo solo empuja.
+
 ## 2 · El módulo de balasto k_{s}: de dónde sale
 
 #: **Winkler** cambia el suelo por un colchón de muelles independientes: la presión en un punto es proporcional a lo que baja ese punto, p = k_{s}·w (la recta y = m·x con pendiente m = k_{s}). GEO5 no usa muelles: calcula el asiento con el módulo edométrico, capa a capa (hoja 105). Por eso k_{s} **no es un dato del suelo**: hay que elegirlo.

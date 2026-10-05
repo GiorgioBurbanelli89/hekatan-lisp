@@ -259,6 +259,53 @@ r_d = round(delta_S, 2)
 #: **Lectura.** FS = @{r_FS} con δ = @{r_d}°. Las fuerzas entre dovelas **crecen** desde el pie (cada dovela de la izquierda frena a las de arriba), dan **dos saltos** en las dovelas 11 y 13 (los anclajes empujan la masa hacia dentro del talud y aumentan la compresión entre dovelas) y bajan a cero en la salida.
 #: E_{i} de Hekatan (azul) y de GEO5 (rojo), en la abscisa del corte; casi no se distinguen:
 #fplot(Hekatan = [9.768 27.531; 11.813 68.686; 13.858 114.863; 15.903 160.988; 17.948 208.884; 19.993 265.505; 22.038 330.754; 24.083 377.754; 26.128 411.004; 28.173 431.663; 30.218 612.504; 32.264 607.873; 34.309 750.552; 36.354 716.686; 38.399 669.938; 40.444 600.923; 42.489 509.345; 44.534 334.382; 46.579 161.894], GEO5 = [9.768 27.519; 11.813 68.663; 13.858 114.848; 15.903 160.984; 17.948 209.151; 19.993 265.789; 22.038 331.001; 24.083 378.038; 26.128 411.322; 28.173 432.012; 30.218 612.905; 32.264 608.313; 34.309 751.045; 36.354 717.223; 38.399 670.517; 40.444 600.789; 42.489 509.225; 44.534 334.305; 46.579 161.858], [7 49])
+
+## 5b · El talud, el círculo y las fuerzas entre dovelas dibujados
+
+#: **Cómo se lee el dibujo.** Es la etapa 3 del Demo01 a escala, en metros: el **terreno** (línea clara), el **techo del suelo 2** (azul a trazos), el **muro de pie** (achurado), las sobrecargas (12 kPa y 160 kPa, flechas azules), los dos **anclajes** de 200 kN a 30° (verde), el **círculo de falla** con sus 20 dovelas (rojo, con las rectas verticales de cada dovela). La región **azul** entre el círculo y su borde exterior es el **diagrama de la fuerza entre dovelas** E: en cada corte, su ancho horizontal es E·cos δ a escala (1 m = 100 kN), colgado a la altura z de su punto de aplicación sobre la base. Crece del pie hacia arriba hasta el corte 13 y cae al cerrar contra la cresta (E₂₁ = 0). Las cotas dan el alto del talud, el ancho de la superficie de falla (de su entrada a su salida) y el ancho b de cada dovela.
+#hide
+Xk = zeros(2*(n - 1), 1)
+Yk = zeros(2*(n - 1), 1)
+for i = 1:n - 1
+  Xk(i) = X_i(i + 1)
+  Yk(i) = Z_i(i + 1) + z_i(i)
+  Xk(2*(n - 1) + 1 - i) = X_i(i + 1) + E_i(i)*cos(d_S)/100
+  Yk(2*(n - 1) + 1 - i) = Z_i(i + 1) + z_i(i) - E_i(i)*sin(d_S)/100
+end
+#show
+b_t = round(b, 2) 'ancho de dovela, para el rótulo
+#dibujo("Etapa 3 del Demo01: talud, círculo, 20 dovelas y diagrama de la fuerza entre dovelas E (azul, 1 m = 100 kN)", ud = m, cotas = m, ancho = 190, alto = 120)
+#  poligono(21.5, 117.9, 21.5, 122.98, 20, 122.98, 19, 119, 17.25, 119, 17.25, 118, 17.2, 117.99, "media")
+#  achurado([21.5, 21.5, 20, 19, 17.25, 17.25, 17.2], [117.9, 122.98, 122.98, 119, 119, 118, 117.99], "concreto")
+#  polilinea([2, 7.89, 11.54, 17.2, 17.25, 17.25, 19, 20, 21.5, 26.5, 29.8, 32.39, 36.16, 38.69, 41, 41.5, 53, 54, 56], [115.29, 115.2, 116.85, 117.99, 118, 119, 119, 122.98, 122.98, 122.98, 124.92, 125.92, 127.92, 128.51, 128.67, 127.5, 127.5, 128.75, 128.75], "gruesa")
+#  polilinea([2, 7.89, 11.54, 17.2, 21.5, 21.5, 36.18, 53.99, 56], [115.29, 115.2, 116.85, 117.99, 117.9, 120.02, 120.75, 121.7, 121.78], "media trazos azul")
+#  polilinea([7.722, 7.722, 7.722, 9.768, 9.768, 9.768, 11.813, 11.813, 11.813, 13.858, 13.858, 13.858, 15.903, 15.903, 15.903, 17.948, 17.948, 17.948, 19.993, 19.993, 19.993, 22.038, 22.038, 22.038, 24.083, 24.083, 24.083, 26.128, 26.128, 26.128, 28.173, 28.173, 28.173, 30.218, 30.218, 30.218, 32.264, 32.264, 32.264, 34.309, 34.309, 34.309, 36.354, 36.354, 36.354, 38.399, 38.399, 38.399, 40.444, 40.444, 40.444, 42.489, 42.489, 42.489, 44.534, 44.534, 44.534, 46.579, 46.579, 46.579, 48.624], [115.203, 115.203, 115.203, 114.972, 116.049, 114.972, 114.823, 116.905, 114.823, 114.755, 117.317, 114.755, 114.767, 117.729, 114.767, 114.861, 119.0, 114.861, 115.035, 122.952, 115.035, 115.292, 122.98, 115.292, 115.632, 122.98, 115.632, 116.056, 122.98, 116.056, 116.568, 123.964, 116.568, 117.169, 125.082, 117.169, 117.864, 125.871, 117.864, 118.656, 126.938, 118.656, 119.55, 127.965, 119.55, 120.551, 128.442, 120.551, 121.668, 128.631, 121.668, 122.909, 127.5, 122.909, 124.285, 127.5, 124.285, 125.81, 127.5, 125.81, 127.5], "fina rojo")
+#  polilinea([7.722, 9.768, 11.813, 13.858, 15.903, 17.948, 19.993, 22.038, 24.083, 26.128, 28.173, 30.218, 32.264, 34.309, 36.354, 38.399, 40.444, 42.489, 44.534, 46.579, 48.624], [115.203, 114.972, 114.823, 114.755, 114.767, 114.861, 115.035, 115.292, 115.632, 116.056, 116.568, 117.169, 117.864, 118.656, 119.55, 120.551, 121.668, 122.909, 124.285, 125.81, 127.5], "gruesa rojo")
+#  linea(29.29, 124.62, 29.29 + 14·cos(pi/6), 124.62 - 7, "media verde")
+#  linea(33.97, 126.76, 33.97 + 14·cos(pi/6), 126.76 - 7, "media verde")
+#  flecha(26.0, 126.1, 29.29, 124.62, "verde")
+#  flecha(30.7, 128.24, 33.97, 126.76, "verde")
+#  flecha(23.3, 125.5, 23.3, 123.1, "azul")
+#  flecha(25.0, 125.5, 25.0, 123.1, "azul")
+#  flecha(43.0, 131.0, 43.0, 127.6, "azul")
+#  flecha(45.5, 131.0, 45.5, 127.6, "azul")
+#  flecha(48.0, 131.0, 48.0, 127.6, "azul")
+#  flecha(50.5, 131.0, 50.5, 127.6, "azul")
+#  texto(46.5, 131.6, "q = 160 kPa", 2.4, "c", estilo = "azul")
+#  texto(24.2, 126.2, "12 kPa", 2.4, "c", estilo = "azul")
+#  texto(38.5, 117.0, "anclajes 2 × 200 kN, 30°", 2.4, "i", estilo = "verde")
+#  texto(19.5, 124.0, "muro", 2.4, "c")
+#  texto(45.0, 125.0, "suelo 1", 2.4, "c")
+#  texto(30.0, 113.0, "suelo 2", 2.4, "c", estilo = "azul")
+#  poligono(Xk, Yk, "azul tenue")
+#  polilinea(Xk, Yk, "fina azul")
+#  cota(x_a, 112.6, x_b, 112.6, -0.4, "entrada a salida: 40.90 m")
+#  cota(x_a, 113.6, x_a + b, 113.6, -0.3, "b")
+#  cota(58.2, 115.29, 58.2, 128.75, 0.4, "13.46")
+#  cota(14.0, 117.9, 14.0, 122.98, 0.4, "5.08")
+#  texto(12.0, 110.9, "círculo R = 51.88 m (el centro queda 50 m más arriba)", 2.4, "c", estilo = "rojo")
+#fin
+#: En el dibujo se ve lo que dicen las ecuaciones: donde el diagrama se ensancha, las dovelas de arriba empujan con más fuerza a las de abajo; el sentido de E es hacia el pie, inclinado δ = @{r_d}° respecto de la horizontal. Las dos fuerzas más grandes (cortes 13 a 15, del orden de 600 a 750 kN/m) son las que mueven el bloque cargado por los 160 kPa y los anclajes.
 #: **El punto de aplicación.** Las alturas z quedan dentro de la dovela (entre 0.3 y 3.4 m sobre la base, alturas de dovela de 1 a 9 m): la «línea de empuje» es razonable, otra señal de que la solución es buena.
 
 ## 6 · Hekatan contra GEO5

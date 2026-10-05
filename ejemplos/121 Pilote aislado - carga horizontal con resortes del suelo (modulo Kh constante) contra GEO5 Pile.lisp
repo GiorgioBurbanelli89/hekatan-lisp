@@ -106,7 +106,7 @@ p_w = 0.6·w_n 'desplazamiento de los nudos, escalado
 p_z = -z_n 'profundidad de los nudos (hacia abajo)
 p_M = -M_n/40 'momento al inicio de cada elemento, escalado
 p_zm = -z_m 'profundidad del inicio de cada elemento
-#dibujo("Pilote deformado (azul, desplazamiento ×600: 1 m = 1.67 mm) y momento flector (rojo, 1 m = 40 kN·m)", ud = m, escala = auto, alto = 120)
+#dibujo("Pilote deformado (azul, desplazamiento ×600: 1 m = 1.67 mm) y momento flector (rojo, 1 m = 40 kN·m)", ud = m, cotas = m, escala = auto, alto = 120)
 #  rect(-7, -6, 13, 6, "relleno azul tenue sinborde")
 #  rect(-7, -13, 13, 7, "relleno naranja tenue sinborde")
 #  texto(-6.9, -0.8, "arcilla: k_{h} = 5.54 MN/m³", 3.2, "i")
@@ -119,6 +119,10 @@ p_zm = -z_m 'profundidad del inicio de cada elemento
 #  texto(-6.9, 0.9, "H = 85 kN, M = 120 kN·m", 3.2, "i")
 #  texto(2.7, -0.6, "w = 4.21 mm", 3.2, "i")
 #  texto(3.3, -1.6, "M = 120 kN·m (rojo)", 3.2, "i")
+#  cota(1.3, 0, 1.3, -12, 0.2, "12.00")
+#  cota(-7.4, 0, -7.4, -6, 0.2, "6.00")
+#  cota(-7.4, -6, -7.4, -13, 0.2, "7.00")
+#  cota(-0.5, -13.6, 0.5, -13.6, -0.1, "d = 1.00")
 #fin
 
 ## 5 · NEC-SE-GC 2015 (oficial)

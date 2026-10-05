@@ -31,6 +31,28 @@ p_x = a_x + c_x/2 - l_x/2 'eje de la columna desde el centro, en x [m]
 e_x = (-M_y + H_x·t_z + N_1·p_x)/V_d 'excentricidad sin viga (hoja 136) [m]
 e_y = (M_x + H_y·t_z)/V_d 'excentricidad en y [m]
 
+## 1b · La planta: zapata de lindero, viga de amarre y zapata interior
+
+#: **Cómo se lee.** Planta a escala, en metros. A la izquierda, la **línea de lindero** (a trazos): la zapata de 1.20 × 1.20 m no puede salirse de ella, así que la columna de 0.40 m queda a 0.01 m del borde y la carga cae **excéntrica**. La **viga de amarre** (0.40 m de ancho, 0.90 m de canto) une esa columna con la interior, a 5.00 m (eje a eje), donde hay otra zapata de 1.20 × 1.20 m. La viga toma el momento de la excentricidad y lo lleva a la zapata interior como un par de fuerzas: por eso la zapata de lindero deja de girar y el suelo bajo ella se carga casi parejo (secciones 9 a 11).
+#dibujo("Planta: zapata de lindero, viga de amarre de 0.40 × 0.90 m y zapata interior", ud = m, escala = auto, cotas = m, alto = 90)
+#  linea(-0.6, -0.95, -0.6, 0.95, "eje")
+#  texto(-0.55, 0.85, "lindero", 2.5, "i")
+#  rect(-0.6, -0.6, 1.2, 1.2, "gruesa")
+#  rect(4.0, -0.6, 1.2, 1.2, "gruesa")
+#  rect(-0.4, -0.2, 5.0, 0.4, "media")
+#  achurado(-0.4, -0.2, 5.0, 0.4, "concreto")
+#  rect(-0.59, -0.2, 0.4, 0.4, "denso")
+#  rect(4.4, -0.2, 0.4, 0.4, "denso")
+#  texto(-0.4, -0.78, "columna de lindero", 2.4, "i")
+#  texto(4.1, -0.78, "columna interior", 2.4, "i")
+#  texto(1.6, 0.34, "viga de amarre", 2.5, "i")
+#  cota(-0.6, 0.85, 0.6, 0.85, 0.08, "1.20")
+#  cota(4.0, 0.85, 5.2, 0.85, 0.08, "1.20")
+#  cota(-0.4, -0.95, 4.6, -0.95, -0.08, "5.00 entre ejes de columnas")
+#  cota(2.6, -0.2, 2.6, 0.2, 0.08, "0.40")
+#  cota(-0.6, 0.0, -0.19, 0.0, -0.45, "0.01 + 0.40")
+#fin
+
 ## 2 · Módulo de balasto (criterio de la hoja 135)
 
 #: Calibrado con el asiento de GEO5 (hoja 105): la carga 3 de servicio da una presión neta q_{n} y GEO5 un asiento de 15.9 mm; k_{s} = q_{n}/s.

@@ -180,6 +180,9 @@ end
 #  texto(45.0, 125.0, "suelo 1", 2.4, "c")
 #  texto(30.0, 113.0, "suelo 2", 2.4, "c", estilo = "azul")
 #  texto(12.0, 112.6, "círculo R = 51.88 m (centro 50 m más arriba)", 2.4, "c", estilo = "rojo")
+#  cota(7.722, 112.6, 48.624, 112.6, -0.4, "entrada a salida del círculo: 40.90 m")
+#  cota(58.2, 115.29, 58.2, 128.75, 0.4, "13.46")
+#  cota(14.0, 117.9, 14.0, 122.98, 0.4, "5.08")
 #fin
 #: Las líneas rojas finas son los cortes entre dovelas; la gruesa, las 20 cuerdas que forman la base. Las flechas verdes son los anclajes **reemplazados por su fuerza en la cabeza**, como hace GEO5.
 

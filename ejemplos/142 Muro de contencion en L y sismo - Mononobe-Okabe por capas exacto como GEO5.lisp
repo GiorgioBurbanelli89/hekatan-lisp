@@ -291,6 +291,40 @@ T_ac = H_h*cos(eps_b) - N_v*sin(eps_b) 'fuerza actuante a lo largo de la base [k
 FS_v = M_res/M_ovr 'factor de seguridad al VUELCO
 FS_d = H_res/T_ac 'factor de seguridad al DESLIZAMIENTO
 
+### El muro dibujado con sus empujes
+
+#: **El dibujo, leído con calma.** Es la sección del muro a escala, en metros, con las cotas de la geometría. **Gris con achurado:** el hormigón (zapata y fuste). **Verde tenue:** la cuña de tierra que empuja; su cara inclinada es la **cara virtual**, el plano que sale del extremo del talón con 45° + φ/2 sobre la horizontal. **Azul:** el empuje **estático** de cada capa (1 m de flecha = 25 kPa), que crece con la profundidad (se acumula desde arriba). **Rojo:** el **incremento sísmico** de Mononobe-Okabe, que es un **triángulo invertido**: es máximo arriba y se anula abajo, porque se acumula con el peso del suelo que queda por DEBAJO de cada punto. La línea horizontal a trazos marca donde la arena SP pasa a la SP-SM.
+q_1 = pa_1/25 'empuje estático, capa 1 arriba, a escala del dibujo
+q_2 = pb_1/25 'empuje estático, capa 1 abajo
+q_3 = pa_2/25 'empuje estático, capa 2 arriba
+q_4 = pb_2/25 'empuje estático, capa 2 abajo
+u_1 = qa_1/25 'incremento sísmico, capa 1 arriba
+u_2 = qb_1/25 'incremento sísmico, capa 1 abajo
+u_3 = qa_2/25 'incremento sísmico, capa 2 arriba
+u_4 = qb_2/25 'incremento sísmico, capa 2 abajo
+#dibujo("Muro L: hormigón, cuña de tierra, cara virtual y empuje estático (azul) e incremento sísmico (rojo), 1 m = 25 kPa", ud = m, escala = auto, cotas = m, alto = 220)
+#  poligono(0, 0, B_z, 0, B_z, h_z, x_t, h_z, x_t, H_t, x_t - b_t, H_t, x_p, h_z, 0, h_z, "gruesa")
+#  achurado(0, 0, B_z, h_z, "concreto")
+#  poligono(x_t, h_z, B_z, h_z, x_v, H_t, x_t, H_t, "verde tenue")
+#  linea(x_v, H_t, B_z, h_z, "trazos verde")
+#  linea(x_t, H_t, B_z + 3, H_t, "media verde")
+#  linea(-1.2, h_z, 0, h_z, "media verde")
+#  linea(-1.2, 0, B_z + 3, 0, "trazos")
+#  texto(B_z + 1.6, 2.2, "arena SP: γ 18.5, φ 30°", 2.5, "i")
+#  texto(B_z + 1.6, -0.5, "arena limosa SP-SM: γ 17.5, φ 29.97°", 2.5, "i")
+#  texto((x_t + B_z)/2, 1.4, "cuña", 2.5, "c")
+#  carga(x_v, H_t, B_z, h_z, q_1, q_2, "", "azul", n = 5)
+#  carga(B_z, h_z, B_z, 0, q_3, q_4, "", "azul", n = 3)
+#  carga(x_v, H_t, B_z, h_z, u_1, u_2, "", "rojo", n = 5)
+#  carga(B_z, h_z, B_z, 0, u_3, u_4, "", "rojo", n = 3)
+#  cota(0, -0.70, B_z, -0.70, -0.1, "2.15")
+#  cota(-0.6, 0, -0.6, h_z, 0.1, "0.40")
+#  cota(-0.6, h_z, -0.6, H_t, 0.1, "2.60")
+#  cota(x_t, H_t + 0.5, x_t - b_t, H_t + 0.5, 0.1, "0.25")
+#  cota(x_t, H_t + 1.1, B_z, H_t + 1.1, 0.1, "1.90")
+#fin
+#: **Cómo se lee.** Las cotas dan el ancho de la zapata (2.15 m), el canto (0.40 m), la altura del fuste (2.60 m), su espesor en la coronación (0.25 m) y el talón (1.90 m), sin puntera (muro en **L**). La resultante de cada diagrama (azul y rojo) es lo que se suma en la tabla de la sección 4: la **estática** actúa a un tercio de la altura de cada capa; la **sísmica** más arriba, porque su diagrama es un triángulo invertido. En el **vuelco** esas fuerzas giran el muro alrededor de la punta de la zapata (el origen del dibujo); en el **deslizamiento**, la base es horizontal.
+
 ## 4 · Contra GEO5: peso, empuje, incremento sísmico, vuelco y deslizamiento
 
 #: Los factores de seguridad de GEO5 salen de los porcentajes de uso de GEO5 (2.0/1.298 y 1.05/0.894). Filas: peso del muro; empuje estático Fx, Fz, x, y; incremento sísmico Fx, Fz, x, y; FS al vuelco; FS al deslizamiento. La diferencia debe quedar bajo 0.01 (en Fz del incremento sísmico, bajo 0.03).

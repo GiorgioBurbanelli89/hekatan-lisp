@@ -79,7 +79,7 @@ FS_s = f_y/σ_s 'factor de seguridad de la sección
 R_s = pi·d_r·l_r·τ_m·J_r 'resistencia de la raíz [kN]
 FS_r = R_s/N_d 'factor de seguridad de la raíz
 
-#dibujo("El micropilote inclinado 20°: 9 m libres (1 m sobre el terreno) y la raíz inyectada de 3 m", ud = m, escala = auto, alto = 120)
+#dibujo("El micropilote inclinado 20°: 9 m libres (1 m sobre el terreno) y la raíz inyectada de 3 m", ud = m, cotas = m, escala = auto, alto = 120)
 #  rect(-2, -12, 9, 12, "relleno naranja tenue sinborde")
 #  linea(-2, 0, 7, 0, "media verde")
 #  linea(-2, -4, 7, -4, "trazos")
@@ -91,6 +91,9 @@ FS_r = R_s/N_d 'factor de seguridad de la raíz
 #  texto(0, 1.6, "N = 120 kN, M = 9.5 kN·m", 3.2, "i")
 #  texto(4.1, -9, "raíz: d = 0.30 m, l = 3.00 m", 3.2, "i")
 #  texto(1.9, -3, "TK 121 × 7", 3.2, "i")
+#  cota(7.3, 0, 7.3, -4, 0.2, "4.00")
+#  cota(-0.342, 0.94, 2.736, -7.517, -0.5, "9.00 m libres")
+#  cota(2.736, -7.517, 3.762, -10.336, 0.6, "raíz 3.00 m")
 #fin
 
 ## 6 · NEC-SE-GC 2015

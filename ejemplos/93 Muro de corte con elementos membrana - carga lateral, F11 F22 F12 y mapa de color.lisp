@@ -130,18 +130,6 @@ u_cor = 1000·U(2·j_cor - 1) [mm]
 #: **Mapa de color** del desplazamiento horizontal u_{x} en mm, en TODO el panel:
 u_x(x, y) = spline(1 + x/a_1, 1 + y/b_1, U_x)
 #map(u_x(x, y), [0 L], [0 H])
-#: **Deformada** (amplificada ×300, para verla): el muro corto corta Y flexiona a la vez —
-#: por eso las horizontales se inclinan (cortante) y además el conjunto se curva (flexión).
-esc = 300 'factor de amplificación visual
-#hide
-x_def = zeros(n_j, 1)
-y_def = zeros(n_j, 1)
-for j = 1:n_j
-  x_def(j) = x_j(j) + esc·U(2·j - 1)
-  y_def(j) = y_j(j) + esc·U(2·j)
-end
-#show
-#malla(x_def, y_def, e_j, s_j)
 
 ## 7 · Esfuerzos F11, F22, F12
 #: En un elemento **membrana** los esfuerzos se llaman F11, F22, F12 (fuerza por unidad de ancho,

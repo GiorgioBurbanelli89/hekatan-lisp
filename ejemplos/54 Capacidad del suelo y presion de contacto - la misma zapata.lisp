@@ -173,7 +173,7 @@ q_med = dec(Q_adm/A_e/9.81, 2) [tonf/m^2]
 rel = dec(q_max/q_med, 2)
 #: El pico vale {q_max} tonf/m² y la media sobre el área efectiva {q_med} tonf/m², que es la presión admisible del punto 4. **El pico es {rel} veces la media, y eso no es un fallo: las dos comprobaciones miden cosas distintas.** La geotécnica pregunta si la masa de suelo revienta, y para eso cuenta la carga total repartida en el área que trabaja, o sea medias. La estructural pregunta cuánto momento y cuánto punzonamiento le llega al hormigón, y ahí manda el pico y dónde está.
 #: Dicho corto: con la presión admisible se decide el TAMAÑO de la zapata; con la distribución de presiones se decide su ARMADURA y su CANTO. Comparar el pico contra la admisible deja zapatas absurdamente grandes; armar con la media deja la esquina sin acero.
-#tabla("Comprobación","Q_ué compara","Valor [tonf/m²]:2","Límite [tonf/m²]:2")({"Geotécnica (Meyerhof)","Estructural (contacto)"}; [17.26, 27.31]; [17.26, 0])
+#tabla("Comprobación","Qué compara","Valor [tonf/m²]:2","Límite [tonf/m²]:2")({"Geotécnica (Meyerhof)","Estructural (contacto)"}; [17.26, 27.31]; [17.26, 0])
 #: La fila estructural no lleva límite porque no se compara contra el suelo: ese 27.31 tonf/m² entra como carga en el cálculo de la placa, y de ahí salen los momentos y el punzonamiento.
 
 ## 9 · El ejemplo 3.8 de punta a punta, y su gráfica

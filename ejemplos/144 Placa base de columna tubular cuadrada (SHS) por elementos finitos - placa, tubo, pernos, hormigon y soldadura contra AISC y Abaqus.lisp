@@ -765,7 +765,96 @@ end
 #show
 p_xy(x, y) = spline(1 + (x + 0.2)/(0.2/10), 1 + (y + 0.2)/(0.2/10), P_f)
 #map(p_xy(x, y), [-0.2 0.2], [-0.2 0.2])
-#: **La deformada de la placa** (ampliada) con el hormigón en el lado comprimido y la placa levantada en el otro; con el ratón se gira:
+#: **Tensión de la placa.** Con los giros de cada elemento se calculan las curvaturas en su centro (κ₁₁ = −∂θ_y/∂x, κ₂₂ = ∂θ_x/∂y, κ₁₂ = ∂θ_x/∂x − ∂θ_y/∂y), los momentos por unidad de ancho m = D·[κ₁₁ + νκ₂₂, νκ₁₁ + κ₂₂, (1 − ν)/2·κ₁₂] con D = E·t³/(12·(1 − ν²)), y las tensiones de la fibra extrema σ = 6·m/t². Se muestra la tensión equivalente de Von Mises (en MPa) promediada en los nudos de la placa:
+#hide
+sv_n = zeros(n_p, 1)
+cn_n = zeros(n_p, 1)
+D_p = E·t_p^3/12/(1 - ν^2)
+sig_el = zeros(64, 1)
+for e = 1:64
+  q = En(e, :)
+  dxi = [-0.25, 0.25, 0.25, -0.25]
+  det_ = [-0.25, -0.25, 0.25, 0.25]
+  j11 = 0
+  j12 = 0
+  j21 = 0
+  j22 = 0
+  for r = 1:4
+    j11 = j11 + dxi(r)·Xn(q(r), 1)
+    j12 = j12 + dxi(r)·Xn(q(r), 2)
+    j21 = j21 + det_(r)·Xn(q(r), 1)
+    j22 = j22 + det_(r)·Xn(q(r), 2)
+  end
+  dj = j11·j22 - j12·j21
+  k11 = 0
+  k22 = 0
+  k12 = 0
+  for r = 1:4
+    dnx = (j22·dxi(r) - j12·det_(r))/dj
+    dny = (-j21·dxi(r) + j11·det_(r))/dj
+    tx = U(6·(q(r) - 1) + 4)
+    ty = U(6·(q(r) - 1) + 5)
+    k11 = k11 - dnx·ty
+    k22 = k22 + dny·tx
+    k12 = k12 + dnx·tx - dny·ty
+  end
+  m11 = D_p·(k11 + ν·k22)
+  m22 = D_p·(ν·k11 + k22)
+  m12 = D_p·(1 - ν)/2·k12
+  sx = 6·m11/t_p^2
+  sy = 6·m22/t_p^2
+  txy = 6·m12/t_p^2
+  svm = sqrt(sx^2 - sx·sy + sy^2 + 3·txy^2)/1000
+  sig_el(e) = svm
+  for r = 1:4
+    sv_n(q(r)) = sv_n(q(r)) + svm
+    cn_n(q(r)) = cn_n(q(r)) + 1
+  end
+end
+S_m = zeros(n_x, n_x)
+W_m = zeros(n_x, n_x)
+for j = 1:n_x
+  for i = 1:n_x
+    q = (j - 1)·n_x + i
+    sv_n(q) = sv_n(q)/cn_n(q)
+    S_m(i, j) = sv_n(q)
+    W_m(i, j) = 1000·U(6·(q - 1) + 3)
+  end
+end
+S_f = zeros(n_f, n_f)
+W_f = zeros(n_f, n_f)
+for jf = 1:n_f
+  for if_ = 1:n_f
+    xq = -0.2 + (if_ - 1)·0.2/10
+    yq = -0.2 + (jf - 1)·0.2/10
+    i0 = 1
+    for i = 1:n_x - 1
+      if xs(i) <= xq + 1e-9
+        i0 = i
+      end
+    end
+    j0 = 1
+    for j = 1:n_x - 1
+      if ys(j) <= yq + 1e-9
+        j0 = j
+      end
+    end
+    tx = (xq - xs(i0))/(xs(i0 + 1) - xs(i0))
+    ty = (yq - ys(j0))/(ys(j0 + 1) - ys(j0))
+    S_f(if_, jf) = (1 - tx)·(1 - ty)·S_m(i0, j0) + tx·(1 - ty)·S_m(i0 + 1, j0) + (1 - tx)·ty·S_m(i0, j0 + 1) + tx·ty·S_m(i0 + 1, j0 + 1)
+    W_f(if_, jf) = (1 - tx)·(1 - ty)·W_m(i0, j0) + tx·(1 - ty)·W_m(i0 + 1, j0) + (1 - tx)·ty·W_m(i0, j0 + 1) + tx·ty·W_m(i0 + 1, j0 + 1)
+  end
+end
+#show
+sig_max_p = max(sv_n) 'tensión de Von Mises máxima en la placa (promedio de nudos) [MPa]
+sig_el_max = max(sig_el) 'tensión de Von Mises máxima en el centro de un elemento [MPa]
+rat_f = sig_el_max/355 'aprovechamiento de la placa frente al límite elástico de 355 MPa
+s_xy(x, y) = spline(1 + (x + 0.2)/(0.2/10), 1 + (y + 0.2)/(0.2/10), S_f)
+#map(s_xy(x, y), [-0.2 0.2], [-0.2 0.2])
+#: **Desplazamiento vertical de la placa** (mm; positivo hacia arriba): la zona levantada es la del lado de los pernos traccionados.
+w_xy(x, y) = spline(1 + (x + 0.2)/(0.2/10), 1 + (y + 0.2)/(0.2/10), W_f)
+#map(w_xy(x, y), [-0.2 0.2], [-0.2 0.2])
+#: **La deformada de la placa** (ampliada) con el hormigón en el lado comprimido y la placa levantada en el otro; con el ratón se gira y, al pasar el cursor, se lee el desplazamiento (mm) de cada nudo:
 #hide
 X_d = zeros(n_p, 3)
 U_3 = zeros(n_p, 3)
@@ -781,10 +870,13 @@ e_f = zeros(0, 2)
 v_f = zeros(0, 2)
 #show
 #modelo3d(X_d, e_j, e_f, w_j, v_f, U_3, 500)
+#: **La misma deformada con la tensión de Von Mises** (MPa) de cada nudo al pasar el cursor:
+#modelo3d(X_d, e_j, e_f, sv_n, v_f, U_3, 500)
 
 ## 15 · Resumen
 
 #: Con N = 300 kN y M = 40 kN·m (excentricidad 0.133 m, mayor que N/6 = 0.067 m de la placa): la placa **se despega** por el lado traccionado, los pernos de ese lado trabajan, y el hormigón del lado comprimido soporta la carga concentrada. Por elementos finitos hacen falta menos milímetros de placa que por AISC, porque AISC supone un bloque plano de presión; AISC es más conservador.
 #: Los 966 desplazamientos y giros (u_x, u_y, u_z, θ_x, θ_y, θ_z de cada nudo, en m y rad) para compararlos con Abaqus:
 U_f = U 'desplazamientos y giros de los 161 nudos
+sig_el_f = sig_el 'tensión de Von Mises en el centro de cada elemento de la placa [MPa]
 Fw_f = Fw 'fuerzas de soldadura en los 16 nudos del perímetro: Fx, Fy, Fz [kN]

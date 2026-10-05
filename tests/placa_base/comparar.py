@@ -11,10 +11,12 @@ caso = sys.argv[1] if len(sys.argv) > 1 else "shs"
 dbg = sys.argv[2] if len(sys.argv) > 2 else r"C:\Users\j-b-j\AppData\Local\Temp\pb_144.txt"
 P = json.load(open(os.path.join(AQUI, "params_%s.json" % caso)))
 D = json.load(open(os.path.join(AQUI, "abq_%s" % caso, "datos.json")))
-U = Fw = None
+U = Fw = SE = None
 for l in open(dbg, encoding="utf8", errors="replace"):
     if re.match(r";; \d+ \[U_f\] ", l):
         U = np.array([float(v) for v in re.findall(r"[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?", l.split("=>", 1)[1])])
+    if re.match(r";; \d+ \[sig_el_f\] ", l):
+        SE = np.array([float(v) for v in re.findall(r"[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?", l.split("=>", 1)[1])])
     if re.match(r";; \d+ \[Fw_f\] ", l):
         Fw = np.array([float(v) for v in re.findall(r"[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?", l.split("=>", 1)[1])])
 n = len(U) // 6
@@ -64,3 +66,29 @@ if Fw is not None and NF:
     print("  máx |dif| entre nudos: %.3f kN (%.2f %% del máximo)" % (np.abs(mh - ma).max(), 100 * np.abs(mh - ma).max() / ma.max()))
 else:
     print("(sin fuerzas nodales de Abaqus que comparar: NF=%d)" % len(NF))
+
+# tensiones de la placa: Von Mises en el centro de cada elemento (extremo de la sección: máximo de los 5 puntos de la sección)
+if SE is not None:
+    txt = open(os.path.join(AQUI, "abq_%s" % caso, "pb.dat"), encoding="utf8", errors="replace").read().splitlines()
+    SV = {}
+    ult = None
+    for i, l in enumerate(txt):
+        if "ELEMENT" in l and "SEC" in l and "S11" in l:
+            ult = i
+    if ult is not None:
+        for l in txt[ult + 1:]:
+            m = re.match(r"\s*(\d+)\s+(\d+)\s+(%s)\s+(%s)\s+(%s)\s*$" % ((num,) * 3), l)
+            if m:
+                e = int(m.group(1)); s11, s22, s12 = [float(m.group(k)) for k in range(3, 6)]
+                svm = (s11 * s11 - s11 * s22 + s22 * s22 + 3 * s12 * s12) ** 0.5 / 1000
+                SV[e] = max(SV.get(e, 0), svm)
+            elif SV and l.strip() == "":
+                pass
+    if SV:
+        a_ = np.array([SV[e] for e in range(1, 65) if e in SV])
+        print("== tensión de Von Mises en el centro de los 64 elementos de la placa (MPa) ==")
+        print("  hoja   máx %.2f   Abaqus máx %.2f   (dif %.2f %%)" % (SE.max(), a_.max(), 100 * abs(SE.max() - a_.max()) / a_.max()))
+        if len(a_) == 64:
+            print("  máx |dif| entre elementos: %.2f MPa (%.2f %% del máximo)" % (np.abs(SE[:64] - a_).max(), 100 * np.abs(SE[:64] - a_).max() / a_.max()))
+    else:
+        print("(no pude leer las tensiones S de Abaqus)")

@@ -35,6 +35,7 @@ namespace HekatanLisp
             public string Mapa;      // #map(...): lo de dentro de los paréntesis
             public string Malla;     // #malla(x, y, elementos[, apoyos]) con datos del modelo
             public string Modelo3D;  // #modelo3d(X, cascaras, barras, valor_nudo, valor_barra[, U, escala])
+            public string Serie;     // #fplot(…, nombre = M, …): M = matriz N×2 calculada (x y; …) que se dibuja como puntos/línea
         }
 
         public sealed class Rejilla { public double Xa, Xb, Ya, Yb; public int N; public double[,] Z; }
@@ -49,6 +50,7 @@ namespace HekatanLisp
             public readonly Dictionary<int, Rejilla> Mapa = new();          // línea #map → rejilla
             public readonly Dictionary<int, MallaDatos> Malla = new();      // línea #malla → nudos y elementos
             public readonly Dictionary<int, List<string>> Modelo3D = new(); // línea #modelo3d → literales de sus datos
+            public readonly Dictionary<int, List<(string Nombre, double[] X, double[] Y)>> Serie = new(); // línea #fplot → series calculadas
             public readonly Dictionary<int, (string Nombre, string Valor)> Oculta = new(); // línea #hide con número → para @{nombre}
             public readonly HashSet<int> Calculada = new();                 // líneas que entraron al programa
             public double Segundos;          // todo: traducir, compilar (SBCL), correr y leer
@@ -137,7 +139,7 @@ namespace HekatanLisp
             foreach (var ln in lineas)
             {
                 if (ln.Bloque >= 0) { RecogeBloque(bloques[ln.Bloque], ctx); continue; }
-                if (ln.Mapa != null || ln.Malla != null || ln.Modelo3D != null) continue;
+                if (ln.Mapa != null || ln.Malla != null || ln.Modelo3D != null || ln.Serie != null) continue;
                 var t = Normaliza(ln.Texto).Trim();
                 if (!EsNumerica(t)) continue;
                 var fd = RxFuncDef.Match(t);
@@ -148,7 +150,7 @@ namespace HekatanLisp
             foreach (var f in ctx.PorDefinir) if (!ctx.Vars.Contains(f)) ctx.SheetFuncs.Add(f);
             foreach (var ln in lineas)                     // A(i) = … con A ya variable: asignación indexada
             {
-                if (ln.Bloque >= 0 || ln.Mapa != null || ln.Malla != null || ln.Modelo3D != null) continue;
+                if (ln.Bloque >= 0 || ln.Mapa != null || ln.Malla != null || ln.Modelo3D != null || ln.Serie != null) continue;
                 var t = Normaliza(ln.Texto).Trim();
                 var fd = RxFuncDef.Match(t);
                 if (fd.Success && ctx.Vars.Contains(fd.Groups[1].Value)) ctx.SheetFuncs.Remove(fd.Groups[1].Value);
@@ -172,6 +174,19 @@ namespace HekatanLisp
                         var args = PartirNivel0(Normaliza(ln.Modelo3D), ',').Select(a => tr.Expr(a)).ToList();
                         if (args.Count < 5) throw new FormatException("#modelo3d(X, cascaras, barras, valor_nudo, valor_barra[, U, escala]): faltan datos");
                         code = "(hn-emit " + ln.Idx + " \"#m3d\" (format nil \"~{~a~^;~}\" (mapcar #'hn-lit (list " + string.Join(" ", args) + "))))";
+                    }
+                    else if (ln.Serie != null)
+                    {
+                        // #fplot(c = M, …): M (matriz N×2 de la hoja) se emite tal cual; el gráfico la dibuja
+                        var tr = new Tr(ctx);
+                        var partes = new List<string>();
+                        foreach (var a in PartirNivel0(Normaliza(ln.Serie), ','))
+                        {
+                            var sm = Regex.Match(a.Trim(), @"^([A-Za-z][\w']*)\s*=\s*(.+)$", RegexOptions.Singleline);
+                            if (sm.Success && EsSerieCalculada(sm.Groups[2].Value))
+                                partes.Add("\"" + sm.Groups[1].Value + "\" (hn-lit " + tr.Expr(sm.Groups[2].Value.Trim()) + ")");
+                        }
+                        code = "(hn-emit " + ln.Idx + " \"#ser\" (format nil \"~{~a~^;~}\" (list " + string.Join(" ", partes) + ")))";
                     }
                     else if (ln.Malla != null)
                     {
@@ -219,6 +234,15 @@ namespace HekatanLisp
                         (res.Valor.Count + res.Oculta.Count) + " valores): se cayó (sin memoria con matrices muy grandes) o tardó demasiado (equipo cargado). Vuelve a calcular.";
             }
             return res;
+        }
+
+        /// <summary>¿El segundo miembro de «nombre = …» en un #fplot es una serie calculada por la hoja
+        /// (lleva nombres de variables) y no puntos literales «[x y; …]» ni un rango?</summary>
+        public static bool EsSerieCalculada(string rhs)
+        {
+            rhs = (rhs ?? "").Trim();
+            if (rhs.Length == 0) return false;
+            return Regex.IsMatch(Regex.Replace(rhs, @"\d+(\.\d+)?([eE][-+]?\d+)?", ""), @"[A-Za-z_]");
         }
 
         static bool ParamsSimples(string ps)
@@ -787,6 +811,16 @@ namespace HekatanLisp
                 }
                 else if (tag == "#m3d")
                     res.Modelo3D[idx] = text.Split(';').ToList();
+                else if (tag == "#ser")
+                {
+                    var ps = text.Split(';'); var lista = new List<(string, double[], double[])>();
+                    for (int q = 0; q + 1 < ps.Length; q += 2)
+                    {
+                        var filas = Regex.Matches(ps[q + 1], @"\(vector ([^()]*)\)").Select(m => RxNum.Matches(m.Groups[1].Value).Select(v => double.Parse(v.Value, NumberStyles.Float, inv)).ToArray()).ToArray();
+                        if (filas.Length > 0 && filas.All(f => f.Length == 2)) lista.Add((ps[q], filas.Select(f => f[0]).ToArray(), filas.Select(f => f[1]).ToArray()));
+                    }
+                    res.Serie[idx] = lista;
+                }
                 else if (tag == "#mesh")
                 {
                     var ps = text.Split(';');

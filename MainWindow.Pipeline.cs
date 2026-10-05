@@ -387,7 +387,8 @@ namespace HekatanLisp
 
         // UN #fplot (o ;grafica) → su SVG. rest = lo que sigue a la palabra clave.
         private static string OneFplotHtml(string rest, Dictionary<string, LispConverter.N> byName,
-                                           List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv)
+                                           List<(string, LispConverter.N)> fns, System.Globalization.CultureInfo inv,
+                                           List<(string Nombre, double[] X, double[] Y)> series = null)
         {
             rest = (rest ?? "").Trim();
             double lo = -1, hi = 1; string forcedVar = null;
@@ -399,6 +400,13 @@ namespace HekatanLisp
                 foreach (var a0 in SplitTop(paren.Groups[1].Value))
                 {
                     var a = a0.Trim(); if (a.Length == 0) continue;
+                    // serie CALCULADA por la hoja numérica:  curva = M  (M matriz N×2 de un lazo for)
+                    var sm = System.Text.RegularExpressions.Regex.Match(a, @"^([A-Za-z][\w']*)\s*=\s*(.+)$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (sm.Success && series != null)
+                    {
+                        var sf = series.FirstOrDefault(s0 => s0.Nombre == sm.Groups[1].Value);
+                        if (sf.Nombre != null) { dots.Add((sf.Nombre, sf.X, sf.Y)); continue; }
+                    }
                     // PUNTOS sueltos:  SAP2000 = [x1 y1; x2 y2]  (datos encima de las curvas)
                     var dm = System.Text.RegularExpressions.Regex.Match(a, @"^([A-Za-z][\w']*)\s*=\s*\[([^\[\]]*)\]$");
                     if (dm.Success && TryPuntos(dm.Groups[2].Value, inv, out var pxs, out var pys)) { dots.Add((dm.Groups[1].Value, pxs, pys)); continue; }
@@ -545,6 +553,7 @@ namespace HekatanLisp
                 catch { }
             }
             int surfId = 0;
+            var vecesS = new Dictionary<string, int>();
             var vecesG = new Dictionary<string, int>(); var vecesM = new Dictionary<string, int>();   // n.º de aparición de cada #map/#malla (ClaveNum)
             var veces3D = new Dictionary<string, int>();   // n.º de aparición de cada #modelo3d
             int Vez(Dictionary<string, int> d, string k) { d[k] = d.TryGetValue(k, out var c) ? c + 1 : 0; return d[k]; }
@@ -820,7 +829,11 @@ namespace HekatanLisp
                 }
                 else   // familia fplot
                 {
-                    outList.Add(OneFplotHtml(rest, byName, fns, inv));
+                    List<(string Nombre, double[] X, double[] Y)> serFp = null;
+                    var pfp = System.Text.RegularExpressions.Regex.Match((rest ?? "").Trim(), @"^\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (pfp.Success && _numSeries != null)
+                        _numSeries.TryGetValue(ClaveNum(pfp.Groups[1].Value.Trim(), Vez(vecesS, pfp.Groups[1].Value.Trim())), out serFp);
+                    outList.Add(OneFplotHtml(rest, byName, fns, inv, serFp));
                 }
             }
             CerrarFila();
@@ -1409,6 +1422,7 @@ dib();})();";
         private List<List<string>> _numBlocks;
         private static Dictionary<string, HojaNumerica.Rejilla> _numGrids;   // #map de la hoja numérica: texto → rejilla
         private static Dictionary<string, List<string>> _numModels;   // #modelo3d(…) → literales de sus datos
+        private static Dictionary<string, List<(string Nombre, double[] X, double[] Y)>> _numSeries;   // #fplot(c = M): series calculadas por la hoja numérica
         private static Dictionary<string, HojaNumerica.MallaDatos> _numMeshes;   // #malla(x, y, e, s) → datos del modelo
         private static string ClaveNum(string texto, int vez) => texto + "\u0001" + vez;
         private const string NumOculta = "\u0002hkoculta";                   // línea #hide: no se dibuja
@@ -1784,7 +1798,7 @@ dib();})();";
             // Aquí los nombres se preparan ANTES de plegar, para que los bloques usen los mismos
             // nombres que la hoja (ν → nu, E/e distintos…); el plegado deja una línea marcador.
             _numMode = RxNumerico.IsMatch(text);
-            _numRes = null; _numBlocks = null; _numGrids = null; _numMeshes = null; _numModels = null;
+            _numRes = null; _numBlocks = null; _numGrids = null; _numMeshes = null; _numModels = null; _numSeries = null;
             if (_numMode)
             {
                 { var a0 = text; text = RxNumerico.Replace(text, ""); Paso(ref mapaT, a0, text); }
@@ -1979,6 +1993,12 @@ dib();})();";
                     { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Malla = mz.Groups[2].Value, Visible = true }); continue; }
                     var mm = rxMap.Match(lines[i]);
                     if (mm.Success) { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Mapa = mm.Groups[2].Value, Visible = true }); continue; }
+                    // #fplot(c = M, …) con M calculada por la hoja (matriz N×2): el motor la entrega al gráfico
+                    var mfp = System.Text.RegularExpressions.Regex.Match(lines[i], @"^\s*#\s*fplot\s*\((.*)\)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (mfp.Success && SplitTop(mfp.Groups[1].Value).Any(a0 =>
+                        { var sm0 = System.Text.RegularExpressions.Regex.Match(a0.Trim(), @"^([A-Za-z][\w']*)\s*=\s*(.+)$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                          return sm0.Success && HojaNumerica.EsSerieCalculada(sm0.Groups[2].Value); }))
+                    { progLines.Add(new HojaNumerica.Linea { Idx = i, Texto = s, Serie = mfp.Groups[1].Value, Visible = true }); continue; }
                     if (s.Length == 0 || s.StartsWith("#") || s.StartsWith(";") || s.StartsWith("%")) continue;   // texto
                     numOculta[i] = oculta;
                     if (modo == 'n') continue;                 // #noc: se dibuja, no se calcula (Calcpad)
@@ -2010,6 +2030,14 @@ dib();})();";
                     {
                         string kt = pl.Malla.Trim(); vecesM[kt] = vecesM.TryGetValue(kt, out var c0) ? c0 + 1 : 0;
                         if (_numRes.Malla.TryGetValue(pl.Idx, out var md)) _numMeshes[ClaveNum(kt, vecesM[kt])] = md;
+                    }
+                _numSeries = new Dictionary<string, List<(string Nombre, double[] X, double[] Y)>>();
+                var vecesS = new Dictionary<string, int>();
+                foreach (var pl in progLines)
+                    if (pl.Serie != null)
+                    {
+                        string kt = pl.Serie.Trim(); vecesS[kt] = vecesS.TryGetValue(kt, out var c0) ? c0 + 1 : 0;
+                        if (_numRes.Serie.TryGetValue(pl.Idx, out var sr)) _numSeries[ClaveNum(kt, vecesS[kt])] = sr;
                     }
                 if (Environment.GetEnvironmentVariable("HK_NUM_DEBUG") is string dbg && dbg.Length > 0)
                     try

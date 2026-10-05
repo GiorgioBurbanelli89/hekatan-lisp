@@ -69,12 +69,102 @@ P_0 = P_1 + P_2r + P_2t + P_3r + P_3t 'empuje en reposo total sobre el fuste [kN
 M_0 = P_1·(t_2 + t_3 + t_1/3) + P_2r·(t_3 + t_2/2) + P_2t·(t_3 + t_2/3) + P_3r·t_3/2 + P_3t·t_3/3 'su momento en la junta [kN·m/m]
 z_0 = M_0/P_0 'altura de la resultante sobre la junta [m]
 
+#: **El fuste dibujado, a escala.** Sección vertical del fuste con el relleno a la derecha (la cara trasera, vertical, está en x = 0) y la cara delantera inclinada 1:12.5 a la izquierda. Las líneas a trazos separan los tres estratos (2.30, 1.70 y 1.00 m hasta la junta). **Azul:** el empuje **en reposo** σ₀ = K₀·σ_{z} sobre la cara trasera (1 m de flecha = 25 kPa): crece con la profundidad y **salta** en cada contacto porque cambia K₀ (cada suelo tiene su φ). **Rojo:** la fuerza de la coronación, 30 kN/m. **Naranja:** el peso del fuste, que cae detrás del centro de la sección. Todo se reduce a la **junta de construcción**, a 5.00 m de la coronación (y = 0 en el dibujo), que es donde se arma.
+pq_1 = K_01*g_1*t_1/25 'σ₀ en la base del suelo 1, a escala del dibujo
+pq_2 = K_02*s_v1/25 'σ₀ arriba del suelo 2 (salta: cambia K₀)
+pq_3 = K_02*(s_v1 + g_2*t_2)/25 'σ₀ en la base del suelo 2
+pq_4 = K_03*s_v2/25 'σ₀ arriba del suelo 3
+pq_5 = K_03*(s_v2 + g_3*t_3)/25 'σ₀ en la junta
+P0_t = round(P_0, 1) 'empuje total, para el rótulo
+#dibujo("Fuste de GEO5 Demo01: estratos, empuje en reposo (azul, 1 m = 25 kPa), fuerza de la coronación (rojo) y peso (naranja)", ud = m, escala = auto, cotas = m, alto = 230)
+#  poligono(0, 0, 0, H_j, -t_f, H_j, -h_s, 0, "gruesa")
+#  poligono(0, 0, 0, H_j, -t_f, H_j, -h_s, 0, "gris tenue")
+#  linea(0, H_j, 4.8, H_j, "media verde")
+#  linea(0, H_j - t_1, 4.8, H_j - t_1, "trazos")
+#  linea(0, H_j - t_1 - t_2, 4.8, H_j - t_1 - t_2, "trazos")
+#  linea(-h_s - 0.4, 0, 4.8, 0, "eje")
+#  carga(0, H_j, 0, H_j - t_1, 0, pq_1, "", "azul", n = 4)
+#  carga(0, H_j - t_1, 0, H_j - t_1 - t_2, pq_2, pq_3, "", "azul", n = 4)
+#  carga(0, H_j - t_1 - t_2, 0, 0, pq_4, pq_5, "", "azul", n = 3)
+#  flecha(2.4, H_j + a_F, 0.05, H_j + a_F, "rojo")
+#  texto(0.4, H_j + a_F + 0.25, "F = 30 kN/m", 2.5, "i")
+#  flecha(-x_W, y_W + 1.2, -x_W, y_W, "naranja")
+#  texto(-x_W - 1.5, y_W + 1.3, "W = 45.98 kN/m", 2.5, "i")
+#  texto(2.35, H_j - t_1/2, "suelo 1: γ 19, φ 29°", 2.5, "i")
+#  texto(2.35, H_j - t_1 - t_2/2, "suelo 2: γ 17.5, φ 31.5°", 2.5, "i")
+#  texto(2.35, t_3/2, "suelo 3: γ 19.5, φ 27°", 2.5, "i")
+#  texto(0.3, 0.2, "junta: se arma aquí", 2.5, "i")
+#  cota(-h_s - 0.7, 0, -h_s - 0.7, H_j, 0.1, "5.00")
+#  cota(-t_f, H_j + 0.7, 0, H_j + 0.7, 0.1, "0.20")
+#  cota(-h_s, -0.6, 0, -0.6, -0.1, "0.60")
+#  cota(5.0, H_j - t_1, 3.6, H_j, 0.1, "2.30")
+#  cota(5.0, H_j - t_1 - t_2, 3.6, H_j - t_1, 0.1, "1.70")
+#  cota(5.0, 0, 3.6, H_j - t_1 - t_2, 0.1, "1.00")
+#fin
+#: **Cómo se lee.** El área de cada trapecio azul es el empuje de ese estrato (rectángulo = lo que pesa lo de arriba × K₀, triángulo = su propio peso × K₀). Sumados dan **P₀ = @{P0_t} kN/m**, a @{z_0} m sobre la junta: el brazo con que flexiona el fuste. La fuerza de 30 kN/m actúa 5.20 m sobre la junta (brazo grande) y por eso pesa casi tanto como todo el suelo. El peso, al caer detrás del centro de la sección, **resta** un poco de momento. La suma de los tres momentos es M_{Ed}, que se compara más abajo con la resistencia de la armadura.
+
 ## 4 · Momento y cortante de diseño en la junta
 
 #: El empuje y la fuerza de la coronación flexionan el fuste hacia delante (tracción en la cara trasera); el peso, que cae detrás del centro, lo endereza un poco. Con los coeficientes 1.000 del ejemplo (ASD):
 M_Ed = M_0 + F_1·(H_j + a_F) - W_f·e_W 'momento de diseño en la junta [kN·m/m]
 V_Ed = P_0 + F_1 'cortante de diseño en la junta [kN/m]
 N_Ed = W_f 'axial (no se usa en la flexión simple de GEO5) [kN/m]
+
+## 4b · Momento y cortante a lo largo del fuste
+
+#: El mismo cálculo (empuje en reposo por estratos + fuerza de la coronación − excentricidad del peso) repetido en cada profundidad z bajo la coronación da los diagramas de **momento** y **cortante** del fuste. El empotramiento en la zapata (z = 5.00 m) es donde valen más: ahí se arma. Los puntos de GEO5 son su resultado en la junta a 5.00 m.
+Pm = [t_f; n_f; gamma_c; t_1; t_2; g_1; g_2; g_3; K_01; K_02; K_03; F_1; a_F] 'datos del fuste juntos
+#hide
+function R = mvz(z, Pm)
+  t_f = Pm(1)
+  n_f = Pm(2)
+  gc = Pm(3)
+  t1 = Pm(4)
+  t2 = Pm(5)
+  g1 = Pm(6)
+  g2 = Pm(7)
+  g3 = Pm(8)
+  k1 = Pm(9)
+  k2 = Pm(10)
+  k3 = Pm(11)
+  Fc = Pm(12)
+  aF = Pm(13)
+  d1 = min(z, t1)
+  F1 = k1*g1*d1*d1/2
+  dep1 = 2*d1/3
+  d2 = max(min(z - t1, t2), 0)
+  st2 = k2*g1*t1
+  sb2 = k2*(g1*t1 + g2*d2)
+  F2 = (st2 + sb2)/2*d2
+  dep2 = t1 + d2*(st2 + 2*sb2)/(3*max(st2 + sb2, 0.000000001))
+  d3 = max(z - t1 - t2, 0)
+  st3 = k3*(g1*t1 + g2*t2)
+  sb3 = k3*(g1*t1 + g2*t2 + g3*d3)
+  F3 = (st3 + sb3)/2*d3
+  dep3 = t1 + t2 + d3*(st3 + 2*sb3)/(3*max(st3 + sb3, 0.000000001))
+  P = F1 + F2 + F3
+  M = F1*(z - dep1) + F2*(z - dep2) + F3*(z - dep3)
+  h = t_f + z/n_f
+  Ar = t_f*z
+  At = (h - t_f)*z/2
+  W = gc*(Ar + At)
+  xW = (Ar*t_f/2 + At*(t_f + (h - t_f)/3))/max(Ar + At, 0.000000001)
+  R = [M + Fc*(z + aF) - W*(h/2 - xW); P + Fc]
+end
+Mv = zeros(26, 2)
+Vv = zeros(26, 2)
+for j = 1:26
+  zj = (j - 1)*0.2
+  Rj = mvz(zj, Pm)
+  Mv(j, 1) = zj
+  Mv(j, 2) = Rj(1)
+  Vv(j, 1) = zj
+  Vv(j, 2) = Rj(2)
+end
+#show
+R_j = mvz(H_j, Pm) 'comprobación: la función en la junta da [M_Ed; V_Ed]
+#fplot(Momento = Mv, Cortante = Vv, GEO5M = [5 348.11], GEO5V = [5 148.8], [0 5])
+#: Eje x: profundidad z bajo la coronación [m]; eje y: momento M [kN·m/m] y cortante V [kN/m]. El momento crece **más que lineal** con la profundidad (el empuje del suelo crece con z y su brazo también): por eso la sección crítica es siempre el arranque.
 
 ## 5 · La sección de hormigón armado (EN 1992-1-1)
 
@@ -102,6 +192,26 @@ r_us = round(100·M_Ed/M_Rd, 1)
 r_uv = round(100·V_Ed/V_Rd, 1)
 #show
 #: **Lectura.** La flexión usa el @{r_us} % de la sección y el cortante el @{r_uv} %: la sección cumple con holgura. GEO5 marca «NOT OK. (1000 %)» en la flexión por OTRA sección, la de 1.57 m bajo la coronación, donde corta la armadura: allí el canto es 0.33 m y las mismas 14 Ø 20 dan x > x_{max} («too much reinforcement»), una sección sobrearmada.
+
+As_t = round(A_s, 0) 'armadura, para el rótulo
+ME_t = round(M_Ed, 1) 'momento de diseño, para el rótulo
+MR_t = round(M_Rd, 1) 'momento resistente, para el rótulo
+xn_t = round(x_n, 3) 'eje neutro, para el rótulo
+yb_ = linspace(1/28, 1 - 1/28, 14) 'posición de las 14 barras a lo largo del metro
+#: **La sección armada, a escala.** Corte horizontal del fuste a la altura de la junta (0.60 m de espesor) por una franja de 1 m de largo. La cara delantera (izquierda) comprime; la **trasera** (derecha), traccionada, lleva las 14 barras Ø20 por metro, a 30 mm de recubrimiento. El **eje neutro** (línea a trazos) queda a x = @{xn_t} m de la cara comprimida: es la profundidad del bloque de hormigón que equilibra la tracción del acero. El **canto útil** d es la distancia de la cara comprimida al centro de las barras.
+#dibujo("Sección del arranque: 14 Ø20 por metro en la cara trasera, recubrimiento 30 mm, eje neutro y canto útil", ud = m, escala = auto, cotas = m, alto = 200)
+#  rect(0, 0, h_s, 1, "gruesa")
+#  circulo(h_s - (r_c + d_b/2)/1000, yb_, d_b/2000, "acero relleno")
+#  linea(x_n, 0, x_n, 1, "trazos")
+#  texto(x_n + 0.02, 0.5, "eje neutro", 2.5, "i")
+#  texto(0.05, 0.9, "cara delantera (compresión)", 2.5, "i")
+#  texto(h_s + 0.25, 0.5, "cara trasera (tracción)", 2.5, "i")
+#  cota(0, -0.12, h_s, -0.12, -0.05, "0.60")
+#  cota(0, 1.12, d_u, 1.12, 0.05, "d")
+#  cota(h_s - (r_c + d_b/2)/1000, 1.12, h_s, 1.12, 0.05, "0.04")
+#  cota(h_s + 0.15, 0, h_s + 0.15, 1/14, 0.05, "7.1 cm")
+#fin
+#: **Cómo se lee.** Cada círculo es una barra Ø20 (área 314 mm²); 14 barras por metro dan A_{s} = @{As_t} mm². Con el momento de diseño M_{Ed} = @{ME_t} kN·m/m, la resistencia M_{Rd} = @{MR_t} kN·m/m deja la sección holgada; GEO5 marca «NOT OK» por otra sección (a 1.57 m de la coronación) que esta hoja no reproduce.
 
 ## 6 · Hekatan contra GEO5
 

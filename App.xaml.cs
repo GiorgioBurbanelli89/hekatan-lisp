@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 
 namespace HekatanLisp
@@ -23,7 +23,23 @@ namespace HekatanLisp
             if (!headless)
             {
                 _mutex = new System.Threading.Mutex(true, "HekatanLisp_SingleInstance_v1", out bool creada);
-                if (!creada) { Shutdown(0); return; }   // ya existe una → cerrar esta
+                if (!creada)
+                {
+                    // ya existe una → se le ENTREGA el archivo (doble clic en un .lisp con la app abierta:
+                    // antes esta copia se cerraba y el archivo no se abría en ninguna parte)
+                    var archivo = Array.Find(args, a => !a.StartsWith("--") && !a.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) && !a.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(a));
+                    if (archivo != null)
+                        try
+                        {
+                            using var cli = new System.IO.Pipes.NamedPipeClientStream(".", TuboAbrir, System.IO.Pipes.PipeDirection.Out);
+                            cli.Connect(3000);
+                            using var w = new System.IO.StreamWriter(cli) { AutoFlush = true };
+                            w.WriteLine(System.IO.Path.GetFullPath(archivo));
+                        }
+                        catch { }
+                    Shutdown(0); return;
+                }
+                EscucharOtrasCopias();
             }
 
             // Un error sin atrapar cerraba la ventana SIN AVISO (Jorge: «al rato la app ya no estaba»).
@@ -54,5 +70,29 @@ namespace HekatanLisp
         }
 
         private System.Threading.Mutex _mutex;
+        private const string TuboAbrir = "HekatanLisp_Abrir_v1";
+
+        /// <summary>La primera copia escucha: otra copia que se abra con un archivo se lo manda por esta
+        /// tubería y aquí se carga en la ventana, que pasa al frente.</summary>
+        private void EscucharOtrasCopias()
+        {
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        using var srv = new System.IO.Pipes.NamedPipeServerStream(TuboAbrir, System.IO.Pipes.PipeDirection.In, 1,
+                            System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+                        await srv.WaitForConnectionAsync();
+                        using var r = new System.IO.StreamReader(srv);
+                        var ruta = (await r.ReadLineAsync())?.Trim();
+                        if (!string.IsNullOrEmpty(ruta) && System.IO.File.Exists(ruta))
+                            await Dispatcher.InvokeAsync(() => (MainWindow as HekatanLisp.MainWindow)?.AbrirDesdeOtraCopia(ruta));
+                    }
+                    catch { await System.Threading.Tasks.Task.Delay(500); }
+                }
+            });
+        }
     }
 }

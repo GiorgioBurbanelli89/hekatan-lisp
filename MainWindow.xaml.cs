@@ -1172,6 +1172,17 @@ namespace HekatanLisp
             catch (Exception ex) { MessageBox.Show("No pude abrir: " + ex.Message); }
         }
 
+        /// <summary>Otra copia de la app se abrió con un archivo (doble clic en un .lisp): se carga aquí
+        /// y la ventana pasa al frente.</summary>
+        public void AbrirDesdeOtraCopia(string path)
+        {
+            CargarArchivo(path);
+            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+            Activate();
+            Topmost = true; Topmost = false;   // al frente aunque otra ventana tuviera el foco
+            Focus();
+        }
+
         private void MenuAbrir(object s, RoutedEventArgs e)
         {
             var dlg = new Microsoft.Win32.OpenFileDialog

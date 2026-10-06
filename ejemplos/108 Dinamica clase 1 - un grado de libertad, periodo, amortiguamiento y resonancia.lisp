@@ -46,7 +46,7 @@ r_t = Simplify{m·Diff{Diff{u_0·cos(w·t) @ t} @ t} + k·u_0·cos(w·t)} 'lo qu
 #fplot(T_n = 0.128198*sqrt(x), T_lineal = 0.128198*x, [1 4])
 #: Eje horizontal: n, veces la masa; eje vertical: T en s. La curva de abajo es la de verdad (√n); la recta de arriba es lo que pasaría si T fuera proporcional a m. Con n = 4 el periodo solo se dobla (0.256 s), no se cuadruplica.
 #: La misma oscilación con la masa ×1, ×2, ×3 y ×4 (eje horizontal: t en s; vertical: u/u_{0}):
-#anim fplot(u = cos(2*pi*x/(0.128198*sqrt(n))), [0 0.5]), n = 1:4
+#anim fplot(u = cos(2*pi*x/(0.128198*sqrt(n))), [0 0.5]), n = 1:0.05:4
 
 ## 4 · Un pórtico de un piso, con números
 
@@ -110,7 +110,7 @@ omega_D = omega_n·sqrt(1 - xi^2) 'frecuencia amortiguada, Chopra ec. 2.2.5 [rad
 p_env = -xi·omega_n 'pendiente de ln(amplitud) contra t [1/s]
 N_50 = 0.11/xi 'ciclos para que la amplitud caiga a la mitad, Chopra ec. 2.2.13
 #: Con ξ = 0 a 20 % (n·5 %), el mismo pórtico:
-#anim fplot(u = exp(-(n/20)*omega_n*x)*cos(omega_n*x), [0 0.5]), n = 0:4
+#anim fplot(u = exp(-(n/20)*omega_n*x)*cos(omega_n*x), [0 0.5]), n = 0:0.05:4
 
 ## 6 · La resonancia: cuando la carga va al ritmo de la estructura
 

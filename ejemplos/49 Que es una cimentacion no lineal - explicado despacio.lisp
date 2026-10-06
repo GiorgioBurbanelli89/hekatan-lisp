@@ -15,7 +15,7 @@ F_suelo = k*(delta + abs(delta))/2
 #: Se aplasta y se estira poco a poco: la curva se va dibujando de izquierda a derecha. Del lado del tirón (izquierda) el resorte normal responde con fuerza negativa; el suelo se queda en cero porque la zapata simplemente se DESPEGA. A la derecha, empujando, los dos responden igual.
 #fila
 #fplot(resorte = x, suelo = (x + abs(x))/2, [-1 1])
-#anim fplot(resorte = x*(1 + sign(n/10 - x))/2, suelo = (x + abs(x))/2*(1 + sign(n/10 - x))/2, [-1 1]), n = -10:10
+#anim fplot(resorte = x*(1 + sign(n/10 - x))/2, suelo = (x + abs(x))/2*(1 + sign(n/10 - x))/2, [-1 1]), n = -10:0.25:10
 #finfila
 
 ## 3 · La zapata: una fila de resortes
@@ -36,7 +36,7 @@ a_contacto = 3*(B/2 - e)
 #: La animación: e sube de 0 a B/3 en pasos de B/60 (n = 0 … 20). x se mide desde el borde cargado.
 #: • «lineal» = lo que daría un suelo que SÍ tira: recta que, pasado e = B/6 (n = 10), cruza el cero y sigue hacia abajo. Esa parte bajo cero es tracción IMPOSIBLE.
 #: • «sin_traccion» = el suelo real: rectángulo → trapecio → triángulo que toca 0 en n = 10; luego el borde queda en CERO (levantado) y el triángulo se acorta y sube.
-#anim fplot(lineal = 27.4644*(1 + 0.1*n) - 3.66192*n*x, sin_traccion = ((1 + sign(10.5 - n))/2)*(27.4644*(1 + 0.1*n) - 3.66192*n*x) + ((1 - sign(10.5 - n))/2)*(54.9289/(1.5 - 0.05*n))*((1 - x/(2.25 - 0.075*n)) + abs(1 - x/(2.25 - 0.075*n)))/2, [0 1.5]), n = 0:20
+#anim fplot(lineal = 27.4644*(1 + 0.1*n) - 3.66192*n*x, sin_traccion = ((1 + sign(10.5 - n))/2)*(27.4644*(1 + 0.1*n) - 3.66192*n*x) + ((1 - sign(10.5 - n))/2)*(54.9289/(1.5 - 0.05*n))*((1 - x/(2.25 - 0.075*n)) + abs(1 - x/(2.25 - 0.075*n)))/2, [0 1.5]), n = 0:0.25:20
 #: Mira el final (n = 20, e = B/3 = 0.5 m): la recta lineal marca 82.4 en el borde y −27.5 al otro lado; la real marca 110 en el borde y el contacto mide solo 3·(0.75 − 0.5) = 0.75 m. El suelo real aprieta MÁS en menos área.
 q_n20 = dec(54.9289/(1.5 - 0.05*20), 1)
 a_n20 = dec(3*(0.75 - 0.5), 2)

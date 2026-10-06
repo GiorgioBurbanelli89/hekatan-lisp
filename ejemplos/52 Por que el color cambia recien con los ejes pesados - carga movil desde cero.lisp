@@ -33,7 +33,7 @@ w_borde = dec(P_2/kB*(1 + 3), 3) [mm]
 ### La animación: el bloque bajo el camión que pasa
 
 #: Línea azul: la losa inferior vista de lado, hundiéndose e inclinándose mientras el camión avanza de izquierda a derecha (cada cuadro, el eje delantero avanza medio metro). Línea roja: el asiento máximo de todo el viaje, el que corresponde al color rojo. Mira los primeros cuadros: con solo el eje delantero encima la línea casi no se separa del cero. Cuando entra el primer eje pesado por la izquierda, el bloque cabecea de golpe hacia ese lado.
-#anim fplot(asiento_mm = -((35*(1+sign(0.5*n+0.01))/2*(1+sign(6.01-0.5*n))/2 + 145*(1+sign(0.5*n-4.29))/2*(1+sign(10.31-0.5*n))/2 + 145*(1+sign(0.5*n-8.59))/2*(1+sign(14.61-0.5*n))/2) + (35*(1+sign(0.5*n+0.01))/2*(1+sign(6.01-0.5*n))/2*(0.5*n-3) + 145*(1+sign(0.5*n-4.29))/2*(1+sign(10.31-0.5*n))/2*(0.5*n-7.3) + 145*(1+sign(0.5*n-8.59))/2*(1+sign(14.61-0.5*n))/2*(0.5*n-11.6))*(x-3)/3)/117.68, maximo_del_viaje_mm = -4.93 + 0*x, cero = 0*x, [0 6]), n = 0:29
+#anim fplot(asiento_mm = -((35*(1+sign(0.5*n+0.01))/2*(1+sign(6.01-0.5*n))/2 + 145*(1+sign(0.5*n-4.29))/2*(1+sign(10.31-0.5*n))/2 + 145*(1+sign(0.5*n-8.59))/2*(1+sign(14.61-0.5*n))/2) + (35*(1+sign(0.5*n+0.01))/2*(1+sign(6.01-0.5*n))/2*(0.5*n-3) + 145*(1+sign(0.5*n-4.29))/2*(1+sign(10.31-0.5*n))/2*(0.5*n-7.3) + 145*(1+sign(0.5*n-8.59))/2*(1+sign(14.61-0.5*n))/2*(0.5*n-11.6))*(x-3)/3)/117.68, maximo_del_viaje_mm = -4.93 + 0*x, cero = 0*x, [0 6]), n = 0:0.25:29
 
 ## 4 · El color a lo largo del viaje: la cuenta a mano contra el programa
 

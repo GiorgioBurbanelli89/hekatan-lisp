@@ -974,7 +974,7 @@ namespace HekatanLisp
             plot = System.Text.RegularExpressions.Regex.Replace(plot, @"^(?:fplot|plot|ezplot)\s*(?=\()", "",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             var vals = new List<double>();
-            for (double v = a; v <= b + st * 1e-9 && vals.Count < 60; v += st) vals.Add(v);
+            for (double v = a; v <= b + st * 1e-9 && vals.Count < 240; v += st) vals.Add(v);
             if (vals.Count == 0) return "";
             int id = System.Threading.Interlocked.Increment(ref _sliderId);
             string P(double v) => v.ToString("0.####", inv);

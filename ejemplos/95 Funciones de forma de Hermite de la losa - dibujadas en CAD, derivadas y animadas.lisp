@@ -73,7 +73,7 @@ giro_42 = Simplify{Slope{Φ_4a(ξ) @ ξ = 1}*(1/a_1)} 'Φ_4a en el nudo 2
 
 ### 4.1 · La flecha del nudo 1: dibuja Φ_{1a}
 #: El nudo 1 sube; el nudo 2 no se mueve y las dos tangentes siguen horizontales.
-#anim(k = 0:10)
+#anim(k = 0:0.25:10)
 #autolisp("Sube la flecha del nudo 1", ancho = 130, alto = 110)
 (setq d (/ k 10.0))
 (capa "SIN DEFORMAR" :color 8 :tipo "trazos")
@@ -92,7 +92,7 @@ giro_42 = Simplify{Slope{Φ_4a(ξ) @ ξ = 1}*(1/a_1)} 'Φ_4a en el nudo 2
 
 ### 4.2 · El giro del nudo 1: dibuja Φ_{2a}
 #: La tangente del nudo 1 se inclina; ningún nudo se mueve de su sitio.
-#anim(k = 0:10)
+#anim(k = 0:0.25:10)
 #autolisp("Crece el giro del nudo 1", ancho = 130, alto = 110)
 (setq d (/ k 10.0))
 (capa "SIN DEFORMAR" :color 8 :tipo "trazos")
@@ -111,7 +111,7 @@ giro_42 = Simplify{Slope{Φ_4a(ξ) @ ξ = 1}*(1/a_1)} 'Φ_4a en el nudo 2
 
 ### 4.3 · La flecha del nudo 2: dibuja Φ_{3a}
 #: Es la del nudo 1 vista en un espejo: ahora sube el nudo 2.
-#anim(k = 0:10)
+#anim(k = 0:0.25:10)
 #autolisp("Sube la flecha del nudo 2", ancho = 130, alto = 110)
 (setq d (/ k 10.0))
 (capa "SIN DEFORMAR" :color 8 :tipo "trazos")
@@ -130,7 +130,7 @@ giro_42 = Simplify{Slope{Φ_4a(ξ) @ ξ = 1}*(1/a_1)} 'Φ_4a en el nudo 2
 
 ### 4.4 · El giro del nudo 2: dibuja Φ_{4a}
 #: La curva queda por debajo: para llegar al nudo 2 subiendo, primero tiene que bajar.
-#anim(k = 0:10)
+#anim(k = 0:0.25:10)
 #autolisp("Crece el giro del nudo 2", ancho = 130, alto = 110)
 (setq d (/ k 10.0))
 (capa "SIN DEFORMAR" :color 8 :tipo "trazos")
@@ -177,7 +177,7 @@ r_3 = Simplify{Diff{Φ_3a(ξ) @ ξ}*(1/a_1) - 6*(ξ/a_1)*(1 - ξ)}
 r_4 = Simplify{Diff{Φ_4a(ξ) @ ξ}*(1/a_1) - (-ξ*(2 - 3*ξ))}
 #: Cuatro ceros: la segunda columna es la derivada de la primera.
 #: **Animación: la tangente recorre la curva.** La recta roja toca a Φ_{1a} en el punto ξ = n/10. Su inclinación es Φ′_{1a} en ese punto: nula en los dos nudos y máxima en el centro.
-#anim fplot(flecha_nudo_1 = 1 - x^2*(3 - 2*x), tangente = 1 - (n/10)^2*(3 - 2*n/10) - 6*(n/10)*(1 - n/10)*(x - n/10), [0 1]), n = 0:10
+#anim fplot(flecha_nudo_1 = 1 - x^2*(3 - 2*x), tangente = 1 - (n/10)^2*(3 - 2*n/10) - 6*(n/10)*(1 - n/10)*(x - n/10), [0 1]), n = 0:0.125:10
 
 ## 6 · Segunda derivada: la curvatura, que da el momento
 #: La segunda derivada dice **cuánto cambia la pendiente**, o sea cuánto se curva la losa. El momento flector es la rigidez por la curvatura: donde no hay curvatura no hay momento. Por eso el programa necesita la tercera columna: con ella arma la rigidez y después saca los momentos.

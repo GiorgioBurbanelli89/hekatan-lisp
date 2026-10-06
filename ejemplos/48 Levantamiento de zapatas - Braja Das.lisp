@@ -161,7 +161,7 @@ A_c = dec(0.5*(L_1c + L_2c)*B_d, 4)
 ## 6 · La animación: la presión al crecer e (una dirección)
 
 #: La zapata del ejemplo con Q = 61.8 tonf (606 kN) y la carga moviéndose en una sola dirección, de e = 0 a e = B/3 en pasos de B/60. Hasta e = B/6 la presión es un trapecio que se inclina; en e = B/6 es un triángulo justo; pasado ese punto el borde se despega (presión cero) y el triángulo se acorta y sube. x se mide desde el borde cargado. Pasa el ratón por encima para pausar.
-#anim fplot(q = ((1+sign(10-n))/2)*(27.4644*(1+0.1*n) - 27.4644*0.133333*n*x) + ((1-sign(10-n))/2)*(54.9289/(1.5-0.05*n))*((1 - x/(2.25-0.075*n)) + abs(1 - x/(2.25-0.075*n)))/2, [0 1.5]), n = 0:20
+#anim fplot(q = ((1+sign(10-n))/2)*(27.4644*(1+0.1*n) - 27.4644*0.133333*n*x) + ((1-sign(10-n))/2)*(54.9289/(1.5-0.05*n))*((1 - x/(2.25-0.075*n)) + abs(1 - x/(2.25-0.075*n)))/2, [0 1.5]), n = 0:0.25:20
 #: La presión máxima (en el borde, x = 0) y el largo de contacto en función de e, para la misma zapata:
 #fila
 #fplot(q_max = 27.4644*(1 + 4*x)*(1+sign(0.25-x))/2 + (54.9289/(1.5-2*x))*(1-sign(0.25-x))/2, [0 0.5])

@@ -51,7 +51,7 @@ namespace HekatanLisp
             if (!string.IsNullOrEmpty(c)) { st = vb; vb = double.Parse(c, Inv); }
             var vals = new List<double>();
             if (st <= 0 || vb < va) return vals;
-            for (double v = va; v <= vb + st * 1e-9 && vals.Count < 60; v += st) vals.Add(Math.Round(v, 10));
+            for (double v = va; v <= vb + st * 1e-9 && vals.Count < 240; v += st) vals.Add(Math.Round(v, 10));
             return vals;
         }
 
@@ -299,6 +299,8 @@ window.hkAnimInit=function(R){if(!R||R.hkAnim)return;
  for(var i=0;i<N;i++)if(voz[i]&&par)voz[i]=voz[i].split('⟦'+par+'⟧').join(esc(val(i)));
  var plano=voz.map(function(h){var d=document.createElement('div');d.innerHTML=h;return txt(d);});
  var i0=0,jugando=false,conVoz=false,tm=null,dt=+R.dataset.dt||1200;
+ /* muchos cuadros = movimiento continuo (~16 por segundo); pocos = un cuadro por paso, como diapositivas */
+ if(N>=24)dt=Math.min(dt,60);
  function show(i){i0=(i%N+N)%N;R.dataset.i=i0;
   if(lienzo){if(lienzo.hkFrame)lienzo.hkFrame(i0);else lienzo.dataset.frame=i0;}
   else for(var k=0;k<fr.length;k++)fr[k].style.visibility=(k===i0?'visible':'hidden');

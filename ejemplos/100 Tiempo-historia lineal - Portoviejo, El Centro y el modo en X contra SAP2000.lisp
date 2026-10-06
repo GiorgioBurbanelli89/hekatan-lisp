@@ -28,7 +28,7 @@ comprueba = Simplify{Diff{Diff{A·sin(w·t) @ t} @ t} + w^2·A·sin(w·t)}
 #: Con amortiguamiento ξ la oscilación decae como e^{−ξ·ω·t}. Mueve la barra (ξ de 0 a 20 %): el modo en X del pórtico (T = 0.2267 s, ω = 27.716 rad/s) soltado desde 1:
 #slider fplot(u = exp(-(n/20)*27.716*x)*cos(27.716*x), [0 1]), n = 0:4
 #: Con n = 1 (ξ = 5 %, el de la NEC) la amplitud cae a la mitad en unos 2.2 ciclos. La misma curva, animada de ξ = 0 a ξ = 20 %:
-#anim fplot(u = exp(-(n/20)*27.716*x)*cos(27.716*x), [0 1]), n = 0:4
+#anim fplot(u = exp(-(n/20)*27.716*x)*cos(27.716*x), [0 1]), n = 0:0.05:4
 
 ## 3 · Los datos del modo en X
 T = 0.2267 [s] 'modo en X del pórtico (Hekatan Struct = SAP2000); el modo 1 (0.7785 s) vibra FUERA del plano

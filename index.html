@@ -11,23 +11,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css?v=95d21bfdde">
-  <link href="_framework/dotnet.ymmu4p1i13.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-GuaSs6sA4YketTSkqAul2Iwa9YGtN357mK/OwVy7lqg=" />
+  <link href="_framework/dotnet.qn44keui4q.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-aiPXIl6b0rPDqJaxcVis0Sh8DfuE6WtlBdtzIY0NNzI=" />
   <script type="importmap">{
   "imports": {
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.jwpb6aevwu.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.qn44keui4q.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
-    "./_framework/dotnet.js": "./_framework/dotnet.ymmu4p1i13.js",
     "./hlisp.js": "./hlisp.c7cu44e0d8.js",
     "./main.js": "./main.i1al5kaodg.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.js": "sha256-GuaSs6sA4YketTSkqAul2Iwa9YGtN357mK/OwVy7lqg=",
+    "./_framework/dotnet.js": "sha256-aiPXIl6b0rPDqJaxcVis0Sh8DfuE6WtlBdtzIY0NNzI=",
     "./_framework/dotnet.native.js": "sha256-Hdq+Wa7iE/Lfspe1r5W0TzvZPElJDa4w74hVJz5UqRQ=",
     "./_framework/dotnet.native.jwpb6aevwu.js": "sha256-Hdq+Wa7iE/Lfspe1r5W0TzvZPElJDa4w74hVJz5UqRQ=",
+    "./_framework/dotnet.qn44keui4q.js": "sha256-aiPXIl6b0rPDqJaxcVis0Sh8DfuE6WtlBdtzIY0NNzI=",
     "./_framework/dotnet.runtime.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
-    "./_framework/dotnet.ymmu4p1i13.js": "sha256-GuaSs6sA4YketTSkqAul2Iwa9YGtN357mK/OwVy7lqg=",
     "./hlisp.c7cu44e0d8.js": "sha256-SI32vwpo9f4qKdkxQfoYecyPeWznIZvoVu2IbZjqkpA=",
     "./hlisp.js": "sha256-SI32vwpo9f4qKdkxQfoYecyPeWznIZvoVu2IbZjqkpA=",
     "./main.i1al5kaodg.js": "sha256-Frt9KUjHvA19nWvvfIYUQnRp8eRuFPR5mwf/7kw2CsQ=",
@@ -100,6 +100,7 @@
         <button data-a="manual">📘 Manual de Hekatan LISP (PDF)</button>
         <button data-a="manualDibujo">📐 Dibujo estilo AutoCAD (PDF)</button>
         <button data-a="manualWeb">Manual en línea</button>
+        <button onclick="window.open('https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases/latest','_blank','noopener')">⬇ Descargar el programa de escritorio (Windows)</button>
         <button data-a="acerca">Acerca de Hekatan LISP</button>
       </div>
     </div>
@@ -112,6 +113,7 @@
     <button class="mode" data-a="nuevo" style="margin-left:14px" title="Hoja nueva en blanco">📄 Nuevo</button>
     <button class="mode" data-a="dibujo2d" title="Abre la ventana de dibujo como AutoCAD (línea de órdenes, OSNAP, cotas, 3D). Lo dibujado vuelve a la hoja como entmake de AutoLISP.">✏ Dibujar (CAD)</button>
     <button class="mode" data-a="compartir" title="Copia un enlace con esta hoja: quien lo abra la ve igual, ya calculada">🔗 Compartir</button>
+    <button class="mode" onclick="window.open('https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases/latest','_blank','noopener')" title="Descarga el programa de escritorio (Windows): hojas sin límite, dibujo CAD y animaciones">⬇ Descargar Hekatan LISP</button>
     <label class="ejemplos" title="Carga un ejemplo y lo calcula (AutoRun)">
       <span class="lbl">ejemplos:</span>
       <select id="sel-ejemplos" aria-label="Ejemplos"><option value="">— elige un ejemplo —</option></select>

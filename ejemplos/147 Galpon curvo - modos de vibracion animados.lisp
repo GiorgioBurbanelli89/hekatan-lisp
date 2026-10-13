@@ -1,11 +1,33 @@
 # Galpón curvo: los modos de vibración, animados
-#numerico
-
 #: **Qué se ve.** El galpón curvo de luz 20 m (6 pórticos, columnas CFT, cerchas en los dos sentidos y chapas de zinc) **vibrando en sus tres primeros modos**. Cada modo es una forma de moverse que la estructura prefiere; el **periodo** T dice cuánto tarda en cada vaivén.
 #: **De dónde salen los modos.** De **Hekatan OpenSees**, sobre la misma malla que Hekatan Struct (214 nudos, 443 barras de Timoshenko y 100 chapas). OpenSees da los periodos T_{1} = 0.3309 s, T_{2} = 0.3237 s, T_{3} = 0.2786 s y esta hoja solo los **dibuja y los anima**: arrastra para girar, la rueda hace zoom y el cursor da el valor.
 #: **El color** es lo que se mueve cada nudo en ese modo, de 0 (azul, quieto) a 1 (rojo, el que más se mueve). El **movimiento está ampliado** para verlo; en la realidad es de milímetros. Un clic detiene la animación.
 
-## 1 · La malla
+## 1 · Un grado de libertad, en símbolos
+
+#: Un modo de vibración es, en cada instante, **una masa sobre un resorte**. Newton con la ley de Hooke da la ecuación del movimiento libre **m·ü + k·u = 0**. Se prueba u(t) = u_{0}·cos(ω·t) y se mira qué sobra al sustituir:
+r_t = Simplify{m·Diff{Diff{u_0·cos(w·t) @ t} @ t} + k·u_0·cos(w·t)} 'lo que sobra al sustituir
+#: Para que sobre cero en todo instante hace falta (k − m·ω²) = 0. De ahí sale la frecuencia circular **ω = √(k/m)** y el periodo **T = 2·π/ω**:
+w_s = Simplify{sqrt(k/m)} 'frecuencia circular ω
+T_s = Simplify{2·pi/sqrt(k/m)} 'periodo T
+
+## 2 · Los mismos símbolos, con los números del galpón
+
+#: El galpón tiene 214 nudos y mil tantos grados de libertad, pero cada modo se comporta como esa masa y ese resorte. Con el periodo del primer modo (T_{1} = 0.3309 s) sale:
+w_s1 = Simplify{2·pi/0.3309} 'ω_1 = 2π/T_1, en rad/s
+f_s1 = Simplify{1/0.3309} 'f_1 = 1/T_1, en Hz
+#: Los otros modos son **resortes y masas distintas**: el de más rigidez por masa tiene el periodo más corto. Hekatan OpenSees los calcula todos a la vez y se ven a continuación, animados.
+
+#numerico
+
+## 3 · Ahora, en números
+
+#: Los mismos símbolos evaluados (T_{1} en s): **ω_{1} = 2·π/T_{1}** y **f_{1} = 1/T_{1}**.
+T_1 = 0.3309
+om_1 = 2*pi/T_1
+fr_1 = 1/T_1
+
+## 4 · La malla
 
 #: Los 214 nudos, las 443 barras (columnas, vigas y cerchas) y las 100 chapas de la cubierta. Los datos se dan una vez y los tres modos los comparten.
 #hide
@@ -26,7 +48,7 @@ end
 w_1 = v_f
 #show
 
-## 2 · Modo 1
+## 5 · Modo 1
 
 #: **T_{1} = 0.3309 s**, f = 3.022 Hz. El primer modo: toda la cubierta se mueve en bloque en una dirección y las columnas se flexionan.
 #modelo3d(X_n, e_s, e_f, v_1, w_1, U_1, 2.5, 2.5)
@@ -40,7 +62,7 @@ end
 w_2 = v_f
 #show
 
-## 3 · Modo 2
+## 6 · Modo 2
 
 #: **T_{2} = 0.3237 s**, f = 3.090 Hz. El segundo modo: la cubierta se mueve en la dirección perpendicular, con un periodo casi igual al del primero.
 #modelo3d(X_n, e_s, e_f, v_2, w_2, U_2, 2.5, 2.5)
@@ -54,11 +76,11 @@ end
 w_3 = v_f
 #show
 
-## 4 · Modo 3
+## 7 · Modo 3
 
 #: **T_{3} = 0.2786 s**, f = 3.589 Hz. El tercer modo: la cubierta se deforma en vertical, subiendo en el centro y bajando en los bordes; las columnas casi no se mueven.
 #modelo3d(X_n, e_s, e_f, v_3, w_3, U_3, 2.5, 2.5)
 
-## 5 · Qué enseña
+## 8 · Qué enseña
 
 #: Los modos 1 y 2 tienen periodos casi iguales (0.331 y 0.324 s) porque el galpón es casi simétrico: se mueve igual de fácil hacia los dos lados. Cuanto **más rígida y más liviana** la estructura, **más corto** el periodo. Con el suelo flexible los periodos se alargan: eso es la **interacción suelo-estructura** (hoja de Hekatan OpenSees, ejemplo 11).

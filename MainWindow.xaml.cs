@@ -1099,7 +1099,7 @@ namespace HekatanLisp
             try
             {
                 if (Directory.Exists(EjemplosDir))
-                    foreach (var f in System.Linq.Enumerable.OrderBy(Directory.GetFiles(EjemplosDir, "*.lisp"), x => x))
+                    foreach (var f in System.Linq.Enumerable.OrderBy(System.Linq.Enumerable.Concat(Directory.GetFiles(EjemplosDir, "*.lisp"), Directory.GetFiles(EjemplosDir, "*.hlisp")), x => x))
                     {
                         // «_nombre.lisp» son hojas de prueba (las leen los guiones de Hekatan School),
                         // no ejemplos para practicar: no van al menú

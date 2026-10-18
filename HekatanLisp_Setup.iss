@@ -40,6 +40,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; las hojas «_*.lisp» de ejemplos/ son pruebas (Hekatan School las lee del repo): no se instalan
 Source: "{#MyOut}\*"; DestDir: "{app}"; Excludes: "ejemplos\_*.lisp{#MyFuera}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Registry]
+; .hlisp = hoja de Hekatan LISP (texto plano; la abren Hekatan LISP y Hekatan Math Studio). .lisp queda para el lenguaje LISP.
+Root: HKA; Subkey: "Software\Classes\.hlisp"; ValueType: string; ValueName: ""; ValueData: "HekatanLisp.Hoja"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\HekatanLisp.Hoja"; ValueType: string; ValueName: ""; ValueData: "Hoja de Hekatan LISP"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\HekatanLisp.Hoja\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"

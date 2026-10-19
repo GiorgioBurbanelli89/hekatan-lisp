@@ -32,7 +32,7 @@ namespace HekatanLisp
         private string _view = "render";           // formato DERECHA: "render" | "lisp" | "math"
         private bool _autoRun = true;              // AutoRun (en vivo) como Hekatan Lab; si off, se usa ▶/F5
         private string _shot, _ctl, _pdf, _html, _latex;
-        private string _lastHtml;   // último HTML renderizado (para --html: Hekatan School)
+        private string _lastHtml, _serve;   // último HTML renderizado (para --html: Hekatan School)
         private bool _webReady;
         private bool _syntaxLisp = false;          // toggle de ENTRADA: escribo matemática (false) / LISP (true)
         private bool _dark = false;                // tema: oscuro (true) / claro (false). Arranca CLARO, como la UI XAML
@@ -56,6 +56,8 @@ namespace HekatanLisp
             _pdf = ValueAfter(args, "--pdf");
             _ctl = ValueAfter(args, "--ctl");
             _html = ValueAfter(args, "--html");   // vuelca el HTML REAL del render (para Hekatan School)
+            _serve = ValueAfter(args, "--serve");   // modo RESIDENTE: se queda vivo y atiende hojas por una tubería (Hekatan MathStudio: evita 1.5 s de arranque en cada gráfica)
+            if (_serve != null) { _view = "render"; ShowInTaskbar = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -32000; Top = -32000; StartServe(_serve); }          // fuera de pantalla (no minimizada: el WebView2 necesita ventana visible)
             // --latex: las MISMAS expresiones, en LaTeX. Manim necesita las letras como
             // vectores para transformar una formula en la siguiente; un PNG solo se funde.
             _latex = ValueAfter(args, "--latex");

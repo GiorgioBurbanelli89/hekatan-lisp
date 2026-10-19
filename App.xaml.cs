@@ -19,6 +19,7 @@ namespace HekatanLisp
                 string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--pdf", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--serve", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--latex", StringComparison.OrdinalIgnoreCase));
             if (!headless)
             {

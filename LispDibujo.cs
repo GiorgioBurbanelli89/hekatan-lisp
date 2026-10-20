@@ -459,7 +459,7 @@ namespace HekatanLisp
               .Append(prims.Any(p => p.Name.StartsWith("cota")) ? " · cotas en " + cotaUd : "").Append("</span></div>");
             sb.Append("<svg class=\"hk-dib-svg\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"").Append(F(vx)).Append(' ').Append(F(vy)).Append(' ')
               .Append(F(vw)).Append(' ').Append(F(vh)).Append("\" width=\"").Append(F(vw)).Append("mm\" height=\"").Append(F(vh))
-              .Append("mm\" style=\"max-width:100%;height:auto\">").Append(defs).Append(c.Sb).Append("</svg>");
+              .Append("mm\" data-x0=\"").Append(c.X0.ToString("R", Inv)).Append("\" data-y1=\"").Append(c.Y1.ToString("R", Inv)).Append("\" data-ml=\"").Append(F(c.ML)).Append("\" data-mt=\"").Append(F(c.MT)).Append("\" data-k=\"").Append(c.K.ToString("R", Inv)).Append("\" data-vy=\"").Append(c.Vy.ToString("R", Inv)).Append("\" style=\"max-width:100%;height:auto\">").Append(defs).Append(c.Sb).Append("</svg>");
             if (leyenda.Count > 0)
             {
                 sb.Append("<div class=\"hk-dib-ley\">");

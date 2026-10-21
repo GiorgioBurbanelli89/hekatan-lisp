@@ -46,6 +46,8 @@ namespace HekatanLisp
         public MainWindow()
         {
             InitializeComponent();
+            var argv = Environment.GetCommandLineArgs();
+            if (Array.Exists(argv, q => q is "--serve" or "--html" or "--pdf" or "--latex")) { ShowInTaskbar = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -32000; Top = -32000; }          // sin pantalla: la ventana nace FUERA de la pantalla ya en el constructor (antes se veía un instante en el centro hasta que cargaba)
             Loaded += OnLoaded;
         }
 
@@ -62,6 +64,7 @@ namespace HekatanLisp
             // vectores para transformar una formula en la siguiente; un PNG solo se funde.
             _latex = ValueAfter(args, "--latex");
             if (_pdf != null || _html != null || _latex != null) _view = "render";
+            if (_html != null || _pdf != null || _latex != null) { ShowInTaskbar = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -32000; Top = -32000; }          // modos sin pantalla (los usa MathStudio): la ventana nace FUERA de la pantalla y sin botón en la barra: no se ve parpadear Hekatan LISP
             var v = ValueAfter(args, "--view");
             if (v is "render" or "lisp" or "math") _view = v;
             var o = ValueAfter(args, "--op");

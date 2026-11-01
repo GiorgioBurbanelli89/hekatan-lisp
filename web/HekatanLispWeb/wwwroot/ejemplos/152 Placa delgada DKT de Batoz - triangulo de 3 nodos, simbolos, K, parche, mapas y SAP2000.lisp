@@ -2,6 +2,14 @@
 #numerico
 #: Elemento DKT (Discrete Kirchhoff Triangle) de Batoz, Bathe y Ho (1980): el triángulo de placa delgada que usa Shell-Thin de CSI. Tres grados de libertad por nodo: w, θx = ∂w/∂y, θy = −∂w/∂x. Primero todo en símbolos y después con números; se valida con la prueba de parche, los cuerpos rígidos, los mapas de momentos y la comparación con SAP2000 y ETABS. Solo flexión: la membrana y el drilling son otro elemento.
 
+## 0 · De la ecuación diferencial a la forma débil
+#: Placa delgada de Kirchhoff. El desplazamiento vertical w cumple la ecuación diferencial D·∇⁴w = q, con la rigidez a flexión D = E·t³/(12·(1−ν²)) en kN·m y la carga q por unidad de área en kN/m².
+D_flex = Simplify{Em*t^3/(12*(1-nu^2))}
+#: Condiciones de borde. Esenciales, se imponen al desplazamiento: empotrado w = 0 y ∂w/∂n = 0; apoyado w = 0. Naturales, salen solas de la forma débil: apoyado Mn = 0; libre Mn = 0 y Vn = 0.
+#: Función de prueba. Se multiplica la ecuación por una variación δw y se integra en el área A: ∫ δw·(D·∇⁴w − q) dA = 0.
+#: Se integra por partes dos veces. Con las condiciones de borde desaparecen los términos de borde y solo quedan segundas derivadas: ∫ δκᵀ·Db·κ dA = ∫ δw·q dA, con las curvaturas κ = [−w,xx ; −w,yy ; −2·w,xy] y Db la matriz de comportamiento a flexión.
+#: Discretización. Se aproxima w con funciones de forma nodo a nodo: w ≈ Σ Nᵢ·wᵢ. Las curvaturas salen de sus segundas derivadas: κ = B·u. La rigidez del elemento es K = ∫ Bᵀ·Db·B dA y el sistema es K·u = f. Las funciones de forma y B se construyen en las secciones siguientes.
+
 ## 1 · Símbolos: de dónde salen los coeficientes
 #: Sobre el lado k (de i a j, largo l) la rotación a lo largo del lado sigue un cubo y la normal es lineal. En el punto medio:
 #: βs = −3/(2·l)·(wj − wi) − 1/4·(βs_i + βs_j) · βn = 1/2·(βn_i + βn_j)

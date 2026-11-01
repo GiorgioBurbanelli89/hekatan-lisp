@@ -2,6 +2,12 @@
 #numerico
 #: El triángulo Shell-Thick de SAP2000 24 y ETABS 22 no es el CS-DSG3 ni ninguno de los publicados: se obtuvo midiendo el binario de ETABS (emulación del código del kernel) y se comprobó contra los dos programas. Tres grados de libertad por nodo: w, θx = ∂w/∂y, θy = −∂w/∂x. Aquí se arma entero, primero con las fórmulas y después con números: K de 9×9, reacciones, momentos en los nodos, cortante V13 y V23 y los mapas de Mxx, Myy y Mxy con el ratón. Solo flexión: la membrana y el drilling son otro elemento.
 
+## 0 · De la ecuación diferencial a la forma débil (Reissner-Mindlin)
+#: Placa gruesa de Reissner-Mindlin. El desplazamiento w y los giros θ son incógnitas independientes. Equilibrio: ∇·M − Q = 0 y ∇·Q = −q, con el momento M = Db·κ en kN·m/m y el cortante Q = (5/6)·G·t·(∇w − θ) en kN/m.
+#: Condiciones de borde. Esenciales: empotrado w = 0 y θ = 0; apoyado w = 0. Naturales: apoyado Mn = 0; libre Mn = 0, Mns = 0 y Qn = 0.
+#: Función de prueba. Se multiplica por δw y por δθ y se integra en el área A; al integrar por partes queda la forma débil con flexión y cortante: ∫ δκᵀ·Db·κ dA + ∫ δγᵀ·Ds·γ dA = ∫ δw·q dA, con las curvaturas κ (derivadas de θ), la distorsión γ = ∇w − θ y Ds = (5/6)·G·t en kN/m.
+#: Discretización. Se aproximan w y θ con funciones de forma; en este triángulo son 15 grados de libertad que se condensan a 9. La rigidez es K = ∫ Bbᵀ·Db·Bb dA + ∫ Bsᵀ·Ds·Bs dA. El cortante es el que distingue esta placa de la delgada.
+
 ## 1 · La receta, en palabras (por qué es así)
 #: Los giros no son lineales: además de los tres nodales Lᵢ, cada lado lleva una función propia 4·La·Lb (dos componentes, θx y θy). Son seis grados de libertad internos que se eliminan por condensación. No hay burbuja. Con eso el giro puede curvarse dentro del elemento.
 #: El cortante de cada lado sale de Wilson: gk = (wb − wa)/L − (sa/2)(θx_a + θx_b) + (ca/2)(θy_a + θy_b) − (2/3)·sa·θx_k + (2/3)·ca·θy_k, con ca, sa el coseno y el seno del lado. El cortante dentro del triángulo se toma CONSTANTE: (γr, γs) = C·(g1·L1, g2·L2, g3·L3) con C = [2/3 −1/3 −1/3; 1/3 1/3 −2/3], y γ = J⁻¹·(γr, γs). Por eso V13 y V23 valen lo mismo en los tres nodos.

@@ -20,7 +20,7 @@ Em = 24850000 [kN/m²] 'módulo de elasticidad del hormigón
 nu = 0.2 'relación de Poisson (sin unidad)
 t = 0.1 [m] 'espesor de la placa
 Dpl = Em*t^3/(12*(1-nu^2)) [kN·m] 'rigidez a flexión de la placa
-Db = Dpl*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]
+Db = Dpl*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2] [kN·m] 'matriz de comportamiento a flexión
 
 ## 3 · DKQ: las N de ocho nodos (cuatro esquinas y cuatro puntos medios)
 #: N5 = 1/2·(1−ξ²)(1−η), N6 = 1/2·(1+ξ)(1−η²), N7 = 1/2·(1−ξ²)(1+η), N8 = 1/2·(1−ξ)(1−η²) y las de esquina N1 = 1/4·(1−ξ)(1−η) − 1/2·(N8 + N5), etc.

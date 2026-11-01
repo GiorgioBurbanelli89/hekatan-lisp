@@ -561,20 +561,31 @@ namespace HekatanLisp
    document.body.appendChild(tip);
    function num(v){var a=Math.abs(v);return (a>=1e5||(a>0&&a<1e-3))?v.toExponential(3):v.toFixed(4);}
    function Zi(i,j){return z[j*(nn+1)+i];}
+   sp._val=function(u,v){var fi=u*nn,fj=v*nn,i=Math.min(nn-1,Math.floor(fi)),j=Math.min(nn-1,Math.floor(fj)),a=fi-i,b=fj-j;
+     return Zi(i,j)*(1-a)*(1-b)+Zi(i+1,j)*a*(1-b)+Zi(i,j+1)*(1-a)*b+Zi(i+1,j+1)*a*b;};   // bilineal
+   var cap=sp.nextElementSibling, ct=cap?cap.textContent:'';
+   sp._nom=(ct.replace(/^\s*mapa de\s+/,'').replace(/\(.*$/,'').trim())||'z';
    im.addEventListener('pointermove',function(e){
      var r=im.getBoundingClientRect();
      var px=(e.clientX-r.left)*W/r.width, py=(e.clientY-r.top)*H/r.height;   // pixel del PNG original
      var u=(px-pL)/(W-pL-pR), v=1-(py-pT)/(H-pT-pB);                        // 0..1 dentro de la placa
      if(u<0||u>1||v<0||v>1){tip.style.display='none';return;}
-     var fi=u*nn, fj=v*nn, i=Math.min(nn-1,Math.floor(fi)), j=Math.min(nn-1,Math.floor(fj));
-     var a=fi-i,b=fj-j;
-     var zz=Zi(i,j)*(1-a)*(1-b)+Zi(i+1,j)*a*(1-b)+Zi(i,j+1)*(1-a)*b+Zi(i+1,j+1)*a*b;   // bilineal
-     tip.textContent=vx+' = '+num(xa+(xb-xa)*u)+'\n'+vy+' = '+num(ya+(yb-ya)*v)+'\nz = '+num(zz);
+     var zz=sp._val(u,v);
+     // 2-nov-2026, Jorge: «HOVER con Mxx, Myy, Mxy». Los mapas de la página con el MISMO dominio
+     // (misma planta) forman un grupo: el globo da el valor de TODOS en ese punto (▶ = el mapa
+     // que está bajo el cursor). Un mapa solo sigue dando «z».
+     var gr=grupo(sp),txt=vx+' = '+num(xa+(xb-xa)*u)+'\n'+vy+' = '+num(ya+(yb-ya)*v);
+     if(gr.length>1){for(var k=0;k<gr.length;k++)txt+='\n'+(gr[k]===sp?'▶ ':'  ')+gr[k]._nom+' = '+num(gr[k]._val(u,v));}
+     else txt+='\nz = '+num(zz);
+     tip.textContent=txt;
      tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
    });
    im.addEventListener('pointerleave',function(){tip.style.display='none';});
    im.style.cursor='crosshair';
  }
+ function clave(s){var d=s.dataset;return d.xa+'|'+d.xb+'|'+d.ya+'|'+d.yb;}
+ function grupo(sp){var m=document.querySelectorAll('span.hk-map'),k=clave(sp),r=[];
+   for(var i=0;i<m.length;i++)if(m[i]._val&&clave(m[i])===k)r.push(m[i]);return r;}
  function init(){var m=document.querySelectorAll('span.hk-map');for(var i=0;i<m.length;i++)setup(m[i]);}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

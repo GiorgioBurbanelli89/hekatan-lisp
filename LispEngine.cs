@@ -35,8 +35,11 @@ namespace HekatanLisp
         /// Si existe un core CON EL MOTOR HORNEADO (engine.core), usamos ese → sin recargar → ~3× más rápido.</summary>
         private static string CoreArg()
         {
+            // 2-nov-2026: 4 GB de montón (antes 1 GB por defecto). Una hoja FEM de 1575 ecuaciones
+            // (losa de 2 × 2 paños) agotaba el montón al compilar/correr («no devolvió resultados»).
+            // Es reserva de direcciones, no memoria usada.
             var ec = EngineCore();
-            if (ec != null) return $"--core \"{ec}\" ";
+            if (ec != null) return $"--dynamic-space-size 4096 --core \"{ec}\" ";
             var dir = Path.GetDirectoryName(Sbcl);
             var core = dir == null ? null : Path.Combine(dir, "sbcl.core");
             return (core != null && File.Exists(core)) ? $"--core \"{core}\" " : "";
@@ -348,6 +351,7 @@ namespace HekatanLisp
                 StandardOutputEncoding = new UTF8Encoding(false),
                 StandardErrorEncoding = new UTF8Encoding(false),
             };
+            psi.ArgumentList.Add("--dynamic-space-size"); psi.ArgumentList.Add("4096");   // ver CoreArg
             psi.ArgumentList.Add("--core"); psi.ArgumentList.Add(core);
             psi.ArgumentList.Add("--non-interactive");
             psi.ArgumentList.Add("--eval"); psi.ArgumentList.Add("(hlisp-server)");

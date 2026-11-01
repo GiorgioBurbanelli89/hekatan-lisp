@@ -16,10 +16,10 @@ c_comprueba = Simplify{-(C*(-1/4*C) - S*(1/2*(-S)))}
 #: Con C² = x²/l² y S² = y²/l² da 1/4·C² − 1/2·S², igual que c_k.
 
 ## 2 · Números: datos
-Em = 24850000
-nu = 0.2
-t = 0.1
-Dpl = Em*t^3/(12*(1-nu^2))
+Em = 24850000 [kN/m²] 'módulo de elasticidad del hormigón
+nu = 0.2 'relación de Poisson (sin unidad)
+t = 0.1 [m] 'espesor de la placa
+Dpl = Em*t^3/(12*(1-nu^2)) [kN·m] 'rigidez a flexión de la placa
 Db = Dpl*[1, nu, 0; nu, 1, 0; 0, 0, (1-nu)/2]
 
 ## 3 · DKQ: las N de ocho nodos (cuatro esquinas y cuatro puntos medios)
@@ -31,24 +31,24 @@ Q1 = Simplify{1/4*(1-xi)*(1-eta) - 1/2*(Q8 + Q5)}
 Hx1_dkq = Simplify{[1.5*(a5*Q5 - a8*Q8), b5*Q5 + b8*Q8, Q1 - c5*Q5 - c8*Q8]}
 
 ## 4 · DKQ con números (cuadrilátero cualquiera)
-X1 = 0
-Y1 = 0
-X2 = 2
-Y2 = 0.2
-X3 = 2.2
-Y3 = 1.8
-X4 = 0.1
-Y4 = 1.6
+X1 = 0 [m] 'coordenada del nodo
+Y1 = 0 [m] 'coordenada del nodo
+X2 = 2 [m] 'coordenada del nodo
+Y2 = 0.2 [m] 'coordenada del nodo
+X3 = 2.2 [m] 'coordenada del nodo
+Y3 = 1.8 [m] 'coordenada del nodo
+X4 = 0.1 [m] 'coordenada del nodo
+Y4 = 1.6 [m] 'coordenada del nodo
 XY = [X1, Y1; X2, Y2; X3, Y3; X4, Y4]
 #: Lados 5 = 1-2, 6 = 2-3, 7 = 3-4, 8 = 4-1:
-m5 = (X1-X2)^2 + (Y1-Y2)^2
-m6 = (X2-X3)^2 + (Y2-Y3)^2
-m7 = (X3-X4)^2 + (Y3-Y4)^2
-m8 = (X4-X1)^2 + (Y4-Y1)^2
-A5 = -(X1-X2)/m5
-A6 = -(X2-X3)/m6
-A7 = -(X3-X4)/m7
-A8 = -(X4-X1)/m8
+m5 = (X1-X2)^2 + (Y1-Y2)^2 [m²] 'cuadrado del largo del lado
+m6 = (X2-X3)^2 + (Y2-Y3)^2 [m²] 'cuadrado del largo del lado
+m7 = (X3-X4)^2 + (Y3-Y4)^2 [m²] 'cuadrado del largo del lado
+m8 = (X4-X1)^2 + (Y4-Y1)^2 [m²] 'cuadrado del largo del lado
+A5 = -(X1-X2)/m5 'coeficiente de lado, en 1/m
+A6 = -(X2-X3)/m6 'coeficiente de lado, en 1/m
+A7 = -(X3-X4)/m7 'coeficiente de lado, en 1/m
+A8 = -(X4-X1)/m8 'coeficiente de lado, en 1/m
 B5 = 0.75*(X1-X2)*(Y1-Y2)/m5
 B6 = 0.75*(X2-X3)*(Y2-Y3)/m6
 B7 = 0.75*(X3-X4)*(Y3-Y4)/m7
@@ -57,10 +57,10 @@ C5 = (0.25*(X1-X2)^2 - 0.5*(Y1-Y2)^2)/m5
 C6 = (0.25*(X2-X3)^2 - 0.5*(Y2-Y3)^2)/m6
 C7 = (0.25*(X3-X4)^2 - 0.5*(Y3-Y4)^2)/m7
 C8 = (0.25*(X4-X1)^2 - 0.5*(Y4-Y1)^2)/m8
-D5 = -(Y1-Y2)/m5
-D6 = -(Y2-Y3)/m6
-D7 = -(Y3-Y4)/m7
-D8 = -(Y4-Y1)/m8
+D5 = -(Y1-Y2)/m5 'coeficiente de lado, en 1/m
+D6 = -(Y2-Y3)/m6 'coeficiente de lado, en 1/m
+D7 = -(Y3-Y4)/m7 'coeficiente de lado, en 1/m
+D8 = -(Y4-Y1)/m8 'coeficiente de lado, en 1/m
 E5 = (0.25*(Y1-Y2)^2 - 0.5*(X1-X2)^2)/m5
 E6 = (0.25*(Y2-Y3)^2 - 0.5*(X2-X3)^2)/m6
 E7 = (0.25*(Y3-Y4)^2 - 0.5*(X3-X4)^2)/m7
@@ -107,9 +107,9 @@ kb_q(xi, eta) = (Db(1, 1)*B1_q(xi, eta)*transpose(B1_q(xi, eta)) + Db(1, 2)*(B1_
 #: Cuatro puntos de Gauss ±1/√3, peso 1:
 g = 1/sqrt(3)
 K_dkq = kb_q(-g, -g) + kb_q(g, -g) + kb_q(g, g) + kb_q(-g, g)
-K_dkq_11 = K_dkq(1, 1)
-K_dkq_22 = K_dkq(2, 2)
-K_dkq_33 = K_dkq(3, 3)
+K_dkq_11 = K_dkq(1, 1) [kN/m] 'rigidez a w del nodo 1
+K_dkq_22 = K_dkq(2, 2) [kN·m] 'rigidez al giro del nodo 1
+K_dkq_33 = K_dkq(3, 3) [kN·m] 'rigidez al giro del nodo 1
 
 ## 5 · DKQ: prueba de parche y cuerpo rígido
 u_par_q = [X1^2/2; 0; -X1; X2^2/2; 0; -X2; X3^2/2; 0; -X3; X4^2/2; 0; -X4]
@@ -118,9 +118,9 @@ kyy_q = transpose(B2_q(0.3, -0.4))*u_par_q
 kxy_q = transpose(B3_q(0.3, -0.4))*u_par_q
 kxx_q2 = transpose(B1_q(-0.7, 0.6))*u_par_q
 #: Área del cuadrilátero por la fórmula del cordón:
-Aq = 0.5*((X1*Y2 - X2*Y1) + (X2*Y3 - X3*Y2) + (X3*Y4 - X4*Y3) + (X4*Y1 - X1*Y4))
-U_q = 0.5*transpose(u_par_q)*K_dkq*u_par_q
-U_q_exacta = 0.5*Dpl*Aq
+Aq = 0.5*((X1*Y2 - X2*Y1) + (X2*Y3 - X3*Y2) + (X3*Y4 - X4*Y3) + (X4*Y1 - X1*Y4)) [m²] 'área
+U_q = 0.5*transpose(u_par_q)*K_dkq*u_par_q [kN·m] 'energía de deformación
+U_q_exacta = 0.5*Dpl*Aq [kN·m] 'energía de deformación
 u_tras_q = [1; 0; 0; 1; 0; 0; 1; 0; 0; 1; 0; 0]
 f_tras_q = K_dkq*u_tras_q
 u_giro_q = [X1; 0; -1; X2; 0; -1; X3; 0; -1; X4; 0; -1]
@@ -130,11 +130,11 @@ f_giro_q = K_dkq*u_giro_q
 #: Mismo cuadrilátero de la sección 4 y el campo w = x³/6 + x·y²/2 impuesto como desplazamientos en los cuatro nodos (w, θx = x·y, θy = −(x²+y²)/2). Con los 12 GDL restringidos, la reacción de SAP2000 es K·u. SAP2000 24: área Plate-Thin, sin malla automática, unidades kN y m.
 wf(x, y) = x^3/6 + x*y^2/2
 u_s_q = [wf(X1, Y1); X1*Y1; -(X1^2+Y1^2)/2; wf(X2, Y2); X2*Y2; -(X2^2+Y2^2)/2; wf(X3, Y3); X3*Y3; -(X3^2+Y3^2)/2; wf(X4, Y4); X4*Y4; -(X4^2+Y4^2)/2]
-f_q = K_dkq*u_s_q
+f_q = K_dkq*u_s_q 'reacciones: kN para w y kN·m para θx, θy
 #: Reacciones de SAP2000 (w, θx, θy de cada nodo), copiadas de su salida [SAP2000 OAPI]:
 f_sap_q = [5503.829765; -751.808244; -316.323307; -4502.797955; -3135.217694; -4287.655588; 398.404973; 4136.870944; -3873.509261; -1399.436783; 2172.684486; 208.439509]
 dif_q = f_q - f_sap_q
-err_q = 100*sqrt(transpose(dif_q)*dif_q)/sqrt(transpose(f_sap_q)*f_sap_q)
+err_q = 100*sqrt(transpose(dif_q)*dif_q)/sqrt(transpose(f_sap_q)*f_sap_q) [%] 'diferencia relativa
 #: Momentos en el nodo: B del DKQ en los puntos de Gauss y extrapolación bilineal a los nodos (así los da SAP2000).
 Mxx_n(xi, eta) = Db(1, 1)*transpose(B1_q(xi, eta))*u_s_q + Db(1, 2)*transpose(B2_q(xi, eta))*u_s_q
 Myy_n(xi, eta) = Db(1, 2)*transpose(B1_q(xi, eta))*u_s_q + Db(2, 2)*transpose(B2_q(xi, eta))*u_s_q
@@ -142,26 +142,26 @@ Mxy_n(xi, eta) = Db(3, 3)*transpose(B3_q(xi, eta))*u_s_q
 Mxx_x(si, ti) = 0.25*((1-sqrt(3)*si)*(1-sqrt(3)*ti)*Mxx_n(-g, -g) + (1+sqrt(3)*si)*(1-sqrt(3)*ti)*Mxx_n(g, -g) + (1+sqrt(3)*si)*(1+sqrt(3)*ti)*Mxx_n(g, g) + (1-sqrt(3)*si)*(1+sqrt(3)*ti)*Mxx_n(-g, g))
 Myy_x(si, ti) = 0.25*((1-sqrt(3)*si)*(1-sqrt(3)*ti)*Myy_n(-g, -g) + (1+sqrt(3)*si)*(1-sqrt(3)*ti)*Myy_n(g, -g) + (1+sqrt(3)*si)*(1+sqrt(3)*ti)*Myy_n(g, g) + (1-sqrt(3)*si)*(1+sqrt(3)*ti)*Myy_n(-g, g))
 Mxy_x(si, ti) = 0.25*((1-sqrt(3)*si)*(1-sqrt(3)*ti)*Mxy_n(-g, -g) + (1+sqrt(3)*si)*(1-sqrt(3)*ti)*Mxy_n(g, -g) + (1+sqrt(3)*si)*(1+sqrt(3)*ti)*Mxy_n(g, g) + (1-sqrt(3)*si)*(1+sqrt(3)*ti)*Mxy_n(-g, g))
-M_q1 = [Mxx_x(-1, -1), Myy_x(-1, -1), Mxy_x(-1, -1)]
-M_q2 = [Mxx_x(1, -1), Myy_x(1, -1), Mxy_x(1, -1)]
-M_q3 = [Mxx_x(1, 1), Myy_x(1, 1), Mxy_x(1, 1)]
-M_q4 = [Mxx_x(-1, 1), Myy_x(-1, 1), Mxy_x(-1, 1)]
+M_q1 = [Mxx_x(-1, -1), Myy_x(-1, -1), Mxy_x(-1, -1)] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_q2 = [Mxx_x(1, -1), Myy_x(1, -1), Mxy_x(1, -1)] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_q3 = [Mxx_x(1, 1), Myy_x(1, 1), Mxy_x(1, 1)] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_q4 = [Mxx_x(-1, 1), Myy_x(-1, 1), Mxy_x(-1, 1)] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
 #: SAP2000 (M11, M22, M12) en los nodos 1 a 4 [SAP2000 OAPI]. SAP2000 da el momento con el signo contrario al de esta hoja (M11 = −Mxx, M22 = −Myy, M12 = −Mxy), así que la suma de los dos debe dar cero:
-M_sap1 = [-221.352005, -161.569777, 773.527219]
-M_sap2 = [4990.463335, 4961.900813, 938.655492]
-M_sap3 = [5922.245888, 5968.54638, 2329.722025]
-M_sap4 = [417.801978, 379.808169, 2149.254494]
+M_sap1 = [-221.352005, -161.569777, 773.527219] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_sap2 = [4990.463335, 4961.900813, 938.655492] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_sap3 = [5922.245888, 5968.54638, 2329.722025] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_sap4 = [417.801978, 379.808169, 2149.254494] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
 n3(v) = sqrt(v(1)^2 + v(2)^2 + v(3)^2)
-err_M_q = 100*sqrt(n3(M_q1 + M_sap1)^2 + n3(M_q2 + M_sap2)^2 + n3(M_q3 + M_sap3)^2 + n3(M_q4 + M_sap4)^2)/sqrt(n3(M_sap1)^2 + n3(M_sap2)^2 + n3(M_sap3)^2 + n3(M_sap4)^2)
+err_M_q = 100*sqrt(n3(M_q1 + M_sap1)^2 + n3(M_q2 + M_sap2)^2 + n3(M_q3 + M_sap3)^2 + n3(M_q4 + M_sap4)^2)/sqrt(n3(M_sap1)^2 + n3(M_sap2)^2 + n3(M_sap3)^2 + n3(M_sap4)^2) [%] 'diferencia relativa
 
 #: ETABS 22 (OAPI, losa Shell-Thin, OBJMESHTYPE NOAUTOMESH para que no remalle; sus GDL de membrana quedan en cero, así que no afectan la flexión). Mismas reacciones y mismos momentos [ETABS OAPI]:
 f_etabs_q = [5503.829972; -751.807911; -316.323343; -4502.796709; -3135.216921; -4287.655684; 398.403504; 4136.871793; -3873.509643; -1399.436767; 2172.684901; 208.439283]
-err_q_etabs = 100*sqrt(transpose(f_q - f_etabs_q)*(f_q - f_etabs_q))/sqrt(transpose(f_etabs_q)*f_etabs_q)
-M_etabs1 = [-221.351797, -161.569725, 773.527096]
-M_etabs2 = [4990.462902, 4961.899605, 938.655356]
-M_etabs3 = [5922.24661, 5968.547651, 2329.721915]
-M_etabs4 = [417.801466, 379.808048, 2149.254371]
-err_M_q_etabs = 100*sqrt(n3(M_q1 + M_etabs1)^2 + n3(M_q2 + M_etabs2)^2 + n3(M_q3 + M_etabs3)^2 + n3(M_q4 + M_etabs4)^2)/sqrt(n3(M_etabs1)^2 + n3(M_etabs2)^2 + n3(M_etabs3)^2 + n3(M_etabs4)^2)
+err_q_etabs = 100*sqrt(transpose(f_q - f_etabs_q)*(f_q - f_etabs_q))/sqrt(transpose(f_etabs_q)*f_etabs_q) [%] 'diferencia relativa
+M_etabs1 = [-221.351797, -161.569725, 773.527096] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_etabs2 = [4990.462902, 4961.899605, 938.655356] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_etabs3 = [5922.24661, 5968.547651, 2329.721915] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+M_etabs4 = [417.801466, 379.808048, 2149.254371] [kN·m/m] 'momentos Mxx Myy Mxy del nodo
+err_M_q_etabs = 100*sqrt(n3(M_q1 + M_etabs1)^2 + n3(M_q2 + M_etabs2)^2 + n3(M_q3 + M_etabs3)^2 + n3(M_q4 + M_etabs4)^2)/sqrt(n3(M_etabs1)^2 + n3(M_etabs2)^2 + n3(M_etabs3)^2 + n3(M_etabs4)^2) [%] 'diferencia relativa
 
 ## 7 · Mapas sobre el cuadrilátero de SAP2000 y ETABS (para comparar con el ratón)
 #: El mismo cuadrilátero (0,0), (2,0.2), (2.2,1.8), (0.1,1.6) y el mismo campo, dibujado en el cuadrado de referencia ξ, η (x = ξ, y = η). Es el campo que da SAP2000: valores en los 4 puntos de Gauss extrapolados de forma bilineal. Pasa el ratón por las esquinas: (−1,−1), (1,−1), (1,1), (−1,1) son los nodos 1 a 4 y deben leer Mxx = −M11 de SAP2000 y ETABS (221.35, −4990.46, −5922.25, −417.80 con el signo de SAP).
@@ -177,22 +177,22 @@ Mxy_p(x, y) = Mxy_x(x, y)
 
 ## 8 · Mapas de Mxx, Myy y Mxy (pasa el ratón y lee el valor)
 #: Un elemento DKQ rectangular de 4 × 3 con el campo w = x³/6 + x·y²/2, cuyos giros en los nodos son θx = x·y y θy = −(x² + y²)/2. Los momentos salen de M = Db·κ con la B del DKQ en cada punto (x, y) del elemento: ξ = x/2 − 1, η = 2·y/3 − 1.
-X1 = 0
-Y1 = 0
-X2 = 4
-Y2 = 0
-X3 = 4
-Y3 = 3
-X4 = 0
-Y4 = 3
-m5 = (X1-X2)^2 + (Y1-Y2)^2
-m6 = (X2-X3)^2 + (Y2-Y3)^2
-m7 = (X3-X4)^2 + (Y3-Y4)^2
-m8 = (X4-X1)^2 + (Y4-Y1)^2
-A5 = -(X1-X2)/m5
-A6 = -(X2-X3)/m6
-A7 = -(X3-X4)/m7
-A8 = -(X4-X1)/m8
+X1 = 0 [m] 'coordenada del nodo
+Y1 = 0 [m] 'coordenada del nodo
+X2 = 4 [m] 'coordenada del nodo
+Y2 = 0 [m] 'coordenada del nodo
+X3 = 4 [m] 'coordenada del nodo
+Y3 = 3 [m] 'coordenada del nodo
+X4 = 0 [m] 'coordenada del nodo
+Y4 = 3 [m] 'coordenada del nodo
+m5 = (X1-X2)^2 + (Y1-Y2)^2 [m²] 'cuadrado del largo del lado
+m6 = (X2-X3)^2 + (Y2-Y3)^2 [m²] 'cuadrado del largo del lado
+m7 = (X3-X4)^2 + (Y3-Y4)^2 [m²] 'cuadrado del largo del lado
+m8 = (X4-X1)^2 + (Y4-Y1)^2 [m²] 'cuadrado del largo del lado
+A5 = -(X1-X2)/m5 'coeficiente de lado, en 1/m
+A6 = -(X2-X3)/m6 'coeficiente de lado, en 1/m
+A7 = -(X3-X4)/m7 'coeficiente de lado, en 1/m
+A8 = -(X4-X1)/m8 'coeficiente de lado, en 1/m
 B5 = 0.75*(X1-X2)*(Y1-Y2)/m5
 B6 = 0.75*(X2-X3)*(Y2-Y3)/m6
 B7 = 0.75*(X3-X4)*(Y3-Y4)/m7
@@ -201,10 +201,10 @@ C5 = (0.25*(X1-X2)^2 - 0.5*(Y1-Y2)^2)/m5
 C6 = (0.25*(X2-X3)^2 - 0.5*(Y2-Y3)^2)/m6
 C7 = (0.25*(X3-X4)^2 - 0.5*(Y3-Y4)^2)/m7
 C8 = (0.25*(X4-X1)^2 - 0.5*(Y4-Y1)^2)/m8
-D5 = -(Y1-Y2)/m5
-D6 = -(Y2-Y3)/m6
-D7 = -(Y3-Y4)/m7
-D8 = -(Y4-Y1)/m8
+D5 = -(Y1-Y2)/m5 'coeficiente de lado, en 1/m
+D6 = -(Y2-Y3)/m6 'coeficiente de lado, en 1/m
+D7 = -(Y3-Y4)/m7 'coeficiente de lado, en 1/m
+D8 = -(Y4-Y1)/m8 'coeficiente de lado, en 1/m
 E5 = (0.25*(Y1-Y2)^2 - 0.5*(X1-X2)^2)/m5
 E6 = (0.25*(Y2-Y3)^2 - 0.5*(X2-X3)^2)/m6
 E7 = (0.25*(Y3-Y4)^2 - 0.5*(X3-X4)^2)/m7

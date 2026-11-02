@@ -4,8 +4,8 @@ redondear a 0.001 mm (para comparar a 4 decimales) y un bloque ORACULO al final 
 en nudos clave y la suma de reacciones). Se corre con el Cli de Calcpad."""
 import os, subprocess
 AQUI = os.path.dirname(os.path.abspath(__file__))
-BASE = r"C:\Users\j-b-j\Documents\Calcpad-Suite\Examples\Mechanics\Finite Elements\Flat Slab FEA.cpd"
-CLI = r"C:\Users\j-b-j\Documents\Calcpad-Suite\Calcpad.Cli\bin\Release\net10.0\Cli.exe"
+BASE = os.path.expanduser("~") + r"\Documents\Calcpad-Suite\Examples\Mechanics\Finite Elements\Flat Slab FEA.cpd"
+CLI = os.path.expanduser("~") + r"\Documents\Calcpad-Suite\Calcpad.Cli\bin\Release\net10.0\Cli.exe"
 s = open(BASE, encoding="utf-8").read().replace("\r\n", "\n")
 old = "round(w((i - 1)*n_jb + j)*1000)/1000"
 assert old in s

@@ -5,7 +5,7 @@
 #define MyAppExeName "HekatanLisp.exe"
 ; otra carpeta de salida (bin\Release ocupada por una ventana abierta):  ISCC /DMyOut="C:\...\carpeta"
 #ifndef MyOut
-#define MyOut "C:\Users\j-b-j\Documents\Hekatan Calc 1.0.0\hekatan-lisp\bin\Release\net8.0-windows"
+#define MyOut SourcePath + "bin\Release\net8.0-windows"
 #endif
 ; dejar algo fuera sin borrarlo del disco:  ISCC /DMyFuera=",ejemplos\94 *.lisp"
 #ifndef MyFuera
@@ -20,7 +20,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-OutputDir=C:\Users\j-b-j\Documents\Hekatan Calc 1.0.0\hekatan-lisp\Installer
+OutputDir={#SourcePath}Installer
 OutputBaseFilename=HekatanLisp_Setup_v{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes

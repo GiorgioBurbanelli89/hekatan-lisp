@@ -11,8 +11,8 @@ Uso: python tests/placas_bfs/oraculo_calcpad.py  → tests/placas_bfs/calcpad/<c
 import os, subprocess, sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-BASE = r"C:\Users\j-b-j\Documents\Calcpad-Suite\Examples\Mechanics\Finite Elements\Rectangular Slab FEA.cpd"
-CLI = r"C:\Users\j-b-j\Documents\Calcpad-Suite\Calcpad.Cli\bin\Release\net10.0\Cli.exe"
+BASE = os.path.expanduser("~") + r"\Documents\Calcpad-Suite\Examples\Mechanics\Finite Elements\Rectangular Slab FEA.cpd"
+CLI = os.path.expanduser("~") + r"\Documents\Calcpad-Suite\Calcpad.Cli\bin\Release\net10.0\Cli.exe"
 OUT = os.path.join(AQUI, "calcpad")
 
 # condiciones de apoyo por GDL (w, θx, θy, ψ), en sintaxis de Calcpad sobre el nudo j

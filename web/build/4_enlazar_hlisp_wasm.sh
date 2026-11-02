@@ -1,7 +1,7 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 cd ~/lispwasm/emsdk && source ./emsdk_env.sh >/dev/null 2>&1
 E=~/lispwasm/ecl-wasm/ecl-emscripten
-W="/mnt/c/Users/j-b-j/Documents/Hekatan Calc 1.0.0/hekatan-lisp/web"
+W="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd ~/lispwasm/hl
 file engine.o | head -1
 emcc "$W/hlisp_main.c" -I$E -O0 -DECL_C_COMPATIBLE_VARIADIC_DISPATCH -Demscripten \

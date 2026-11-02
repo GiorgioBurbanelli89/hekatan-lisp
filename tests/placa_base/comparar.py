@@ -8,7 +8,7 @@ import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 caso = sys.argv[1] if len(sys.argv) > 1 else "shs"
-dbg = sys.argv[2] if len(sys.argv) > 2 else r"C:\Users\j-b-j\AppData\Local\Temp\pb_144.txt"
+dbg = sys.argv[2] if len(sys.argv) > 2 else os.path.expanduser("~") + r"\AppData\Local\Temp\pb_144.txt"
 P = json.load(open(os.path.join(AQUI, "params_%s.json" % caso)))
 D = json.load(open(os.path.join(AQUI, "abq_%s" % caso, "datos.json")))
 U = Fw = SE = None

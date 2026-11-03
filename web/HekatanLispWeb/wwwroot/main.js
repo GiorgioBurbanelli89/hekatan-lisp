@@ -373,7 +373,7 @@ async function abrirDesdeEnlace() {
   }
   if (p.get('s')) {
     const r = await fetch(COMPARTIR + '/h/' + encodeURIComponent(p.get('s')));
-    if (!r.ok) { aviso('No se encontró la hoja de este enlace (' + p.get('s') + ').'); return false; }
+    if (!r.ok) { aviso('No se encontró la hoja de este enlace (' + esc(p.get('s')) + ').'); return false; }
     ponerEditor(await r.text()); setSolo(true); return true;
   }
   if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); return true; }

@@ -142,18 +142,34 @@ function calcularYMostrar() {
 }
 // Recalcular NO manda arriba: se repone donde estaba el lector; si estaba al final (escribiendo la
 // última línea), se queda al final. (Lo mismo que el escritorio en ShowResult.)
+// El iframe del resultado va en SANDBOX (sin same-origin): una hoja ajena no puede tocar esta pagina.
+// Por eso ya no se lee su documento: el iframe AVISA su posicion (hkScroll) y recibe ordenes (hkCmd).
+let ultimoScroll = { y: 0, fin: false };
+const PUENTE = '<script>(function(){var P=window.parent;if(!P||P===window)return;' +
+  'function pos(){var d=document.documentElement;P.postMessage({hkScroll:{y:window.scrollY||0,fin:window.innerHeight+(window.scrollY||0)>=d.scrollHeight-40&&d.scrollHeight>window.innerHeight+40}},"*")}' +
+  'addEventListener("scroll",pos,{passive:true});' +
+  'addEventListener("message",function(e){var m=e.data;if(!m||typeof m!=="object"||e.source!==P)return;' +
+  'if(m.hkCmd==="print"){window.print();return}' +
+  'if(m.hkCmd==="abrirDibujo"){var nom=String(m.nom||""),bs=[].slice.call(document.querySelectorAll(".hk-cad-btn"));' +
+  'var b=bs.filter(function(x){return (x.textContent||"").indexOf("«"+nom+"»")>=0})[0]||bs.pop();if(!b)return;' +
+  'b.scrollIntoView({block:"center"});b.click();' +
+  'if(m.tipo==="3d"){var n=0,t=setInterval(function(){try{if(document.querySelector(".hkcad")){window.hkCad.vista("ISOSO");clearInterval(t)}}catch(x){}if(++n>30)clearInterval(t)},100)}}});' +
+  '})()<\/script>';
 function conPosicion(html) {
-  try {
-    const w = $('render').contentWindow, d = w && w.document.documentElement;
-    if (!d) return html;
-    const y = w.scrollY || 0, alFinal = w.innerHeight + y >= d.scrollHeight - 40 && d.scrollHeight > w.innerHeight + 40;
-    if (!y && !alFinal) return html;
-    const ir = alFinal ? 'window.scrollTo(0,document.documentElement.scrollHeight)' : `window.scrollTo(0,${y})`;
-    const js = `<script>${ir};addEventListener('load',function(){${ir}});<\/script>`;
-    const i = html.toLowerCase().lastIndexOf('</body>');
-    return i >= 0 ? html.slice(0, i) + js + html.slice(i) : html + js;
-  } catch { return html; }
+  const y = ultimoScroll.y, alFinal = ultimoScroll.fin;
+  let js = PUENTE;
+  if (y || alFinal) {
+    const ir = alFinal ? 'window.scrollTo(0,document.documentElement.scrollHeight)' : `window.scrollTo(0,${y | 0})`;
+    js += `<script>${ir};addEventListener('load',function(){${ir}});<\/script>`;
+  }
+  const i = html.toLowerCase().lastIndexOf('</body>');
+  return i >= 0 ? html.slice(0, i) + js + html.slice(i) : html + js;
 }
+addEventListener('message', e => {
+  const m = e.data;
+  if (m && typeof m === 'object' && m.hkScroll && e.source === $('render').contentWindow)
+    ultimoScroll = { y: Number(m.hkScroll.y) || 0, fin: !!m.hkScroll.fin };
+});
 function insertarDibujo(tipo) {
   let k = 1; while (ed.value.includes('#dibujar(dibujo' + k)) k++;
   const nom = 'dibujo' + k;
@@ -171,11 +187,7 @@ function insertarDibujo(tipo) {
   const fr = $('render');
   fr.addEventListener('load', function abrir() {
     fr.removeEventListener('load', abrir);
-    const w = fr.contentWindow, d = w.document;
-    const btn = [...d.querySelectorAll('.hk-cad-btn')].find(x => (x.textContent || '').includes('«' + nom + '»')) || [...d.querySelectorAll('.hk-cad-btn')].pop();
-    if (!btn) return;
-    btn.scrollIntoView({ block: 'center' }); btn.click();
-    if (tipo === '3d') { let n = 0; const t = setInterval(() => { try { if (d.querySelector('.hkcad')) { w.hkCad.vista('ISOSO'); clearInterval(t); } } catch { } if (++n > 30) clearInterval(t); }, 100); }
+    fr.contentWindow.postMessage({ hkCmd: 'abrirDibujo', nom, tipo }, '*');
   });
 }
 function programar() {                  // _debounce de 280 ms, como el escritorio
@@ -277,7 +289,7 @@ const ACCIONES = {
   guardar: () => descargar(archivo || 'hoja.lisp', sourceText()),
   guardarLisp: () => descargar((archivo || 'hoja').replace(/\.lisp$/, '') + '_ejecutable.lisp', W.FullLisp(sourceText(), op)),
   copiarLisp: () => navigator.clipboard?.writeText(W.FullLisp(sourceText(), op)),
-  pdf: () => { if (view !== 'render') setView('render'); $('render').contentWindow?.print(); },
+  pdf: () => { if (view !== 'render') setView('render'); $('render').contentWindow?.postMessage({ hkCmd: 'print' }, '*'); },
   verMotor: async () => cargarTexto(await (await fetch('engine.lisp')).text(), 'engine.lisp'),
   compartir: () => compartir(),
   // Dibujo: el bloque entra en el cursor (en una línea propia) y, si es una ventana, se ABRE

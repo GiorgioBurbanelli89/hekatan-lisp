@@ -124,7 +124,18 @@ let calcGen = 0;
 // que colgaria la pestana (el calculo corre en este hilo). Se muestra el codigo y NO se ejecuta hasta
 // que el lector pulse ▶ Ejecutar (o F5). Tampoco se guarda en el autosave mientras este retenida.
 let retenida = false;
-const AVISO_RETENIDA = 'Hoja recibida por enlace: revisa el código y pulsa ▶ Ejecutar';
+// Una hoja de enlace se ejecuta sola si es pequena. Solo se retiene si PARECE enorme: mucho texto, numeros de millones
+// (1000000, 1e7…), muchos bucles anidados o bucles sin fin. El resto corre al abrir, como una hoja propia.
+function esEnorme(t) {
+  t = String(t || '');
+  if (t.length > 150000) return true;
+  if (/(^|[^\w.])\d{7,}(?![\w])/.test(t) || /\d(?:\.\d+)?[eE]\+?([6-9]|\d{2})\b/.test(t)) return true;      // 1000000, 5e6, 1e12
+  if (/\(\s*while\s+(t|true|1)\b|\bwhile\s*\(?\s*(true|1)\s*\)?|\(\s*loop\b/i.test(t)) return true;           // bucle sin fin
+  const bucles = (t.match(/\b(for|dotimes|while|loop|repeat|sum|prod)\b/gi) || []).length;
+  return bucles >= 6;
+}
+
+const AVISO_RETENIDA = 'Esta hoja de enlace parece muy pesada (números de millones, muchos bucles o bucles sin fin) y no se ejecutó sola: revisa el código y pulsa ▶ Ejecutar';
 function showResult() {
   const g = ++calcGen;
   let b = $('hk-calc');
@@ -398,9 +409,9 @@ async function abrirDesdeEnlace() {
   if (p.get('s')) {
     const r = await fetch(COMPARTIR + '/h/' + encodeURIComponent(p.get('s')));
     if (!r.ok) { aviso('No se encontró la hoja de este enlace (' + esc(p.get('s')) + ').'); return false; }
-    ponerEditor(await r.text()); retenida = true; setSolo(false); return true;
+    ponerEditor(await r.text()); retenida = esEnorme(sourceText()); setSolo(false); return true;
   }
-  if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); retenida = true; setSolo(false); return true; }
+  if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); retenida = esEnorme(sourceText()); setSolo(false); return true; }
   return false;
 }
 

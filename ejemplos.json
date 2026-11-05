@@ -166,5 +166,6 @@
  "157 Losa rectangular por elementos finitos - de la ecuacion diferencial de Kirchhoff a la DKQ = DKE, mapas con hover y Navier.lisp",
  "158 Placa delgada DKE de Wilson - libro 2005 cap. 8, simbolos, K, igual a la DKQ de Batoz y tabla 8.2.lisp",
  "159 Placa con cortante DSE de Wilson - libro 2005 cap. 8, K 16x16, condensacion y tabla 8.2.lisp",
- "160 Errata de la Ec. 8.9 de Wilson - parche de cortante en un trapecio, la impresa contra la inversa de la 8.8.lisp"
+ "160 Errata de la Ec. 8.9 de Wilson - parche de cortante en un trapecio, la impresa contra la inversa de la 8.8.lisp",
+ "161 Matriz simbolica - determinante e inversa.lisp"
 ]

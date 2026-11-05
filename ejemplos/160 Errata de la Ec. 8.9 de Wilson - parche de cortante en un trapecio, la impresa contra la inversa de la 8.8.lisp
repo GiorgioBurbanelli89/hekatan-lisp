@@ -233,3 +233,14 @@ d_00 = cos(0)·sin(0) - cos(0)·sin(0) 'determinante con los dos lados paralelos
 
 ## 7 · Lectura
 #: En el rectángulo las dos dan cero. En el trapecio la impresa falla y la inversa de (8.8) da cero (redondeo). Medido en Python con placas_wilson (hekatan-struct-py): impresa se desvía hasta 0.11 en el cortante de los puntos de Gauss; correcta 1e-12. El C++ de Struct usa la correcta en el pf 4 y la impresa solo en el pf 7. **Nota:** la hoja 159 usa la (8.9) impresa tal como está en el libro (sus datos son un cuadrilátero cualquiera).
+
+## 8 · Fuente, lo correcto y lo mal tipeado (qué cambia en el cálculo)
+#: **De dónde sale.** E. L. Wilson, *Three-Dimensional Static and Dynamic Analysis of Structures*, **cap. 8** (elemento de placa con cortante, DSE), **ecuaciones (8.8) y (8.9)**, p. 8-6 de la edición 2005 (p. 8-7 en el PDF paginado). La (8.8) pasa los cortantes del elemento (γxz, γyz) a los de los lados (γij, γki); la (8.9) debe hacer el camino inverso, o sea ser la **inversa** de la matriz de la (8.8).
+#: **Lo correcto** (inversa de la 8.8, adjunta ÷ determinante), con α_ij = 0° y α_ki = 60°: los términos de la diagonal secundaria **cambian de signo pero se quedan en su lugar**.
+W_correcta = [sin(a_ki), -sin(a_ij); -cos(a_ki), cos(a_ij)]/d_a 'T = 1/det · [sin α_ki, −sin α_ij; −cos α_ki, cos α_ij]
+#: **Lo mal tipeado** (la (8.9) tal como está impresa): los dos términos de la diagonal secundaria quedaron **cambiados de lugar** (cos α_ki arriba y sin α_ij abajo).
+W_impresa = [sin(a_ki), -cos(a_ki); -sin(a_ij), cos(a_ij)]/d_a 'T = 1/det · [sin α_ki, −cos α_ki; −sin α_ij, cos α_ij]
+#: **Prueba de cada una:** M·T debe dar la identidad.
+W_prueba_ok = M_a·W_correcta 'identidad [1, 0; 0, 1]: bien
+W_prueba_mal = M_a·W_impresa 'NO es la identidad: mal
+#: **Qué cambia al calcular.** Con la correcta, el parche de cortante constante (γ = 0.3, 0.7) sale **exacto** en los cuatro nudos, en el rectángulo y en el trapecio (error ≈ 1e-16, ver sección 3). Con la impresa, el rectángulo sigue saliendo exacto, pero el **trapecio falla: el cortante del nudo se desvía hasta 0.246** (sección 3, E_trap_impresa) respecto de 0.3 y 0.7, y en los puntos de Gauss hasta 0.11 (sección 7). Es decir: **si se sigue la ecuación mal tipeada, en un elemento de lados no perpendiculares el cortante nudal sale equivocado**, y como la rigidez a cortante se arma con esos valores, la rigidez, los desplazamientos y los cortantes de la placa se alejan de la solución correcta. En rectángulos no se nota (por eso las tablas del libro no lo delatan). Esta hoja no mide cuánto cambia la rigidez total ni la flecha de una placa completa: eso depende de la malla.

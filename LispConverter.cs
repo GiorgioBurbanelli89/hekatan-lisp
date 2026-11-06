@@ -1594,6 +1594,41 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                 cuerpo = FormatInlineText(c, varLookup, isVec, imgSrc);   // texto: prosa normal (@{}, *negrita*…)
             return "<span class=\"hk-mano\">☞<span class=\"hk-globo\">" + cuerpo + "</span></span>";
         }
+        // Un nombre de matriz o variable en la prosa, dibujado como en las fórmulas: cursiva, y A_1 con subíndice.
+        static string NombreMatematico(string n)
+        {
+            int k = n.IndexOf('_');
+            return k > 0 && k < n.Length - 1
+                ? "<i>" + n.Substring(0, k) + "</i><sub>" + n.Substring(k + 1) + "</sub>"
+                : "<i>" + n + "</i>";
+        }
+        static readonly Regex RxProsaDet = new Regex(@"(?<![\p{L}\p{N}_])det\(\s*(\p{L}[\p{L}\p{N}_]*)\s*\)", RegexOptions.Compiled);
+        static readonly Regex RxProsaAdj = new Regex(@"(?<![\p{L}\p{N}_])adj\(\s*(\p{L}[\p{L}\p{N}_]*)\s*\)", RegexOptions.Compiled);
+        static readonly Regex RxProsaInv = new Regex(@"(?<![\p{L}\p{N}_])inv\(\s*(\p{L}[\p{L}\p{N}_]*)\s*\)", RegexOptions.Compiled);
+        static readonly Regex RxProsaTrans = new Regex(@"(?<![\p{L}\p{N}_])transpose\(\s*(\p{L}[\p{L}\p{N}_]*)\s*\)", RegexOptions.Compiled);
+        static readonly Regex RxProsaExp = new Regex(@"(?<![\p{L}\p{N}_])(\p{L}[\p{L}\p{N}_]*)\^(-1|T)(?![\p{L}\p{N}])", RegexOptions.Compiled);
+        static readonly Regex RxProsaPor = new Regex(@"(?<=[\p{L}\p{N})\]])(?<!\*)\*(?!\*)(?=[\p{L}\p{N}(])", RegexOptions.Compiled);
+        /// <summary>Matemática dentro de la prosa #: sin símbolos extra. det(A) → |A| · adj(A) → adj(A) · inv(A) → A⁻¹ ·
+        /// transpose(A) → Aᵀ · A^-1 y A^T → exponente · a*d (sin espacios) → a·d (antes el * se comía el texto como cursiva).
+        /// Cada trozo va a «literales» para que negrita/cursiva/subíndice no lo toquen después.</summary>
+        static string FormulasMatrizEnProsa(string t, List<string> literales)
+        {
+            if (string.IsNullOrEmpty(t)) return t;
+            string Guarda(string html) { literales.Add(html); return "\x0e" + (literales.Count - 1) + "\x0e"; }
+            if (t.IndexOf("det(", StringComparison.Ordinal) >= 0)
+                t = RxProsaDet.Replace(t, m => Guarda("<span class=\"m-expr\">|" + NombreMatematico(m.Groups[1].Value) + "|</span>"));
+            if (t.IndexOf("adj(", StringComparison.Ordinal) >= 0)
+                t = RxProsaAdj.Replace(t, m => Guarda("<span class=\"m-expr\"><span style=\"font-style:normal\">adj</span>(" + NombreMatematico(m.Groups[1].Value) + ")</span>"));
+            if (t.IndexOf("inv(", StringComparison.Ordinal) >= 0)
+                t = RxProsaInv.Replace(t, m => Guarda("<span class=\"m-expr\">" + NombreMatematico(m.Groups[1].Value) + "<sup>−1</sup></span>"));
+            if (t.IndexOf("transpose(", StringComparison.Ordinal) >= 0)
+                t = RxProsaTrans.Replace(t, m => Guarda("<span class=\"m-expr\">" + NombreMatematico(m.Groups[1].Value) + "<sup>T</sup></span>"));
+            if (t.IndexOf('^') >= 0)
+                t = RxProsaExp.Replace(t, m => Guarda("<span class=\"m-expr\">" + NombreMatematico(m.Groups[1].Value) + "<sup>" + (m.Groups[2].Value == "-1" ? "−1" : "T") + "</sup></span>"));
+            if (t.IndexOf('*') >= 0)
+                t = RxProsaPor.Replace(t, "·");
+            return t;
+        }
         public static string FormatInlineText(string t, Func<string, string> varLookup, Func<string, bool> isVec = null, Func<string, string> imgSrc = null)
         {
             var manos = new List<string>();
@@ -1661,6 +1696,7 @@ table.hk-obs td:nth-child(3){min-width:22em;}
                 var u = m.Value.Replace("&", "&amp;");
                 return "<a class=\"m-link\" href=\"" + u + "\" target=\"_blank\" rel=\"noopener\">" + m.Value + "</a>";
             });
+            t = FormulasMatrizEnProsa(t, literales);   // det(A) → |A| · adj(A) · inv(A) → A⁻¹ · A^T · a*d → a·d, dibujados como matemática
             // markdown: **negrita** o __negrita__ ; *cursiva* o _cursiva_ (doble antes que simple)
             t = Regex.Replace(t, @"\*\*([^*]+)\*\*", "<b>$1</b>");
             t = Regex.Replace(t, @"__([^_]+)__", "<b>$1</b>");

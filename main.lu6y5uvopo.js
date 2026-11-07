@@ -120,22 +120,6 @@ function sourceText() {                 // SourceText(): el ORIGINAL, no el deri
 // El cálculo corre en el hilo de la página: sin esto, una hoja de 1–3 s (mallas grandes) dejaba el
 // panel quieto sin decir nada. Se pinta «calculando…» y se calcula en el cuadro siguiente.
 let calcGen = 0;
-// SEGURIDAD: una hoja que llega por enlace (#s / #h) es de un tercero y puede traer un bucle infinito
-// que colgaria la pestana (el calculo corre en este hilo). Se muestra el codigo y NO se ejecuta hasta
-// que el lector pulse ▶ Ejecutar (o F5). Tampoco se guarda en el autosave mientras este retenida.
-let retenida = false;
-// Una hoja de enlace se ejecuta sola si es pequena. Solo se retiene si PARECE enorme: mucho texto, numeros de millones
-// (1000000, 1e7…), muchos bucles anidados o bucles sin fin. El resto corre al abrir, como una hoja propia.
-function esEnorme(t) {
-  t = String(t || '');
-  if (t.length > 150000) return true;
-  if (/(^|[^\w.])\d{7,}(?![\w])/.test(t) || /\d(?:\.\d+)?[eE]\+?([6-9]|\d{2})\b/.test(t)) return true;      // 1000000, 5e6, 1e12
-  if (/\(\s*while\s+(t|true|1)\b|\bwhile\s*\(?\s*(true|1)\s*\)?|\(\s*loop\b/i.test(t)) return true;           // bucle sin fin
-  const bucles = (t.match(/\b(for|dotimes|while|loop|repeat|sum|prod)\b/gi) || []).length;
-  return bucles >= 6;
-}
-
-const AVISO_RETENIDA = 'Esta hoja de enlace parece muy pesada (números de millones, muchos bucles o bucles sin fin) y no se ejecutó sola: revisa el código y pulsa ▶ Ejecutar';
 function showResult() {
   const g = ++calcGen;
   let b = $('hk-calc');
@@ -148,13 +132,6 @@ function showResult() {
   setTimeout(() => { if (g !== calcGen) return; try { calcularYMostrar(); } finally { if (g === calcGen) b.style.display = 'none'; } }, 30);
 }
 function calcularYMostrar() {
-  if (retenida) {
-    const render = view === 'render' || view === 'learn';
-    $('render').hidden = !render; $('texto').hidden = render;
-    if (render) $('render').srcdoc = '<body style="font:15px Segoe UI,sans-serif;padding:24px;color:#8a5a00;background:#fff8e1"><b>' + AVISO_RETENIDA + '</b></body>';
-    else $('texto').textContent = AVISO_RETENIDA;
-    return;
-  }
   const text = sourceText();
   let out;
   try { out = W.Compute(text, op, $('txt-var').value.trim(), view, dark); }
@@ -286,7 +263,7 @@ function setArchivo(nombre) { archivo = nombre; $('lbl-archivo').textContent = n
 function cargarTexto(t, nombre) {
   syntaxLisp = synFull = transliterated = false; lispBackup = null; highlightSyntax();
   $('lbl-in').textContent = 'escribes: texto plano';
-  retenida = false; ponerEditor(t); setArchivo(nombre); showResult();
+  ponerEditor(t); setArchivo(nombre); showResult();
 }
 function descargar(nombre, texto) {
   const a = document.createElement('a');
@@ -402,16 +379,16 @@ async function abrirDesdeEnlace() {
       f = l.find(x => x.startsWith(f + ' ')) || f;
     }
     const t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
-    retenida = false; ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
+    ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
     setSolo(true);                       // abierto por enlace: se ve el resultado, no el código
     return true;
   }
   if (p.get('s')) {
     const r = await fetch(COMPARTIR + '/h/' + encodeURIComponent(p.get('s')));
     if (!r.ok) { aviso('No se encontró la hoja de este enlace (' + esc(p.get('s')) + ').'); return false; }
-    ponerEditor(await r.text()); retenida = esEnorme(sourceText()); setSolo(false); return true;
+    ponerEditor(await r.text()); setSolo(true); return true;
   }
-  if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); retenida = esEnorme(sourceText()); setSolo(false); return true; }
+  if (p.get('h')) { ponerEditor(await descomprimir(p.get('h'))); return true; }
   return false;
 }
 
@@ -437,7 +414,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.a) ACCIONES[b.dataset.a]?.();
   else if (b.dataset.ej) { cargarEjemplo(b.dataset.ej); $('sel-ejemplos').value = b.dataset.ej; }
 });
-$('btn-run').onclick = () => { retenida = false; showResult(); };
+$('btn-run').onclick = showResult;
 // «Solo resultado»: pantalla completa para la hoja renderizada (Esc o el mismo botón para volver)
 function setSolo(on) {
   document.body.classList.toggle('solo', on);
@@ -482,14 +459,14 @@ $('btn-full').onclick = () => { const s = W.FullLisp(sourceText(), op); navigato
 $('txt-var').oninput = () => { if (autoRun) programar(); };
 
 ed.addEventListener('input', () => {
-  pintarEditor(); if (!retenida) guardarLocal('hlisp-autosave', ed.value);
+  pintarEditor(); guardarLocal('hlisp-autosave', ed.value);
   if (autoRun) programar();
 });
 ed.addEventListener('keydown', e => {
   if (e.key === 'Tab') { e.preventDefault(); ed.setRangeText('    ', ed.selectionStart, ed.selectionEnd, 'end'); pintarEditor(); }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'F5') { e.preventDefault(); retenida = false; showResult(); }
+  if (e.key === 'F5') { e.preventDefault(); showResult(); }
   if (e.key === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ACCIONES.guardar(); }
 });
 

@@ -10,33 +10,32 @@
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css?v=95d21bfdde">
-  <link href="_framework/dotnet.pm8oc3bpm0.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-T1b7bww2rT/Fca4HNXGvTx+1t79/Qqho2R8fQpdkCNU=" />
+  <link rel="stylesheet" href="app.css">
+  <link href="_framework/dotnet.mgqjy3b0x3.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-tgoowwBJs4xD1GjDehXL2y79ygPbugGQOjhkNNNJ/hM=" />
   <script type="importmap">{
   "imports": {
+    "./_framework/dotnet.js": "./_framework/dotnet.mgqjy3b0x3.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.jwpb6aevwu.js",
-    "./_framework/dotnet.js": "./_framework/dotnet.pm8oc3bpm0.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.r2kbxkuujc.js",
-    "./hlisp.js": "./hlisp.c7cu44e0d8.js",
-    "./main.js": "./main.7121141a9d.js"
+    "./hlisp.js": "./hlisp.hh295cbgfj.js",
+    "./main.js": "./main.lu6y5uvopo.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.js": "sha256-T1b7bww2rT/Fca4HNXGvTx+1t79/Qqho2R8fQpdkCNU=",
+    "./_framework/dotnet.js": "sha256-tgoowwBJs4xD1GjDehXL2y79ygPbugGQOjhkNNNJ/hM=",
+    "./_framework/dotnet.mgqjy3b0x3.js": "sha256-tgoowwBJs4xD1GjDehXL2y79ygPbugGQOjhkNNNJ/hM=",
     "./_framework/dotnet.native.js": "sha256-Hdq+Wa7iE/Lfspe1r5W0TzvZPElJDa4w74hVJz5UqRQ=",
     "./_framework/dotnet.native.jwpb6aevwu.js": "sha256-Hdq+Wa7iE/Lfspe1r5W0TzvZPElJDa4w74hVJz5UqRQ=",
-    "./_framework/dotnet.pm8oc3bpm0.js": "sha256-T1b7bww2rT/Fca4HNXGvTx+1t79/Qqho2R8fQpdkCNU=",
     "./_framework/dotnet.runtime.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
     "./_framework/dotnet.runtime.r2kbxkuujc.js": "sha256-YyudibIWETMKrLb+nAZdJ+xDY7HY6BWf6s32UAdcvCU=",
-    "./hlisp.c7cu44e0d8.js": "sha256-SI32vwpo9f4qKdkxQfoYecyPeWznIZvoVu2IbZjqkpA=",
-    "./hlisp.js": "sha256-SI32vwpo9f4qKdkxQfoYecyPeWznIZvoVu2IbZjqkpA=",
-    "./main.7121141a9d.js": "sha256-cSEUGp258oIlc6SwKocUKqdEb14+9C9UIZP/Hc6n/nU=",
-    "./main.js": "sha256-eLHNs/+l5O6rXZ/73HQvxbaJFRn98jmrN+BC+UDlw8M="
+    "./hlisp.hh295cbgfj.js": "sha256-1fmK6PNTV88ssMF1X+UZxfNWvojVYYA8LqMSl0Mzj2M=",
+    "./hlisp.js": "sha256-1fmK6PNTV88ssMF1X+UZxfNWvojVYYA8LqMSl0Mzj2M=",
+    "./main.js": "sha256-LaQZFwKnoMVUVCORR6nePcKnVEYIgbBjN0ATNFFkW7s=",
+    "./main.lu6y5uvopo.js": "sha256-LaQZFwKnoMVUVCORR6nePcKnVEYIgbBjN0ATNFFkW7s="
   }
 }</script>
-  <script src="hlisp.c7cu44e0d8.js"></script>
-  <script type="module" src="main.7121141a9d.js"></script>
-  <script data-goatcounter="https://hekatanlisp.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <script src="hlisp.hh295cbgfj.js"></script>
+  <script type="module" src="main.lu6y5uvopo.js"></script>
 </head>
 <body>
   <div class="carga" id="carga"><div>Cargando <b>Hekatan LISP</b>… (motor LISP + render)</div></div>
@@ -114,7 +113,6 @@
     <button class="mode" data-a="nuevo" style="margin-left:14px" title="Hoja nueva en blanco">📄 Nuevo</button>
     <button class="mode" data-a="dibujo2d" title="Abre la ventana de dibujo como AutoCAD (línea de órdenes, OSNAP, cotas, 3D). Lo dibujado vuelve a la hoja como entmake de AutoLISP.">✏ Dibujar (CAD)</button>
     <button class="mode" data-a="compartir" title="Copia un enlace con esta hoja: quien lo abra la ve igual, ya calculada">🔗 Compartir</button>
-    <button class="mode" data-a="pdf" title="Pasar el resultado a PDF (se abre el cuadro de imprimir: elige Guardar como PDF)">📄 PDF</button>
     <button class="mode" onclick="window.open('https://github.com/GiorgioBurbanelli89/hekatan-lisp/releases/latest','_blank','noopener')" title="Descarga el programa de escritorio (Windows): hojas sin límite, dibujo CAD y animaciones">⬇ Descargar Hekatan LISP</button>
     <label class="ejemplos" title="Carga un ejemplo y lo calcula (AutoRun)">
       <span class="lbl">ejemplos:</span>

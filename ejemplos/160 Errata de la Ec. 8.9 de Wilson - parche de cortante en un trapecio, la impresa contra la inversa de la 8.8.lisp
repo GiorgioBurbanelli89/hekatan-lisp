@@ -212,6 +212,18 @@ T_cb = [sin(a_2), -sin(a_1); -cos(a_2), cos(a_1)]/d_b
 T_ib = [sin(a_2), -cos(a_2); -sin(a_1), cos(a_1)]/d_b
 P_cb = M_b·T_cb 'identidad
 P_ib = M_b·T_ib 'no es la identidad
+#: **d) Comprobación numérica del libro** con α_ij = 30° y α_ki = 105° (los lados del dibujo). Se multiplica (8.8) por cada versión de (8.9):
+a_3 = 30·pi/180 'ángulo del lado ij [rad]
+a_4 = 105·pi/180 'ángulo del lado ki [rad]
+M_d = [cos(a_3), sin(a_3); cos(a_4), sin(a_4)]
+d_d = sin(a_4 - a_3) 'determinante
+T_cd = [sin(a_4), -sin(a_3); -cos(a_4), cos(a_3)]/d_d
+T_id = [sin(a_4), -cos(a_4); -sin(a_3), cos(a_3)]/d_d
+#: **Correcta:** (8.8) × (8.9 correcta) = [1.0000, ok:0.0000; ok:0.0000, 1.0000]
+P_cd = M_d·T_cd 'identidad
+#: **Impresa:** (8.8) × (8.9 impresa) = [0.6072, mal:0.6803; mal:−0.7588, 0.7967]
+P_id = M_d·T_id 'no es la identidad
+#: La versión correcta da la **identidad** (unos y ceros). La impresa deja números distintos de cero fuera de la diagonal (**0.6803** y **−0.7588**): no es la inversa.
 
 ## 6 · Ejemplos de determinante
 #: **Qué es.** El determinante es un número que dice si la matriz tiene inversa (det ≠ 0) y por cuánto escala las áreas o volúmenes. En 2 × 2: det [m_a, m_b; m_c, m_d] = m_a·m_d − m_b·m_c = **área con signo del paralelogramo** formado por sus dos filas.
@@ -236,11 +248,11 @@ d_00 = cos(0)·sin(0) - cos(0)·sin(0) 'determinante con los dos lados paralelos
 
 ## 8 · Fuente, lo correcto y lo mal tipeado (qué cambia en el cálculo)
 #: **De dónde sale.** E. L. Wilson, *Three-Dimensional Static and Dynamic Analysis of Structures*, **cap. 8** (elemento de placa con cortante, DSE), **ecuaciones (8.8) y (8.9)**, p. 8-6 de la edición 2005 (p. 8-7 en el PDF paginado). La (8.8) pasa los cortantes del elemento (γxz, γyz) a los de los lados (γij, γki); la (8.9) debe hacer el camino inverso, o sea ser la **inversa** de la matriz de la (8.8).
-#: **Lo correcto** (inversa de la 8.8, adjunta ÷ determinante), con α_ij = 0° y α_ki = 60°: los términos de la diagonal secundaria **cambian de signo pero se quedan en su lugar**.
+#: **Lo correcto** (inversa de la 8.8, adjunta ÷ determinante), con α_ij = 0° y α_ki = 60°: los términos de la diagonal secundaria **cambian de signo pero se quedan en su lugar**. M⁻¹ = 1/det·[sin α_ki, ok:−sin α_ij; ok:−cos α_ki, cos α_ij]
 W_correcta = [sin(a_ki), -sin(a_ij); -cos(a_ki), cos(a_ij)]/d_a 'T = 1/det · [sin α_ki, −sin α_ij; −cos α_ki, cos α_ij]
-#: **Lo mal tipeado** (la (8.9) tal como está impresa): los dos términos de la diagonal secundaria quedaron **cambiados de lugar** (cos α_ki arriba y sin α_ij abajo).
+#: **Lo mal tipeado** (la (8.9) tal como está impresa): los dos términos de la diagonal secundaria quedaron **cambiados de lugar** (cos α_ki arriba y sin α_ij abajo). (8.9) = 1/det·[sin α_ki, mal:−cos α_ki; mal:−sin α_ij, cos α_ij]
 W_impresa = [sin(a_ki), -cos(a_ki); -sin(a_ij), cos(a_ij)]/d_a 'T = 1/det · [sin α_ki, −cos α_ki; −sin α_ij, cos α_ij]
 #: **Prueba de cada una:** M·T debe dar la identidad.
-W_prueba_ok = M_a·W_correcta 'identidad [1, 0; 0, 1]: bien
-W_prueba_mal = M_a·W_impresa 'NO es la identidad: mal
+W_ok = M_a·W_correcta 'identidad [1, 0; 0, 1]: bien
+W_mal = M_a·W_impresa 'NO es la identidad: mal
 #: **Qué cambia al calcular.** Con la correcta, el parche de cortante constante (γ = 0.3, 0.7) sale **exacto** en los cuatro nudos, en el rectángulo y en el trapecio (error ≈ 1e-16, ver sección 3). Con la impresa, el rectángulo sigue saliendo exacto, pero el **trapecio falla: el cortante del nudo se desvía hasta 0.246** (sección 3, E_trap_impresa) respecto de 0.3 y 0.7, y en los puntos de Gauss hasta 0.11 (sección 7). Es decir: **si se sigue la ecuación mal tipeada, en un elemento de lados no perpendiculares el cortante nudal sale equivocado**, y como la rigidez a cortante se arma con esos valores, la rigidez, los desplazamientos y los cortantes de la placa se alejan de la solución correcta. En rectángulos no se nota (por eso las tablas del libro no lo delatan). Esta hoja no mide cuánto cambia la rigidez total ni la flecha de una placa completa: eso depende de la malla.

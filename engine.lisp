@@ -201,8 +201,29 @@
         ((consp e) (remove-duplicates (mapcan #'vars-of (cdr e))))
         (t nil)))
 
+(defun mono-sorted-p (m)
+  (loop for (a b) on m while b always (string< (string (car a)) (string (car b)))))
+
 (defun mono-mul (m1 m2)
   "Producto de monomios: suma potencias de la misma variable; ordena por nombre."
+  (cond ((and (mono-sorted-p m1) (mono-sorted-p m2))
+         ;; RAPIDO: los dos ya vienen ordenados por nombre → mezcla en una pasada (mismo resultado)
+         (let ((res nil) (a m1) (b m2))
+           (loop while (or a b)
+                 do (let ((c (cond ((null a) 1) ((null b) -1)
+                                   ((eq (caar a) (caar b)) 0)
+                                   ((string< (string (caar a)) (string (caar b))) -1)
+                                   (t 1))))
+                      (case c
+                        (-1 (unless (zerop (cdar a)) (push (cons (caar a) (cdar a)) res)) (setf a (cdr a)))
+                        (1  (unless (zerop (cdar b)) (push (cons (caar b) (cdar b)) res)) (setf b (cdr b)))
+                        (t  (let ((s (+ (cdar a) (cdar b))))
+                              (unless (zerop s) (push (cons (caar a) s) res)))
+                            (setf a (cdr a) b (cdr b))))))
+           (nreverse res)))
+        (t (mono-mul-lento m1 m2))))
+
+(defun mono-mul-lento (m1 m2)
   (let ((res (copy-alist m1)))
     (dolist (pr m2)
       (let ((cell (assoc (car pr) res)))
@@ -213,25 +234,85 @@
 
 (defun mono-degree (m) (reduce #'+ (mapcar #'cdr m) :initial-value 0))
 
+;; RAPIDO (19-nov-2026): p+ y p* eran O(n²) (assoc lineal + append que copia toda la lista
+;; por cada termino; p* llamaba a p+ por cada producto de terminos). Ahora una tabla hash
+;; (monomio → celda) y una cola con puntero al final: O(n). El ORDEN de los terminos es el
+;; MISMO que antes (poly->expr solo ordena por grado y respeta el orden de llegada dentro
+;; de cada grado), asi que las formulas se ven igual. Polinomios chicos: el camino viejo.
+(defmacro with-poly-acc ((add collect) &body body)
+  "ADD (mono coef): suma al acumulador conservando el orden de llegada; COLLECT: la lista."
+  (let ((ht (gensym)) (head (gensym)) (tail (gensym)))
+    `(let* ((,ht (make-hash-table :test #'equal)) (,head (list nil)) (,tail ,head))
+       (flet ((,add (m c)
+                (let ((cell (gethash m ,ht)))
+                  (if cell (incf (cdr cell) c)
+                      (let ((nc (cons m c)))
+                        (setf (gethash m ,ht) nc (cdr ,tail) (list nc) ,tail (cdr ,tail))))))
+              (,collect () (remove-if (lambda (term) (zerop (cdr term))) (cdr ,head))))
+         ,@body))))
+
+;; Acumulador de sumas largas: a + b + c + … (arbol binario a la izquierda) hacia p+ paso
+;; a paso era O(n²): cada p+ recorre todo lo acumulado. Este suma TODO en una pasada con el
+;; MISMO resultado que la cadena de p+ (mismo orden; un monomio que se anula sale y, si
+;; vuelve, entra al final, igual que el remove-if de cada p+).
+(defun pacc-new () (let ((h (list nil))) (list (make-hash-table :test #'equal) h h)))
+(defun pacc-add (acc poly k)
+  "Suma k·poly al acumulador."
+  (let ((ht (first acc)))
+    (dolist (tm poly)
+      (let* ((m (car tm)) (c (* k (cdr tm))) (cell (gethash m ht)))
+        (cond (cell (incf (cdr cell) c) (when (zerop (cdr cell)) (remhash m ht)))
+              ((zerop c))
+              (t (let ((nc (cons m c)))
+                   (setf (gethash m ht) nc (cdr (third acc)) (list nc) (third acc) (cdr (third acc))))))))))
+(defun pacc-list (acc) (remove-if (lambda (term) (zerop (cdr term))) (cdr (second acc))))
+
+(defun sum-chain (e)
+  "(+ (- (+ x y) z) w) -> ((1 . x) (1 . y) (-1 . z) (1 . w)): la espina izquierda de + y - binarios."
+  (let ((items nil))
+    (loop while (and (consp e) (or (eq (car e) '+) (and (eq (car e) '-) (cddr e))))
+          do (push (cons (if (eq (car e) '+) 1 -1) (third e)) items)
+             (setf e (second e)))
+    (cons (cons 1 e) items)))
+
 (defun p+ (p q)
   "Suma de polinomios (combina monomios iguales, tira los de coef 0)."
-  (let ((res (copy-alist p)))
-    (dolist (term q)
-      (let ((cell (assoc (car term) res :test #'equal)))
-        (if cell (incf (cdr cell) (cdr term))
-            (setf res (append res (list (cons (car term) (cdr term))))))))
-    (remove-if (lambda (term) (zerop (cdr term))) res)))
+  (if (< (+ (length p) (length q)) 12)
+      (let ((res (copy-alist p)))
+        (dolist (term q)
+          (let ((cell (assoc (car term) res :test #'equal)))
+            (if cell (incf (cdr cell) (cdr term))
+                (setf res (append res (list (cons (car term) (cdr term))))))))
+        (remove-if (lambda (term) (zerop (cdr term))) res))
+      (with-poly-acc (add collect)
+        (dolist (term p) (add (car term) (cdr term)))
+        (dolist (term q) (add (car term) (cdr term)))
+        (collect))))
 
 (defun p-scale (p c)
   (if (zerop c) nil (mapcar (lambda (term) (cons (car term) (* (cdr term) c))) p)))
 
 (defun p* (p q)
-  (let ((res nil))
-    (dolist (a p)
-      (dolist (b q)
-        (setf res (p+ res (list (cons (mono-mul (car a) (car b))
-                                      (* (cdr a) (cdr b))))))))
-    res))
+  ;; Igual que antes (p+ termino a termino): un monomio que se anula SALE de la lista y,
+  ;; si reaparece, entra AL FINAL. Se reproduce con la tabla: al llegar a 0 se borra.
+  (if (< (* (length p) (length q)) 12)
+      (let ((res nil))
+        (dolist (a p)
+          (dolist (b q)
+            (setf res (p+ res (list (cons (mono-mul (car a) (car b))
+                                          (* (cdr a) (cdr b))))))))
+        res)
+      (let* ((ht (make-hash-table :test #'equal)) (head (list nil)) (tail head))
+        (dolist (a p)
+          (dolist (b q)
+            (let* ((m (mono-mul (car a) (car b))) (c (* (cdr a) (cdr b)))
+                   (cell (gethash m ht)))
+              (cond (cell (incf (cdr cell) c)
+                          (when (zerop (cdr cell)) (remhash m ht)))
+                    ((zerop c))
+                    (t (let ((nc (cons m c)))
+                         (setf (gethash m ht) nc (cdr tail) (list nc) tail (cdr tail))))))))
+        (remove-if (lambda (term) (zerop (cdr term))) (cdr head)))))
 
 (defun p-const (c) (if (zerop c) nil (list (cons nil c))))
 (defun p-var (v) (list (cons (list (cons v 1)) 1)))
@@ -253,6 +334,12 @@
     ((consp e)
      (let ((op (car e)))
        (cond
+         ((and (member op '(+ -)) (cddr e)
+               (consp (second e)) (member (car (second e)) '(+ -)) (cddr (second e)))
+          ;; cadena larga de sumas: una sola pasada (antes O(n²))
+          (let ((acc (pacc-new)))
+            (dolist (it (sum-chain e)) (pacc-add acc (expr->poly (cdr it)) (car it)))
+            (pacc-list acc)))
          ((eq op '+) (p+ (expr->poly (second e)) (expr->poly (third e))))
          ((eq op '-) (if (cddr e)
                          (p+ (expr->poly (second e)) (p-scale (expr->poly (third e)) -1))
@@ -324,11 +411,12 @@
     ((consp e)
      (let ((op (car e)))
        (cond
-         ((eq op '+) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
-                       (cons (p+ (p* (car a) (cdr b)) (p* (car b) (cdr a))) (p* (cdr a) (cdr b)))))
+         ((and (member op '(+ -)) (cddr e)
+               (consp (second e)) (member (car (second e)) '(+ -)) (cddr (second e)))
+          (rat-suma-cadena (mapcar (lambda (it) (cons (car it) (to-ratpoly (cdr it)))) (sum-chain e))))
+         ((eq op '+) (rat-suma (to-ratpoly (second e)) (to-ratpoly (third e)) 1))
          ((eq op '-) (if (cddr e)
-                         (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
-                           (cons (p+ (p* (car a) (cdr b)) (p-scale (p* (car b) (cdr a)) -1)) (p* (cdr a) (cdr b))))
+                         (rat-suma (to-ratpoly (second e)) (to-ratpoly (third e)) -1)
                          (let ((a (to-ratpoly (second e)))) (cons (p-scale (car a) -1) (cdr a)))))
          ((eq op '*) (let ((a (to-ratpoly (second e))) (b (to-ratpoly (third e))))
                        (cons (p* (car a) (car b)) (p* (cdr a) (cdr b)))))
@@ -342,6 +430,41 @@
          (t (throw 'notrat :fail)))))
     (t (throw 'notrat :fail))))
 (defun try-ratpoly (e) (catch 'notrat (to-ratpoly e)))
+
+(defun rat-suma (a b s)
+  "a + s·b con a, b = (num . den). RAPIDO (19-nov-2026): si los dos denominadores son UN
+   monomio (a², b², a·b del FEM) se usa su MINIMO COMUN MULTIPLO en vez del producto:
+   n1/a² + n2/a² = (n1+n2)/a², no (n1·a² + n2·a²)/a⁴. El polinomio no crece y el resultado,
+   ya cancelado, es el mismo."
+  (let ((da (cdr a)) (db (cdr b)))
+    (let ((g (and da db (null (cdr da)) (null (cdr db)) (mono-min (list (car da) (car db))))))
+      (if g
+          (let ((fa (poly-div-mono db g))      ; db/g: lo que le falta a da para llegar al mcm
+                (fb (poly-div-mono da g)))
+            (cons (p+ (p* (car a) fa) (p-scale (p* (car b) fb) s)) (p* da fa)))
+          (cons (p+ (p* (car a) db) (p-scale (p* (car b) da) s)) (p* da db))))))
+
+(defun rat-suma-cadena (items)
+  "Σ sᵢ·(nᵢ/dᵢ), items = ((s . (n . d)) …). Si TODOS los dᵢ son un monomio: el denominador
+   final D se arma igual que rat-suma paso a paso, y cada nᵢ se multiplica UNA vez por D/dᵢ
+   (mismo resultado, sin rehacer lo acumulado en cada paso). Si no, rat-suma paso a paso."
+  (if (every (lambda (it) (null (cdr (cddr it)))) items)
+      (let ((d (cddr (first items))))
+        (dolist (it (rest items))
+          (let* ((dk (cddr it)) (g (mono-min (list (car d) (car dk)))))
+            (setf d (if g (p* d (poly-div-mono dk g)) (p* d dk)))))
+        (let ((acc (pacc-new)) (dm (car (car d))) (dc (cdr (car d))))
+          (dolist (it items)
+            (let* ((dk (car (cddr it)))
+                   (f (list (cons (remove-if (lambda (x) (zerop (cdr x)))
+                                             (mapcar (lambda (pr) (let ((c (assoc (car pr) (car dk))))
+                                                                    (cons (car pr) (- (cdr pr) (if c (cdr c) 0)))))
+                                                     dm))
+                                  (/ dc (cdr dk))))))
+              (pacc-add acc (p* (cadr it) f) (car it))))
+          (cons (pacc-list acc) d)))
+      (let ((r (cdr (first items))))
+        (dolist (it (rest items) r) (setf r (rat-suma r (cdr it) (car it)))))))
 
 (defun gcd-rat (a b)
   "MCD de dos racionales: gcd(numeradores)/lcm(denominadores)."
@@ -555,9 +678,13 @@
          (when mm (setf num (poly-div-mono num mm) den (poly-div-mono den mm)))
          (let ((g (gcd-rat (ratcontent num) (ratcontent den))))
            (when (and (/= g 0) (/= g 1)) (setf num (p-scale num (/ 1 g)) den (p-scale den (/ 1 g)))))
-         ;; y el factor POLINOMICO comun (el determinante que salia al cuadrado)
-         (let ((g (cancel-gcd num den)))
-           (setf num (car g) den (cdr g)))
+         ;; y el factor POLINOMICO comun (el determinante que salia al cuadrado).
+         ;; RAPIDO: si num o den es UN solo monomio, su unico factor comun posible es un
+         ;; monomio, y ese ya se quito arriba (mono-min): el MCD saldria constante. Se salta
+         ;; (a², b², a·b en los denominadores del FEM: era la mitad del tiempo de K).
+         (unless (or (null (cdr num)) (null (cdr den)))
+           (let ((g (cancel-gcd num den)))
+             (setf num (car g) den (cdr g))))
          ;; si el denominador es una constante negativa, pasa el signo al numerador
          (let ((dc (p-constant den)))
            (when (and (numberp dc) (minusp dc)) (setf num (p-scale num -1) den (p-scale den -1))))

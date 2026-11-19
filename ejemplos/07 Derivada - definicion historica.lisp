@@ -10,7 +10,7 @@ m_s = Simplify{((1 + h)^2 - 1^2)/h}
 ## 2 · El límite: la tangente
 m_t = Limit{((1 + h)^2 - 1)/h @ h = 0}
 #: La animación achica h = 1/n (n = 1 … 12): la secante gira hasta coincidir con la tangente en el punto (1, 1).
-#anim fplot(f = x^2, secante = 1 + (2 + 1/n)*(x - 1), tangente = 1 + 2*(x - 1), [-1 3]), n = 1:12
+#anim fplot(f = x^2, secante = 1 + (2 + 1/n)*(x - 1), tangente = 1 + 2*(x - 1), [-1 3]), n = 1:0.1:12
 
 ## 3 · La regla que sale del límite
 #: Lo mismo en cualquier x da la derivada:

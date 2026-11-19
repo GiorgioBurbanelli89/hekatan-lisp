@@ -13,9 +13,11 @@ Tiempo por pasada (1 de calentamiento, luego promedio), mismo PC, 19-nov-2026:
 | Hekatan LISP escritorio (SBCL nativo) | 4.0 ms |
 | wxMaxima 25.04 / Maxima 5.48.1 (SBCL) | 14–45 ms (24.5 ms en la corrida de la captura) |
 | Hekatan LISP web (WebAssembly, navegador) | ~69 ms |
-| Hekatan Lab (Giac) | 87.5 ms |
+| Hekatan Math Studio web (WebAssembly, navegador) | ~83 ms |
+| Hekatan Lab (Giac) | 84.6 ms |
+| MATLAB R2017a (Symbolic Math Toolbox) | 100.1 ms |
 
 Archivos:
 - Hekatan LISP: `ejemplos/Placa Kirchhoff BFS simbolica - forma, Jacobiano, B y k contra wxMaxima.lisp` (tic / toc)
 - wxMaxima: `bfs_simbolico_wxmaxima.wxm` (Celda → Evaluar todas las celdas)
-- Hekatan Lab: `bfs_simbolico_hekatan_lab.m`
+- Hekatan Lab y MATLAB: `bfs_simbolico_hekatan_lab.m` (el mismo .m en los dos)

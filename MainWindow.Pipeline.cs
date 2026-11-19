@@ -2186,7 +2186,7 @@ dib();})();";
                         string tiempo = us >= 1000 ? (us / 1000).ToString("0.000", ci) + " ms" : us.ToString("0.000", ci) + " µs";
                         html = "<span style=\"color:var(--var);font-weight:600\">⏱ " + tiempo +
                                "</span> por pasada <span style=\"color:var(--mut)\">(promedio de " +
-                               iters.ToString("#,0", new System.Globalization.CultureInfo("es-ES")) +
+                               iters.ToString("#,0", ci).Replace(",", " ") +
                                (iters == 1 ? " pasada" : " pasadas") + ", motor de polinomios en Lisp)</span>";
                     }
                     display.Add(LispConverter.TxtLine("p", "left", html));

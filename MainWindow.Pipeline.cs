@@ -2181,10 +2181,13 @@ dib();})();";
                         html = "<span style=\"color:var(--mut)\">⏱ tic/toc sin operaciones que medir</span>";
                     else
                     {
-                        double us = LispEngine.TimeOps(opForms, 10000);
-                        html = "<span style=\"color:var(--var);font-weight:600\">⏱ " +
-                               us.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) +
-                               " µs</span> por operación <span style=\"color:var(--mut)\">(10 000 iteraciones, motor de polinomios en SBCL)</span>";
+                        double us = LispEngine.TimeOps(opForms, 10000, out int iters);
+                        var ci = System.Globalization.CultureInfo.InvariantCulture;
+                        string tiempo = us >= 1000 ? (us / 1000).ToString("0.000", ci) + " ms" : us.ToString("0.000", ci) + " µs";
+                        html = "<span style=\"color:var(--var);font-weight:600\">⏱ " + tiempo +
+                               "</span> por pasada <span style=\"color:var(--mut)\">(promedio de " +
+                               iters.ToString("#,0", new System.Globalization.CultureInfo("es-ES")) +
+                               (iters == 1 ? " pasada" : " pasadas") + ", motor de polinomios en Lisp)</span>";
                     }
                     display.Add(LispConverter.TxtLine("p", "left", html));
                     continue;

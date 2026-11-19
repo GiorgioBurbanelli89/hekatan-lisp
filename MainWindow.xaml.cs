@@ -157,8 +157,9 @@ namespace HekatanLisp
             }
             if (_pdf != null)
             {   // espera el CÁLCULO (hojas largas tardan más de 1 s: salía el PDF de la hoja anterior/vacía)
-                try { if (_showTask != null) await _showTask; } catch { }
-                await Task.Delay(1500);
+                // como --shot: el TextChanged del editor relanza el cálculo tras el debounce; con un
+                // tic/toc de ~2 s salía «calculando…» en el PDF. Se espera también ese segundo cálculo.
+                for (int k = 0; k < 3; k++) { try { if (_showTask != null) await _showTask; } catch { } await Task.Delay(k == 0 ? 1500 : 400); }
                 await PrintPdfAndExit(Path.GetFullPath(_pdf));   // WebView2 exige ruta absoluta
             }
             if (_latex != null) {  // --latex: las expresiones en LaTeX (Hekatan School / Manim)

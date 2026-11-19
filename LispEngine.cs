@@ -231,25 +231,39 @@ namespace HekatanLisp
 
         /// <summary>CRONÓMETRO (tic/toc): corre las formas de operación N veces en SBCL y devuelve
         /// los MICROSEGUNDOS por operación. Mide el cálculo puro, como el tic/toc de Hekatan Lab.</summary>
-        public static double TimeOps(List<string> forms, int n)
+        public static double TimeOps(List<string> forms, int n) => TimeOps(forms, n, out _);
+
+        /// <summary>Igual, pero ADAPTATIVO: corre el bloque una vez (calentamiento y estimación) y repite
+        /// las veces que quepan en ~2 s, como máximo <paramref name="n"/>. Así un bloque pesado
+        /// (p. ej. matrices simbólicas) no tarda minutos. <paramref name="iters"/> = pasadas medidas.</summary>
+        public static double TimeOps(List<string> forms, int n, out int iters)
         {
+            iters = 0;
             if (forms == null || forms.Count == 0 || n <= 0) return 0;
-            var sb = new StringBuilder();
-            sb.Append("(setf *print-case* :downcase)\n");
-            sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
-            sb.Append("(let ((t0 (get-internal-real-time)))\n  (dotimes (i ").Append(n).Append(")\n");
+            var body = new StringBuilder();
             foreach (var f in forms)
             {
                 // matrices (vector/transpuesta) se evalúan con meval; el resto con evops
                 bool isMat = f.Contains("(vector") || f.Contains("(mtransp") || f.Contains("(mrange") || f.Contains("(ngauss");
-                sb.Append("    (ignore-errors (").Append(isMat ? "meval" : "evops").Append(" '").Append(f).Append("))\n");
+                body.Append("    (ignore-errors (").Append(isMat ? "meval" : "evops").Append(" '").Append(f).Append("))\n");
             }
-            sb.Append("  )\n  (format t \"~,4f~%\" (/ (* 1000000.0 (- (get-internal-real-time) t0)) (* internal-time-units-per-second ")
-              .Append(n).Append("))))\n");
+            var sb = new StringBuilder();
+            sb.Append("(setf *print-case* :downcase)\n");
+            sb.Append("(load \"").Append(Lib.Replace("\\", "/")).Append("\")\n");
+            sb.Append("(let* ((t0 (get-internal-real-time)))\n  (progn\n").Append(body).Append("  )\n");
+            sb.Append("  (let* ((one (max 1 (- (get-internal-real-time) t0)))\n");
+            sb.Append("         (n (max 1 (min ").Append(n).Append(" (floor (* 2 internal-time-units-per-second) one))))\n");
+            sb.Append("         (t1 (get-internal-real-time)))\n");
+            sb.Append("    (dotimes (i n)\n").Append(body).Append("    )\n");
+            sb.Append("    (format t \"~,4f ~d~%\" (/ (* 1000000.0 (- (get-internal-real-time) t1)) (* internal-time-units-per-second n)) n)))\n");
             foreach (var l in Run(sb.ToString()).Replace("\r", "").Split('\n'))
-                if (double.TryParse(l.Trim(), System.Globalization.NumberStyles.Float,
-                                    System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0)
-                    return v;
+            {
+                var p = l.Trim().Split(' ');
+                if (p.Length == 2 && double.TryParse(p[0], System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0
+                    && int.TryParse(p[1], out var k))
+                { iters = k; return v; }
+            }
             return 0;
         }
 

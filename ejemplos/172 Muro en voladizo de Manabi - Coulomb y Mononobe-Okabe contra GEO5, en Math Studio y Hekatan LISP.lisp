@@ -37,8 +37,11 @@ delta_p = 20 'δ suelo-hormigón en la cara del talón [grados]
 Kc(phi, delta, alpha, beta) = cos(phi - alpha)^2/(cos(alpha)^2*cos(alpha + delta)*(1 + sqrt(max(sin(phi + delta)*sin(phi - beta)/(cos(alpha + delta)*cos(alpha - beta)), 0)))^2)
 rad = pi/180 'de grados a radianes
 psi = atan(k_h/(1 - k_v)) 'ángulo del sismo ψ [rad]
-theta = pi/4 + phi_1*rad/2 'cara virtual: 45° + φ/2 sobre la horizontal [rad]
-alpha_1 = pi/2 - theta 'su inclinación respecto de la vertical [rad]
+#: **El ángulo de la cara virtual como lo halla GEO5.** La teoría da α = 45° − φ/2 respecto de la vertical (θ = 45° + φ/2 sobre la horizontal). GEO5 no usa esa fórmula: lo **busca por bisección entre 0° y 90°** y se queda con el **punto medio número 15**, es decir, el centro de la celda de ancho 90°/2^{14} que contiene el valor exacto. Medido con Frida en CantileverWall_5.dll el 20-nov-2026 con φ = 27, 30, 33, 34.5 y 36: los cinco casos cumplen la regla. Con φ = 30° sale α = 30.000915527…° en vez de 30°; con 30° exactos, F_{z} del empuje se desvía 0.0013 y el incremento sísmico 0.004.
+a_ex = 45 - phi_1/2 'α exacto de la teoría [grados]
+a_G = 90/16384*(floor(16384*a_ex/90) + 0.5) 'α de GEO5: punto medio 15 de la bisección en [0°, 90°] [grados]
+alpha_1 = a_G*rad 'inclinación de la cara virtual respecto de la vertical [rad]
+theta = pi/2 - alpha_1 'ángulo de la cara virtual sobre la horizontal [rad]
 phi = phi_1*rad 'φ de la arena SP [rad]
 delta_1 = phi 'δ en la cara virtual = φ (suelo contra suelo) [rad]
 delta_K = delta_1 - 0.0001 'δ para K: GEO5 lo recorta a φ − 1e-4 (binario, 0xD9D978) [rad]
@@ -144,7 +147,14 @@ T_P = [E_xx, 2.53, E_xx - 2.53; E_y, 1.03, E_y - 1.03; S_xx, 2.06, S_xx - 2.06; 
 T_I = [k_h*W_m, 15.80, k_h*W_m - 15.80; W_c, 55.29, W_c - 55.29; k_h*W_c, 18.58, k_h*W_c - 18.58] 'Hekatan, GEO5, diferencia
 #: **Momentos [kN·m/m] y fuerzas horizontales [kN/m]**, de la ventana «In detail» de GEO5: M_{res}, M_{ovr}, H_{res}, H_{act}.
 T_M = [M_res, 388.96, M_res - 388.96; M_ovr, 143.34, M_ovr - 143.34; H_res, 119.02, H_res - 119.02; H_h, 99.40, H_h - 99.40] 'Hekatan, GEO5, diferencia
+#: **Bit a bit contra el binario.** Valores internos de GEO5 leídos con Frida (doble precisión, 17 cifras) el 20-nov-2026 en este mismo muro: K_{a} y K_{ae} de la cara virtual y del talón, y las fuerzas F_{x}, F_{z} del empuje estático y del incremento sísmico. La diferencia queda en 1e-14: es el redondeo de la máquina, no del método.
+T_B = [Ka_1, 0.6666466332305437, Ka_1 - 0.6666466332305437; Kae_1, 1.594497947900209, Kae_1 - 1.594497947900209; Ka_2, 0.29731385720545084, Ka_2 - 0.29731385720545084; Kae_2, 0.6246519605930702, Kae_2 - 0.6246519605930702; E_x, 26.630959107165644, E_x - 26.630959107165644; E_z, 38.20792194799549, E_z - 38.20792194799549; S_x, 38.389394942694004, S_x - 38.389394942694004; S_z, 65.87199689777745, S_z - 65.87199689777745] 'Hekatan, GEO5 (Frida), diferencia
 #: **Factores de seguridad**, por filas: vuelco y deslizamiento.
 T_S = [FS_v, 2.71, FS_v - 2.71; FS_d, 1.20, FS_d - 1.20] 'Hekatan, GEO5, diferencia
+
+## 8 · Hekatan Geotechnic
+
+#: **Hekatan Geotechnic** tiene el mismo muro en su módulo de muros (src/wall/geo5Cantilever.ts, función muroGeo5) con la misma bisección de GEO5. Su prueba tests/muro_manabi_bits.ts da estos valores para este muro; la tercera columna es la diferencia con esta hoja, que debe ser cero salvo el último bit.
+T_G = [M_res, 388.96271750378833, M_res - 388.96271750378833; M_ovr, 143.33668963897173, M_ovr - 143.33668963897173; H_res, 119.02277604224209, H_res - 119.02277604224209; H_h, 99.400910118337535, H_h - 99.400910118337535; FS_v, 2.7136298353442192, FS_v - 2.7136298353442192; FS_d, 1.1974012702755394, FS_d - 1.1974012702755394] 'esta hoja, Hekatan Geotechnic, diferencia
 
 #: **NEC-SE-GC, tabla 5 (sismo):** vuelco ≥ 2.00 y deslizamiento ≥ 1.05. Con k_{h} = 0.336 el muro **cumple** los dos (2.71 y 1.20).

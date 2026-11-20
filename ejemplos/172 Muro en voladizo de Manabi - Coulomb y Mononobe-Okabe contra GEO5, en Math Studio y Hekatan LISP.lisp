@@ -64,7 +64,8 @@ W_m = W_z + W_f 'peso del muro [kN/m]
 x_m = (W_z*B_z/2 + W_f*x_f)/W_m 'abscisa del c.d.g. del muro [m]
 y_m = (W_z*h_z/2 + W_f*y_f)/W_m 'cota del c.d.g. del muro [m]
 w_0 = B_z - x_t 'ancho de la cuña de tierra abajo [m]
-w_1 = x_v - x_t 'ancho de la cuña arriba [m]
+#: **La cuña de GEO5.** Su lado inclinado usa el mismo α de la bisección, pero GEO5 corre el punto de arriba **1e-5 m** hacia el relleno (una tolerancia interna): con eso su peso y su centro de gravedad salen iguales al binario bit a bit (Frida: W = 55.287195935578424, x desde el fuste 0.6563994871255965, z desde arriba 1.5829687446284182).
+w_1 = L_t - H_f*tan(alpha_1) + 0.00001 'ancho de la cuña arriba, como GEO5 [m]
 A_c = (w_0 + w_1)/2*H_f 'área de la cuña sobre el talón [m2]
 W_c = gamma_1*A_c 'peso de la cuña [kN/m]
 x_c = x_t + H_f*(w_0^2 + w_0*w_1 + w_1^2)/6/A_c 'abscisa de su c.d.g. [m]
@@ -147,14 +148,14 @@ T_P = [E_xx, 2.53, E_xx - 2.53; E_y, 1.03, E_y - 1.03; S_xx, 2.06, S_xx - 2.06; 
 T_I = [k_h*W_m, 15.80, k_h*W_m - 15.80; W_c, 55.29, W_c - 55.29; k_h*W_c, 18.58, k_h*W_c - 18.58] 'Hekatan, GEO5, diferencia
 #: **Momentos [kN·m/m] y fuerzas horizontales [kN/m]**, de la ventana «In detail» de GEO5: M_{res}, M_{ovr}, H_{res}, H_{act}.
 T_M = [M_res, 388.96, M_res - 388.96; M_ovr, 143.34, M_ovr - 143.34; H_res, 119.02, H_res - 119.02; H_h, 99.40, H_h - 99.40] 'Hekatan, GEO5, diferencia
-#: **Bit a bit contra el binario.** Valores internos de GEO5 leídos con Frida (doble precisión, 17 cifras) el 20-nov-2026 en este mismo muro: K_{a} y K_{ae} de la cara virtual y del talón, y las fuerzas F_{x}, F_{z} del empuje estático y del incremento sísmico. La diferencia queda en 1e-14: es el redondeo de la máquina, no del método.
-T_B = [Ka_1, 0.6666466332305437, Ka_1 - 0.6666466332305437; Kae_1, 1.594497947900209, Kae_1 - 1.594497947900209; Ka_2, 0.29731385720545084, Ka_2 - 0.29731385720545084; Kae_2, 0.6246519605930702, Kae_2 - 0.6246519605930702; E_x, 26.630959107165644, E_x - 26.630959107165644; E_z, 38.20792194799549, E_z - 38.20792194799549; S_x, 38.389394942694004, S_x - 38.389394942694004; S_z, 65.87199689777745, S_z - 65.87199689777745] 'Hekatan, GEO5 (Frida), diferencia
+#: **Bit a bit contra el binario.** Valores internos de GEO5 leídos con Frida (doble precisión, 17 cifras) el 20-nov-2026 en este mismo muro: peso de la cuña y su centro de gravedad, K_{a} y K_{ae} de la cara virtual y del talón, y las fuerzas F_{x}, F_{z} del empuje estático y del incremento sísmico. La diferencia queda en 1e-14: es el redondeo de la máquina, no del método.
+T_B = [W_c, 55.287195935578424, W_c - 55.287195935578424; x_c - x_t, 0.6563994871255965, x_c - x_t - 0.6563994871255965; H_t - y_c, 1.5829687446284182, H_t - y_c - 1.5829687446284182; Ka_1, 0.6666466332305437, Ka_1 - 0.6666466332305437; Kae_1, 1.594497947900209, Kae_1 - 1.594497947900209; Ka_2, 0.29731385720545084, Ka_2 - 0.29731385720545084; Kae_2, 0.6246519605930702, Kae_2 - 0.6246519605930702; E_x, 26.630959107165644, E_x - 26.630959107165644; E_z, 38.20792194799549, E_z - 38.20792194799549; S_x, 38.389394942694004, S_x - 38.389394942694004; S_z, 65.87199689777745, S_z - 65.87199689777745] 'Hekatan, GEO5 (Frida), diferencia
 #: **Factores de seguridad**, por filas: vuelco y deslizamiento.
 T_S = [FS_v, 2.71, FS_v - 2.71; FS_d, 1.20, FS_d - 1.20] 'Hekatan, GEO5, diferencia
 
 ## 8 · Hekatan Geotechnic
 
-#: **Hekatan Geotechnic** tiene el mismo muro en su módulo de muros (src/wall/geo5Cantilever.ts, función muroGeo5) con la misma bisección de GEO5. Su prueba tests/muro_manabi_bits.ts da estos valores para este muro; la tercera columna es la diferencia con esta hoja, que debe ser cero salvo el último bit.
-T_G = [M_res, 388.96271750378833, M_res - 388.96271750378833; M_ovr, 143.33668963897173, M_ovr - 143.33668963897173; H_res, 119.02277604224209, H_res - 119.02277604224209; H_h, 99.400910118337535, H_h - 99.400910118337535; FS_v, 2.7136298353442192, FS_v - 2.7136298353442192; FS_d, 1.1974012702755394, FS_d - 1.1974012702755394] 'esta hoja, Hekatan Geotechnic, diferencia
+#: **Hekatan Geotechnic** tiene el mismo muro en su módulo de muros (src/wall/geo5Cantilever.ts, función muroGeo5) con la misma bisección de GEO5. En su interfaz (panel del muro, bloque «Como GEO5 Cantilever Wall», con k_{h} = 0.336, s1 = 17.33, k = 0.25 y φ de la base 29.97) y en su prueba tests/muro_manabi_bits.ts da estos valores para este muro; la tercera columna es la diferencia con esta hoja, que debe ser cero salvo el último bit.
+T_G = [M_res, 388.96319832456504, M_res - 388.96319832456504; M_ovr, 143.33686202937173, M_ovr - 143.33686202937173; H_res, 119.02291472713189, H_res - 119.02291472713189; H_h, 99.400990926337528, H_h - 99.400990926337528; FS_v, 2.7136299261585695, FS_v - 2.7136299261585695; FS_d, 1.1974016920549158, FS_d - 1.1974016920549158] 'esta hoja, Hekatan Geotechnic, diferencia
 
 #: **NEC-SE-GC, tabla 5 (sismo):** vuelco ≥ 2.00 y deslizamiento ≥ 1.05. Con k_{h} = 0.336 el muro **cumple** los dos (2.71 y 1.20).

@@ -140,6 +140,10 @@ u_3 = (Kae_2 - Ka_2)*t_2/25 'sísmico, arriba de la capa 2
 T_F = [W_m, 47.04, W_m - 47.04; E_x, 26.63, E_x - 26.63; E_z, 38.21, E_z - 38.21; S_x, 38.39, S_x - 38.39; S_z, 65.87, S_z - 65.87] 'Hekatan, GEO5, diferencia
 #: **Puntos de aplicación [m]**, por filas: empuje estático x e y; incremento sísmico x e y.
 T_P = [E_xx, 2.53, E_xx - 2.53; E_y, 1.03, E_y - 1.03; S_xx, 2.06, S_xx - 2.06; S_y, 2.01, S_y - 2.01] 'Hekatan, GEO5, diferencia
+#: **Inercia sísmica y cuña [kN/m]**, por filas: inercia del muro k_{h}·W_{m} («Earthq.- constr.»), peso de la cuña, inercia de la cuña («Earthquake - soil wedge»).
+T_I = [k_h*W_m, 15.80, k_h*W_m - 15.80; W_c, 55.29, W_c - 55.29; k_h*W_c, 18.58, k_h*W_c - 18.58] 'Hekatan, GEO5, diferencia
+#: **Momentos [kN·m/m] y fuerzas horizontales [kN/m]**, de la ventana «In detail» de GEO5: M_{res}, M_{ovr}, H_{res}, H_{act}.
+T_M = [M_res, 388.96, M_res - 388.96; M_ovr, 143.34, M_ovr - 143.34; H_res, 119.02, H_res - 119.02; H_h, 99.40, H_h - 99.40] 'Hekatan, GEO5, diferencia
 #: **Factores de seguridad**, por filas: vuelco y deslizamiento.
 T_S = [FS_v, 2.71, FS_v - 2.71; FS_d, 1.20, FS_d - 1.20] 'Hekatan, GEO5, diferencia
 

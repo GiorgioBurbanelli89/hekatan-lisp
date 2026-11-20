@@ -347,7 +347,7 @@ namespace HekatanLisp
             var c = new Ctx { Look = lookup, Id = "hkd" + Guid.NewGuid().ToString("N").Substring(0, 6) };
             var errs = new List<string>();
             // ---- cabecera ----
-            string titulo = null; double? escFija = null; double anchoMax = 170, altoMax = 150;
+            string titulo = null; double? escFija = null; double anchoMax = 170, altoMax = 150; bool derecha = false;
             foreach (var a in ParseArgs(blk.Cabecera ?? ""))
             {
                 if (a.Name == null && a.Str != null) { titulo = a.Str; continue; }
@@ -355,6 +355,7 @@ namespace HekatanLisp
                 switch (a.Name)
                 {
                     case "titulo": titulo = v; break;
+                    case "lado": derecha = v.ToLowerInvariant().StartsWith("der"); break;   // lado = derecha: al lado de los datos de su sección (flota a la derecha)
                     case "ud": case "unidad": c.Ud = v.ToLowerInvariant(); break;
                     case "cotas": c.UdCota = v.ToLowerInvariant(); break;
                     case "dec": int.TryParse(v, out c.Dec); break;
@@ -451,7 +452,7 @@ namespace HekatanLisp
             double vx = Math.Min(0, c.PxMin - pad), vy = Math.Min(0, c.PyMin - pad);
             double vw = Math.Max(c.PxMax + pad, c.ML + wg * c.K + mR) - vx, vh = Math.Max(c.PyMax + pad, c.MT + hg * c.K * c.Vy + mB) - vy;
             var sb = new StringBuilder();
-            sb.Append("<div class=\"hk-dib\">");
+            sb.Append(derecha ? "<div class=\"hk-dib hk-dib-der\">" : "<div class=\"hk-dib\">");
             string cotaUd = c.UdCota;
             sb.Append("<div class=\"hk-dib-tit\">");
             if (!string.IsNullOrEmpty(titulo)) sb.Append("<b>").Append(LispConverter.FormatInlineText(titulo, _ => null)).Append("</b> · ");

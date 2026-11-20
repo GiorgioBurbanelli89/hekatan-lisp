@@ -1545,6 +1545,26 @@ dib();})();";
         /// <summary>#dibujo en una hoja #numerico: los nombres del dibujo toman el valor que el programa
         /// les dio (la misma búsqueda que @{nombre}). Antes el dibujo buscaba en las etiquetas del modo
         /// simbólico, vacías en #numerico, y cada nombre salía «no está definida».</summary>
+        /// <summary>#dibujo con lado = derecha: el SVG se pega DESPUÉS del título (#/##/###) de su sección, así flota a la
+        /// derecha de los datos que siguen al título (Jorge, 20-nov-2026: «al lado de los datos debería haber una gráfica»).</summary>
+        private static bool SubeAlTitulo(List<string> display, string[] lines, int i, string svg)
+        {
+            for (int j = i - 1; j >= 0 && j < display.Count; j--)
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(lines[j], @"^\s*#{1,3}\s")) continue;
+                string d = display[j];
+                if (!d.StartsWith(LispConverter.TxtMark, StringComparison.Ordinal)) return false;
+                var pz = d.Split(LispConverter.TxtSep);
+                string kind = pz.Length > 2 ? pz[2] : "p", align = pz.Length > 3 ? pz[3] : "left";
+                string html = pz.Length > 4 ? string.Join(LispConverter.TxtSep.ToString(), pz.Skip(4)) : "";
+                string cls = kind == "h1" ? "ws-h1" : kind == "h2" ? "ws-h2" : kind == "h3" ? "ws-h3" : "";
+                if (kind == "table") display[j] = LispConverter.TxtLine("table", "left", html + svg);
+                else display[j] = LispConverter.TxtLine("table", "left", "<div class=\"ws-fmt " + cls + " al-" + align + "\">" + html + "</div>" + svg);
+                return true;
+            }
+            return false;
+        }
+
         private double[] NumDibujo(string name, int linea, string[] srcLines)
         {
             var v = NumLiteral(name, linea, srcLines);
@@ -2217,6 +2237,7 @@ dib();})();";
                     try { svg = LispDibujo.Render(dibujos[i], name => _numMode ? NumDibujo(name, iDib, lines) ?? NumLookup(name, labels, resOf, formOf, 0)
                                                                            : NumLookup(name, labels, resOf, formOf, 0)); }
                     catch (Exception ex) { svg = "<div class=\"hk-dib-err\">⚠ #dibujo: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div>"; }
+                    if (svg.Contains("hk-dib-der") && SubeAlTitulo(display, lines, i, svg)) { display.Add(""); continue; }   // lado = derecha: va pegado al título de su sección y flota al lado de los datos
                     display.Add(LispConverter.TxtLine("table", "left", svg));
                     continue;
                 }

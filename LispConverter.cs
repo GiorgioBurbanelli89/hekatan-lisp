@@ -1368,6 +1368,8 @@ table.ws-table th.ws-c-center,table.ws-table td.ws-c-center{text-align:center;}
 table.ws-table sub{font-size:.72em;} table.ws-table sup{font-size:.72em;}
 /* DIBUJO TÉCNICO (#dibujo … #fin): SVG en mm de papel, colores del tema; no se parte entre páginas */
 .hk-dib{margin:.6em 0 1em;break-inside:avoid;page-break-inside:avoid;}
+.hk-dib-der{float:right;clear:right;width:46%;margin:.2em 0 .6em 1.2em;}
+.ws-h1,.ws-h2{clear:both;}
 .hk-dib-tit{font-family:'Segoe UI',sans-serif;font-size:10pt;color:var(--fg);margin-bottom:.3em;}
 .hk-dib-esc{color:var(--mut);font-size:.92em;}
 .hk-dib-svg{display:block;margin:0 auto;}

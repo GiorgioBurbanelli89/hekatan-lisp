@@ -1137,12 +1137,73 @@ namespace HekatanLisp
         private void SetCurrentFile(string path)
         {
             _currentFile = path;
+            _textoEnDisco = Editor.Text;
+            VigilarArchivo(path);
             string name = string.IsNullOrEmpty(path) ? "(sin guardar)" : Path.GetFileName(path);
             Title = string.IsNullOrEmpty(path) ? "Hekatan LISP" : "Hekatan LISP — " + name;
             if (LblFile != null) LblFile.Text = name;   // nombre visible arriba (como Hekatan Lab)
             // ya hay archivo REAL → el respaldo temporal sobra (bórralo)
             if (!string.IsNullOrEmpty(path))
                 try { if (File.Exists(AutoSavePath)) File.Delete(AutoSavePath); } catch { }
+        }
+
+        // ---------- recarga en vivo: si OTRO programa (un agente de IA, VS Code, Cursor…) cambia el
+        // archivo abierto, el editor lo vuelve a leer y el AutoRun recalcula la hoja. ----------
+        private string _textoEnDisco = "";          // lo último leído o guardado (para no recargar lo propio)
+        private FileSystemWatcher _vigia;
+        private DispatcherTimer _vigiaPausa;        // los editores escriben en varias tandas: espera 250 ms
+
+        private void VigilarArchivo(string path)
+        {
+            _vigia?.Dispose(); _vigia = null;
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+            if (_vigiaPausa == null)
+            {
+                _vigiaPausa = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _vigiaPausa.Tick += (s, e) => { _vigiaPausa.Stop(); RecargarSiCambio(); };
+            }
+            try
+            {
+                // se vigila la CARPETA con el nombre del archivo: muchos editores guardan en un temporal
+                // y lo renombran encima (eso no es un «Changed» del archivo, es un «Renamed/Created»).
+                _vigia = new FileSystemWatcher(Path.GetDirectoryName(Path.GetFullPath(path)), Path.GetFileName(path))
+                { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName | NotifyFilters.CreationTime };
+                FileSystemEventHandler h = (s, e) => Dispatcher.BeginInvoke(new Action(() => { _vigiaPausa.Stop(); _vigiaPausa.Start(); }));
+                _vigia.Changed += h; _vigia.Created += h;
+                _vigia.Renamed += (s, e) => h(s, e);
+                _vigia.EnableRaisingEvents = true;
+            }
+            catch { _vigia = null; }
+        }
+
+        private void RecargarSiCambio()
+        {
+            if (string.IsNullOrEmpty(_currentFile) || !File.Exists(_currentFile)) return;
+            string txt = null;
+            for (int i = 0; i < 5 && txt == null; i++)   // el otro programa puede tenerlo abierto un instante
+            {
+                try { txt = File.ReadAllText(_currentFile); }
+                catch (IOException) { System.Threading.Thread.Sleep(80); }
+            }
+            if (txt == null || txt == _textoEnDisco) return;   // nada nuevo (o es lo que guardamos nosotros)
+            if (string.Equals(Path.GetExtension(_currentFile), ".m", StringComparison.OrdinalIgnoreCase)) return;
+            if (Editor.Text != _textoEnDisco && Editor.Text != txt)
+            {
+                // el usuario también escribió sin guardar: no se pisa su trabajo sin preguntar
+                var r = MessageBox.Show(this, Path.GetFileName(_currentFile) + " cambió en el disco (otro programa lo editó).\n\n" +
+                    "¿Cargar la versión del disco? Perderás lo que escribiste sin guardar.", "Hekatan LISP",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question);
+                _textoEnDisco = txt;
+                if (r != MessageBoxResult.Yes) return;
+            }
+            _textoEnDisco = txt;
+            if (Editor.Text == txt) return;
+            // Replace en vez de Editor.Text = …: conserva el deshacer (Ctrl+Z) y el cursor/scroll cerca de donde estaban
+            int caret = Editor.CaretOffset; double vy = Editor.VerticalOffset;
+            Editor.Document.Replace(0, Editor.Document.TextLength, txt);
+            Editor.CaretOffset = Math.Min(caret, Editor.Document.TextLength);
+            Editor.ScrollToVerticalOffset(vy);
+            // el TextChanged ya dispara el AutoRun (debounce); si está apagado, queda para ▶/F5
         }
 
         // respaldo del trabajo NO guardado: mientras no haya archivo real, se vuelca a %temp%.
@@ -1204,7 +1265,7 @@ namespace HekatanLisp
         {
             if (!string.IsNullOrEmpty(_currentFile))
             {
-                try { File.WriteAllText(_currentFile, Editor.Text); }
+                try { _textoEnDisco = Editor.Text; File.WriteAllText(_currentFile, Editor.Text); }
                 catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
             else MenuGuardarComo(s, e);

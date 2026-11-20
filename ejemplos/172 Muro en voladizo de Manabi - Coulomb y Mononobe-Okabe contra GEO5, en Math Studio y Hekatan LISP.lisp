@@ -16,19 +16,45 @@ k_v = 0 'coeficiente sísmico vertical (caso base)
 
 ## 2 · Datos del muro y del suelo (los mismos que en GEO5)
 
-x_p = 0.7 'puntera: de la punta a la cara del fuste [m]
-b_t = 0.25 'espesor del fuste en la coronación [m]
-H_f = 2.6 'altura del fuste sobre la zapata [m]
-b_b = b_t + H_f/17.33 'espesor del fuste abajo, cara vista con talud 1:17.33 [m]
-x_t = x_p + b_b 'abscisa de la cara trasera del fuste [m]
-L_t = 1.9 'talón detrás del fuste [m]
-B_z = x_t + L_t 'ancho de la zapata [m]
-h_z = 0.4 'canto de la zapata [m]
-gamma_c = 23 'peso específico del hormigón [kN/m3]
-gamma_1 = 18.5 'γ de la arena SP [kN/m3]
-phi_1 = 30 'φ de la arena SP [grados]
-phi_2 = 29.97 'φ de la SP-SM bajo 3.00 m: es el rozamiento de la base [grados]
-delta_p = 20 'δ suelo-hormigón en la cara del talón [grados]
+#dibujo("El muro con estos datos", ud = m, escala = auto, cotas = m, alto = 120, lado = derecha)
+#  poligono(0, 0, B_z, 0, B_z, h_z, x_t, h_z, x_t, h_z + H_f, x_t - b_t, h_z + H_f, x_p, h_z, 0, h_z, "gruesa")
+#  achurado(0, 0, B_z, h_z, "concreto")
+#  linea(x_t, h_z + H_f, B_z + 1.2, h_z + H_f, "media verde")
+#  linea(-0.8, h_z, 0, h_z, "media verde")
+#  texto(B_z - 0.5, h_z + H_f/2, "arena SP", 2.5, "i")
+#  cota(0, -0.35, x_p, -0.35, 0)
+#  cota(x_t, -0.35, B_z, -0.35, 0)
+#  cota(-0.45, 0, -0.45, h_z, 0)
+#  cota(-0.45, h_z, -0.45, h_z + H_f, 0)
+#  cota(x_t - b_t, h_z + H_f + 0.35, x_t, h_z + H_f + 0.35, 0)
+#fin
+#: Puntera: de la punta a la cara del fuste [m].
+x_p = 0.7
+#: Espesor del fuste en la coronación [m].
+b_t = 0.25
+#: Altura del fuste sobre la zapata [m].
+H_f = 2.6
+#: Fuste abajo (talud 1:17.33) [m].
+b_b = b_t + H_f/17.33
+#: Abscisa de la cara trasera del fuste [m].
+x_t = x_p + b_b
+#: Talón detrás del fuste [m].
+L_t = 1.9
+#: Ancho de la zapata [m].
+B_z = x_t + L_t
+#: Canto de la zapata [m].
+h_z = 0.4
+#: Peso específico del hormigón [kN/m3].
+gamma_c = 23
+#: γ de la arena SP [kN/m3].
+gamma_1 = 18.5
+#: φ de la arena SP [grados].
+phi_1 = 30
+#: φ de la SP-SM bajo 3.00 m: es el rozamiento de la base [grados].
+phi_2 = 29.97
+#: δ suelo-hormigón en la cara del talón [grados].
+delta_p = 20
+#: Medidas en m, sacadas de los datos: si cambias uno, el dibujo cambia. Gris: hormigón; verde: el terreno, que llega a la coronación detrás del muro y a la cara de la zapata delante.
 
 ## 3 · Coulomb y Mononobe-Okabe
 
@@ -109,14 +135,7 @@ FS_d = H_res/H_h 'factor de seguridad al DESLIZAMIENTO
 
 ### El muro dibujado con sus empujes
 
-#: **Cómo se lee.** Gris achurado: el hormigón. Verde tenue: la cuña de tierra que viaja con el muro; su lado inclinado (trazos) es la **cara virtual**. **Azul:** empuje estático (crece hacia abajo). **Rojo:** incremento sísmico de Mononobe-Okabe, un **triángulo invertido** (máximo arriba). Escala de flechas: 1 m = 25 kPa.
-q_1 = Ka_1*s_1/25 'estático, pie de la capa 1, a escala
-q_3 = Ka_2*s_1/25 'estático, arriba de la capa 2
-q_4 = Ka_2*s_2/25 'estático, pie de la capa 2
-u_1 = (Kae_1 - Ka_1)*t_1/25 'sísmico, arriba de la capa 1
-u_2 = (Kae_1 - Ka_1)*t_2/25 'sísmico, pie de la capa 1
-u_3 = (Kae_2 - Ka_2)*t_2/25 'sísmico, arriba de la capa 2
-#dibujo("Muro T de Portoviejo: cuña, cara virtual, empuje estático (azul) e incremento sísmico (rojo), 1 m = 25 kPa", ud = m, escala = auto, cotas = m, alto = 220)
+#dibujo("Empujes sobre el muro", ud = m, escala = auto, cotas = m, alto = 220, lado = derecha)
 #  poligono(0, 0, B_z, 0, B_z, h_z, x_t, h_z, x_t, H_t, x_t - b_t, H_t, x_p, h_z, 0, h_z, "gruesa")
 #  achurado(0, 0, B_z, h_z, "concreto")
 #  poligono(x_t, h_z, B_z, h_z, x_v, H_t, x_t, H_t, "verde tenue")
@@ -129,13 +148,26 @@ u_3 = (Kae_2 - Ka_2)*t_2/25 'sísmico, arriba de la capa 2
 #  carga(B_z, h_z, B_z, 0, q_3, q_4, "", "azul", n = 3)
 #  carga(x_v, H_t, B_z, h_z, u_1, u_2, "", "rojo", n = 5)
 #  carga(B_z, h_z, B_z, 0, u_3, 0, "", "rojo", n = 3)
-#  cota(0, -0.70, B_z, -0.70, -0.1, "3.00")
-#  cota(-0.6, 0, -0.6, h_z, 0.1, "0.40")
-#  cota(-0.6, h_z, -0.6, H_t, 0.1, "2.60")
-#  cota(x_t, H_t + 0.5, x_t - b_t, H_t + 0.5, 0.1, "0.25")
-#  cota(x_t, H_t + 1.1, B_z, H_t + 1.1, 0.1, "1.90")
-#  cota(0, H_t + 0.5, x_p, H_t + 0.5, 0.1, "0.70")
+#  cota(0, -0.70, B_z, -0.70, -0.1)
+#  cota(-0.6, 0, -0.6, h_z, 0.1)
+#  cota(-0.6, h_z, -0.6, H_t, 0.1)
+#  cota(x_t, H_t + 0.5, x_t - b_t, H_t + 0.5, 0.1)
+#  cota(x_t, H_t + 1.1, B_z, H_t + 1.1, 0.1)
+#  cota(0, H_t + 0.5, x_p, H_t + 0.5, 0.1)
 #fin
+#: Estático, pie de la capa 1, a escala.
+q_1 = Ka_1*s_1/25
+#: Estático, arriba de la capa 2.
+q_3 = Ka_2*s_1/25
+#: Estático, pie de la capa 2.
+q_4 = Ka_2*s_2/25
+#: Sísmico, arriba de la capa 1.
+u_1 = (Kae_1 - Ka_1)*t_1/25
+#: Sísmico, pie de la capa 1.
+u_2 = (Kae_1 - Ka_1)*t_2/25
+#: Sísmico, arriba de la capa 2.
+u_3 = (Kae_2 - Ka_2)*t_2/25
+#: **Cómo se lee.** Gris achurado: el hormigón. Verde tenue: la cuña de tierra que viaja con el muro; su lado inclinado (trazos) es la **cara virtual**. **Azul:** empuje estático (crece hacia abajo). **Rojo:** incremento sísmico de Mononobe-Okabe, un **triángulo invertido** (máximo arriba). Escala de flechas: 1 m = 25 kPa.
 
 ## 7 · Contra GEO5 Cantilever Wall 2024
 

@@ -24,37 +24,37 @@ x_t = x_p + b_b 'abscisa de la cara trasera del fuste [m]
 L_t = 1.9 'talón detrás del fuste [m]
 B_z = x_t + L_t 'ancho de la zapata [m]
 h_z = 0.4 'canto de la zapata [m]
-gam_c = 23 'peso específico del hormigón [kN/m3]
-g_1 = 18.5 'γ de la arena SP [kN/m3]
-f_1 = 30 'φ de la arena SP [grados]
-f_2 = 29.97 'φ de la SP-SM bajo 3.00 m: es el rozamiento de la base [grados]
-d_p = 20 'δ suelo-hormigón en la cara del talón [grados]
+gamma_c = 23 'peso específico del hormigón [kN/m3]
+gamma_1 = 18.5 'γ de la arena SP [kN/m3]
+phi_1 = 30 'φ de la arena SP [grados]
+phi_2 = 29.97 'φ de la SP-SM bajo 3.00 m: es el rozamiento de la base [grados]
+delta_p = 20 'δ suelo-hormigón en la cara del talón [grados]
 
 ## 3 · Coulomb y Mononobe-Okabe
 
 #: **Coulomb** (rama de GEO5), con α la inclinación de la cara respecto de la vertical, β la del terreno y δ el rozamiento: K = cos²(φ−α) / [cos²α · cos(α+δ) · (1+√R)²], R = sen(φ+δ)·sen(φ−β) / [cos(α+δ)·cos(α−β)].
 #: **Mononobe-Okabe**: es Coulomb con todo girado el ángulo del sismo ψ = atan(k_{h}/(1−k_{v})): K_{ae} = K(φ, δ, α+ψ, β+ψ) · cos²(α+ψ) / (cos ψ · cos²α).
-Kc(f, d, a, b) = cos(f - a)^2/(cos(a)^2*cos(a + d)*(1 + sqrt(max(sin(f + d)*sin(f - b)/(cos(a + d)*cos(a - b)), 0)))^2)
+Kc(phi, delta, alpha, beta) = cos(phi - alpha)^2/(cos(alpha)^2*cos(alpha + delta)*(1 + sqrt(max(sin(phi + delta)*sin(phi - beta)/(cos(alpha + delta)*cos(alpha - beta)), 0)))^2)
 rad = pi/180 'de grados a radianes
 psi = atan(k_h/(1 - k_v)) 'ángulo del sismo ψ [rad]
-th = pi/4 + f_1*rad/2 'cara virtual: 45° + φ/2 sobre la horizontal [rad]
-a_1 = pi/2 - th 'su inclinación respecto de la vertical [rad]
-ph = f_1*rad 'φ de la arena SP [rad]
-dd_1 = ph 'δ en la cara virtual = φ (suelo contra suelo) [rad]
-dK_1 = dd_1 - 0.0001 'δ para K: GEO5 lo recorta a φ − 1e-4 (binario, 0xD9D978) [rad]
-dd_2 = d_p*rad 'δ en la cara del talón [rad]
-Ka_1 = Kc(ph, dK_1, a_1, 0) 'K_a de Coulomb, cara virtual
-Ka_2 = Kc(ph, dd_2, 0, 0) 'K_a de Coulomb, cara del talón
-Kae_1 = Kc(ph, dK_1, a_1 + psi, psi)*cos(a_1 + psi)^2/(cos(psi)*cos(a_1)^2) 'K_ae de Mononobe-Okabe, cara virtual
-Kae_2 = Kc(ph, dd_2, psi, psi)*cos(psi)^2/cos(psi) 'K_ae, cara del talón
+theta = pi/4 + phi_1*rad/2 'cara virtual: 45° + φ/2 sobre la horizontal [rad]
+alpha_1 = pi/2 - theta 'su inclinación respecto de la vertical [rad]
+phi = phi_1*rad 'φ de la arena SP [rad]
+delta_1 = phi 'δ en la cara virtual = φ (suelo contra suelo) [rad]
+delta_K = delta_1 - 0.0001 'δ para K: GEO5 lo recorta a φ − 1e-4 (binario, 0xD9D978) [rad]
+delta_2 = delta_p*rad 'δ en la cara del talón [rad]
+Ka_1 = Kc(phi, delta_K, alpha_1, 0) 'K_a de Coulomb, cara virtual
+Ka_2 = Kc(phi, delta_2, 0, 0) 'K_a de Coulomb, cara del talón
+Kae_1 = Kc(phi, delta_K, alpha_1 + psi, psi)*cos(alpha_1 + psi)^2/(cos(psi)*cos(alpha_1)^2) 'K_ae de Mononobe-Okabe, cara virtual
+Kae_2 = Kc(phi, delta_2, psi, psi)*cos(psi)^2/cos(psi) 'K_ae, cara del talón
 
 ## 4 · Pesos y centros de gravedad
 
 H_t = h_z + H_f 'altura total [m]
-x_v = B_z - H_f/tan(th) 'abscisa donde la cara virtual corta el terreno [m]
-W_z = gam_c*B_z*h_z 'peso de la zapata [kN/m]
+x_v = B_z - H_f/tan(theta) 'abscisa donde la cara virtual corta el terreno [m]
+W_z = gamma_c*B_z*h_z 'peso de la zapata [kN/m]
 A_f = (b_b + b_t)/2*H_f 'área del fuste [m2]
-W_f = gam_c*A_f 'peso del fuste [kN/m]
+W_f = gamma_c*A_f 'peso del fuste [kN/m]
 x_f = x_t - H_f*(b_b^2 + b_b*b_t + b_t^2)/6/A_f 'abscisa del c.d.g. del fuste [m]
 y_f = h_z + H_f*(b_b + 2*b_t)/(3*(b_b + b_t)) 'cota del c.d.g. del fuste [m]
 W_m = W_z + W_f 'peso del muro [kN/m]
@@ -63,34 +63,34 @@ y_m = (W_z*h_z/2 + W_f*y_f)/W_m 'cota del c.d.g. del muro [m]
 w_0 = B_z - x_t 'ancho de la cuña de tierra abajo [m]
 w_1 = x_v - x_t 'ancho de la cuña arriba [m]
 A_c = (w_0 + w_1)/2*H_f 'área de la cuña sobre el talón [m2]
-W_c = g_1*A_c 'peso de la cuña [kN/m]
+W_c = gamma_1*A_c 'peso de la cuña [kN/m]
 x_c = x_t + H_f*(w_0^2 + w_0*w_1 + w_1^2)/6/A_c 'abscisa de su c.d.g. [m]
 y_c = h_z + H_f*(w_0 + 2*w_1)/(3*(w_0 + w_1)) 'cota de su c.d.g. [m]
 
 ## 5 · Empuje estático (desde arriba) e incremento sísmico (desde abajo)
 
 #: Dos capas: la **1** es la cara virtual (alto H_{f}); la **2** es la cara del talón (alto h_{z}), que sigue en la arena SP porque el muro mide justo 3.00 m.
-s_1 = g_1*H_f 'σv al pie de la capa 1 [kPa]
-s_2 = s_1 + g_1*h_z 'σv al pie de la capa 2 [kPa]
+s_1 = gamma_1*H_f 'σv al pie de la capa 1 [kPa]
+s_2 = s_1 + gamma_1*h_z 'σv al pie de la capa 2 [kPa]
 F_1 = Ka_1*s_1/2*H_f 'empuje estático, capa 1: triángulo [kN/m]
 F_2 = Ka_2*(s_1 + s_2)/2*h_z 'empuje estático, capa 2: trapecio [kN/m]
 zc_1 = 2*H_f/3 'profundidad de F_1 [m]
 zc_2 = H_f + h_z*(s_1 + 2*s_2)/(3*(s_1 + s_2)) 'profundidad de F_2 [m]
-E_x = F_1*cos(a_1 + dd_1) + F_2*cos(dd_2) 'empuje activo horizontal [kN/m]
-E_z = F_1*sin(a_1 + dd_1) + F_2*sin(dd_2) 'empuje activo vertical [kN/m]
-E_xx = (F_1*sin(a_1 + dd_1)*(x_v + zc_1/tan(th)) + F_2*sin(dd_2)*B_z)/E_z 'abscisa de aplicación [m]
-E_y = (F_1*cos(a_1 + dd_1)*(H_t - zc_1) + F_2*cos(dd_2)*(H_t - zc_2))/E_x 'cota de aplicación [m]
+E_x = F_1*cos(alpha_1 + delta_1) + F_2*cos(delta_2) 'empuje activo horizontal [kN/m]
+E_z = F_1*sin(alpha_1 + delta_1) + F_2*sin(delta_2) 'empuje activo vertical [kN/m]
+E_xx = (F_1*sin(alpha_1 + delta_1)*(x_v + zc_1/tan(theta)) + F_2*sin(delta_2)*B_z)/E_z 'abscisa de aplicación [m]
+E_y = (F_1*cos(alpha_1 + delta_1)*(H_t - zc_1) + F_2*cos(delta_2)*(H_t - zc_2))/E_x 'cota de aplicación [m]
 #: El incremento sísmico usa σ_{v}′ medido **desde abajo**: arriba de la capa 1 vale todo el peso (s_{2}) y al pie de la capa 2 vale cero.
 t_1 = (1 - k_v)*s_2 'σv′ arriba de la capa 1 [kPa]
-t_2 = (1 - k_v)*g_1*h_z 'σv′ al pie de la capa 1 = arriba de la capa 2 [kPa]
+t_2 = (1 - k_v)*gamma_1*h_z 'σv′ al pie de la capa 1 = arriba de la capa 2 [kPa]
 G_1 = (Kae_1 - Ka_1)*(t_1 + t_2)/2*H_f 'incremento sísmico, capa 1 [kN/m]
 G_2 = (Kae_2 - Ka_2)*t_2/2*h_z 'incremento sísmico, capa 2 [kN/m]
 zs_1 = H_f*(t_1 + 2*t_2)/(3*(t_1 + t_2)) 'profundidad de G_1 [m]
 zs_2 = H_f + h_z/3 'profundidad de G_2 [m]
-S_x = G_1*cos(a_1 + dd_1) + G_2*cos(dd_2) 'incremento sísmico horizontal [kN/m]
-S_z = G_1*sin(a_1 + dd_1) + G_2*sin(dd_2) 'incremento sísmico vertical [kN/m]
-S_xx = (G_1*sin(a_1 + dd_1)*(x_v + zs_1/tan(th)) + G_2*sin(dd_2)*B_z)/S_z 'abscisa de aplicación [m]
-S_y = (G_1*cos(a_1 + dd_1)*(H_t - zs_1) + G_2*cos(dd_2)*(H_t - zs_2))/S_x 'cota de aplicación [m]
+S_x = G_1*cos(alpha_1 + delta_1) + G_2*cos(delta_2) 'incremento sísmico horizontal [kN/m]
+S_z = G_1*sin(alpha_1 + delta_1) + G_2*sin(delta_2) 'incremento sísmico vertical [kN/m]
+S_xx = (G_1*sin(alpha_1 + delta_1)*(x_v + zs_1/tan(theta)) + G_2*sin(delta_2)*B_z)/S_z 'abscisa de aplicación [m]
+S_y = (G_1*cos(alpha_1 + delta_1)*(H_t - zs_1) + G_2*cos(delta_2)*(H_t - zs_2))/S_x 'cota de aplicación [m]
 
 ## 6 · Vuelco y deslizamiento
 
@@ -99,7 +99,7 @@ M_res = (1 - k_v)*(W_m*x_m + W_c*x_c) + E_z*E_xx + S_z*S_xx 'momento resistente 
 M_ovr = k_h*(W_m*y_m + W_c*y_c) + E_x*E_y + S_x*S_y 'momento volcador [kN·m/m]
 N_v = (1 - k_v)*(W_m + W_c) + E_z + S_z 'resultante vertical [kN/m]
 H_h = k_h*(W_m + W_c) + E_x + S_x 'resultante horizontal [kN/m]
-H_res = N_v*tan(f_2*rad) 'resistencia al deslizamiento [kN/m]
+H_res = N_v*tan(phi_2*rad) 'resistencia al deslizamiento [kN/m]
 FS_v = M_res/M_ovr 'factor de seguridad al VUELCO
 FS_d = H_res/H_h 'factor de seguridad al DESLIZAMIENTO
 

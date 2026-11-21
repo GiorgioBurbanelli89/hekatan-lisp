@@ -117,19 +117,46 @@ function sourceText() {                 // SourceText(): el ORIGINAL, no el deri
   const derivado = ts.startsWith(';;;; Script LISP') || ts.startsWith('% Hekatan Lab') || ts.startsWith('% =====');
   return derivado && lispBackup != null ? lispBackup : t;
 }
-// El cálculo corre en el hilo de la página: sin esto, una hoja de 1–3 s (mallas grandes) dejaba el
-// panel quieto sin decir nada. Se pinta «calculando…» y se calcula en el cuadro siguiente.
-let calcGen = 0;
+// El cálculo bloquea el hilo de la página: un contador con JS se congelaría. Los segundos van en un
+// «odómetro» de CSS (tiras de dígitos que suben con transform + steps): esas animaciones las pinta el
+// compositor del navegador aparte, así que el contador SIGUE CORRIENDO aunque la página esté calculando.
+// Al terminar: «listo en N s» unos segundos.
+let calcGen = 0, calcUltimo = 0, calcOculta = 0;
+function odometro() {
+  const tira = (dur) => '<span class="hkc"><span class="hks" style="animation-duration:' + dur + 's">' +
+    '0123456789'.split('').map(d => '<i>' + d + '</i>').join('') + '</span></span>';
+  return 'calculando… ' + tira(100) + tira(10) + '.' + tira(1) + ' s';
+}
 function showResult() {
   const g = ++calcGen;
   let b = $('hk-calc');
   if (!b) {
-    b = document.createElement('div'); b.id = 'hk-calc'; b.textContent = 'calculando…';
-    b.style.cssText = 'position:fixed;top:64px;right:18px;z-index:99;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;display:none';
+    const st = document.createElement('style');
+    st.textContent = '#hk-calc .hkc{display:inline-block;height:1.25em;line-height:1.25em;overflow:hidden;vertical-align:-0.3em}' +
+      '#hk-calc .hks{display:block;will-change:transform;animation-name:hkodo;animation-iteration-count:infinite;animation-timing-function:steps(10,end)}' +
+      '#hk-calc .hks i{display:block;font-style:normal;height:1.25em}' +
+      '@keyframes hkodo{from{transform:translateY(0)}to{transform:translateY(-12.5em)}}';
+    document.head.appendChild(st);
+    b = document.createElement('div'); b.id = 'hk-calc';
+    b.style.cssText = 'position:fixed;top:64px;right:18px;z-index:99;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;display:none;font-variant-numeric:tabular-nums';
     document.body.appendChild(b);
   }
+  clearTimeout(calcOculta);
+  b.innerHTML = odometro();          // nuevo cada vez: las tiras vuelven a 00.0
   b.style.display = 'block';
-  setTimeout(() => { if (g !== calcGen) return; try { calcularYMostrar(); } finally { if (g === calcGen) b.style.display = 'none'; } }, 30);
+  // dos cuadros antes de calcular: el aviso ya pintado y sus animaciones en el compositor
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+    if (g !== calcGen) return;
+    const t0 = performance.now();
+    try { calcularYMostrar(); }
+    finally {
+      if (g === calcGen) {
+        calcUltimo = (performance.now() - t0) / 1000;
+        b.textContent = 'listo en ' + (calcUltimo < 1 ? Math.round(calcUltimo * 1000) + ' ms' : calcUltimo.toFixed(1) + ' s');
+        calcOculta = setTimeout(() => { if (g === calcGen) b.style.display = 'none'; }, calcUltimo > 1 ? 4000 : 1500);
+      }
+    }
+  }, 0)));
 }
 function calcularYMostrar() {
   const text = sourceText();

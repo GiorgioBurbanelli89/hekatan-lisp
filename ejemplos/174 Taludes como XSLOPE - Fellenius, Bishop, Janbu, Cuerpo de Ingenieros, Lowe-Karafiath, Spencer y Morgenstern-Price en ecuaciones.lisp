@@ -151,41 +151,137 @@ function r = residuo(t, F, TH, W, al, dl, cc, tp, uu, xm, yb, n)
   end
 end
 function Fr = raiz(t, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
-  Fa = 0.3
-  ra = residuo(t, Fa, TH, W, al, dl, cc, tp, uu, xm, yb, n)
-  best = -1
-  dmin = 1e9
-  for k = 1:185
-    Fb = 0.3 + 0.02*k
-    rb = residuo(t, Fb, TH, W, al, dl, cc, tp, uu, xm, yb, n)
-    if ra*rb <= 0
-      if abs(ra) + abs(rb) < 20*WT*(1 + 30*(t - 1))
-        if abs((Fa + Fb)/2 - Fref) < dmin
-          dmin = abs((Fa + Fb)/2 - Fref)
-          best = Fa
+  lim = 20*WT*(1 + 30*(t - 1))
+  r0 = residuo(t, Fref, TH, W, al, dl, cc, tp, uu, xm, yb, n)
+  Fl = -1
+  Fu = -1
+  pu = Fref
+  ru = r0
+  pd = Fref
+  rd = r0
+  for k = 1:60
+    if Fl < 0
+      q = Fref + 0.05*k
+      rq = residuo(t, q, TH, W, al, dl, cc, tp, uu, xm, yb, n)
+      if ru*rq <= 0
+        if abs(ru) + abs(rq) < lim
+          Fl = pu
+          Fu = q
+          rl = ru
+          rh = rq
+        end
+      end
+      pu = q
+      ru = rq
+    end
+    if Fl < 0
+      q = Fref - 0.05*k
+      if q > 0.2
+        rq = residuo(t, q, TH, W, al, dl, cc, tp, uu, xm, yb, n)
+        if rd*rq <= 0
+          if abs(rd) + abs(rq) < lim
+            Fl = q
+            Fu = pd
+            rl = rq
+            rh = rd
+          end
+        end
+        pd = q
+        rd = rq
+      end
+    end
+  end
+  Fr = -1
+  if Fl > 0
+    for k = 1:40
+      if abs(rh) > 0
+        Fq = Fu - rh*(Fu - Fl)/(rh - rl)
+        rq = residuo(t, Fq, TH, W, al, dl, cc, tp, uu, xm, yb, n)
+        if rq*rh < 0
+          Fl = Fu
+          rl = rh
+        else
+          rl = rl/2
+        end
+        Fu = Fq
+        rh = rq
+        if abs(rq) < 1e-10*WT
+          rh = 0
         end
       end
     end
-    Fa = Fb
-    ra = rb
+    Fr = Fu
   end
-  Fl = best
-  Fu = best + 0.02
-  rl = residuo(t, Fl, TH, W, al, dl, cc, tp, uu, xm, yb, n)
-  for k = 1:45
-    Fq = (Fl + Fu)/2
-    rq = residuo(t, Fq, TH, W, al, dl, cc, tp, uu, xm, yb, n)
-    if rl*rq <= 0
-      Fu = Fq
-    else
-      Fl = Fq
-      rl = rq
+end
+function S = lamsol(fx, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+  la = -1
+  lb = -1
+  dmin = 1e9
+  lp = 0
+  TH = fx
+  for jj = 1:n + 1
+    TH(jj) = atan(lp*fx(jj))
+  end
+  Ff = raiz(1, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+  Fm = raiz(2, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+  gp = Ff - Fm
+  mp = Fm
+  for s = 1:12
+    if la < 0
+    lq = 0.1*s
+    for jj = 1:n + 1
+      TH(jj) = atan(lq*fx(jj))
+    end
+    Ff = raiz(1, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+    Fm = raiz(2, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+    gq = Ff - Fm
+    if mp > 0.4
+      if Fm > 0.4
+        if gp*gq <= 0
+          if abs(Ff - Fref) < dmin
+            dmin = abs(Ff - Fref)
+            la = lp
+            lb = lq
+            ga = gp
+            gb = gq
+          end
+        end
+      end
+    end
+    lp = lq
+    gp = gq
+    mp = Fm
     end
   end
-  Fr = (Fl + Fu)/2
+  for k = 1:25
+    if abs(gb) > 1e-12
+      lq = lb - gb*(lb - la)/(gb - ga)
+      for jj = 1:n + 1
+        TH(jj) = atan(lq*fx(jj))
+      end
+      Ff = raiz(1, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+      Fm = raiz(2, TH, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
+      gq = Ff - Fm
+      if gq*gb < 0
+        la = lb
+        ga = gb
+      else
+        ga = ga/2
+      end
+      lb = lq
+      gb = gq
+      if abs(gq) < 1e-10
+        gb = 0
+      end
+    end
+  end
+  S = zeros(4, 1)
+  S(1) = lb
+  S(2) = Ff
+  S(3) = Fm
 end
 #show
-#: El F de cada método se busca como XSLOPE: se recorre F de 0.3 a 4, se marcan los cambios de signo del residuo (descartando los polos, donde el determinante de A se hace cero y el residuo salta), se toma la raíz más cercana al valor de momentos (Bishop) y se afina por bisección.
+#: El F de cada método se busca como XSLOPE pide: la raíz **más cercana al valor de momentos** (Bishop). Se sale de F_{Bishop} hacia arriba y hacia abajo en pasos de 0.05 hasta el primer cambio de signo del residuo (descartando los polos, donde el determinante de A se hace cero y el residuo salta) y se afina con regula falsi: unas pocas pasadas en vez de cientos.
 
 ## 7 · Cuerpo de Ingenieros de EE. UU. (Corps of Engineers #2)
 
@@ -219,55 +315,12 @@ F_LoweK = F_L 'Lowe y Karafiath
 ## 9 · Spencer
 
 #: **Suposición:** todas las fuerzas entre dovelas son **paralelas**: la misma inclinación θ en todos los bordes, tan θ = λ. **Equilibrio que cumple:** **todo** (fuerzas horizontales, verticales y momentos). **Incógnitas:** F y λ.
-#: Para cada λ hay dos factores de seguridad: F_{f}(λ), el que cierra las fuerzas (Z_{n+1} = 0), y F_{m}(λ), el que cierra los momentos (R_{m} = 0). La solución es el λ donde **los dos coinciden**: F_{f}(λ) = F_{m}(λ). XSLOPE lo resuelve con Newton en 2D; aquí se recorre λ de −0.3 a 1.2, se toma el cruce de las dos curvas y se afina por bisección (mismo resultado).
+#: Para cada λ hay dos factores de seguridad: F_{f}(λ), el que cierra las fuerzas (Z_{n+1} = 0), y F_{m}(λ), el que cierra los momentos (R_{m} = 0). La solución es el λ donde **los dos coinciden**: F_{f}(λ) = F_{m}(λ). XSLOPE lo resuelve con Newton en 2D; aquí se recorre λ desde 0 en pasos de 0.1 hasta el primer cruce de las dos curvas y se afina con regula falsi (mismo resultado).
 #hide
-l_a = -1
-l_b = -1
-dmin = 1e9
-l_p = -0.3
-TH = atan(l_p)*ones(n + 1, 1)
-F_f = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-F_m = raiz(2, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-g_p = F_f - F_m
-m_p = F_m
-for s = 1:30
-  l_q = -0.3 + 0.05*s
-  TH = atan(l_q)*ones(n + 1, 1)
-  F_f = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-  F_m = raiz(2, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-  g_q = F_f - F_m
-  if m_p > 0.4
-    if F_m > 0.4
-      if g_p*g_q <= 0
-        if abs(F_f - F_B) < dmin
-          dmin = abs(F_f - F_B)
-          l_a = l_p
-          l_b = l_q
-        end
-      end
-    end
-  end
-  l_p = l_q
-  g_p = g_q
-  m_p = F_m
-end
-TH = atan(l_a)*ones(n + 1, 1)
-g_a = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n) - raiz(2, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-for k = 1:30
-  l_q = (l_a + l_b)/2
-  for j = 1:n + 1
-    TH(j) = atan(l_q)
-  end
-  F_f = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-  F_m = raiz(2, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-  g_q = F_f - F_m
-  if g_a*g_q <= 0
-    l_b = l_q
-  else
-    l_a = l_q
-    g_a = g_q
-  end
-end
+S_p = lamsol(ones(n + 1, 1), F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
+l_q = S_p(1)
+F_f = S_p(2)
+F_m = S_p(3)
 #show
 lambda_S = l_q 'λ de Spencer = tan θ
 theta_S = atan(l_q)·180/pi 'inclinación de las fuerzas entre dovelas [grados]
@@ -281,27 +334,14 @@ dF_S = F_f - F_m 'comprobación: F de fuerzas − F de momentos (debe ser ≈ 0)
 #: f(x) = sen[π·(x − x_{L})/(x_{R} − x_{L})]
 #: **Equilibrio que cumple:** todo, como Spencer. **Incógnitas:** F y λ, con las mismas dos condiciones F_{f}(λ) = F_{m}(λ). Con f(x) = 1 es **exactamente Spencer** (XSLOPE se verifica así, a 10⁻¹⁰).
 #hide
-l_a = -0.3
-l_b = 1.2
+f_x = zeros(n + 1, 1)
 for j = 1:n + 1
-  TH(j) = atan(l_a*sin(pi*(X_j(j) - x_a)/(x_b - x_a)))
+  f_x(j) = sin(pi*(X_j(j) - x_a)/(x_b - x_a))
 end
-g_a = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n) - raiz(2, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-for k = 1:30
-  l_q = (l_a + l_b)/2
-  for j = 1:n + 1
-    TH(j) = atan(l_q*sin(pi*(X_j(j) - x_a)/(x_b - x_a)))
-  end
-  F_f = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-  F_m = raiz(2, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
-  g_q = F_f - F_m
-  if g_a*g_q <= 0
-    l_b = l_q
-  else
-    l_a = l_q
-    g_a = g_q
-  end
-end
+S_p = lamsol(f_x, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
+l_q = S_p(1)
+F_f = S_p(2)
+F_m = S_p(3)
 #show
 lambda_MP = l_q 'λ de Morgenstern-Price (con media onda de seno)
 F_MP = (F_f + F_m)/2 'Morgenstern-Price

@@ -22,6 +22,49 @@ R = sqrt(x_c^2 + z_c^2) 'radio: el círculo pasa por el pie (0; 0) [m]
 z_o(x) = z_c - sqrt(R^2 - (x - x_c)^2)
 x_a = 0 'entrada por el pie [m]
 x_b = x_c + sqrt(R^2 - (z_c - H)^2) 'salida en la coronación [m]
+#hide
+a_e = -90 - atan((x_c - x_a)/(z_c - z_o(x_a)))*180/pi
+a_s = -90 + atan((x_b - x_c)/(z_c - H))*180/pi
+z_a0 = z_o(x_a)
+G_x = zeros(4, 1)
+G_z = zeros(4, 1)
+P_x = zeros(3, 1)
+P_z = zeros(3, 1)
+for k = 1:1
+  G_x(1) = -6
+  G_x(3) = 2*H
+  G_x(4) = 2*H + 14
+  G_z(3) = H
+  G_z(4) = H
+  P_x(1) = x_a
+  P_z(1) = z_a0
+  P_x(2) = x_b
+  P_z(2) = H
+  P_x(3) = x_c
+  P_z(3) = z_c
+end
+A_x = zeros(41, 1)
+A_z = zeros(41, 1)
+for k = 1:41
+  a_k = (a_e + (a_s - a_e)*(k - 1)/40)*pi/180
+  A_x(k) = x_c + R*cos(a_k)
+  A_z(k) = z_c + R*sin(a_k)
+end
+#show
+#dibujo("El talud, el círculo de prueba y su centro O", ud = m, escala = auto, cotas = m, alto = 105)
+#  poligono(-6, -5, -6, 0, 0, 0, 2*H, H, 2*H + 14, H, 2*H + 14, -5, "fina gris")
+#  polilinea(G_x, G_z, "gruesa")
+#  arco(x_c, z_c, R, a_e, a_s, "gruesa rojo")
+#  circulo(x_c, z_c, 0.35, "rojo")
+#  texto(x_c + 0.6, z_c + 0.2, "O", 3.2, "i")
+#  linea(x_c, z_c, x_a, z_a0, "fina trazos rojo")
+#  linea(x_c, z_c, x_b, H, "fina trazos rojo")
+#  texto((x_c + x_b)/2 + 0.6, (z_c + H)/2, "R", 3.2, "i")
+#  texto(8, 3.2, "2:1", 3, "c")
+#  texto(26, 6.5, "c, φ, γ", 3, "c")
+#  cota(-3, 0, -3, H, 0)
+#  hover(P_x, P_z, "({#1:2}; {#2:2}) m", P_x, P_z)
+#fin
 
 ## 2 · Las dovelas
 
@@ -60,6 +103,36 @@ uu = zeros(n, 1)
 W_T = sum(W) 'peso total de la masa que desliza [kN/m]
 a_min = min(al)·180/pi 'base más tendida (cerca del pie, negativa: sube hacia el pie) [grados]
 a_max = max(al)·180/pi 'base más empinada (bajo la coronación) [grados]
+#hide
+X_z = zeros(3*(n + 1), 1)
+Z_z = zeros(3*(n + 1), 1)
+for j = 1:n + 1
+  X_z(3*j - 2) = X_j(j)
+  X_z(3*j - 1) = X_j(j)
+  X_z(3*j) = X_j(j)
+  Z_z(3*j - 2) = z_o(X_j(j))
+  Z_z(3*j - 1) = z_t(X_j(j))
+  Z_z(3*j) = z_o(X_j(j))
+end
+a_g = zeros(n, 1)
+for i = 1:n
+  a_g(i) = al(i)*180/pi
+end
+Zo_j = zeros(n + 1, 1)
+for j = 1:n + 1
+  Zo_j(j) = z_o(X_j(j))
+end
+x_15 = X_j(15) + b/2
+z_15t = z_t(X_j(15)) + 1.2
+z_15b = z_o(X_j(15)) - 1.3
+#show
+#dibujo("Las 20 dovelas: base = cuerda del círculo (pasa el cursor: W y α de cada una)", ud = m, escala = auto, alto = 70)
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(X_z, Z_z, "media rojo")
+#  texto(x_15, z_15t, "dovela i", 2.6, "c")
+#  texto(x_15, z_15b, "b, Δℓ, α", 2.6, "c")
+#  hover(xm, yb, "dovela: W = {#1:1} kN/m, α = {#2:1}°, Δℓ = {#3:2} m", W, a_g, dl)
+#fin
 
 ## 3 · Fellenius (Método Ordinario de Dovelas, OMS)
 
@@ -67,6 +140,22 @@ a_max = max(al)·180/pi 'base más empinada (bajo la coronación) [grados]
 #: Sin fuerzas en las caras, la normal en la base sale de equilibrar la dovela perpendicular a su base: N_{i} = W_{i}·cos α_{i}. El momento que resiste (cortante de la base × R) entre el que empuja (peso × brazo, W·R·sen α):
 #: F = Σ [c·Δℓ + (W·cos α − u·Δℓ·cos²α)·tan φ] / Σ W·sen α    (XSLOPE usa la forma con u·Δℓ·cos²α, la «preferida»: evita normales negativas con mucha agua)
 F_OMS = sum(cc.*dl + (W.*cos(al) - uu.*dl.*cos(al).^2).*tp)/sum(W.*sin(al)) 'Fellenius
+#dibujo("Fellenius: sin fuerzas entre dovelas; N = W·cos α; momentos respecto a O", alto = 150, lado = derecha)
+#  poligono(0, 0, 4, 1.6, 4, 6, 0, 5, "gruesa")
+#  linea(0, 0, 2.6, 0, "fina trazos")
+#  texto(1.7, 0.18, "α", 3, "i")
+#  flecha(2, 4.6, 2, 2.5, "rojo")
+#  texto(2.2, 3.7, "W", 3.2, "i")
+#  flecha(2.82, -1.24, 2, 0.8, "azul")
+#  texto(2.95, -1.25, "N'", 3.2, "i")
+#  flecha(0.77, -0.18, 2.57, 0.54, "verde")
+#  texto(-0.6, -1.1, "S = [c·Δℓ + N'·tan φ]/F", 2.6, "i")
+#  circulo(-3, 9, 0.18, "rojo")
+#  texto(-2.6, 9.1, "O", 3, "i")
+#  linea(-3, 9, 2, 0.8, "fina trazos rojo")
+#  texto(-1.5, 6.5, "R", 3, "i")
+#  texto(4.6, 5.2, "sin Z en las caras", 2.6, "i")
+#fin
 #: **Qué significa:** como ignora las fuerzas entre dovelas, la normal sale «mal» en las dovelas empinadas y el resultado suele ser **conservador** (más bajo). XSLOPE lo trae como referencia histórica y de enseñanza, no para diseñar.
 
 ## 4 · Bishop simplificado
@@ -85,6 +174,22 @@ for k = 1:100
 end
 #show
 F_Bishop = F_B 'Bishop simplificado
+#dibujo("Bishop: fuerzas entre dovelas horizontales (E); ΣF_y = 0 por dovela y ΣM_O = 0", alto = 150, lado = derecha)
+#  poligono(0, 0, 4, 1.6, 4, 6, 0, 5, "gruesa")
+#  linea(0, 0, 2.6, 0, "fina trazos")
+#  texto(1.7, 0.18, "α", 3, "i")
+#  flecha(2, 4.6, 2, 2.5, "rojo")
+#  texto(2.2, 3.7, "W", 3.2, "i")
+#  flecha(2.82, -1.24, 2, 0.8, "azul")
+#  texto(2.95, -1.25, "N'", 3.2, "i")
+#  flecha(0.77, -0.18, 2.57, 0.54, "verde")
+#  texto(-0.6, -1.1, "S = [c·Δℓ + N'·tan φ]/F", 2.6, "i")
+#  flecha(-2.2, 2.4, 0, 2.4, "naranja")
+#  texto(-2.3, 2.75, "Eᵢ", 3, "i")
+#  flecha(6.2, 3.6, 4, 3.6, "naranja")
+#  texto(4.5, 3.95, "Eᵢ₊₁", 3, "i")
+#  texto(-0.4, 7, "m_α = cos α + sen α·tan φ/F", 2.6, "i")
+#fin
 #: **Qué significa:** en círculos queda casi igual que los métodos completos (Spencer), por eso es el de uso diario. XSLOPE lo usa como el valor «de momentos» de referencia en superficies circulares.
 
 ## 5 · Janbu simplificado
@@ -109,6 +214,41 @@ r_dL = min(d_c/L_c, 1/2.8) 'd/L
 b_1 = 0.5 'suelo c-φ
 f_0 = 1 + b_1·(r_dL - 1.4·r_dL^2) 'factor de corrección de Janbu
 F_Janbu = f_0·F_0 'Janbu corregido
+#hide
+x_m1 = (x_a + x_b)/2
+z_m1 = (z_o(x_a) + z_o(x_b))/2
+x_L1 = (x_a + x_b)/2 + 1
+z_L1 = (z_a0 + H)/2 + 1
+J_x = zeros(2, 1)
+J_z = zeros(2, 1)
+J_L = zeros(2, 1)
+J_d = zeros(2, 1)
+J_f = zeros(2, 1)
+r_m1 = sqrt((x_m1 - x_c)^2 + (z_m1 - z_c)^2)
+x_d1 = x_c + R*(x_m1 - x_c)/r_m1
+z_d1 = z_c + R*(z_m1 - z_c)/r_m1
+for j = 1:2
+  J_L(j) = L_c
+  J_d(j) = d_c
+  J_f(j) = f_0
+end
+for k = 1:1
+  J_x(1) = x_m1
+  J_z(1) = z_m1
+  J_x(2) = x_d1
+  J_z(2) = z_d1
+end
+#show
+#dibujo("Janbu: ΣF_x = 0 de toda la masa; corrección f₀ con la flecha d y la cuerda L", ud = m, escala = auto, alto = 72)
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(A_x, A_z, "gruesa rojo")
+#  linea(x_a, z_a0, x_b, H, "media trazos azul")
+#  linea(x_m1, z_m1, x_d1, z_d1, "gruesa azul")
+#  texto(x_L1, z_L1, "L", 3.2, "i")
+#  texto(x_d1 + 0.5, z_d1 + 0.8, "d", 3.2, "i")
+#  texto(-4, H + 1, "f₀ = 1 + b₁·[d/L − 1.4·(d/L)²]", 2.6, "i")
+#  hover(J_x, J_z, "L = {#1:2} m, d = {#2:2} m, f₀ = {#3:4}", J_L, J_d, J_f)
+#fin
 #: **Qué significa:** es una estimación rápida, sobre todo para superficies no circulares; XSLOPE recomienda confirmarla con Spencer.
 
 ## 6 · El barrido de fuerzas (lo que usan los cuatro métodos que faltan)
@@ -281,6 +421,24 @@ function S = lamsol(fx, Fref, WT, W, al, dl, cc, tp, uu, xm, yb, n)
   S(3) = Fm
 end
 #show
+#dibujo("El barrido: en cada dovela 2 incógnitas (N' y Zᵢ₊₁) y 2 ecuaciones (ΣF_x, ΣF_y)", alto = 150, lado = derecha)
+#  poligono(0, 0, 4, 1.6, 4, 6, 0, 5, "gruesa")
+#  linea(0, 0, 2.6, 0, "fina trazos")
+#  texto(1.7, 0.18, "α", 3, "i")
+#  flecha(2, 4.6, 2, 2.5, "rojo")
+#  texto(2.2, 3.7, "W", 3.2, "i")
+#  flecha(2.82, -1.24, 2, 0.8, "azul")
+#  texto(2.95, -1.25, "N'", 3.2, "i")
+#  flecha(0.77, -0.18, 2.57, 0.54, "verde")
+#  texto(-0.6, -1.1, "S = [c·Δℓ + N'·tan φ]/F", 2.6, "i")
+#  flecha(-2.125, 2.03, 0, 2.6, "morado")
+#  texto(-2.6, 1.5, "Zᵢ (conocida)", 2.6, "i")
+#  flecha(6.125, 4.17, 4, 3.6, "morado")
+#  texto(4.4, 4.7, "Zᵢ₊₁ (incógnita)", 2.6, "i")
+#  linea(4, 3.6, 6.2, 3.6, "fina trazos")
+#  texto(5.3, 3.2, "θ", 3, "i")
+#  texto(-2.6, 7.4, "Z₁ = 0 → … → Zₙ₊₁(F) = 0", 2.8, "i")
+#fin
 #: El F de cada método se busca como XSLOPE pide: la raíz **más cercana al valor de momentos** (Bishop). Se sale de F_{Bishop} hacia arriba y hacia abajo en pasos de 0.05 hasta el primer cambio de signo del residuo (descartando los polos, donde el determinante de A se hace cero y el residuo salta) y se afina con regula falsi: unas pocas pasadas en vez de cientos.
 
 ## 7 · Cuerpo de Ingenieros de EE. UU. (Corps of Engineers #2)
@@ -295,6 +453,29 @@ end
 F_C = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
 #show
 F_Corps = F_C 'Cuerpo de Ingenieros #2
+#hide
+T_C_x = zeros(3*(n + 1), 1)
+T_C_z = zeros(3*(n + 1), 1)
+for j = 1:n + 1
+  z0 = z_o(X_j(j))
+  T_C_x(3*j - 2) = X_j(j)
+  T_C_z(3*j - 2) = z0
+  T_C_x(3*j - 1) = X_j(j) + 3*cos(TH(j))
+  T_C_z(3*j - 1) = z0 + 3*sin(TH(j))
+  T_C_x(3*j) = X_j(j)
+  T_C_z(3*j) = z0
+end
+T_C_g = zeros(n + 1, 1)
+for j = 1:n + 1
+  T_C_g(j) = TH(j)*180/pi
+end
+#show
+#dibujo("Cuerpo de Ingenieros #2: Z en cada borde paralela al terreno (θ = pendiente del terreno)", ud = m, escala = auto, alto = 78)
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(X_z, Z_z, "fina gris")
+#  polilinea(T_C_x, T_C_z, "media morado")
+#  hover(X_j, Zo_j, "θ = {#1:1}°", T_C_g)
+#fin
 #: **Qué significa:** XSLOPE avisa que esta convención da sistemáticamente el F **más alto** (menos conservador) de todos, de unos pocos % hasta ~15 % sobre Spencer. Se informa para comparar; para diseñar, Spencer.
 
 ## 8 · Lowe y Karafiath
@@ -310,6 +491,29 @@ end
 F_L = raiz(1, TH, F_B, W_T, W, al, dl, cc, tp, uu, xm, yb, n)
 #show
 F_LoweK = F_L 'Lowe y Karafiath
+#hide
+T_L_x = zeros(3*(n + 1), 1)
+T_L_z = zeros(3*(n + 1), 1)
+for j = 1:n + 1
+  z0 = z_o(X_j(j))
+  T_L_x(3*j - 2) = X_j(j)
+  T_L_z(3*j - 2) = z0
+  T_L_x(3*j - 1) = X_j(j) + 3*cos(TH(j))
+  T_L_z(3*j - 1) = z0 + 3*sin(TH(j))
+  T_L_x(3*j) = X_j(j)
+  T_L_z(3*j) = z0
+end
+T_L_g = zeros(n + 1, 1)
+for j = 1:n + 1
+  T_L_g(j) = TH(j)*180/pi
+end
+#show
+#dibujo("Lowe-Karafiath: θ = promedio de la pendiente del terreno y la del círculo", ud = m, escala = auto, alto = 78)
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(X_z, Z_z, "fina gris")
+#  polilinea(T_L_x, T_L_z, "media morado")
+#  hover(X_j, Zo_j, "θ = {#1:1}°", T_L_g)
+#fin
 #: **Qué significa:** según el manual EM 1110-2-1902 suele quedar a menos de ~10 % de los métodos completos. Ojo en superficies no circulares: como θ sigue a la base, una base casi vertical en el pie baja F artificialmente.
 
 ## 9 · Spencer
@@ -325,6 +529,34 @@ F_m = S_p(3)
 lambda_S = l_q 'λ de Spencer = tan θ
 theta_S = atan(l_q)·180/pi 'inclinación de las fuerzas entre dovelas [grados]
 F_Spencer = (F_f + F_m)/2 'Spencer
+#hide
+for j = 1:n + 1
+  TH(j) = atan(l_q)
+end
+#show
+#hide
+T_S_x = zeros(3*(n + 1), 1)
+T_S_z = zeros(3*(n + 1), 1)
+for j = 1:n + 1
+  z0 = z_o(X_j(j))
+  T_S_x(3*j - 2) = X_j(j)
+  T_S_z(3*j - 2) = z0
+  T_S_x(3*j - 1) = X_j(j) + 3*cos(TH(j))
+  T_S_z(3*j - 1) = z0 + 3*sin(TH(j))
+  T_S_x(3*j) = X_j(j)
+  T_S_z(3*j) = z0
+end
+T_S_g = zeros(n + 1, 1)
+for j = 1:n + 1
+  T_S_g(j) = TH(j)*180/pi
+end
+#show
+#dibujo("Spencer: todas las Z paralelas, θ constante (sale de F_f = F_m)", ud = m, escala = auto, alto = 78)
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(X_z, Z_z, "fina gris")
+#  polilinea(T_S_x, T_S_z, "media morado")
+#  hover(X_j, Zo_j, "θ = {#1:1}°", T_S_g)
+#fin
 dF_S = F_f - F_m 'comprobación: F de fuerzas − F de momentos (debe ser ≈ 0)
 #: **Qué significa:** es el método «riguroso» que XSLOPE recomienda para diseñar: no supone la dirección de las fuerzas entre dovelas, la **calcula**.
 
@@ -345,6 +577,42 @@ F_m = S_p(3)
 #show
 lambda_MP = l_q 'λ de Morgenstern-Price (con media onda de seno)
 F_MP = (F_f + F_m)/2 'Morgenstern-Price
+#hide
+TH = zeros(n + 1, 1)
+for j = 1:n + 1
+  TH(j) = atan(l_q*f_x(j))
+end
+F_xz = zeros(n + 1, 1)
+for j = 1:n + 1
+  F_xz(j) = -4 + 3*f_x(j)
+end
+#show
+#hide
+T_M_x = zeros(3*(n + 1), 1)
+T_M_z = zeros(3*(n + 1), 1)
+for j = 1:n + 1
+  z0 = z_o(X_j(j))
+  T_M_x(3*j - 2) = X_j(j)
+  T_M_z(3*j - 2) = z0
+  T_M_x(3*j - 1) = X_j(j) + 3*cos(TH(j))
+  T_M_z(3*j - 1) = z0 + 3*sin(TH(j))
+  T_M_x(3*j) = X_j(j)
+  T_M_z(3*j) = z0
+end
+T_M_g = zeros(n + 1, 1)
+for j = 1:n + 1
+  T_M_g(j) = TH(j)*180/pi
+end
+#show
+#dibujo("Morgenstern-Price: tan θ = λ·f(x), con f(x) = media onda de seno (abajo)", ud = m, escala = auto, alto = 95)
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(X_z, Z_z, "fina gris")
+#  polilinea(T_M_x, T_M_z, "media morado")
+#  polilinea(X_j, F_xz, "media azul")
+#  linea(x_a, -4, x_b, -4, "fina")
+#  texto(x_b + 0.5, -3, "f(x)", 2.8, "i")
+#  hover(X_j, Zo_j, "θ = {#1:1}°", T_M_g)
+#fin
 dF_MP = F_f - F_m 'comprobación: F de fuerzas − F de momentos (debe ser ≈ 0)
 #: **Qué significa:** es el más general. El F casi no depende de la f(x) elegida; λ sí.
 
@@ -357,6 +625,39 @@ F_Corps = F_Corps 'Cuerpo de Ingenieros #2 (solo fuerzas, θ = terreno)
 F_LoweK = F_LoweK 'Lowe-Karafiath (solo fuerzas, θ = promedio terreno y base)
 F_Spencer = F_Spencer 'Spencer (todo, θ constante)
 F_MP = F_MP 'Morgenstern-Price (todo, θ = λ·f(x))
+#hide
+F_v = zeros(7, 1)
+for k = 1:1
+  F_v(1) = F_OMS
+  F_v(2) = F_Bishop
+  F_v(3) = F_Janbu
+  F_v(4) = F_Corps
+  F_v(5) = F_LoweK
+  F_v(6) = F_Spencer
+  F_v(7) = F_MP
+end
+B_x = zeros(7, 1)
+B_h = zeros(7, 1)
+B_c = zeros(7, 1)
+for j = 1:7
+  B_x(j) = 1.5*(j - 1)
+  B_h(j) = 20*(F_v(j) - 1.4)
+  B_c(j) = B_x(j) + 0.5
+end
+#show
+#dibujo("Los siete F (barras desde F = 1.40; pasa el cursor para ver cada valor)", alto = 105)
+#  rect(B_x, 0, 1, B_h, "media azul")
+#  linea(-0.5, 0, 10.5, 0, "media")
+#  texto(-0.6, 0, "1.40", 2.6, "d")
+#  texto(0.5, -0.5, "OMS", 2.4, "c")
+#  texto(1.5 + 0.5, -1.1, "Bishop", 2.4, "c")
+#  texto(3.5, -0.5, "Janbu", 2.4, "c")
+#  texto(5, -1.1, "Corps", 2.4, "c")
+#  texto(6.5, -0.5, "L-K", 2.4, "c")
+#  texto(8, -1.1, "Spencer", 2.4, "c")
+#  texto(9.5, -0.5, "M-P", 2.4, "c")
+#  hover(B_c, B_h, "F = {#1:4}", F_v)
+#fin
 #: **Cómo leerlo.** Los dos métodos completos (Spencer y Morgenstern-Price) y Bishop quedan casi iguales en un círculo: cumplen los momentos, que es lo que más pesa. Fellenius sale más bajo porque ignora las fuerzas entre dovelas. Los de solo fuerzas dependen de la θ que suponen: Corps #2 sale más alto, como avisa XSLOPE.
 #: Este es un círculo de prueba; para el **factor de seguridad del talud** hay que buscar el círculo crítico (el de F mínimo), que XSLOPE hace con su búsqueda automática.
 
@@ -364,6 +665,16 @@ F_MP = F_MP 'Morgenstern-Price (todo, θ = λ·f(x))
 
 #: No usa dovelas. Se modela el talud con elementos finitos (XSLOPE usa por defecto triángulos de 6 nodos) y se **reduce** la resistencia del suelo por un factor F hasta que el talud no puede quedar en equilibrio:
 #: c_{r} = c/F,   tan φ_{r} = tan φ/F
+#dibujo("Reducción de resistencia (SSR): sin dovelas; la falla aparece como una banda de corte", ud = m, escala = auto, alto = 75)
+#  poligono(-6, -5, -6, 0, 0, 0, 2*H, H, 2*H + 14, H, 2*H + 14, -5, "fina gris")
+#  polilinea(G_x, G_z, "gruesa")
+#  polilinea(A_x, A_z, "muygruesa naranja")
+#  flecha(16, 6.5, 12, 4.2, "rojo")
+#  flecha(24, 9.2, 21, 7.4, "rojo")
+#  texto(36, 6, "cᵣ = c/F", 2.8, "i")
+#  texto(36, 3.6, "tan φᵣ = tan φ/F", 2.8, "i")
+#  texto(2, -3, "F sube hasta que el equilibrio no converge", 2.6, "i")
+#fin
 #: **Plasticidad:** Mohr-Coulomb, con el método **viscoplástico explícito** de Smith y Griffiths: la rigidez elástica K se factoriza **una sola vez**; en cada paso, el exceso sobre la superficie de fluencia se convierte en deformación viscoplástica, ε^{vp} += Δt·∂Q/∂σ·⟨f⟩, con Δt = 4·(1 + ν)/(3·E), y vuelve como carga. Flujo **no asociado** con dilatancia ψ = 0.
 #: **Cuándo falla:** XSLOPE usa un criterio híbrido: (1) que no converja (desplazamientos y fuerzas por nodo con tolerancia 10⁻³) y (2) que el desplazamiento crezca respecto al elástico, u/u_{elástico} ≥ 1.5. El F de falla se busca por **bisección** entre 1 y 2 (ampliando el intervalo si hace falta) con tolerancia 0.01.
 #: **Qué significa:** no hay que suponer nada sobre la forma de la superficie ni sobre las fuerzas entre dovelas: la falla **aparece** sola, como la zona donde se concentra la deformación cortante. Hekatan Geotechnic hace lo mismo con Newton-Raphson en vez del método viscoplástico (hoja 164).

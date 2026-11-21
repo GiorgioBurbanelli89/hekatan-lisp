@@ -2237,7 +2237,7 @@ dib();})();";
                     try { svg = LispDibujo.Render(dibujos[i], name => _numMode ? NumDibujo(name, iDib, lines) ?? NumLookup(name, labels, resOf, formOf, 0)
                                                                            : NumLookup(name, labels, resOf, formOf, 0)); }
                     catch (Exception ex) { svg = "<div class=\"hk-dib-err\">⚠ #dibujo: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div>"; }
-                    if (svg.Contains("hk-dib-der") && SubeAlTitulo(display, lines, i, svg)) { display.Add(""); continue; }   // lado = derecha: va pegado al título de su sección y flota al lado de los datos
+                    if (_serve == null && svg.Contains("hk-dib-der") && SubeAlTitulo(display, lines, i, svg)) { display.Add(""); continue; }   // lado = derecha: va pegado al título de su sección y flota al lado de los datos (no en --serve: Math Studio coloca él mismo el bloque al lado)
                     display.Add(LispConverter.TxtLine("table", "left", svg));
                     continue;
                 }

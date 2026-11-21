@@ -332,7 +332,10 @@ namespace HekatanLisp
         {
             var pel = Peligros(code);
             if (pel.Count > 0 && !Autorizado(pel))
+            {
+                try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "hekatan_lisp_bloqueos.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " bloqueado: " + string.Join(" | ", pel) + Environment.NewLine); } catch { }
                 return "error: Hekatan bloqueó esta hoja por seguridad: trae código LISP que puede tocar la PC (" + pel[0] + "). Ábrela en Hekatan LISP y acepta el aviso solo si es de confianza.";
+            }
             // si el motor está HORNEADO en el core, quita los (load "…engine.lisp") — recargarlo sería lento
             if (EngineCore() != null)
                 code = System.Text.RegularExpressions.Regex.Replace(

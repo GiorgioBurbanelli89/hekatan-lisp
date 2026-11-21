@@ -89,8 +89,11 @@ namespace HekatanLisp
                 var r = doc.RootElement;
                 if (r.TryGetProperty("hkGuardarPng", out var ruta))   // (guardar "x.png") de la hoja
                 {
-                    string url = r.GetProperty("datos").GetString();
-                    File.WriteAllBytes(ruta.GetString(), Convert.FromBase64String(url.Substring(url.IndexOf(',') + 1)));
+                    string url = r.GetProperty("datos").GetString(), rs = ruta.GetString();
+                    var by = Convert.FromBase64String(url.Substring(url.IndexOf(',') + 1));
+                    // seguridad: una hoja ajena solo puede escribir PNG (extensión .png y firma PNG), nunca .bat/.exe/.lnk ni otros archivos, ni en carpetas de red
+                    if (!string.IsNullOrEmpty(rs) && string.Equals(Path.GetExtension(rs), ".png", StringComparison.OrdinalIgnoreCase) && by.Length > 8 && by[0] == 0x89 && by[1] == 0x50 && by[2] == 0x4E && by[3] == 0x47 && !rs.StartsWith(@"\\"))
+                        File.WriteAllBytes(rs, by);
                 }
                 else if (r.TryGetProperty("hkGoto", out var lg))      // la flecha «▶ n» del resultado
                     IrALinea(lg.GetInt32());
@@ -99,7 +102,11 @@ namespace HekatanLisp
                     string que = qc.GetString();
                     if (que == "abrir") AmpliarResultado(true);
                     else if (que == "struct")    // 🏗 Struct: el dibujo como modelo de Hekatan Struct, en el navegador
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(r.GetProperty("url").GetString()) { UseShellExecute = true });
+                    {
+                        // seguridad: solo una página web (https); una hoja ajena no puede lanzar programas ni archivos locales
+                        if (Uri.TryCreate(r.GetProperty("url").GetString(), UriKind.Absolute, out var us) && us.Scheme == Uri.UriSchemeHttps)
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(us.AbsoluteUri) { UseShellExecute = true });
+                    }
                     else if (que == "cerrar") AmpliarResultado(false);
                     else if (que == "guardar")
                     {

@@ -241,6 +241,7 @@ namespace HekatanLisp
                     case "azul": st.Col = "var(--dib-azul)"; break;
                     case "verde": st.Col = "var(--dib-verde)"; break;
                     case "naranja": st.Col = "var(--dib-nar)"; break;
+                    case "morado": st.Col = "var(--nary)"; break;
                     case "acero": case "varilla": st.Col = "var(--dib-acero)"; st.W = Math.Max(st.W, 0.55); break;
                 }
             }
@@ -337,7 +338,7 @@ namespace HekatanLisp
         static readonly HashSet<string> Known = new HashSet<string> {
             "linea","polilinea","poligono","rect","circulo","arco","flecha","flechamomento","texto","cota","cotas","cotasx","cotasy",
             "ejex","ejey","ejesx","ejesy","hueco","achurado","varilla","varillas","fila","estribo","seccion",
-            "leyenda","obs","observacion","carga","curva","empotramiento","empotre"
+            "leyenda","obs","observacion","carga","curva","empotramiento","empotre","hover"
         };
 
         /// <summary>Dibuja el bloque. lookup = valores de la hoja (nombre → números).
@@ -674,10 +675,87 @@ namespace HekatanLisp
         // ================= 2ª pasada: dibujar =================
         static string StyS(Prim p) => Named(p, "estilo")?.Str ?? p.A.FirstOrDefault(a => a.Name == null && a.Str != null)?.Str;
 
+        // ================= HOVER (globo con el cursor) =================
+        // hover(x, y, "barra {#1:0}: M = {#2:2} kN·m", barra, M [, radio = 16])
+        //   x, y = puntos de anclaje (vectores del mismo largo); cada {#k} o {#k:d} es el k-ésimo vector que sigue al texto,
+        //   en el punto i (un escalar vale para todos); d = decimales (2 si falta). \n = salto de línea.
+        //   No dibuja: deja un <g class="hk-hv" data-h="[[px,py,"texto"],…]"> y un script (HoverScript) muestra el globo del
+        //   punto más cercano si está a ≤ radio píxeles (16 por defecto). Sin hover() nada cambia.
+        public static bool UsaHover(string html) => html != null && html.Contains("class=\"hk-hv\"");
+        static string JsonStr(string t)
+        {
+            var sb = new StringBuilder("\"");
+            foreach (char ch in t) { if (ch == '"') sb.Append("\\\""); else if (ch == '\\') sb.Append("\\\\"); else if (ch == '\n') sb.Append("\\n"); else if (ch < 32) { } else sb.Append(ch); }
+            return sb.Append('"').ToString();
+        }
+        static string HoverNum(double v, int d)
+        {
+            if (double.IsNaN(v) || double.IsInfinity(v)) return "—";
+            string r = v.ToString("F" + d, Inv);
+            return Regex.IsMatch(r, @"^-0(\.0+)?$") ? r.Substring(1) : r;
+        }
+        static void DrawHover(Ctx c, Prim p)
+        {
+            var nums = p.A.Where(a => a.Name == null && a.Str == null).ToList();
+            string tpl = p.A.FirstOrDefault(a => a.Name == null && a.Str != null)?.Str;
+            if (nums.Count < 2 || tpl == null) throw new FormatException("hover(x, y, \"texto {#1:2}\", v1, v2…)");
+            var xs = Vals(c, nums[0]); var ys = Vals(c, nums[1]);
+            if (xs.Length != ys.Length) throw new FormatException("hover: x e y de distinto largo");
+            var vs = nums.Skip(2).Select(a => Vals(c, a)).ToList();
+            tpl = tpl.Replace("\\n", "\n");
+            var sb = new StringBuilder("[");
+            for (int i = 0; i < xs.Length; i++)
+            {
+                if (double.IsNaN(xs[i]) || double.IsNaN(ys[i])) continue;
+                int ii = i;
+                string txt = Regex.Replace(tpl, @"\{#(\d+)(?::(\d))?\}", m =>
+                {
+                    int k = int.Parse(m.Groups[1].Value) - 1;
+                    if (k < 0 || k >= vs.Count) return m.Value;
+                    var v = vs[k]; double x = v.Length == 1 ? v[0] : ii < v.Length ? v[ii] : double.NaN;
+                    return HoverNum(x, m.Groups[2].Success ? int.Parse(m.Groups[2].Value) : 2);
+                });
+                if (sb.Length > 1) sb.Append(',');
+                sb.Append('[').Append(F(c.Px(xs[i]))).Append(',').Append(F(c.Py(ys[i]))).Append(',').Append(JsonStr(txt)).Append(']');
+            }
+            sb.Append(']');
+            double rad = NumNamed(c, p, "radio", 16);
+            c.Sb.Append("<g class=\"hk-hv\" data-r=\"").Append(F(rad)).Append("\" data-h=\"")
+             .Append(sb.ToString().Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;")).Append("\"/>");
+        }
+
+        // Script del hover de #dibujo: lo inyecta MainWindow antes de </body> si la página trae hk-hv; delegación en el documento (una sola vez). Mismo código que dibujo.js (web).
+        public const string HoverScript = @"<script>(function(){if(window.__hkDibHv)return;window.__hkDibHv=1;
+var tip=null,mk=null;
+function T(){if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;z-index:9999;display:none;pointer-events:none;background:#fffffff2;border:1px solid #888;border-radius:4px;padding:3px 6px;font:12px/1.35 Consolas,monospace;color:#111;box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:pre';document.body.appendChild(tip);}return tip;}
+function off(){if(tip)tip.style.display='none';if(mk&&mk.parentNode)mk.parentNode.removeChild(mk);mk=null;}
+document.addEventListener('pointermove',function(e){
+ var s=e.target&&e.target.closest?e.target.closest('svg.hk-dib-svg'):null;
+ if(!s){off();return;}
+ var gs=s.querySelectorAll('g.hk-hv');if(!gs.length)return;
+ var m=s.getScreenCTM();if(!m)return;var pt=s.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;var q=pt.matrixTransform(m.inverse()),sc=m.a;
+ var best=null,bd=1e18,br=16;
+ for(var g=0;g<gs.length;g++){var d=gs[g].__h;if(!d){try{d=JSON.parse(gs[g].getAttribute('data-h'));}catch(x){d=[];}gs[g].__h=d;}
+  var r=+gs[g].getAttribute('data-r')||16;
+  for(var i=0;i<d.length;i++){var dx=(d[i][0]-q.x)*sc,dy=(d[i][1]-q.y)*sc,dd=dx*dx+dy*dy;if(dd<bd&&dd<=r*r){bd=dd;best=d[i];br=r;}}}
+ if(!best){off();return;}
+ var t=T();t.textContent=best[2];t.style.display='block';
+ var w=t.offsetWidth,h=t.offsetHeight,L=e.clientX+14,Tp=e.clientY+14;
+ if(L+w>window.innerWidth-4)L=Math.max(2,e.clientX-w-14);if(Tp+h>window.innerHeight-4)Tp=Math.max(2,e.clientY-h-14);
+ t.style.left=L+'px';t.style.top=Tp+'px';
+ if(!mk||mk.parentNode!==s){off();mk=document.createElementNS('http://www.w3.org/2000/svg','circle');mk.setAttribute('style','fill:none;stroke:#c00;pointer-events:none');s.appendChild(mk);}
+ mk.setAttribute('cx',best[0]);mk.setAttribute('cy',best[1]);mk.setAttribute('r',4/sc);mk.style.strokeWidth=(1.6/sc)+'px';
+});
+document.documentElement.addEventListener('mouseleave',off);
+})();</script>";
+
         static void Draw(Ctx c, Prim p, List<string> errs)
         {
             switch (p.Name)
             {
+                case "hover":   // hover(x, y, "texto {#1:2} …", v1, v2, …): globo al pasar el cursor (no dibuja nada)
+                    DrawHover(c, p);
+                    break;
                 case "linea":
                     Line(c, V(c, Pos(p, 0)), V(c, Pos(p, 1)), V(c, Pos(p, 2)), V(c, Pos(p, 3)), Style(StyS(p)));
                     break;

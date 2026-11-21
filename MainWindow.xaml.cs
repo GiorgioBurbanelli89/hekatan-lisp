@@ -282,7 +282,8 @@ namespace HekatanLisp
                     {
                         _ = Viewer.ExecuteScriptAsync("(function(){var d=document.getElementById('hk-calc');if(!d){d=document.createElement('div');d.id='hk-calc';" +
                             "d.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#b08a2e;color:#fff;font:600 13px Segoe UI,sans-serif;padding:4px 10px;border-radius:12px;opacity:.92';" +
-                            "(document.body||document.documentElement).appendChild(d);}d.textContent='calculando…';})();");
+                            "(document.body||document.documentElement).appendChild(d);}var t0=Date.now()-350;clearInterval(window.hkCalcT);" +
+                            "function f(){d.textContent='calculando… '+((Date.now()-t0)/1000).toFixed(1)+' s';}f();window.hkCalcT=setInterval(f,100);})();");          // contador en vivo: el cálculo va en otro hilo, la página sí se repinta
                     }
                     catch { }
                 }

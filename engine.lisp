@@ -2465,6 +2465,12 @@
 (defun hn-set (a v &rest idx)
   "A(idx) = v. Modifica A en sitio y lo devuelve; si A no existe o se queda corto, crece
    (como MATLAB). v escalar se reparte por todo el rango; v arreglo va elemento a elemento."
+  ;; 21-nov-2026: zeros(n,1) / zeros(1,n) son VECTOR plano; A(i,1) = v o A(1,j) = v sobre un
+  ;; vector hacia una matriz nueva de i x 1 y perdia lo demas. Como hn-ref: el indice 1 se ignora.
+  (when (and (= (length idx) 2) (hn-vecp a) (plusp (length a)))
+    (let ((i (first idx)) (j (second idx)))
+      (cond ((and (numberp j) (eql (hn-num j) 1)) (return-from hn-set (hn-set a v i)))
+            ((and (numberp i) (eql (hn-num i) 1)) (return-from hn-set (hn-set a v j))))))
   (case (length idx)
     (1 (let* ((i (first idx))
               (a (cond ((hn-matp a) (hn-err "una matriz se asigna con (i, j)"))

@@ -277,8 +277,62 @@ namespace HekatanLisp
             return WebEngine.Run(code).TrimEnd('\n', '\r');
         }
 #else
+        // ---------- seguridad: una hoja ajena no debe tocar la PC sin permiso ----------
+        // El LISP completo puede leer/escribir archivos y lanzar programas (como las macros de Office).
+        // Si el código trae instrucciones de ese tipo: con ventana se PREGUNTA una vez por cada código distinto;
+        // sin ventana (--serve de Math Studio, --html, --pdf, --ctl, --shot, --latex) se BLOQUEA siempre.
+        private static readonly System.Text.RegularExpressions.Regex _peligro = new System.Text.RegularExpressions.Regex(
+            @"\(\s*(run-program|with-open-file|open|delete-file|delete-directory|rename-file|ensure-directories-exist|load|require|compile-file|eval|intern|find-symbol|read-from-string|symbol-function|fdefinition|find-package|directory|set-dispatch-macro-character|set-macro-character|make-two-way-stream|posix-getenv|posix-environ)(?=[\s)])" +
+            @"|(?<![\w-])(sb-[a-z]+|uiop|asdf|ql|cl-user|common-lisp|cl|ext|si|ffi|mp)::?[^\s()]" +
+            @"|#\.|\*read-eval\*",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        private static readonly Dictionary<string, bool> _decidido = new Dictionary<string, bool>();
+        /// <summary>Lo peligroso que trae el código (vacío = nada). El (load "…engine.lisp") del propio motor no cuenta.</summary>
+        public static List<string> Peligros(string code)
+        {
+            var limpio = System.Text.RegularExpressions.Regex.Replace(code, @"(?im)^\s*\(load\s+""[^""]*engine\.lisp""\)\s*$", "");
+            var l = new List<string>();
+            foreach (System.Text.RegularExpressions.Match m in _peligro.Matches(limpio))
+            {
+                int a = Math.Max(0, m.Index - 10), b = Math.Min(limpio.Length, m.Index + m.Length + 40);
+                string trozo = limpio.Substring(a, b - a).Replace('\r', ' ').Replace('\n', ' ').Trim();
+                if (!l.Contains(trozo)) l.Add(trozo);
+            }
+            return l;
+        }
+        private static bool SinVentana()
+        {
+            foreach (var a in Environment.GetCommandLineArgs())
+                if (a is "--serve" or "--html" or "--pdf" or "--ctl" or "--shot" or "--latex") return true;
+            return System.Windows.Application.Current == null;
+        }
+        private static bool Autorizado(List<string> pel)
+        {
+            string firma = string.Join("\n", pel);
+            lock (_decidido) if (_decidido.TryGetValue(firma, out var ya)) return ya;
+            bool ok = false;
+            if (!SinVentana())
+            {
+                try
+                {
+                    var muestra = string.Join("\n", pel.GetRange(0, Math.Min(6, pel.Count)).ConvertAll(s => "• " + s));
+                    ok = System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(
+                        "Esta hoja trae código LISP que puede tocar tu PC (leer o escribir archivos, ejecutar programas):\n\n" + muestra +
+                        "\n\nEjecútalo SOLO si la hoja es tuya o de alguien de confianza.\n¿Ejecutar este código?",
+                        "Hekatan LISP · seguridad", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning,
+                        System.Windows.MessageBoxResult.No) == System.Windows.MessageBoxResult.Yes);
+                }
+                catch { ok = false; }
+            }
+            lock (_decidido) _decidido[firma] = ok;
+            return ok;
+        }
+
         private static string Run(string code)
         {
+            var pel = Peligros(code);
+            if (pel.Count > 0 && !Autorizado(pel))
+                return "error: Hekatan bloqueó esta hoja por seguridad: trae código LISP que puede tocar la PC (" + pel[0] + "). Ábrela en Hekatan LISP y acepta el aviso solo si es de confianza.";
             // si el motor está HORNEADO en el core, quita los (load "…engine.lisp") — recargarlo sería lento
             if (EngineCore() != null)
                 code = System.Text.RegularExpressions.Regex.Replace(

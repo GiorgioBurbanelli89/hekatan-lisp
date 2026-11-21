@@ -635,15 +635,48 @@ namespace HekatanLisp
             var cv = surf.Canvas;
             cv.Clear(bg);
             // celdas de color (j hacia ARRIBA en pantalla)
-            var cell = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
             float cw = pw / nn, chh = ph / nn;
-            for (int i = 0; i < nn; i++)
-                for (int j = 0; j < nn; j++)
+            // relleno POR PÍXEL con interpolación bilineal de la rejilla (no un color por celda): los bordes de banda salen
+            // curvas suaves, sin los escalones de la rejilla (estilo Hekatan Engineers, como Hekatan Geotechnic)
+            {
+                int bw = (int)Math.Ceiling(pw), bh = (int)Math.Ceiling(ph);
+                using var bmp = new SKBitmap(bw, bh, SKColorType.Rgba8888, SKAlphaType.Premul);
+                for (int py = 0; py < bh; py++)
                 {
-                    double zc = (Z[i, j] + Z[i + 1, j] + Z[i, j + 1] + Z[i + 1, j + 1]) / 4;
-                    cell.Color = Banda((zc - zmin) / (zmax - zmin), nlev, csi);
-                    cv.DrawRect(pL + i * cw, pT + (nn - 1 - j) * chh, cw + 1, chh + 1, cell);
+                    double gj = (ph - (py + 0.5)) / chh; int j = Math.Clamp((int)gj, 0, nn - 1); double fj = Math.Clamp(gj - j, 0, 1);
+                    for (int px = 0; px < bw; px++)
+                    {
+                        double gi = (px + 0.5) / cw; int i = Math.Clamp((int)gi, 0, nn - 1); double fi = Math.Clamp(gi - i, 0, 1);
+                        double z = (1 - fi) * (1 - fj) * Z[i, j] + fi * (1 - fj) * Z[i + 1, j] + fi * fj * Z[i + 1, j + 1] + (1 - fi) * fj * Z[i, j + 1];
+                        bmp.SetPixel(px, py, double.IsNaN(z) ? bg : Banda((z - zmin) / (zmax - zmin), nlev, csi));
+                    }
                 }
+                cv.DrawBitmap(bmp, pL, pT);
+            }
+            // ISOLÍNEAS finas en cada borde de banda (estilo Hekatan Engineers): del COLOR de su nivel (un poco más oscuro,
+            // para que se vea sobre la banda), no negras; trazadas por interpolación lineal en cada celda (marching squares),
+            // así son curvas suaves y no escalones de la rejilla.
+            if (nlev > 1 && zmax > zmin)
+            {
+                var iso = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.3f };
+                float PX(double gi) => pL + (float)(gi * cw); float PY(double gj) => pT + ph - (float)(gj * chh);
+                for (int k = 1; k < nlev; k++)
+                {
+                    double L = zmin + (zmax - zmin) * k / nlev; var c0 = Banda((double)k / nlev + 0.5 / nlev, nlev, csi);
+                    iso.Color = new SKColor((byte)(c0.Red * 0.62), (byte)(c0.Green * 0.62), (byte)(c0.Blue * 0.62));
+                    for (int i = 0; i < nn; i++)
+                        for (int j = 0; j < nn; j++)
+                        {
+                            double a = Z[i, j], b = Z[i + 1, j], c = Z[i + 1, j + 1], d = Z[i, j + 1];          // esquinas: (i,j) (i+1,j) (i+1,j+1) (i,j+1)
+                            if (double.IsNaN(a) || double.IsNaN(b) || double.IsNaN(c) || double.IsNaN(d)) continue;
+                            var pts = new List<(double, double)>(4);
+                            void Arista(double v1, double v2, double x1, double y1, double x2, double y2) { if ((v1 - L) * (v2 - L) < 0) { double t = (L - v1) / (v2 - v1); pts.Add((x1 + t * (x2 - x1), y1 + t * (y2 - y1))); } }
+                            Arista(a, b, i, j, i + 1, j); Arista(b, c, i + 1, j, i + 1, j + 1); Arista(c, d, i + 1, j + 1, i, j + 1); Arista(d, a, i, j + 1, i, j);
+                            if (pts.Count >= 2) cv.DrawLine(PX(pts[0].Item1), PY(pts[0].Item2), PX(pts[1].Item1), PY(pts[1].Item2), iso);
+                            if (pts.Count == 4) cv.DrawLine(PX(pts[2].Item1), PY(pts[2].Item2), PX(pts[3].Item1), PY(pts[3].Item2), iso);
+                        }
+                }
+            }
             var axis = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, Color = fg, StrokeWidth = 1 };
             cv.DrawRect(pL, pT, pw, ph, axis);
             var txt = new SKPaint { Typeface = HkFont.Ui, IsAntialias = true, Color = fg, TextSize = 11 };

@@ -11,6 +11,7 @@ namespace HekatanLisp
     public partial class MainWindow
     {
         private static readonly MainWindow _app = new MainWindow();
+        private string _serve = null;          // la web no tiene modo --serve (lo usa MainWindow.Pipeline.cs: el dibujo «lado = derecha» se pega al título)
 
         /// <summary>Resultado de la hoja. view: "render" (HTML) | "lisp" | "math" (texto).</summary>
         [JSExport]
@@ -31,6 +32,7 @@ namespace HekatanLisp
                         ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
                 html = LispAnim.PostProcesar(html);
                 if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + SurfacePlot.Modelo3DScript + "</body>");
+                if (LispDibujo.UsaHover(html)) html = html.Replace("</body>", LispDibujo.HoverScript + "</body>");   // #dibujo con hover()
                 return html;
             }
             var sb = new StringBuilder();

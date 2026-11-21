@@ -2,7 +2,8 @@
 #   motor compilado (WSL ~/lispwasm/hl) + engine.lisp (menú Motor) + ejemplos.
 set -e
 W=web/HekatanLispWeb/wwwroot
-wsl -d Ubuntu -- bash -c "cp ~/lispwasm/hl/hlisp.js ~/lispwasm/hl/hlisp.wasm '$(wslpath -a "$PWD" 2>/dev/null || echo "$PWD")/$W/'"
+# la ruta de Windows se convierte DENTRO de WSL (wslpath no existe en Git Bash)
+MSYS_NO_PATHCONV=1 wsl -d Ubuntu -- bash -c "cp ~/lispwasm/hl/hlisp.js ~/lispwasm/hl/hlisp.wasm \"\$(wslpath -a '$(cygpath -w "$PWD")')/$W/\""
 cp engine.lisp $W/
 # solo los ejemplos que están en git (una hoja suelta de Jorge, p. ej. la 68, no se publica)
 rm -rf $W/ejemplos && mkdir -p $W/ejemplos && git ls-files -z 'ejemplos/*.lisp' | xargs -0 -I{} cp "{}" $W/ejemplos/ && rm -f $W/ejemplos/_*.lisp

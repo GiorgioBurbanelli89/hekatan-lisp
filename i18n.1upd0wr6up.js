@@ -8,7 +8,7 @@
   const HK = G.HKI18N = G.HKI18N || {};
   let L = 'es';
   try { L = localStorage.getItem('hk-idioma') || ((navigator.language || 'es').toLowerCase().startsWith('es') ? 'es' : 'en'); } catch (e) { /* sin almacenamiento: español */ }
-  { const q = /[?&]lang=(es|en)/.exec(location.search) || /[#&]lang=(es|en)/.exec(location.hash); if (q) { L = q[1]; try { localStorage.setItem('hk-idioma', L); } catch (e) { /* nada */ } } }          // enlace con ?lang=en / ?lang=es: abre en ese idioma
+  { const q = /[?&]lang=(es|en)/.exec(location.search) || /[#&]lang=(es|en)/.exec(location.hash); if (q) { L = q[1]; try { localStorage.setItem('hk-idioma', L); } catch (e) { /* nada */ } } }          // enlace con ?lang=en / ?lang=es: abre en ese idioma
   HK.idioma = L;
   HK.dirEj = () => (L === 'en' ? 'ejemplos/en/' : 'ejemplos/');
   const PAT = [

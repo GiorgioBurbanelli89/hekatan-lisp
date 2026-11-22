@@ -2,19 +2,6 @@
 #numerico
 
 ## 1 · Data
-
-B = 1.5 'side [m]
-t = 0.6 'thickness [m]
-D_f = 1.5 'depth [m]
-P = 400 'axial load [kN]
-M_x = 40 'moment about x [kN·m]
-M_y = 20 'moment about y [kN·m]
-k_s = 20000 'subgrade modulus [kN/m3]
-gamma = 18 'soil unit weight [kN/m3]
-phi = 30 'friction angle [deg]
-E_s = 20000 'soil modulus [kPa]
-nu_s = 0.3 'soil Poisson ratio
-FS = 3 'safety factor
 #dibujo("Footing and column: elevation (y = 0) and plan", ud = m, escala = auto, cotas = m, alto = 120, lado = derecha)
 #  linea(-1.3, 0, 1.3, 0, "media gris")
 #  achurado(-B/2, -D_f, B, t, "concreto")
@@ -42,6 +29,19 @@ FS = 3 'safety factor
 #  texto(2.9, -0.55 - B/2 - 0.3, "plan · M_x = {M_x:0} kN·m, M_y = {M_y:0} kN·m", 2.4, "c")
 #  hover([2.9 + B/2, 2.9 - B/2, 2.9 + B/2, 2.9 - B/2, 2.9], [-0.55 - B/2, -0.55 + B/2, -0.55 + B/2, -0.55 - B/2, -0.55], "q = {#1:2} kPa (rigid)", [q_max, q_min, P/A + (M_y - M_x)*B/2/I, P/A - (M_y - M_x)*B/2/I, P/A])
 #fin
+
+B = 1.5 'side [m]
+t = 0.6 'thickness [m]
+D_f = 1.5 'depth [m]
+P = 400 'axial load [kN]
+M_x = 40 'moment about x [kN·m]
+M_y = 20 'moment about y [kN·m]
+k_s = 20000 'subgrade modulus [kN/m3]
+gamma = 18 'soil unit weight [kN/m3]
+phi = 30 'friction angle [deg]
+E_s = 20000 'soil modulus [kPa]
+nu_s = 0.3 'soil Poisson ratio
+FS = 3 'safety factor
 
 ## 2 · Rigid footing: linear pressure
 

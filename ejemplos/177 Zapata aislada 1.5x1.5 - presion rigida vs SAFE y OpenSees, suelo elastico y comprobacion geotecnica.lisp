@@ -2,19 +2,6 @@
 #numerico
 
 ## 1 · Datos
-
-B = 1.5 'lado [m]
-t = 0.6 'espesor [m]
-D_f = 1.5 'profundidad de desplante [m]
-P = 400 'carga axial [kN]
-M_x = 40 'momento alrededor de x [kN·m]
-M_y = 20 'momento alrededor de y [kN·m]
-k_s = 20000 'módulo de balasto [kN/m3]
-gamma = 18 'peso específico del suelo [kN/m3]
-phi = 30 'ángulo de rozamiento [grados]
-E_s = 20000 'módulo del suelo [kPa]
-nu_s = 0.3 'Poisson del suelo
-FS = 3 'factor de seguridad
 #dibujo("Zapata y columna: alzado (y = 0) y planta", ud = m, escala = auto, cotas = m, alto = 120, lado = derecha)
 #  linea(-1.3, 0, 1.3, 0, "media gris")
 #  achurado(-B/2, -D_f, B, t, "concreto")
@@ -42,6 +29,19 @@ FS = 3 'factor de seguridad
 #  texto(2.9, -0.55 - B/2 - 0.3, "planta · M_x = {M_x:0} kN·m, M_y = {M_y:0} kN·m", 2.4, "c")
 #  hover([2.9 + B/2, 2.9 - B/2, 2.9 + B/2, 2.9 - B/2, 2.9], [-0.55 - B/2, -0.55 + B/2, -0.55 + B/2, -0.55 - B/2, -0.55], "q = {#1:2} kPa (rígida)", [q_max, q_min, P/A + (M_y - M_x)*B/2/I, P/A - (M_y - M_x)*B/2/I, P/A])
 #fin
+
+B = 1.5 'lado [m]
+t = 0.6 'espesor [m]
+D_f = 1.5 'profundidad de desplante [m]
+P = 400 'carga axial [kN]
+M_x = 40 'momento alrededor de x [kN·m]
+M_y = 20 'momento alrededor de y [kN·m]
+k_s = 20000 'módulo de balasto [kN/m3]
+gamma = 18 'peso específico del suelo [kN/m3]
+phi = 30 'ángulo de rozamiento [grados]
+E_s = 20000 'módulo del suelo [kPa]
+nu_s = 0.3 'Poisson del suelo
+FS = 3 'factor de seguridad
 
 ## 2 · Zapata rígida: presión lineal
 

@@ -28,6 +28,38 @@ q(x, y) = P/A + M_y·x/I - M_x·y/I
 #sust
 q_max = q(B/2, -B/2)
 q_min = q(-B/2, B/2)
+#equ
+c_col = 0.4 'column side [m]
+q_xp = q(B/2, 0) 'pressure at x = +B/2, y = 0 [kPa]
+q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
+#dibujo("Footing and column: elevation (y = 0) and plan", ud = m, escala = auto, cotas = m, alto = 120)
+#  linea(-1.3, 0, 1.3, 0, "media gris")
+#  achurado(-B/2, -D_f, B, t, "concreto")
+#  rect(-B/2, -D_f, B, t, "gruesa")
+#  achurado(-c_col/2, t - D_f, c_col, D_f - t + 0.6, "concreto")
+#  rect(-c_col/2, t - D_f, c_col, D_f - t + 0.6, "gruesa")
+#  flecha(0, 1.45, 0, 0.62, "gruesa rojo")
+#  texto(-0.25, 1.3, "P = {P:0} kN", 2.6, "d")
+#  flechamomento(0, 0.95, 0.38, 150, 30, "rojo")
+#  texto(0.45, 0.95, "M_y = {M_y:0} kN·m", 2.6, "i")
+#  carga(B/2, -D_f, -B/2, -D_f, 0.5*q_xp/q_max, 0.5*q_xm/q_max, "soil pressure at y = 0: {q_xm:1} → {q_xp:1} kPa", "azul")
+#  cota(-B/2, -D_f - 1.0, B/2, -D_f - 1.0, 0, "B = {B:2} m")
+#  cota(-B/2 - 0.2, -D_f, -B/2 - 0.2, t - D_f, 0, "t = {t:2} m")
+#  cota(B/2 + 0.2, -D_f, B/2 + 0.2, 0, 0, "D_f = {D_f:1} m")
+#  rect(2.9 - B/2, -0.55 - B/2, B, B, "gruesa")
+#  rect(2.9 - c_col/2, -0.55 - c_col/2, c_col, c_col, "gruesa denso gris")
+#  flecha(2.9, -0.55, 3.9, -0.55, "fina")
+#  texto(3.95, -0.55, "x", 2.6, "i")
+#  flecha(2.9, -0.55, 2.9, 0.45, "fina")
+#  texto(2.95, 0.45, "y", 2.6, "i")
+#  circulo(2.9 + B/2, -0.55 - B/2, 0.05, "rojo denso")
+#  texto(2.9 + B/2 + 0.08, -0.55 - B/2 - 0.12, "q_max = {q_max:1} kPa", 2.4, "i")
+#  circulo(2.9 - B/2, -0.55 + B/2, 0.05, "azul denso")
+#  texto(2.9 - B/2 - 0.08, -0.55 + B/2 + 0.12, "q_min = {q_min:1} kPa", 2.4, "d")
+#  texto(2.9, -0.55 - B/2 - 0.3, "plan · M_x = {M_x:0} kN·m, M_y = {M_y:0} kN·m", 2.4, "c")
+#  hover([2.9 + B/2, 2.9 - B/2, 2.9 + B/2, 2.9 - B/2, 2.9], [-0.55 - B/2, -0.55 + B/2, -0.55 + B/2, -0.55 - B/2, -0.55], "q = {#1:2} kPa (rigid)", [q_max, q_min, P/A + (M_y - M_x)*B/2/I, P/A - (M_y - M_x)*B/2/I, P/A])
+#fin
+#sust
 #contourf(q(x, y), [-B/2 B/2], [-B/2 B/2])
 #: Right-hand rule: M_x > 0 compresses the −y side, M_y > 0 the +x side. e_x, e_y ≤ B/6 = 0.25 m: the whole base is in compression.
 

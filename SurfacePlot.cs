@@ -940,7 +940,7 @@ function init(cv){
  for(i=0;i<n;i++)for(k=0;k<3;k++){lo[k]=Math.min(lo[k],D.X[i][k]);hi[k]=Math.max(hi[k],D.X[i][k]);}
  var c=[(lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2],R=Math.max(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2])/2||1;
  var used={},smin=1e99,smax=-1e99;D.S.forEach(function(q){q.forEach(function(j){used[j-1]=1;});});
- for(i in used){var v=D.vN[i]||0;smin=Math.min(smin,v);smax=Math.max(smax,v);}
+ for(i in used){var v=D.vN[i]||0;if(v<=-1e29)continue;smin=Math.min(smin,v);smax=Math.max(smax,v);}          // valor <= -1e29 = elemento SIN ese campo (p. ej. la zapata de concreto sobre el suelo): se pinta gris
  if(D.anim>0)smin=0;
  if(!(smax>smin)){smax=smin+1;}
  var bmax=0;D.vB.forEach(function(r){bmax=Math.max(bmax,Math.abs(r[0]),Math.abs(r[1]));});
@@ -957,13 +957,13 @@ function init(cv){
    function pt(r,s){return lerp(lerp(a,b,r),lerp(d,cc,r),s);}
    function vl(r,s){return (1-r)*(1-s)*va+r*(1-s)*vb+r*s*vc+(1-r)*s*vd;}
    var ii,jj;
-   var F={t:'f',p:[a,b,cc,d],sub:[]};
+   var F={t:'f',p:[a,b,cc,d],sub:[],gris:(va<=-1e29||vb<=-1e29||vc<=-1e29||vd<=-1e29)};
    for(ii=0;ii<ns;ii++)for(jj=0;jj<ns;jj++){var r0=ii/ns,r1=(ii+1)/ns,s0=jj/ns,s1=(jj+1)/ns;
     F.sub.push({p:[pt(r0,s0),pt(r1,s0),pt(r1,s1),pt(r0,s1)],w:[vl(r0,s0),vl(r1,s0),vl(r1,s1),vl(r0,s1)]});}
    prims.push(F);
    var o=D.X[q[0]-1],o2=D.X[q[2]-1];
    for(ii=0;ii<=ns;ii++)for(jj=0;jj<=ns;jj++){var r=ii/ns,s=jj/ns;
-    if(ws!==false)samp.push({p:pt(r,s),txt:D.nS+' = '+fmt(vl(r,s))+'\nx = '+fmt(o[0]+(o2[0]-o[0])*r)+'   y = '+fmt(o[1]+(o2[1]-o[1])*s)+'\nelemento '+(e+1)});}
+    if(ws!==false)samp.push({p:pt(r,s),txt:(F.gris?'zapata (concreto)':D.nS+' = '+fmt(vl(r,s)))+'\nx = '+fmt(o[0]+(o2[0]-o[0])*r)+'   y = '+fmt(o[1]+(o2[1]-o[1])*s)+'\nelemento '+(e+1)});}
   });
   D.B.forEach(function(br,e){var a=P[br[0]-1],b=P[br[1]-1],v0=D.vB[e][0],v1=D.vB[e][1];
    var dv=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],L=Math.hypot(dv[0],dv[1],dv[2])||1,o;
@@ -977,6 +977,7 @@ function init(cv){
   });}
  // una cara: sus subcuadros en triángulos (en pantalla, la proyección es lineal), cada banda recortada exacta; las isolíneas al final de la cara
  function cara(F){var rg=smax-smin,tris=[];
+  if(F.gris){var sg=F.p.map(pr);g.beginPath();g.moveTo(sg[0][0],sg[0][1]);for(var m0=1;m0<4;m0++)g.lineTo(sg[m0][0],sg[m0][1]);g.closePath();g.fillStyle='rgb(201,195,182)';g.fill();g.strokeStyle='rgb(138,132,120)';g.lineWidth=0.8;g.stroke();return;}
   F.sub.forEach(function(q){var s=q.p.map(pr),T=[[s[0][0],s[0][1],q.w[0]],[s[1][0],s[1][1],q.w[1]],[s[2][0],s[2][1],q.w[2]],[s[3][0],s[3][1],q.w[3]]];tris.push([T[0],T[1],T[2]],[T[0],T[2],T[3]]);});
   if(D.anim>0){tris.forEach(function(T){var v=(T[0][2]+T[1][2]+T[2][2])/3,col=jet((v-smin)/rg);g.beginPath();g.moveTo(T[0][0],T[0][1]);g.lineTo(T[1][0],T[1][1]);g.lineTo(T[2][0],T[2][1]);g.closePath();g.fillStyle=css(col,1);g.fill();g.strokeStyle=css(col,1);g.lineWidth=0.6;g.stroke();});return;}
   tris.forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);

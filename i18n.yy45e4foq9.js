@@ -50,7 +50,7 @@
     const m = document.getElementById('menu'); if (!m || document.getElementById('hk-idioma')) return;
     const b = document.createElement('button'); b.id = 'hk-idioma'; b.type = 'button'; b.className = '';
     b.textContent = L === 'en' ? '🌐 ES' : '🌐 EN'; b.title = L === 'en' ? 'Cambiar a español (interfaz y ejemplos)' : 'Switch to English (interface and examples)';
-    b.style.cssText = 'margin-left:auto;font-weight:600';
+    b.style.cssText = 'margin:0 0 0 14px;padding:2px 10px;font-weight:700;border:1px solid #b08a2e;border-radius:12px;background:#fff6dc;color:#5a4410;cursor:pointer;flex:none;display:inline-block;vertical-align:middle';          // visible junto a los menús (antes con margin-left:auto quedaba fuera de vista en ventanas anchas)
     b.addEventListener('click', () => {
       try { localStorage.setItem('hk-idioma', L === 'en' ? 'es' : 'en'); } catch (e) { /* nada */ }
       { const m = /^(\d+) /.exec(String(document.getElementById('sel-ejemplos') && document.getElementById('sel-ejemplos').value || '')); if (m) location.hash = '#ej=' + m[1] + '&solo=1'; }

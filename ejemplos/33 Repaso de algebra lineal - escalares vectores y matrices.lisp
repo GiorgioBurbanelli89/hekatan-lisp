@@ -13,8 +13,8 @@ sf = Simplify{1/p + 1/q}
 
 ## 2 · Vectores: una lista ordenada de números
 #: Un vector agrupa varios números en una columna (una "flecha" con dirección y largo):
-u = [u1; u2]
-v = [v1; v2]
+u = [u_1; u_2]
+v = [v_1; v_2]
 #: **Suma** (componente a componente):
 suma = u + v
 #: **Resta**:
@@ -34,43 +34,43 @@ ext = u * transpose(v)
 
 ## 3 · Producto cruz (vectores en 3D)
 #: Solo en 3D. Dos vectores de tres componentes:
-w = [w1; w2; w3]
-z = [z1; z2; z3]
+w = [w_1; w_2; w_3]
+z = [z_1; z_2; z_3]
 #: El **producto cruz** w×z da un vector **perpendicular** a los dos (sirve para normales de superficies, momentos, áreas):
 cr = cross(w, z)
 
 ## 4 · Matrices: una tabla que TRANSFORMA vectores
 #: Una matriz transforma un vector en otro (lo gira, lo estira). Dos de 2×2:
-A = [a11, a12; a21, a22]
-Bm = [b11, b12; b21, b22]
+A = [a_11, a_12; a_21, a_22]
+Bm = [b_11, b_12; b_21, b_22]
 #: **Suma** y **resta** (componente a componente):
 sumaM = A + Bm
 restaM = A - Bm
 #: **Escalar por matriz** (multiplica cada entrada):
-kA = k * A
+A_k = k * A
 #: **Matriz por vector** A·u: ASÍ transforma un vector (cada componente es un producto punto fila·vector):
-Au = A * u
+A_u = A * u
 #: **Producto de matrices** A·B (encadena dos transformaciones):
-AB = A * Bm
+A_B = A * Bm
 #: **OJO, el orden importa**: en general A·B ≠ B·A:
-BA = Bm * A
+B_A = Bm * A
 #: **Potencia** A² = A·A (aplicar la misma transformación dos veces):
-A2 = A * A
+A_2 = A * A
 #: **Transpuesta** Aᵀ (refleja por la diagonal, filas ↔ columnas):
-At = transpose(A)
+A_t = transpose(A)
 #: **Traza** tr(A): la suma de la diagonal (un escalar; sale en autovalores y en invariantes):
 tr = trace(A)
 
 ## 5 · Determinante: ¿la matriz aplasta el espacio?
 #: El determinante es UN número: cuánto agranda o encoge las áreas la transformación:
-dA = det(A)
-#: Es a11·a22 − a12·a21. Si **det = 0**, la matriz aplasta el plano a una línea → **no tiene inversa**. Si det ≠ 0, sí.
+det_A = det(A)
+#: Es a_{11}·a_{22} − a_{12}·a_{21}. Si **det = 0**, la matriz aplasta el plano a una línea → **no tiene inversa**. Si det ≠ 0, sí.
 
 ## 6 · La inversa: deshacer la transformación
 #: **Adjunta** (intercambia la diagonal, cambia el signo a la otra):
-adjA = adj(A)
+A_adj = adj(A)
 #: **Inversa** = adjunta ÷ determinante:
-iA = inv(A)
+A_inv = inv(A)
 #: Prueba de que "deshace": A por su inversa da la **identidad** (la matriz que no hace nada):
 chk = A * inv(A)
 #: Sale [1 0; 0 1] ✓. Y al revés también, A⁻¹·A = I.
@@ -81,12 +81,12 @@ lhs = transpose(A * Bm)
 rhs = transpose(Bm) * transpose(A)
 #: **La identidad no cambia nada**: A·I = A (como multiplicar por 1). Con la identimatriz:
 Id = [1, 0; 0, 1]
-AI = A * Id
+A_I = A * Id
 
 ## 8 · Resolver un sistema: A·x = b
 #: Para esto sirve TODO lo anterior: encontrar el vector **x** que A transforma en un **b** dado. Es el corazón del FEM: **K·d = F** (rigidez × desplazamientos = fuerzas). Se despeja con la INVERSA (como dividir, pero con matrices):
 #|  A·x = b   →   x = A⁻¹·b
-bb = [b1; b2]
+bb = [b_1; b_2]
 x = inv(A) * bb
 #: Ahí está la solución: los desplazamientos en función de la rigidez A y las cargas b —simbólica y exacta—. Eso es, en esencia, lo que hace un programa de estructuras: monta A, monta b y despeja **x = A⁻¹·b**.
 

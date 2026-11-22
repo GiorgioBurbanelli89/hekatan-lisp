@@ -292,7 +292,7 @@
 (defun p-scale (p c)
   (if (zerop c) nil (mapcar (lambda (term) (cons (car term) (* (cdr term) c))) p)))
 
-(defun p* (p q)
+(defun p*-hash (p q)
   ;; Igual que antes (p+ termino a termino): un monomio que se anula SALE de la lista y,
   ;; si reaparece, entra AL FINAL. Se reproduce con la tabla: al llegar a 0 se borra.
   (if (< (* (length p) (length q)) 12)
@@ -313,6 +313,69 @@
                     (t (let ((nc (cons m c)))
                          (setf (gethash m ht) nc (cdr tail) (list nc) tail (cdr tail))))))))
         (remove-if (lambda (term) (zerop (cdr term))) (cdr head)))))
+
+;; MAS RAPIDO (19-nov-2026, 2.ª etapa): los monomios se EMPAQUETAN en un solo entero (sustitucion de Kronecker): el producto de monomios es una SUMA de enteros y la tabla
+;; hash usa llaves eql (mucho mas baratas que comparar alists con equal). Mismo resultado y MISMO orden de terminos que p*-hash (un monomio que se anula sale y, si reaparece,
+;; entra al final). Si los exponentes no caben en 60 bits se usa p*-hash. Ademas, las potencias de UNA variable se elevan por cuadrados repetidos (ver expr->poly).
+(defun poly-vars-sorted (&rest ps)
+  (let ((vs nil))
+    (dolist (p ps) (dolist (tm p) (dolist (pr (car tm)) (pushnew (car pr) vs))))
+    (sort vs #'string< :key #'string)))
+
+(defun maxexp (p v) (let ((d 0)) (dolist (tm p) (let ((c (assoc v (car tm)))) (when c (setf d (max d (cdr c)))))) d))
+
+(defun pack-mono (m vs w)
+  (let ((k 0) (i 0))
+    (dolist (v vs) (let ((c (assoc v m))) (when c (setf k (logior k (ash (cdr c) (* i w)))))) (incf i))
+    k))
+
+(defun unpack-mono (k vs w)
+  (let ((m nil) (mask (1- (ash 1 w))) (i 0))
+    (dolist (v vs) (let ((e (logand mask (ash k (- (* i w)))))) (unless (zerop e) (push (cons v e) m))) (incf i))
+    (nreverse m)))
+
+(defun p*-kron (p q)
+  (let* ((vs (poly-vars-sorted p q)) (nv (length vs))
+         (dmax (reduce #'max (mapcar (lambda (v) (+ (maxexp p v) (maxexp q v))) vs) :initial-value 0))
+         (w (max 1 (integer-length dmax))))
+    (if (> (* nv w) 60)
+        (p*-hash p q)
+        (let* ((pk (coerce (mapcar (lambda (tm) (cons (pack-mono (car tm) vs w) (cdr tm))) p) 'simple-vector))
+               (qk (coerce (mapcar (lambda (tm) (cons (pack-mono (car tm) vs w) (cdr tm))) q) 'simple-vector))
+               (h (make-hash-table :test 'eql :size (* 2 (length pk) (length qk))))
+               (orden (make-array 16 :adjustable t :fill-pointer 0)))
+          (loop for a across pk do
+            (loop for b across qk do
+              (let* ((key (+ (car a) (car b))) (c (* (cdr a) (cdr b))) (cell (gethash key h)))
+                (if cell
+                    (progn (incf (car cell) c) (when (zerop (car cell)) (remhash key h)))
+                    (let ((nuevo (list c key))) (setf (gethash key h) nuevo) (vector-push-extend nuevo orden))))))
+          (let ((res nil))
+            (loop for cell across orden
+                  when (eq (gethash (second cell) h) cell) do (push (cons (unpack-mono (second cell) vs w) (first cell)) res))
+            (nreverse res))))))
+
+(defun p* (p q)
+  "Producto de polinomios: chicos, el camino simple (p*-hash); grandes, monomios empaquetados."
+  (cond ((or (null p) (null q)) nil)
+        ((< (* (length p) (length q)) 12) (p*-hash p q))
+        (t (p*-kron p q))))
+
+(defun univariate-p (p)
+  "Polinomio de UNA sola variable (o constante): el orden de sus terminos lo fija el grado, asi que se puede elevar por cuadrados."
+  (let ((v nil))
+    (dolist (tm p t)
+      (let ((m (car tm)))
+        (cond ((null m))
+              ((cdr m) (return nil))
+              ((null v) (setf v (caar m)))
+              ((not (eq v (caar m))) (return nil)))))))
+
+(defun p-expt-cuadrados (p n)
+  (let ((r (p-const 1)) (b p))
+    (loop (when (oddp n) (setf r (p* r b)))
+          (setf n (ash n -1)) (when (zerop n) (return r))
+          (setf b (p* b b)))))
 
 (defun p-const (c) (if (zerop c) nil (list (cons nil c))))
 (defun p-var (v) (list (cons (list (cons v 1)) 1)))
@@ -351,9 +414,10 @@
                            (p-scale (expr->poly (second e)) (/ 1 dc)))))
          ((eq op 'expt) (let ((n (third e)))
                           (if (and (integerp n) (>= n 0))
-                              (let ((r (p-const 1)))
-                                (dotimes (i n) (setf r (p* r (expr->poly (second e)))))
-                                r)
+                              (let ((base (expr->poly (second e))))          ; antes se recalculaba n veces
+                                (if (and (> n 3) (univariate-p base))
+                                    (p-expt-cuadrados base n)
+                                    (let ((r (p-const 1))) (dotimes (i n) (setf r (p* r base))) r)))
                               (throw 'notpoly :fail))))
          (t (throw 'notpoly :fail)))))
     (t (throw 'notpoly :fail))))
@@ -1268,11 +1332,18 @@
 ;;;; $Slope{f(x) @ x = a}   = pendiente = DERIVADA de f respecto a x, evaluada en x=a
 ;;;; $Area{f(x) @ x = a : b} = AREA bajo la curva = INTEGRAL definida de a a b
 ;;;; (Calcpad lo hace NUMERICO; aqui, al ser simbolico, es EXACTO.)
+(defun flatten-tree (x) (if (consp x) (mapcan #'flatten-tree (copy-list x)) (list x)))
 (defun slope-at (f var x0)
   (simplify (eval-consts (subst-var (partial f var) var x0))))
 (defun area-under (f var a b)
+  "Simbolico si se puede; si queda '? (p.ej. integral doble de exp(-x*y)) y los limites son numeros → Simpson numerico, como $Area{$Area{}} de Calcpad."
+  (let ((r (area-under-0 f var a b)))
+    (if (and (realp a) (realp b) (member '? (flatten-tree r)))
+        (or (ignore-errors (nsimpson f var a b)) r)
+        r)))
+(defun area-under-0 (f var a b)
   ;; resuelve operaciones anidadas (Diff{} dentro de Area{}) que el quote dejo sin evaluar
-  (let ((f (eval-ops-tree f)))
+  (let* ((f0 f) (f (eval-ops-tree f)))
   (cond
     ;; f NO depende de var (constante respecto a la integración, aunque tenga OTRAS
     ;; letras: 1/L², E·A…) → ∫ₐᵇ f dvar = f·(b−a). Así el FEM con geometría/material
@@ -1320,18 +1391,30 @@
 
 ;;;; ---- evaluador NUMERICO del arbol (para $find/$sup/$inf/$repeat) ----
 ;;;; Calcpad los calcula NUMERICO (Solver.cs); replicamos su algoritmo tal cual.
+(defvar *nenv* nil "variables ya ligadas (integral anidada): alist (var . valor)")
+(defun nsimpson (g v a b)
+  (when (and (consp g) (eq (car g) 'quote)) (setf g (second g)))
+  "∫ₐᵇ g dv numerico (Simpson, 64 tramos) para integrales ANIDADAS; g puede traer otras variables ligadas en *nenv*."
+  (let* ((n 64) (h (/ (- b a) n 1d0)) (s 0d0))
+    (loop for i from 0 to n
+          do (incf s (* (cond ((or (= i 0) (= i n)) 1) ((oddp i) 4) (t 2))
+                        (let ((*nenv* (acons v (+ a (* i h)) *nenv*))) (nval g nil 0d0)))))
+    (* s (/ h 3))))
 (defun nval (e var x)
   "Evalua E como numero double, sustituyendo VAR por X."
   (cond
     ((numberp e) (float e 1d0))
-    ((eq e var) (float x 1d0))
+    ((and var (eq e var)) (float x 1d0))
     ((eq e 'pi) pi)
     ((eq e 'e) (exp 1d0))
+    ((and (symbolp e) (assoc e *nenv*)) (float (cdr (assoc e *nenv*)) 1d0))
     ((symbolp e) (error "variable libre ~a" e))
     ((consp e)
      (let ((op (car e)) (as (cdr e)))
        (flet ((n (a) (nval a var x)))
          (case op
+           (quote (n (first as)))
+           (area-under (nsimpson (first as) (let ((v (second as))) (if (and (consp v) (eq (car v) 'quote)) (second v) v)) (n (third as)) (n (fourth as))))
            (+ (reduce #'+ (mapcar #'n as) :initial-value 0d0))
            (* (reduce #'* (mapcar #'n as) :initial-value 1d0))
            (- (if (cdr as) (- (n (first as)) (reduce #'+ (mapcar #'n (cdr as)))) (- (n (first as)))))

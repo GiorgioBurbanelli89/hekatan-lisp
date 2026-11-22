@@ -204,6 +204,11 @@ d_safe = max(abs(t_hek - t_safe)) 'máx |Hekatan − SAFE| [kPa]
 d_11 = Simplify{E*(1-nu)/((1+nu)*(1-2*nu))}
 d_12 = Simplify{E*nu/((1+nu)*(1-2*nu))}
 d_33 = Simplify{E/(2*(1+nu))}
+#: **Símbolos: el cuadrilátero paso a paso.** Las mismas funciones de forma bilineales y el mismo Jacobiano J = diag(a, b) que la placa (sección 3). Derivadas de N_1 en x e y (las columnas de B del nudo 1):
+N_q1x = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
+N_q1y = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
+#: K(u_1, u_1) = ∫∫ (d_11·N_1,x² + d_33·N_1,y²)·det J dξ dη, integrado en símbolos:
+K_uu = Simplify{Area{Area{(D_11*((eta-1)/(4*a))^2 + D_33*((xi-1)/(4*b))^2)*a*b @ xi = -1 : 1} @ eta = -1 : 1}}
 #: Matriz del elemento K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 puntos de Gauss (integración completa, como el quad de OpenSees).
 h_s = 0.25 'lado del elemento de suelo [m]
 W_s = 4.5 'ancho del suelo [m]
@@ -313,6 +318,7 @@ q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), 
 #fin
 dw_2 = max(abs(w_2 - w2_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_2 = max(abs(q_2 - q2_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
+dK_q = round(K_s2(1, 1) - (D_s2(1, 1) + D_s2(3, 3))/3, 6) 'K(u1,u1): numérica − forma cerrada simbólica (a = b), debe dar 0
 #: La presión de contacto es la fuerza que cada nudo de la zapata pasa al suelo (fuerza interna de los elementos de suelo de arriba) entre su largo tributario; la suma da exactamente P/B. En un suelo continuo una zapata rígida **concentra la presión en sus bordes** (382 y 488 kPa frente a 114 kPa en el medio): los resortes (Winkler) no pueden mostrar eso, el suelo mallado sí.
 #: **El bulbo de presiones** (lo que describe Boussinesq, aquí por FEM): esfuerzo vertical σ_y en el suelo, σ = D·B·u en el centro de cada cuadrilátero, promediado en los nudos. Compresión positiva [kPa]; con el cursor se ve el valor:
 #hide
@@ -348,6 +354,21 @@ s_y2(x, y) = spline(1 + (x + W_s/2)/h_s, 1 + (y + H_s)/h_s, G_2)
 N_b1 = Simplify{(1-xi)*(1-eta)*(1-zeta)/8}
 l_am = Simplify{E*nu/((1+nu)*(1-2*nu))}
 G_s = Simplify{E/(2*(1+nu))}
+#: **El mapeo y el Jacobiano.** Un hexaedro de lados 2a × 2b × 2c_z: x = Σ N_i·x_i con las 8 esquinas (±a, ±b, ±c_z):
+x_b = Simplify{a*(-(1-xi)*(1-eta)*(1-zeta) + (1+xi)*(1-eta)*(1-zeta) + (1+xi)*(1+eta)*(1-zeta) - (1-xi)*(1+eta)*(1-zeta) - (1-xi)*(1-eta)*(1+zeta) + (1+xi)*(1-eta)*(1+zeta) + (1+xi)*(1+eta)*(1+zeta) - (1-xi)*(1+eta)*(1+zeta))/8}
+J_b11 = Partial{a*xi @ xi}
+J_b22 = Partial{b*eta @ eta}
+J_b33 = Partial{c_z*zeta @ zeta}
+J_b12 = Partial{a*xi @ eta}
+detJ_b = Simplify{a*b*c_z}
+#: J = diag(a, b, c_z), det J = a·b·c_z. Derivadas de N_1 en x, y, z (∂/∂x = (1/a)·∂/∂ξ …):
+N_b1x = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ xi}/a}
+N_b1y = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ eta}/b}
+N_b1z = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ zeta}/c_z}
+#: D del sólido: d_11 = λ + 2G en la diagonal de las deformaciones normales, λ fuera de ella, G para los cortantes:
+d_b11 = Simplify{E*nu/((1+nu)*(1-2*nu)) + E/(1+nu)}
+#: K(u_1, u_1) = ∫∫∫ ((λ + 2G)·N_1,x² + G·N_1,y² + G·N_1,z²)·det J dξ dη dζ, integrado en símbolos:
+K_bu = Simplify{Area{Area{Area{(D_11*((1-eta)*(1-zeta)/(8*a))^2 + G*((1-xi)*(1-zeta)/(8*b))^2 + G*((1-xi)*(1-eta)/(8*c_z))^2)*a*b*c_z @ xi = -1 : 1} @ eta = -1 : 1} @ zeta = -1 : 1}}
 h_3 = 0.75 'lado del hexaedro [m]
 W_3 = 4.5 'ancho del bloque de suelo [m]
 H_3 = 3 'profundidad del bloque de suelo [m]
@@ -512,6 +533,7 @@ p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
 #surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
 dw_3 = max(abs(w_3 - w3_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
+dK_b = round(K_s3(1, 1) - (D_s3(1, 1) + 2·D_s3(4, 4))·2·(h_3/2)/9, 6) 'K(u1,u1): numérica − forma cerrada simbólica (cubo a = b = c_z), debe dar 0
 #: Lo mismo en 3D: las esquinas cargan más (428 kPa en la esquina +x, −y, donde empujan M_x y M_y) y el centro menos (65 kPa). Los hexaedros de 0.75 m son gruesos (2 × 2 bajo la zapata): es una validación del método contra OpenSees, no una malla de diseño.
 #: **Bulbo de presiones en 3D**, corte vertical y = 0: σ_z en el centro de los hexaedros promediado en los nudos [kPa] (compresión positiva):
 #hide

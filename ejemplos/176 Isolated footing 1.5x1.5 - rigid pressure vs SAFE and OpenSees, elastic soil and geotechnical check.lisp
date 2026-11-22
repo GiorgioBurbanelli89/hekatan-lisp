@@ -204,6 +204,11 @@ d_safe = max(abs(t_hek - t_safe)) 'max |Hekatan − SAFE| [kPa]
 d_11 = Simplify{E*(1-nu)/((1+nu)*(1-2*nu))}
 d_12 = Simplify{E*nu/((1+nu)*(1-2*nu))}
 d_33 = Simplify{E/(2*(1+nu))}
+#: **Symbolic: the quad, step by step.** Same bilinear shape functions and the same Jacobian J = diag(a, b) as the plate (section 3). Derivatives of N_1 in x and y (the columns of B for node 1):
+N_q1x = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
+N_q1y = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
+#: K(u_1, u_1) = ∫∫ (d_11·N_1,x² + d_33·N_1,y²)·det J dξ dη, integrated symbolically:
+K_uu = Simplify{Area{Area{(D_11*((eta-1)/(4*a))^2 + D_33*((xi-1)/(4*b))^2)*a*b @ xi = -1 : 1} @ eta = -1 : 1}}
 #: Element matrix K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 Gauss points (full integration, as OpenSees quad).
 h_s = 0.25 'soil element size [m]
 W_s = 4.5 'soil width [m]
@@ -313,6 +318,7 @@ q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), 
 #fin
 dw_2 = max(abs(w_2 - w2_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_2 = max(abs(q_2 - q2_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
+dK_q = round(K_s2(1, 1) - (D_s2(1, 1) + D_s2(3, 3))/3, 6) 'K(u1,u1): numeric − symbolic closed form (a = b), must be 0
 #: The contact pressure is the force each footing node passes to the soil (internal force of the top soil elements) over its tributary length; the sum gives exactly P/B. On a continuous soil a stiff footing **concentrates the pressure at its edges** (382 and 488 kPa against 114 kPa in the middle): springs (Winkler) cannot show that, the meshed soil does.
 #: **The pressure bulb** (what Boussinesq describes, here by FEM): vertical stress σ_y in the soil, σ = D·B·u at the centre of each quad, averaged at the nodes. Compression positive [kPa]; hover for the value:
 #hide
@@ -348,6 +354,21 @@ s_y2(x, y) = spline(1 + (x + W_s/2)/h_s, 1 + (y + H_s)/h_s, G_2)
 N_b1 = Simplify{(1-xi)*(1-eta)*(1-zeta)/8}
 l_am = Simplify{E*nu/((1+nu)*(1-2*nu))}
 G_s = Simplify{E/(2*(1+nu))}
+#: **The map and the Jacobian.** A brick of sides 2a × 2b × 2c_z: x = Σ N_i·x_i with the 8 corners (±a, ±b, ±c_z):
+x_b = Simplify{a*(-(1-xi)*(1-eta)*(1-zeta) + (1+xi)*(1-eta)*(1-zeta) + (1+xi)*(1+eta)*(1-zeta) - (1-xi)*(1+eta)*(1-zeta) - (1-xi)*(1-eta)*(1+zeta) + (1+xi)*(1-eta)*(1+zeta) + (1+xi)*(1+eta)*(1+zeta) - (1-xi)*(1+eta)*(1+zeta))/8}
+J_b11 = Partial{a*xi @ xi}
+J_b22 = Partial{b*eta @ eta}
+J_b33 = Partial{c_z*zeta @ zeta}
+J_b12 = Partial{a*xi @ eta}
+detJ_b = Simplify{a*b*c_z}
+#: J = diag(a, b, c_z), det J = a·b·c_z. Derivatives of N_1 in x, y, z (∂/∂x = (1/a)·∂/∂ξ …):
+N_b1x = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ xi}/a}
+N_b1y = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ eta}/b}
+N_b1z = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ zeta}/c_z}
+#: D of the solid: d_11 = λ + 2G on the diagonal of the normal strains, λ off it, G for the shears:
+d_b11 = Simplify{E*nu/((1+nu)*(1-2*nu)) + E/(1+nu)}
+#: K(u_1, u_1) = ∫∫∫ ((λ + 2G)·N_1,x² + G·N_1,y² + G·N_1,z²)·det J dξ dη dζ, integrated symbolically:
+K_bu = Simplify{Area{Area{Area{(D_11*((1-eta)*(1-zeta)/(8*a))^2 + G*((1-xi)*(1-zeta)/(8*b))^2 + G*((1-xi)*(1-eta)/(8*c_z))^2)*a*b*c_z @ xi = -1 : 1} @ eta = -1 : 1} @ zeta = -1 : 1}}
 h_3 = 0.75 'brick size [m]
 W_3 = 4.5 'soil block width [m]
 H_3 = 3 'soil block depth [m]
@@ -512,6 +533,7 @@ p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
 #surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
 dw_3 = max(abs(w_3 - w3_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
+dK_b = round(K_s3(1, 1) - (D_s3(1, 1) + 2·D_s3(4, 4))·2·(h_3/2)/9, 6) 'K(u1,u1): numeric − symbolic closed form (cube a = b = c_z), must be 0
 #: Same picture in 3D: the corners carry the most (428 kPa at the +x, −y corner where M_x and M_y push) and the centre the least (65 kPa). The 0.75 m bricks are coarse (2 × 2 under the footing): this is a validation of the method against OpenSees, not a design mesh.
 #: **Pressure bulb in 3D**, vertical cut y = 0: σ_z at the brick centres averaged at the nodes [kPa] (compression positive):
 #hide

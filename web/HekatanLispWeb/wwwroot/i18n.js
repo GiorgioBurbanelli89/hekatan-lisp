@@ -22,6 +22,15 @@
     [/^Dibujo$/, 'Drawing'], [/#dibujo de Hekatan LISP · con los valores de la hoja/, 'Hekatan LISP #drawing · with the values of the sheet'],
     [/^Bloque Hekatan LISP$/, 'Hekatan LISP block'], [/se dibuja con el motor de Hekatan LISP \(WPF o Hekatan LISP web\); aquí se conserva y se guarda igual/, 'drawn with the Hekatan LISP engine (desktop or Hekatan LISP web); here it is kept and saved as is'],
   ];
+  // frases que pone el MOTOR en los resultados (pies de gráfica, escalas de dibujos): se traducen también DENTRO de la hoja, solo estas, con patrones exactos
+  const RES = [
+    [/^Esc\. 1:/, 'Scale 1:'], [/ · geometría en m/, ' · geometry in m'], [/ · cotas en m/, ' · dimensions in m'], [/ · cotas en cm/, ' · dimensions in cm'], [/ · cotas en mm/, ' · dimensions in mm'],
+    [/^mapa de\s+/, 'map of  '], [/\s+\(planta\)\s*$/, '  (plan)'],
+    [/arrastra para girar, rueda para acercar, cursor para leer/, 'drag to rotate, wheel to zoom, hover to read'], [/arrastra para girar/, 'drag to rotate'],
+    [/^losa: /, 'slab: '], [/ · barras: /, ' · bars: '], [/^malla del modelo: nudos, elementos y apoyos$/, 'model mesh: nodes, elements and supports'],
+    [/^sólido de hexaedros \(se gira con el ratón\)$/, 'hexahedral solid (rotate with the mouse)'],
+  ];
+  function traduceRes(t) { if (!t) return null; let r = t, c = false; for (const [re, en] of RES) if (re.test(r)) { r = r.replace(re, en); c = true; } return c ? r : null; }
   let D = null;
   const fuera = (el) => !(el && el.closest && el.closest('#render, #texto, #code, #hl, #gutter'));          // el resultado y el editor no se tocan
   function traduce(t) {
@@ -31,8 +40,9 @@
     return cambio ? t.replace(k, r) : null;
   }
   function nodo(n) {
-    if (n.nodeType === 3) { if (fuera(n.parentElement)) { const r = traduce(n.nodeValue); if (r !== null && r !== n.nodeValue) n.nodeValue = r; } return; }
-    if (n.nodeType !== 1 || !fuera(n) || n.tagName === 'SCRIPT' || n.tagName === 'STYLE') return;
+    if (n.nodeType === 3) { const r = fuera(n.parentElement) ? traduce(n.nodeValue) : (n.parentElement && n.parentElement.closest && n.parentElement.closest('#code, #hl, textarea') ? null : traduceRes(n.nodeValue)); if (r !== null && r !== n.nodeValue) n.nodeValue = r; return; }
+    if (n.nodeType !== 1 || n.tagName === 'SCRIPT' || n.tagName === 'STYLE') return;
+    if (!fuera(n)) { if (n.closest && n.closest('#code, #hl')) return; const w2 = document.createTreeWalker(n, NodeFilter.SHOW_TEXT); let y; while ((y = w2.nextNode())) { const r = traduceRes(y.nodeValue); if (r !== null && r !== y.nodeValue) y.nodeValue = r; } return; }
     for (const a of ['title', 'placeholder', 'aria-label']) { const v = n.getAttribute(a); if (v) { const r = traduce(v); if (r !== null && r !== v) n.setAttribute(a, r); } }
     if (n.tagName === 'OPTION' || n.tagName === 'BUTTON' || n.childNodes.length) { const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT); let x = w.currentNode; while ((x = w.nextNode())) { if (x.nodeType === 3) nodo(x); else if (x.closest && !fuera(x)) continue; else for (const a of ['title', 'placeholder', 'aria-label']) { const v = x.getAttribute(a); if (v) { const r = traduce(v); if (r !== null && r !== v) x.setAttribute(a, r); } } } }
   }

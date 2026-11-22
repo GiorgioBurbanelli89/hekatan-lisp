@@ -402,10 +402,10 @@ async function abrirDesdeEnlace() {
   if (p.get('ej')) {
     let f = p.get('ej');
     if (/^\d+$/.test(f)) {                // #ej=99 → el archivo que empieza por «99 »
-      const l = window.hkEjemplos || await (await fetch('ejemplos.json', { cache: 'no-cache' })).json();
+      const l = window.hkEjemplos || await (await fetch(EJ + 'lista.json', { cache: 'no-cache' }).then(r => r.ok ? r : fetch('ejemplos.json', { cache: 'no-cache' }))).json();
       f = l.find(x => x.startsWith(f + ' ')) || f;
     }
-    const t = await (await fetch('ejemplos/' + encodeURIComponent(f))).text();
+    const t = await (await fetch(EJ + encodeURIComponent(f))).text();
     ejemploTexto = t; ponerEditor(t); setArchivo(f); $('sel-ejemplos').value = f;
     setSolo(true);                       // abierto por enlace: se ve el resultado, no el código
     return true;
@@ -512,10 +512,12 @@ const GR = [['α', 'alpha'], ['β', 'beta'], ['γ', 'gamma'], ['δ', 'delta'], [
 $('griegas').innerHTML = GR.map(([g, t]) => `<button class="sym gr" data-ins="${t}">${g}</button>`).join('');
 
 // lista de ejemplos: en Archivo → Ejemplos y en la lista de la barra de arriba
+// idioma (Jorge, 22-nov-2026: «en inglés cambia toda la GUI y los ejemplos»): lo elige i18n.js; en inglés los ejemplos salen de ejemplos/en/
+const IDIOMA = (window.HKI18N && window.HKI18N.idioma) || 'es', EJ = IDIOMA === 'en' ? 'ejemplos/en/' : 'ejemplos/';
 let ejemploTexto = null;   // texto del ejemplo cargado: si no se tocó, el enlace lo nombra (corto)
 // un ejemplo se abre SIEMPRE con el resultado solo y a pantalla completa (Esc o ✎ para ver el código)
-const cargarEjemplo = f => fetch('ejemplos/' + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); setSolo(true); });
-fetch('ejemplos.json', { cache: 'no-cache' }).then(r => r.json()).then(l => {
+const cargarEjemplo = f => fetch(EJ + encodeURIComponent(f)).then(r => r.text()).then(t => { ejemploTexto = t; cargarTexto(t, f); setSolo(true); });
+fetch(IDIOMA === 'en' ? 'ejemplos/en/lista.json' : 'ejemplos.json', { cache: 'no-cache' }).then(r => r.json()).then(l => {
   window.hkEjemplos = l;                 // para los enlaces #ej=99 (por número)
   $('lista-ejemplos').innerHTML = l.map(f => `<button data-ej="${f.replace(/"/g, '&quot;')}">${esc(f.replace(/\.lisp$/, ''))}</button>`).join('');
   for (const f of l) $('sel-ejemplos').add(new Option(f.replace(/\.lisp$/, ''), f));

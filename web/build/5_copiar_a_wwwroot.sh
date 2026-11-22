@@ -6,7 +6,9 @@ W=web/HekatanLispWeb/wwwroot
 MSYS_NO_PATHCONV=1 wsl -d Ubuntu -- bash -c "cp ~/lispwasm/hl/hlisp.js ~/lispwasm/hl/hlisp.wasm \"\$(wslpath -a '$(cygpath -w "$PWD")')/$W/\""
 cp engine.lisp $W/
 # solo los ejemplos que están en git (una hoja suelta de Jorge, p. ej. la 68, no se publica)
-rm -rf $W/ejemplos && mkdir -p $W/ejemplos && git ls-files -z 'ejemplos/*.lisp' | xargs -0 -I{} cp "{}" $W/ejemplos/ && rm -f $W/ejemplos/_*.lisp
+rm -rf $W/ejemplos && mkdir -p $W/ejemplos/en && git ls-files -z ':(glob)ejemplos/*.lisp' | xargs -0 -I{} cp "{}" $W/ejemplos/ && rm -f $W/ejemplos/_*.lisp
+# ejemplos en inglés (misma hoja, prosa traducida): aparte, con su lista
+git ls-files -z ':(glob)ejemplos/en/*.lisp' | xargs -0 -I{} cp "{}" $W/ejemplos/en/ && ( cd $W/ejemplos/en && python -c "import os,json; json.dump(sorted(f for f in os.listdir('.') if f.endswith('.lisp')),open('lista.json','w',encoding='utf-8'),ensure_ascii=False)" )
 ( cd $W/ejemplos && python -c "import os,json; json.dump(sorted(os.listdir('.')),open('../ejemplos.json','w',encoding='utf-8'),ensure_ascii=False)" )
 # DWG del dibujo AutoLISP (botón DWG): el escritor de acadrust-wasm para navegador (pkg-web)
 if [ -d $HOME/acadrust-wasm/pkg-web ]; then mkdir -p $W/dwg && cp $HOME/acadrust-wasm/pkg-web/acadrust_wasm_bg.wasm $W/dwg/ && cp $HOME/acadrust-wasm/pkg-web/acadrust_wasm.js $W/dwg/acadrust_wasm.mjs; fi   # .mjs: el .js lo renombra la huella de publish

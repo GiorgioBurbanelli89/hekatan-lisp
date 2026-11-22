@@ -756,8 +756,20 @@ namespace HekatanLisp
                     if (!pm.Success) { outList.Add(""); continue; }
                     // hoja numérica: la rejilla ya la calculó el motor numérico (funciones de la hoja,
                     // spline de una matriz de resultados…) — aquí solo se pinta
-                    if (isMap && _numGrids != null && _numGrids.TryGetValue(ClaveNum(pm.Groups[1].Value.Trim(), Vez(vecesG, pm.Groups[1].Value.Trim())), out var rej))
+                    if (_numGrids != null && _numGrids.TryGetValue(ClaveNum(pm.Groups[1].Value.Trim(), Vez(vecesG, pm.Groups[1].Value.Trim())), out var rej))
                     {
+                        if (isSurf)   // #surf de una hoja numérica: la misma rejilla que #map, en 3D orbitable con hover
+                        {
+                            try
+                            {
+                                anySurf = true;
+                                string spec1 = System.Net.WebUtility.HtmlEncode(SplitTop(pm.Groups[1].Value).FirstOrDefault()?.Trim() ?? "");
+                                outList.Add(PlotWrap(SurfacePlot.SurfaceCanvasGrid(rej.Z, rej.N, rej.Xa, rej.Xb, rej.Ya, rej.Yb, surfId++),
+                                                     "z = " + spec1 + "  ·  <span style=\"opacity:.7\">arrastra para girar</span>"));
+                            }
+                            catch { outList.Add(""); }
+                            continue;
+                        }
                         try
                         {
                             string b64 = SurfacePlot.MapPngGrid(rej.Z, rej.N, rej.Xa, rej.Xb, rej.Ya, rej.Yb, dark, isCont, isCont ? 12 : 0);
@@ -1982,7 +1994,7 @@ dib();})();";
             {
                 bool oculta = false; char modo = 'e';
                 var progLines = new List<HojaNumerica.Linea>();
-                var rxMap = new System.Text.RegularExpressions.Regex(@"^\s*#\s*(map|mapa|heatmap|contourf?)\s*\((.*)\)\s*$",
+                var rxMap = new System.Text.RegularExpressions.Regex(@"^\s*#\s*(map|mapa|heatmap|contourf?|surf|superficie|plot3d|mesh)\s*\((.*)\)\s*$",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
                 for (int i = 0; i < lines.Length; i++)
                 {

@@ -93,6 +93,41 @@ namespace HekatanLisp
                  + " data-z='" + Arr(muestras[0].Z) + "' data-frames='" + fr + "' data-zr='" + zrs + "'></canvas>";
         }
 
+        /// <summary>Superficie 3D orbitable desde una REJILLA ya calculada (hoja #numerico: spline de una matriz de
+        /// resultados FEM, funciones propias…), Z de (n+1)×(n+1). Se remuestrea a ≤ 40 divisiones para que girar sea fluido.</summary>
+        public static string SurfaceCanvasGrid(double[,] Z0, int n0, double xa, double xb, double ya, double yb, int id, string vx = "x", string vy = "y")
+        {
+            int nn = Math.Min(n0, 40);
+            var Z = new double[nn + 1, nn + 1]; double zmin = double.MaxValue, zmax = double.MinValue;
+            for (int i = 0; i <= nn; i++)
+                for (int j = 0; j <= nn; j++)
+                {
+                    double v = Z0[(int)Math.Round((double)i * n0 / nn), (int)Math.Round((double)j * n0 / nn)];
+                    Z[i, j] = v; if (!double.IsNaN(v)) { zmin = Math.Min(zmin, v); zmax = Math.Max(zmax, v); }
+                }
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder("[");
+            for (int j = 0; j <= nn; j++)
+                for (int i = 0; i <= nn; i++)
+                {
+                    if (i + j > 0) sb.Append(',');
+                    sb.Append(Math.Round(Z[i, j], 4).ToString("0.####", inv));
+                }
+            sb.Append(']');
+            // vista inicial: la parte ALTA al fondo (mirando a lo largo de la pendiente media), +0.35 rad para que se vea en 3D;
+            // con la vista fija de siempre un plano inclinado (presión de una zapata) podía quedar de canto
+            double gx = 0, gy = 0;
+            for (int i = 0; i < nn; i++) for (int j = 0; j < nn; j++) { gx += Z[i + 1, j] - Z[i, j]; gy += Z[i, j + 1] - Z[i, j]; }
+            double az = (Math.Abs(gx) + Math.Abs(gy) > 1e-9 * (Math.Abs(zmax) + 1)) ? Math.Atan2(-gy, -gx) + 0.35 : -0.9;
+            return "<canvas class=\"hk-surf\" width=\"560\" height=\"420\" style=\"max-width:100%;touch-action:none;cursor:grab\""
+                 + " data-id=\"" + id + "\" data-nn=\"" + nn + "\" data-az=\"" + az.ToString("0.###", inv) + "\""
+                 + " data-xa=\"" + xa.ToString("0.######", inv) + "\" data-xb=\"" + xb.ToString("0.######", inv) + "\""
+                 + " data-ya=\"" + ya.ToString("0.######", inv) + "\" data-yb=\"" + yb.ToString("0.######", inv) + "\""
+                 + " data-vx=\"" + System.Net.WebUtility.HtmlEncode(vx) + "\" data-vy=\"" + System.Net.WebUtility.HtmlEncode(vy) + "\""
+                 + " data-zmin=\"" + zmin.ToString("0.####", inv) + "\" data-zmax=\"" + zmax.ToString("0.####", inv) + "\""
+                 + " data-z='" + sb + "'></canvas>";
+        }
+
         // ---- <canvas> ORBITABLE: la malla la calcula C# una vez; el JS la rota con el mouse ----
         // El script hkSurfOrbit (una sola vez en la página) proyecta y gira; aquí solo va el canvas + datos.
         public static string SurfaceCanvas(LispConverter.N f, string vx, string vy,
@@ -129,7 +164,7 @@ namespace HekatanLisp
    return 'rgb('+(r*255|0)+','+(g*255|0)+','+(b*255|0)+')';}
  function setup(cv){
    var nn=+cv.dataset.nn, zmin=+cv.dataset.zmin, zmax=+cv.dataset.zmax, z=JSON.parse(cv.dataset.z);
-   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=-0.9,el=0.5,rng=(zmax-zmin)||1;
+   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=cv.dataset.az?+cv.dataset.az:-0.9,el=0.5,rng=(zmax-zmin)||1;
    function Z(i,j){return z[j*(nn+1)+i];}
    function proj(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;

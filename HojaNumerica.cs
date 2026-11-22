@@ -377,7 +377,7 @@ namespace HekatanLisp
             string xa = rangos.Count > 0 ? tr0.Expr(rangos[0].Item1) : "0", xb = rangos.Count > 0 ? tr0.Expr(rangos[0].Item2) : "1";
             string ya = rangos.Count > 1 ? tr0.Expr(rangos[1].Item1) : xa, yb = rangos.Count > 1 ? tr0.Expr(rangos[1].Item2) : xb;
             return "(hn-grid " + idx + " (lambda (" + Sym(libres[0]) + " " + Sym(libres[1]) + ") " + body + ") " +
-                   xa + " " + xb + " " + ya + " " + yb + " 90)";
+                   xa + " " + xb + " " + ya + " " + yb + " 150)";          // 150 divisiones (antes 90): los bordes de banda del #contourf quedan lisos
         }
 
         static List<string> PartirEspacios(string s)

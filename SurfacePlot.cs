@@ -185,10 +185,13 @@ namespace HekatanLisp
    function celda(i,j){var p00=[i,j,Z(i,j)],p10=[i+1,j,Z(i+1,j)],p11=[i+1,j+1,Z(i+1,j+1)],p01=[i,j+1,Z(i,j+1)];
      [[p00,p10,p11],[p00,p11,p01]].forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
        var k0=Math.max(0,Math.min(NB-1,Math.floor((lo-zmin)/rng*NB))),k1=Math.max(0,Math.min(NB-1,Math.floor((hi-zmin)/rng*NB)));
-       for(var k=k0;k<=k1;k++){var P=T;if(k>0)P=cut(P,zmin+rng*k/NB,true);if(k<NB-1)P=cut(P,zmin+rng*(k+1)/NB,false);if(P.length>=3)poly(P,rgb(csi((k+0.5)/NB)));}
+       for(var k=k0;k<=k1;k++){var P=T;if(k>0)P=cut(P,zmin+rng*k/NB,true);if(k<NB-1)P=cut(P,zmin+rng*(k+1)/NB,false);if(P.length>=3)poly(P,rgb(csi((k+0.5)/NB)));}});}
+   // isolíneas en una SEGUNDA pasada: si van con su celda, el relleno de la celda vecina las tapa a trozos (se veían como dientes)
+   function isoCelda(i,j){var p00=[i,j,Z(i,j)],p10=[i+1,j,Z(i+1,j)],p11=[i+1,j+1,Z(i+1,j+1)],p01=[i,j+1,Z(i,j+1)];
+     [[p00,p10,p11],[p00,p11,p01]].forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
        for(var k=1;k<NB;k++){var L=zmin+rng*k/NB;if(L<=lo||L>=hi)continue;var e=[];
          for(var a=0;a<3;a++){var A=T[a],Bq=T[(a+1)%3];if((A[2]-L)*(Bq[2]-L)<0){var t=(L-A[2])/(Bq[2]-A[2]);e.push(proj(A[0]+t*(Bq[0]-A[0]),A[1]+t*(Bq[1]-A[1]),L));}}
-         if(e.length==2){ctx.beginPath();ctx.moveTo(e[0][0],e[0][1]);ctx.lineTo(e[1][0],e[1][1]);ctx.strokeStyle=rgb(csi((k+0.5)/NB),0.62);ctx.lineWidth=1.1;ctx.stroke();}}});}
+         if(e.length==2){ctx.beginPath();ctx.moveTo(e[0][0],e[0][1]);ctx.lineTo(e[1][0],e[1][1]);ctx.strokeStyle=rgb(csi((k+0.5)/NB),0.62);ctx.lineWidth=1.2;ctx.lineCap='round';ctx.stroke();}}});}
    function draw(){ctx.clearRect(0,0,W,H);var c=[];
      for(var i=0;i<nn;i++)for(var j=0;j<nn;j++){var zc=(Z(i,j)+Z(i+1,j)+Z(i+1,j+1)+Z(i,j+1))/4;c.push([dep(i,j,zc),i,j,zc]);}
      c.sort(function(a,b){return a[0]-b[0];});
@@ -196,7 +199,8 @@ namespace HekatanLisp
        var p0=proj(i,j,Z(i,j)),p1=proj(i+1,j,Z(i+1,j)),p2=proj(i+1,j+1,Z(i+1,j+1)),p3=proj(i,j+1,Z(i,j+1));
        ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.lineTo(p3[0],p3[1]);ctx.closePath();
        if(NB>0){celda(i,j);continue;}
-       ctx.fillStyle=jetr((zc-zmin)/rng);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.stroke();}}
+       ctx.fillStyle=jetr((zc-zmin)/rng);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.stroke();}
+     if(NB>0)for(var k=0;k<c.length;k++)isoCelda(c[k][1],c[k][2]);}
    // #anim surf: varios cuadros en el MISMO lienzo; el reproductor llama cv.hkFrame(k)
    if(cv.dataset.frames){var FR=JSON.parse(cv.dataset.frames),ZR=JSON.parse(cv.dataset.zr||'[]');
      cv.hkFrame=function(k){if(!FR[k])return;z=FR[k];if(ZR[k]){zmin=ZR[k][0];zmax=ZR[k][1];}rng=(zmax-zmin)||1;cv.dataset.frame=k;draw();};

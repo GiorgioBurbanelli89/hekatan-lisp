@@ -286,7 +286,7 @@ function insertar(tag) {
 }
 
 // ---------- 6) archivo / menú ----------
-function setArchivo(nombre) { archivo = nombre; $('lbl-archivo').textContent = nombre || '(sin guardar)'; }
+function setArchivo(nombre) { archivo = nombre; $('lbl-archivo').textContent = nombre || '(sin guardar)'; document.title = nombre ? String(nombre).replace(/\.lisp$/i, '') + ' — Hekatan LISP' : 'Hekatan LISP'; }          // la pestaña dice qué hoja está abierta (como Math Studio)
 function cargarTexto(t, nombre) {
   syntaxLisp = synFull = transliterated = false; lispBackup = null; highlightSyntax();
   $('lbl-in').textContent = 'escribes: texto plano';

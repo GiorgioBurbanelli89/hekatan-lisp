@@ -932,6 +932,8 @@ function fmt(v){var a=Math.abs(v);return (a!==0&&(a<1e-3||a>=1e5))?v.toExponenti
 function init(cv){
  if(cv._m3d)return;cv._m3d=1;
  var D=JSON.parse(cv.getAttribute('data-m3d'));
+ var GR={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',eta:'η',theta:'θ',kappa:'κ',lambda:'λ',mu:'μ',nu:'ν',xi:'ξ',rho:'ρ',sigma:'σ',tau:'τ',phi:'φ',psi:'ψ',omega:'ω'};
+ D.nS=String(D.nS||'').replace(/^([a-z]+)(?=_|$)/,function(m){return GR[m]||m;});          // sigma_z → σ_z (el nombre de la escala)
  var g=cv.getContext('2d'),W=cv.width,H=cv.height,tip=cv.parentNode.querySelector('.hk-m3d-tip');
  var n=D.X.length,P=[],i,k;
  function setP(f){P=[];for(i=0;i<n;i++){var u=(D.U&&D.U[i])?D.U[i]:[0,0,0],e=(D.esc||0)*f;P.push([D.X[i][0]+e*u[0],D.X[i][1]+e*u[1],D.X[i][2]+e*u[2]]);}}
@@ -988,7 +990,8 @@ function init(cv){
   tris.forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
    for(var k=1;k<NB;k++){var L=smin+rg*k/NB;if(L<=lo||L>=hi)continue;var e=[];
     for(var a=0;a<3;a++){var A=T[a],B=T[(a+1)%3];if((A[2]-L)*(B[2]-L)<0){var t=(L-A[2])/(B[2]-A[2]);e.push([A[0]+t*(B[0]-A[0]),A[1]+t*(B[1]-A[1])]);}}
-    if(e.length==2){var c0=csi((k+0.5)/NB);g.beginPath();g.moveTo(e[0][0],e[0][1]);g.lineTo(e[1][0],e[1][1]);g.strokeStyle=css([c0[0]*0.62|0,c0[1]*0.62|0,c0[2]*0.62|0],1);g.stroke();}}});}
+    if(e.length==2){var c0=csi((k+0.5)/NB);g.beginPath();g.moveTo(e[0][0],e[0][1]);g.lineTo(e[1][0],e[1][1]);g.strokeStyle=css([c0[0]*0.62|0,c0[1]*0.62|0,c0[2]*0.62|0],1);g.stroke();}}});
+  var so=F.p.map(pr);g.beginPath();g.moveTo(so[0][0],so[0][1]);for(var m1=1;m1<4;m1++)g.lineTo(so[m1][0],so[m1][1]);g.closePath();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=0.7;g.lineCap='butt';g.stroke();}
  function draw(){g.clearRect(0,0,W,H);var fg=getComputedStyle(cv.parentNode).color||'#222';
   var L=prims.map(function(p){var sc=p.p.map(pr),d=0;sc.forEach(function(q){d+=q[2];});return {p:p,sc:sc,d:d/sc.length};});
   L.sort(function(a,b){return b.d-a.d;});
@@ -997,11 +1000,11 @@ function init(cv){
    if(p.t==='s'){g.closePath();var col=jet((p.v-smin)/(smax-smin));g.fillStyle=css(col,1);g.fill();g.strokeStyle=css(col,1);g.lineWidth=0.6;g.stroke();}
    else if(p.t==='b'){g.closePath();var cb=jet(bmax>0?(p.v/bmax+1)/2:0.5);g.fillStyle=css(cb,0.55);g.fill();g.strokeStyle=css(cb,0.9);g.lineWidth=1;g.stroke();}
    else{g.strokeStyle=(D.anim>0&&bmax>0)?css(jet(p.v/bmax),1):fg;g.lineWidth=D.anim>0?2:2.5;g.stroke();}});
-  D.S.forEach(function(q){var sc=q.map(function(j){return pr(P[j-1]);}),m;g.beginPath();g.moveTo(sc[0][0],sc[0][1]);for(m=1;m<4;m++)g.lineTo(sc[m][0],sc[m][1]);g.closePath();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=0.7;g.stroke();});
+  if(D.anim>0)D.S.forEach(function(q){var sc=q.map(function(j){return pr(P[j-1]);}),m;g.beginPath();g.moveTo(sc[0][0],sc[0][1]);for(m=1;m<4;m++)g.lineTo(sc[m][0],sc[m][1]);g.closePath();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=0.7;g.stroke();});          // estático: cada cara dibuja su contorno al pintarse (las de atrás no se ven a través)
   var x0=W-62,y0=60,hh=H-140,m;for(m=0;m<hh;m++){var tb=1-m/hh;g.fillStyle=css(D.anim>0?jet(tb):csi((Math.floor(Math.min(0.999999,tb)*NB)+0.5)/NB),1);g.fillRect(x0,y0+m,18,1);}
   g.strokeStyle=fg;g.lineWidth=1;g.strokeRect(x0,y0,18,hh);g.fillStyle=fg;g.font='12px sans-serif';g.textAlign='right';
-  g.fillText(fmt(smax),x0+44,y0-6);g.fillText(fmt(smin),x0+44,y0+hh+16);g.fillText(D.nS,x0+44,y0-22);
-  if(D.B.length){g.textAlign='left';g.fillText('barras: '+D.nB+'   max |valor| = '+fmt(bmax),12,H-12);}
+  g.fillText(fmt(smax),x0+44,y0-6);g.fillText(fmt(smin),x0+44,y0+hh+16);if(!(D.anim>0)){g.textAlign='right';g.fillText(fmt((smin+smax)/2),x0-5,y0+hh/2+4);}g.fillText(D.nS,x0+44,y0-22);
+  if(D.B.length&&bmax>0){g.textAlign='left';g.fillText('barras: '+D.nB+'   max |valor| = '+fmt(bmax),12,H-12);}
   if(hov){var q=pr(hov.p);g.beginPath();g.arc(q[0],q[1],5,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#000';g.lineWidth=1.5;g.stroke();}}
  function pos(ev){var r=cv.getBoundingClientRect();return [(ev.clientX-r.left)*W/r.width,(ev.clientY-r.top)*H/r.height,r];}
  cv.addEventListener('pointerdown',function(ev){drag=[ev.clientX,ev.clientY,yaw,pitch];try{cv.setPointerCapture(ev.pointerId);}catch(x){}cv.style.cursor='grabbing';});

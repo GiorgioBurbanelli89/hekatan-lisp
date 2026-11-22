@@ -556,7 +556,7 @@ for k = 1:e_z
   end
 end
 #show
-#: **3D: the soil as a solid**, cut at y = 0 to see inside: colour = vertical stress σ_z [kPa] (the pressure bulb on the cut face), deformed shape ×30, the column as a bar. Colour bands and isolines as in the maps. Drag to rotate, wheel to zoom, hover to read:
+#: **3D: the soil as a solid**, cut at y = 0 to see inside: colour = vertical stress σ_z [kPa] (the pressure bulb on the cut face), deformed shape ×30, the column as a bar, the concrete footing in grey (it is another element: it has no soil stress). Colour bands and isolines as in the maps. Drag to rotate, wheel to zoom, hover to read:
 #hide
 n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
 X_3 = zeros(n_t3 + 1, 3)
@@ -578,7 +578,7 @@ for j = 1:3
     X_3(T_n(i, j), 1) = -B/2 + (i - 1)·h_3
     X_3(T_n(i, j), 2) = -B/2 + (j - 1)·h_3
     X_3(T_n(i, j), 3) = t
-    v_3(T_n(i, j)) = v_3(e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0)
+    v_3(T_n(i, j)) = -1e30
   end
 end
 X_3(n_t3 + 1, 3) = t + 1

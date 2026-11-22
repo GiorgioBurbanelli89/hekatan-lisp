@@ -556,7 +556,7 @@ for k = 1:e_z
   end
 end
 #show
-#: **3D: el suelo como sólido**, cortado en y = 0 para ver por dentro: color = esfuerzo vertical σ_z [kPa] (el bulbo en la cara del corte), deformada ×30, la columna como barra. Bandas de color e isolíneas como en los mapas. Arrastra para girar, rueda para acercar, cursor para leer:
+#: **3D: el suelo como sólido**, cortado en y = 0 para ver por dentro: color = esfuerzo vertical σ_z [kPa] (el bulbo en la cara del corte), deformada ×30, la columna como barra, la zapata de concreto en gris (es otro elemento: no lleva el esfuerzo del suelo). Bandas de color e isolíneas como en los mapas. Arrastra para girar, rueda para acercar, cursor para leer:
 #hide
 n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
 X_3 = zeros(n_t3 + 1, 3)
@@ -578,7 +578,7 @@ for j = 1:3
     X_3(T_n(i, j), 1) = -B/2 + (i - 1)·h_3
     X_3(T_n(i, j), 2) = -B/2 + (j - 1)·h_3
     X_3(T_n(i, j), 3) = t
-    v_3(T_n(i, j)) = v_3(e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0)
+    v_3(T_n(i, j)) = -1e30
   end
 end
 X_3(n_t3 + 1, 3) = t + 1

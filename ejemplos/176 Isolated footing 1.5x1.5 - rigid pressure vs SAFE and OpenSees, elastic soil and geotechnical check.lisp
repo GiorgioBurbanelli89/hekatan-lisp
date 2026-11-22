@@ -149,6 +149,8 @@ end
 R_f 'sum of soil reactions = P [kN]
 p_fem(x, y) = spline(1 + (x + B/2)/h_e, 1 + (y + B/2)/h_e, P_m)
 #contourf(p_fem(x, y), [-B/2 B/2], [-B/2 B/2])
+#: **3D:** the same soil pressure as a surface (on Winkler springs the settlement w = p/k_s has the same shape). Drag to rotate, hover for the value:
+#surf(p_fem(x, y), [-B/2 B/2], [-B/2 B/2])
 
 ## 4 · Validation: Hekatan LISP vs SAFE 20 vs OpenSees
 
@@ -170,6 +172,7 @@ q_e(x, y) = P/A·4/(pi^2·sqrt(1 - (2·x/B)^2)·sqrt(1 - (2·y/B)^2))
 #sust
 q_e0 = q_e(0, 0)
 #contourf(q_e(x, y), [-0.95·B/2 0.95·B/2], [-0.95·B/2 0.95·B/2])
+#surf(q_e(x, y), [-0.95·B/2 0.95·B/2], [-0.95·B/2 0.95·B/2])
 #: Winkler springs (SAFE, OpenSees) are independent: the pressure follows the settlement, so a rigid base gives a plane. On an elastic half-space the soil is continuous and the rigid base pushes the stress to the edges and corners; at the center it is only 4/π² ≈ 0.41 of P/A. Sand yields at the edges (closer to the plane); clay stays closer to this.
 
 ## 6 · Geotechnical check

@@ -149,6 +149,8 @@ end
 R_f 'suma de reacciones del suelo = P [kN]
 p_fem(x, y) = spline(1 + (x + B/2)/h_e, 1 + (y + B/2)/h_e, P_m)
 #contourf(p_fem(x, y), [-B/2 B/2], [-B/2 B/2])
+#: **3D:** la misma presión del suelo como superficie (sobre resortes de Winkler el asiento w = p/k_s tiene la misma forma). Arrastra para girar, pasa el cursor para ver el valor:
+#surf(p_fem(x, y), [-B/2 B/2], [-B/2 B/2])
 
 ## 4 · Validación: Hekatan LISP vs SAFE 20 vs OpenSees
 
@@ -170,6 +172,7 @@ q_e(x, y) = P/A·4/(pi^2·sqrt(1 - (2·x/B)^2)·sqrt(1 - (2·y/B)^2))
 #sust
 q_e0 = q_e(0, 0)
 #contourf(q_e(x, y), [-0.95·B/2 0.95·B/2], [-0.95·B/2 0.95·B/2])
+#surf(q_e(x, y), [-0.95·B/2 0.95·B/2], [-0.95·B/2 0.95·B/2])
 #: Los resortes de Winkler (SAFE, OpenSees) son independientes: la presión sigue al asiento, y una base rígida da un plano. En un semiespacio elástico el suelo es continuo y la base rígida lleva el esfuerzo a los bordes y esquinas; en el centro queda solo 4/π² ≈ 0.41 de P/A. La arena plastifica en los bordes (más cerca del plano); la arcilla se queda más cerca de esto.
 
 ## 6 · Comprobación geotécnica

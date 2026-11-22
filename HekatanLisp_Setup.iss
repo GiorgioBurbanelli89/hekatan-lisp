@@ -1,6 +1,6 @@
 ﻿; Instalador de Hekatan LISP (Inno Setup 6)
 #define MyAppName "Hekatan LISP"
-#define MyAppVersion "1.30.8"
+#define MyAppVersion "1.30.9"
 #define MyAppPublisher "Hekatan Engineers"
 #define MyAppExeName "HekatanLisp.exe"
 ; otra carpeta de salida (bin\Release ocupada por una ventana abierta):  ISCC /DMyOut="C:\...\carpeta"

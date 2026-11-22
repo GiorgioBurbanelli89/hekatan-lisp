@@ -165,7 +165,7 @@ function calcularYMostrar() {
   catch (e) { out = view === 'render' || view === 'learn' ? `<pre style="color:#c0392b">${esc(String(e))}</pre>` : String(e); }
   const render = view === 'render' || view === 'learn';
   $('render').hidden = !render; $('texto').hidden = render;
-  if (render) $('render').srcdoc = conPosicion(out); else $('texto').textContent = out;
+  if (render) $('render').srcdoc = conPosicion(IDIOMA === 'en' ? String(out).replace(/<html(?![^>]*lang=)/i, '<html lang="en"') : out); else $('texto').textContent = out;          // EN: el visor (lienzos 3D) lee lang del documento
 }
 // Recalcular NO manda arriba: se repone donde estaba el lector; si estaba al final (escribiendo la
 // última línea), se queda al final. (Lo mismo que el escritorio en ShowResult.)

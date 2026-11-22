@@ -37,7 +37,7 @@
     [/^Dibujo$/, 'Drawing'], [/^#dibujo de Hekatan LISP · con los valores de la hoja$/, 'Hekatan LISP #drawing · with the values of the sheet'],
   ];
   let D = null;
-  const fuera = (el) => !(el && el.closest && el.closest(CFG.hoja));
+  const fuera = (el) => !!el && el.ownerDocument === document && !(el.closest && el.closest(CFG.hoja));          // lo de un iframe (el resultado de Hekatan LISP) es HOJA
   const editor = (el) => !!(el && el.closest && el.closest(CFG.editor));
   function traduce(t) {
     if (!D || !t) return null; const k = t.trim(); if (!k) return null;
@@ -55,6 +55,8 @@
   function nodo(n) {
     if (n.nodeType === 3) { texto(n); return; }
     if (n.nodeType !== 1 || n.tagName === 'SCRIPT' || n.tagName === 'STYLE') return;
+    if (n.tagName === 'IFRAME') { engancha(n); return; }
+    if (n.querySelectorAll) n.querySelectorAll('iframe').forEach(engancha);
     atributos(n); const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT); let x;
     while ((x = w.nextNode())) { if (x.nodeType === 3) texto(x); else atributos(x); }
   }
@@ -125,6 +127,13 @@
     m.querySelector('[data-a=t]').onclick = async () => { m.remove(); const r = await busca(sel); if (r) ventana(sel, r); else google(); };
     m.querySelector('[data-a=g]').onclick = () => { m.remove(); google(); };
     setTimeout(() => document.addEventListener('click', function f() { if (m.isConnected) m.remove(); document.removeEventListener('click', f); }), 0);
+  }
+  // el resultado de Hekatan LISP va en un iframe (srcdoc): sus frases del motor también siguen el idioma de la HOJA
+  function engancha(f) {
+    if (f._hkI18n) return; f._hkI18n = 1;
+    const hook = () => { try { const d = f.contentDocument; if (!d || !d.body) return; d.documentElement.lang = HO; if (HO !== 'en') return; nodo(d.body);
+      new MutationObserver((ms) => { for (const m of ms) { if (m.type === 'childList') m.addedNodes.forEach(nodo); else if (m.type === 'characterData') texto(m.target); } }).observe(d.body, { childList: true, subtree: true, characterData: true }); } catch (e) { /* otro origen */ } };
+    f.addEventListener('load', hook); hook();
   }
   function arranca() {
     document.documentElement.lang = HO; boton(); document.addEventListener('contextmenu', menuClic, true);

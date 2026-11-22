@@ -68,23 +68,23 @@ q_xm = q(-B/2, 0) 'presión en x = −B/2, y = 0 [kPa]
 #: El mismo modelo de SAFE y OpenSees, armado aquí paso a paso: placa de Mindlin de 4 nudos con cortante MITC4 (el elemento ShellMITC4 de OpenSees), 3 gdl por nudo [w, θ_x, θ_y], malla 10 × 10, resortes del suelo k_s·A_trib en cada nudo.
 
 #: **Símbolos: funciones de forma y Jacobiano.** Elemento de lados 2a × 2b, coordenadas naturales ξ, η ∈ [−1, 1]. Función de forma del nudo 1 y el mapeo x(ξ), y(η):
-N_1s = Simplify{(1-xi)*(1-eta)/4}
+N_1 = Simplify{(1-xi)*(1-eta)/4}
 x_s = Simplify{a*(-(1-xi)*(1-eta)/4 + (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 - (1-xi)*(1+eta)/4)}
 y_s = Simplify{b*(-(1-xi)*(1-eta)/4 - (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 + (1-xi)*(1+eta)/4)}
 J_11 = Partial{a*xi @ xi}
 J_22 = Partial{b*eta @ eta}
 J_12 = Partial{a*xi @ eta}
-detJ_s = Simplify{a*b - 0*0}
+J_det = Simplify{a*b - 0*0}
 #: det J = a·b convierte dξ·dη en dx·dy. Derivadas en x e y: ∂N/∂x = (1/a)·∂N/∂ξ, ∂N/∂y = (1/b)·∂N/∂η:
-dN1dx_s = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
-dN1dy_s = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
+N_1_x = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
+N_1_y = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
 #: **Símbolos: rigideces de la placa y cortante MITC4.** Flexión D = E·t³/(12(1 − ν²)); cortante C_s = (5/6)·G·t. La deformación γ_xz no se toma en los puntos de Gauss (eso bloquea la placa delgada) sino en los puntos medios de los lados A = (0, −1), B = (0, 1), y se interpola en η:
-D_s = Simplify{Ee*hh^3/(12*(1-nn^2))}
-C_ss = Simplify{5/6*Ee/(2*(1+nn))*hh}
-g_xz = Simplify{(1-eta)/2*gA + (1+eta)/2*gB}
+D_flex = Simplify{E*h^3/(12*(1-nu^2))}
+C_shear = Simplify{5/6*E/(2*(1+nu))*h}
+g_xz = Simplify{(1-eta)/2*g_A + (1+eta)/2*g_B}
 #: Forma cerrada de dos términos de la matriz del elemento (integrados a mano sobre 2a × 2b):
-K_ww_s = Simplify{Cs*(b/(3*a) + a/(3*b))}
-K_tt_s = Simplify{Dp*b/(3*a) + Dp*(1-nn)*a/(6*b) + Cs*a*b/3}
+K_ww = Simplify{C*(b/(3*a) + a/(3*b))}
+K_tt = Simplify{D*b/(3*a) + D*(1-nu)*a/(6*b) + C*a*b/3}
 
 #: **Números: matriz del elemento 12 × 12** con 2 × 2 puntos de Gauss:
 E_c = 24.87e6 'módulo del hormigón [kPa]

@@ -174,6 +174,12 @@ namespace HekatanLisp
      var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;return ce*ca*X+ce*sa*Y+se*Zn;}
    // bandas + isolíneas como el #contourf 2D (paleta CSI, 12 niveles): data-bands=0 vuelve al degradado jet de antes
    var NB=cv.dataset.bands===undefined?12:+cv.dataset.bands;
+   // LUZ (Jorge, 21-nov-2026: «tiene sombra, claridad»): Lambert + brillo especular de Blinn-Phong con la luz arriba-izquierda-delante;
+   // la normal de cada cara en coordenadas de PANTALLA (x a la derecha, y arriba, z hacia el observador). Da la forma 3D sin tapar las bandas.
+   var LZ=(function(){var l=[-0.45,0.55,0.70],n=Math.hypot(l[0],l[1],l[2]);return [l[0]/n,l[1]/n,l[2]/n];})(),HZ=(function(){var h=[LZ[0],LZ[1],LZ[2]+1],n=Math.hypot(h[0],h[1],h[2]);return [h[0]/n,h[1]/n,h[2]/n];})();
+   function luz(a,b,c,col){var u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]],n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],m=Math.hypot(n[0],n[1],n[2])||1;
+    n=[n[0]/m,n[1]/m,n[2]/m];if(n[2]<0)n=[-n[0],-n[1],-n[2]];var d=Math.max(0,n[0]*LZ[0]+n[1]*LZ[1]+n[2]*LZ[2]),sp=Math.pow(Math.max(0,n[0]*HZ[0]+n[1]*HZ[1]+n[2]*HZ[2]),18)*0.22,I=0.62+0.42*d;
+    return [Math.min(255,col[0]*I+sp*255)|0,Math.min(255,col[1]*I+sp*255)|0,Math.min(255,col[2]*I+sp*255)|0];}
    var PAL=[[0,255,0,255],[.077,255,0,180],[.154,255,0,0],[.231,255,80,0],[.308,255,140,0],[.385,255,190,0],[.462,255,255,0],[.538,180,255,0],[.615,0,255,0],[.692,0,255,180],[.769,0,255,255],[.846,0,180,255],[.923,0,0,255],[1,0,0,180]];
    function csi(t){t=1-Math.max(0,Math.min(1,t));for(var i=0;i<PAL.length-1;i++){var a=PAL[i],b=PAL[i+1];if(t<=b[0]){var u=b[0]>a[0]?(t-a[0])/(b[0]-a[0]):0;return [a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*u,a[3]+(b[3]-a[3])*u];}}var l=PAL[PAL.length-1];return [l[1],l[2],l[3]];}
    function banda(t){if(NB<=0)return null;t=Math.max(0,Math.min(0.999999,t));return csi((Math.floor(t*NB)+0.5)/NB);}
@@ -182,10 +188,13 @@ namespace HekatanLisp
    function cut(P,L,arriba){var o=[];for(var a=0;a<P.length;a++){var A=P[a],Bq=P[(a+1)%P.length],ia=arriba?A[2]>=L:A[2]<=L,ib=arriba?Bq[2]>=L:Bq[2]<=L;
      if(ia)o.push(A);if(ia!==ib){var t=(L-A[2])/(Bq[2]-A[2]);o.push([A[0]+t*(Bq[0]-A[0]),A[1]+t*(Bq[1]-A[1]),L]);}}return o;}
    function poly(P,st){ctx.beginPath();for(var a=0;a<P.length;a++){var q=proj(P[a][0],P[a][1],P[a][2]);if(a)ctx.lineTo(q[0],q[1]);else ctx.moveTo(q[0],q[1]);}ctx.closePath();ctx.fillStyle=st;ctx.fill();ctx.strokeStyle=st;ctx.lineWidth=0.7;ctx.stroke();}
+   function q3(i,j,z){var p=proj(i,j,z);return [p[0],-p[1],dep(i,j,z)*W*0.62];}
    function celda(i,j){var p00=[i,j,Z(i,j)],p10=[i+1,j,Z(i+1,j)],p11=[i+1,j+1,Z(i+1,j+1)],p01=[i,j+1,Z(i,j+1)];
+     var ia=Math.max(0,i-1),ib=Math.min(nn,i+2),ja=Math.max(0,j-1),jb=Math.min(nn,j+2),jm=Math.min(nn,j+1),im=Math.min(nn,i+1);          // normal con un entorno de 3 celdas: las ondas finas del spline no hacen rayas de brillo
+     var X0=q3(ia,j,(Z(ia,j)+Z(ia,jm))/2),X1=q3(ib,j,(Z(ib,j)+Z(ib,jm))/2),Y0=q3(i,ja,(Z(i,ja)+Z(im,ja))/2),Y1=q3(i,jb,(Z(i,jb)+Z(im,jb))/2),C0=[0,0,0],C1=[X1[0]-X0[0],X1[1]-X0[1],X1[2]-X0[2]],C2=[Y1[0]-Y0[0],Y1[1]-Y0[1],Y1[2]-Y0[2]];          // normal de la CELDA (por sus diagonales): los dos triángulos con la misma luz
      [[p00,p10,p11],[p00,p11,p01]].forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
        var k0=Math.max(0,Math.min(NB-1,Math.floor((lo-zmin)/rng*NB))),k1=Math.max(0,Math.min(NB-1,Math.floor((hi-zmin)/rng*NB)));
-       for(var k=k0;k<=k1;k++){var P=T;if(k>0)P=cut(P,zmin+rng*k/NB,true);if(k<NB-1)P=cut(P,zmin+rng*(k+1)/NB,false);if(P.length>=3)poly(P,rgb(csi((k+0.5)/NB)));}});}
+       for(var k=k0;k<=k1;k++){var P=T;if(k>0)P=cut(P,zmin+rng*k/NB,true);if(k<NB-1)P=cut(P,zmin+rng*(k+1)/NB,false);if(P.length>=3)poly(P,rgb(luz(C0,C1,C2,csi((k+0.5)/NB))));}});}
    // isolíneas en una SEGUNDA pasada: si van con su celda, el relleno de la celda vecina las tapa a trozos (se veían como dientes)
    function isoCelda(i,j){var p00=[i,j,Z(i,j)],p10=[i+1,j,Z(i+1,j)],p11=[i+1,j+1,Z(i+1,j+1)],p01=[i,j+1,Z(i,j+1)];
      [[p00,p10,p11],[p00,p11,p01]].forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
@@ -925,6 +934,12 @@ namespace HekatanLisp
 function jet(t){t=Math.max(0,Math.min(1,t));var r=Math.min(Math.max(1.5-Math.abs(4*t-3),0),1),g=Math.min(Math.max(1.5-Math.abs(4*t-2),0),1),b=Math.min(Math.max(1.5-Math.abs(4*t-1),0),1);return [r*255|0,g*255|0,b*255|0];}
 function css(c,a){return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';}
 // bandas CSI e isolíneas del color de su nivel (como el #contourf y el #surf): el sólido se lee igual que los mapas
+// LUZ (Jorge, 21-nov-2026: «tiene sombra, claridad»): Lambert + brillo especular de Blinn-Phong con la luz arriba-izquierda-delante;
+// la normal de cada cara en coordenadas de PANTALLA (x a la derecha, y arriba, z hacia el observador). Da la forma 3D sin tapar las bandas.
+var LZ=(function(){var l=[-0.45,0.55,0.70],n=Math.hypot(l[0],l[1],l[2]);return [l[0]/n,l[1]/n,l[2]/n];})(),HZ=(function(){var h=[LZ[0],LZ[1],LZ[2]+1],n=Math.hypot(h[0],h[1],h[2]);return [h[0]/n,h[1]/n,h[2]/n];})();
+function luz(a,b,c,col){var u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]],n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],m=Math.hypot(n[0],n[1],n[2])||1;
+ n=[n[0]/m,n[1]/m,n[2]/m];if(n[2]<0)n=[-n[0],-n[1],-n[2]];var d=Math.max(0,n[0]*LZ[0]+n[1]*LZ[1]+n[2]*LZ[2]),sp=Math.pow(Math.max(0,n[0]*HZ[0]+n[1]*HZ[1]+n[2]*HZ[2]),40)*0.35,I=0.62+0.42*d;
+ return [Math.min(255,col[0]*I+sp*255)|0,Math.min(255,col[1]*I+sp*255)|0,Math.min(255,col[2]*I+sp*255)|0];}
 var PAL=[[0,255,0,255],[.077,255,0,180],[.154,255,0,0],[.231,255,80,0],[.308,255,140,0],[.385,255,190,0],[.462,255,255,0],[.538,180,255,0],[.615,0,255,0],[.692,0,255,180],[.769,0,255,255],[.846,0,180,255],[.923,0,0,255],[1,0,0,180]],NB=12;
 function csi(t){t=1-Math.max(0,Math.min(1,t));for(var i=0;i<PAL.length-1;i++){var a=PAL[i],b=PAL[i+1];if(t<=b[0]){var u=b[0]>a[0]?(t-a[0])/(b[0]-a[0]):0;return [a[1]+(b[1]-a[1])*u|0,a[2]+(b[2]-a[2])*u|0,a[3]+(b[3]-a[3])*u|0];}}return [0,0,180];}
 function cut(P,L,arriba){var o=[];for(var a=0;a<P.length;a++){var A=P[a],B=P[(a+1)%P.length],ia=arriba?A[2]>=L:A[2]<=L,ib=arriba?B[2]>=L:B[2]<=L;if(ia)o.push(A);if(ia!==ib){var t=(L-A[2])/(B[2]-A[2]);o.push([A[0]+t*(B[0]-A[0]),A[1]+t*(B[1]-A[1]),L]);}}return o;}
@@ -978,14 +993,16 @@ function init(cv){
     samp.push({p:lerp(a,b,tt),txt:lab});samp.push({p:lerp(q0,q1,tt),txt:lab});}
   });}
  // una cara: sus subcuadros en triángulos (en pantalla, la proyección es lineal), cada banda recortada exacta; las isolíneas al final de la cara
+ function p3(q){return [q[0],-q[1],-q[2]*0.42*Math.min(W,H)/R*zoom];}
  function cara(F){var rg=smax-smin,tris=[];
-  if(F.gris){var sg=F.p.map(pr);g.beginPath();g.moveTo(sg[0][0],sg[0][1]);for(var m0=1;m0<4;m0++)g.lineTo(sg[m0][0],sg[m0][1]);g.closePath();g.fillStyle='rgb(201,195,182)';g.fill();g.strokeStyle='rgb(138,132,120)';g.lineWidth=0.8;g.stroke();return;}
+  if(F.gris){var sg=F.p.map(pr);g.beginPath();g.moveTo(sg[0][0],sg[0][1]);for(var m0=1;m0<4;m0++)g.lineTo(sg[m0][0],sg[m0][1]);g.closePath();g.fillStyle=css(luz(p3(sg[0]),p3(sg[1]),p3(sg[3]),[206,200,187]),1);g.fill();g.strokeStyle='rgb(138,132,120)';g.lineWidth=0.8;g.stroke();return;}
+  var sF=F.p.map(pr),LF=function(col){return luz(p3(sF[0]),p3(sF[1]),p3(sF[3]),col);};
   F.sub.forEach(function(q){var s=q.p.map(pr),T=[[s[0][0],s[0][1],q.w[0]],[s[1][0],s[1][1],q.w[1]],[s[2][0],s[2][1],q.w[2]],[s[3][0],s[3][1],q.w[3]]];tris.push([T[0],T[1],T[2]],[T[0],T[2],T[3]]);});
   if(D.anim>0){tris.forEach(function(T){var v=(T[0][2]+T[1][2]+T[2][2])/3,col=jet((v-smin)/rg);g.beginPath();g.moveTo(T[0][0],T[0][1]);g.lineTo(T[1][0],T[1][1]);g.lineTo(T[2][0],T[2][1]);g.closePath();g.fillStyle=css(col,1);g.fill();g.strokeStyle=css(col,1);g.lineWidth=0.6;g.stroke();});return;}
   tris.forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
    var k0=Math.max(0,Math.min(NB-1,Math.floor((lo-smin)/rg*NB))),k1=Math.max(0,Math.min(NB-1,Math.floor((hi-smin)/rg*NB)));
    for(var k=k0;k<=k1;k++){var P=T;if(k>0)P=cut(P,smin+rg*k/NB,true);if(k<NB-1)P=cut(P,smin+rg*(k+1)/NB,false);if(P.length<3)continue;
-    var col=csi((k+0.5)/NB);g.beginPath();g.moveTo(P[0][0],P[0][1]);for(var m=1;m<P.length;m++)g.lineTo(P[m][0],P[m][1]);g.closePath();g.fillStyle=css(col,1);g.fill();g.strokeStyle=css(col,1);g.lineWidth=0.6;g.stroke();}});
+    var col=LF(csi((k+0.5)/NB));g.beginPath();g.moveTo(P[0][0],P[0][1]);for(var m=1;m<P.length;m++)g.lineTo(P[m][0],P[m][1]);g.closePath();g.fillStyle=css(col,1);g.fill();g.strokeStyle=css(col,1);g.lineWidth=0.6;g.stroke();}});
   g.lineWidth=1.1;g.lineCap='round';
   tris.forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
    for(var k=1;k<NB;k++){var L=smin+rg*k/NB;if(L<=lo||L>=hi)continue;var e=[];

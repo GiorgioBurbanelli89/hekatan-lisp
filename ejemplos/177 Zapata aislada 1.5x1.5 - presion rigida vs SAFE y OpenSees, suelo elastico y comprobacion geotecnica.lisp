@@ -560,7 +560,7 @@ end
 #hide
 n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
 X_3 = zeros(n_t3 + 1, 3)
-v_3 = zeros(n_t3 + 1, 1)
+sigma_z = zeros(n_t3 + 1, 1)
 U_m = zeros(n_t3 + 1, 3)
 for k = 1:n_z
   for j = 1:n_3
@@ -569,7 +569,7 @@ for k = 1:n_z
       X_3(nd, 1) = -W_3/2 + (i - 1)·h_3
       X_3(nd, 2) = -W_3/2 + (j - 1)·h_3
       X_3(nd, 3) = -H_3 + (k - 1)·h_3
-      v_3(nd) = S_3(nd)/c_3(nd)
+      sigma_z(nd) = S_3(nd)/c_3(nd)
     end
   end
 end
@@ -578,7 +578,7 @@ for j = 1:3
     X_3(T_n(i, j), 1) = -B/2 + (i - 1)·h_3
     X_3(T_n(i, j), 2) = -B/2 + (j - 1)·h_3
     X_3(T_n(i, j), 3) = t
-    v_3(T_n(i, j)) = -1e30
+    sigma_z(T_n(i, j)) = -1e30
   end
 end
 X_3(n_t3 + 1, 3) = t + 1
@@ -670,7 +670,7 @@ e_q(f_n, 4) = T_n(3, 2)
 e_c = [T_n(2, 2), n_t3 + 1]
 v_c = [0, 0]
 #show
-#modelo3d(X_3, e_q, e_c, v_3, v_c, U_m, 30)
+#modelo3d(X_3, e_q, e_c, sigma_z, v_c, U_m, 30)
 
 ## 7 · Comprobación geotécnica
 

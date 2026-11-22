@@ -314,6 +314,32 @@ q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), 
 dw_2 = max(abs(w_2 - w2_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_2 = max(abs(q_2 - q2_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
 #: La presión de contacto es la fuerza que cada nudo de la zapata pasa al suelo (fuerza interna de los elementos de suelo de arriba) entre su largo tributario; la suma da exactamente P/B. En un suelo continuo una zapata rígida **concentra la presión en sus bordes** (388 y 494 kPa frente a 111 kPa en el medio): los resortes (Winkler) no pueden mostrar eso, el suelo mallado sí.
+#: **El bulbo de presiones** (lo que describe Boussinesq, aquí por FEM): esfuerzo vertical σ_y en el suelo, σ = D·B·u en el centro de cada cuadrilátero, promediado en los nudos. Compresión positiva [kPa]; con el cursor se ve el valor:
+#hide
+S_2 = zeros(n_ss, 1)
+c_2 = zeros(n_ss, 1)
+B_0 = B_q(0, 0, h_s/2, h_s/2)
+for j = 1:n_sy
+  for i = 1:n_sx
+    nd = (j - 1)·n_2 + i
+    c_4 = [nd, nd + 1, nd + 1 + n_2, nd + n_2]
+    u_e = [U_2(2·c_4(1) - 1), U_2(2·c_4(1)), U_2(2·c_4(2) - 1), U_2(2·c_4(2)), U_2(2·c_4(3) - 1), U_2(2·c_4(3)), U_2(2·c_4(4) - 1), U_2(2·c_4(4))]
+    s_e = D_s2·B_0·u_e
+    for m = 1:4
+      S_2(c_4(m)) = S_2(c_4(m)) - s_e(2)
+      c_2(c_4(m)) = c_2(c_4(m)) + 1
+    end
+  end
+end
+G_2 = zeros(n_2, n_sy + 1)
+for j = 1:n_sy + 1
+  for i = 1:n_2
+    G_2(i, j) = S_2((j - 1)·n_2 + i)/c_2((j - 1)·n_2 + i)
+  end
+end
+#show
+s_y2(x, y) = spline(1 + (x + W_s/2)/h_s, 1 + (y + H_s)/h_s, G_2)
+#contourf(s_y2(x, y), [-3 3], [-4.5 0])
 
 ## 6 · El suelo por elementos finitos (2): sólido 3D
 
@@ -480,6 +506,47 @@ p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
 dw_3 = max(abs(w_3 - w3_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
 #: Lo mismo en 3D: las esquinas cargan más (431 kPa en la esquina +x, −y, donde empujan M_x y M_y) y el centro menos (64 kPa). Los hexaedros de 0.75 m son gruesos (2 × 2 bajo la zapata): es una validación del método contra OpenSees, no una malla de diseño.
+#: **Bulbo de presiones en 3D**, corte vertical y = 0: σ_z en el centro de los hexaedros promediado en los nudos [kPa] (compresión positiva):
+#hide
+S_3 = zeros(n_s3, 1)
+c_3 = zeros(n_s3, 1)
+a_x = zeros(8, 1)
+a_y = zeros(8, 1)
+a_z = zeros(8, 1)
+for k = 1:8
+  a_x(k) = s_x(k)/8
+  a_y(k) = s_y(k)/8
+  a_z(k) = s_z(k)/8
+end
+B_0 = [transpose(a_x)·T_u/(h_3/2); transpose(a_y)·T_v/(h_3/2); transpose(a_z)·T_w/(h_3/2); transpose(a_y)·T_u/(h_3/2) + transpose(a_x)·T_v/(h_3/2); transpose(a_z)·T_v/(h_3/2) + transpose(a_y)·T_w/(h_3/2); transpose(a_z)·T_u/(h_3/2) + transpose(a_x)·T_w/(h_3/2)]
+for k = 1:6
+  for j = 1:8
+    for i = 1:8
+      nd = (k - 1)·81 + (j - 1)·9 + i
+      c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+      u_e = zeros(24, 1)
+      for m = 1:8
+        u_e(3·m - 2) = U_3(3·c_8(m) - 2)
+        u_e(3·m - 1) = U_3(3·c_8(m) - 1)
+        u_e(3·m) = U_3(3·c_8(m))
+      end
+      s_e = D_s3·B_0·u_e
+      for m = 1:8
+        S_3(c_8(m)) = S_3(c_8(m)) - s_e(3)
+        c_3(c_8(m)) = c_3(c_8(m)) + 1
+      end
+    end
+  end
+end
+G_3 = zeros(9, 7)
+for k = 1:7
+  for i = 1:9
+    G_3(i, k) = S_3((k - 1)·81 + 4·9 + i)/c_3((k - 1)·81 + 4·9 + i)
+  end
+end
+#show
+s_z3(x, y) = spline(1 + (x + 3)/h_3, 1 + (y + 4.5)/h_3, G_3)
+#contourf(s_z3(x, y), [-3 3], [-4.5 0])
 
 ## 7 · Comprobación geotécnica
 

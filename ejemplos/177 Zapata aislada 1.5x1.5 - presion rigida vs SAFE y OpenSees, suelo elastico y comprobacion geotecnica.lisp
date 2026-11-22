@@ -1,4 +1,4 @@
-# Zapata aislada 1.50 × 1.50 m: presión rígida vs SAFE y OpenSees, suelo elástico y comprobación geotécnica
+# Zapata aislada 1.50 × 1.50 m: presión rígida vs SAFE y OpenSees y comprobación geotécnica
 #numerico
 
 ## 1 · Datos
@@ -197,17 +197,7 @@ d_ops = max(abs(t_hek - t_ops)) 'máx |Hekatan − OpenSees| [kPa]
 d_safe = max(abs(t_hek - t_safe)) 'máx |Hekatan − SAFE| [kPa]
 #: Hekatan LISP y OpenSees resuelven el mismo elemento (MITC4) y los mismos resortes: coinciden en todas las cifras impresas. La placa gruesa de SAFE es un elemento algo distinto: 0.005 %. El 1–2.5 % frente a la fórmula rígida es la flexión de la zapata real de 0.60 m.
 
-## 5 · Zapata rígida sobre suelo elástico (Boussinesq)
-
-#equ
-q_e(x, y) = P/A·4/(pi^2·sqrt(1 - (2·x/B)^2)·sqrt(1 - (2·y/B)^2))
-#sust
-q_e0 = q_e(0, 0)
-#contourf(q_e(x, y), [-0.95·B/2 0.95·B/2], [-0.95·B/2 0.95·B/2])
-#surf(q_e(x, y), [-0.95·B/2 0.95·B/2], [-0.95·B/2 0.95·B/2])
-#: Los resortes de Winkler (SAFE, OpenSees) son independientes: la presión sigue al asiento, y una base rígida da un plano. En un semiespacio elástico el suelo es continuo y la base rígida lleva el esfuerzo a los bordes y esquinas; en el centro queda solo 4/π² ≈ 0.41 de P/A. La arena plastifica en los bordes (más cerca del plano); la arcilla se queda más cerca de esto.
-
-## 6 · Comprobación geotécnica
+## 5 · Comprobación geotécnica
 
 #sust
 phi_r = phi·pi/180

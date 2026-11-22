@@ -554,6 +554,121 @@ end
 #show
 s_z3(x, y) = spline(1 + (x + W_3/2)/h_3, 1 + (y + H_3)/h_3, G_3)
 #contourf(s_z3(x, y), [-W_3/2 W_3/2], [-H_3 0])
+#: **3D: el suelo como sólido**, cortado en y = 0 para ver por dentro: color = esfuerzo vertical σ_z [kPa] (el bulbo en la cara del corte), deformada ×30, la columna como barra. Arrastra para girar, rueda para acercar, cursor para leer:
+#hide
+n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
+X_3 = zeros(n_t3 + 1, 3)
+v_3 = zeros(n_t3 + 1, 1)
+U_m = zeros(n_t3 + 1, 3)
+for k = 1:n_z
+  for j = 1:n_3
+    for i = 1:n_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
+      X_3(nd, 1) = -W_3/2 + (i - 1)·h_3
+      X_3(nd, 2) = -W_3/2 + (j - 1)·h_3
+      X_3(nd, 3) = -H_3 + (k - 1)·h_3
+      v_3(nd) = S_3(nd)/c_3(nd)
+    end
+  end
+end
+for j = 1:3
+  for i = 1:3
+    X_3(T_n(i, j), 1) = -B/2 + (i - 1)·h_3
+    X_3(T_n(i, j), 2) = -B/2 + (j - 1)·h_3
+    X_3(T_n(i, j), 3) = t
+    v_3(T_n(i, j)) = v_3(e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0)
+  end
+end
+X_3(n_t3 + 1, 3) = t + 1
+for nd = 1:n_t3
+  U_m(nd, 1) = U_3(3·nd - 2)
+  U_m(nd, 2) = U_3(3·nd - 1)
+  U_m(nd, 3) = U_3(3·nd)
+end
+e_q = zeros(n_f3, 4)
+f_n = 0
+for k = 1:e_z
+  for j = e_3/2 + 1:e_3
+    for i = 1:e_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
+      if k == 1
+        f_n = f_n + 1
+        e_q(f_n, 1) = nd
+        e_q(f_n, 2) = nd + 1
+        e_q(f_n, 3) = nd + n_3 + 1
+        e_q(f_n, 4) = nd + n_3
+      end
+      if k == e_z
+        f_n = f_n + 1
+        e_q(f_n, 1) = nd + p_2
+        e_q(f_n, 2) = nd + p_2 + 1
+        e_q(f_n, 3) = nd + p_2 + n_3 + 1
+        e_q(f_n, 4) = nd + p_2 + n_3
+      end
+      if i == 1
+        f_n = f_n + 1
+        e_q(f_n, 1) = nd
+        e_q(f_n, 2) = nd + n_3
+        e_q(f_n, 3) = nd + n_3 + p_2
+        e_q(f_n, 4) = nd + p_2
+      end
+      if i == e_3
+        f_n = f_n + 1
+        e_q(f_n, 1) = nd + 1
+        e_q(f_n, 2) = nd + n_3 + 1
+        e_q(f_n, 3) = nd + n_3 + 1 + p_2
+        e_q(f_n, 4) = nd + 1 + p_2
+      end
+      if j == e_3/2 + 1
+        f_n = f_n + 1
+        e_q(f_n, 1) = nd
+        e_q(f_n, 2) = nd + 1
+        e_q(f_n, 3) = nd + 1 + p_2
+        e_q(f_n, 4) = nd + p_2
+      end
+      if j == e_3
+        f_n = f_n + 1
+        e_q(f_n, 1) = nd + n_3
+        e_q(f_n, 2) = nd + n_3 + 1
+        e_q(f_n, 3) = nd + n_3 + 1 + p_2
+        e_q(f_n, 4) = nd + n_3 + p_2
+      end
+    end
+  end
+end
+for i = 1:2
+  nd = e_z·p_2 + (i_0 + 1)·n_3 + i + i_0
+  f_n = f_n + 1
+  e_q(f_n, 1) = T_n(i, 2)
+  e_q(f_n, 2) = T_n(i + 1, 2)
+  e_q(f_n, 3) = T_n(i + 1, 3)
+  e_q(f_n, 4) = T_n(i, 3)
+  f_n = f_n + 1
+  e_q(f_n, 1) = nd
+  e_q(f_n, 2) = nd + 1
+  e_q(f_n, 3) = T_n(i + 1, 2)
+  e_q(f_n, 4) = T_n(i, 2)
+  f_n = f_n + 1
+  e_q(f_n, 1) = nd + n_3
+  e_q(f_n, 2) = nd + n_3 + 1
+  e_q(f_n, 3) = T_n(i + 1, 3)
+  e_q(f_n, 4) = T_n(i, 3)
+end
+nd = e_z·p_2 + (i_0 + 1)·n_3 + i_0 + 1
+f_n = f_n + 1
+e_q(f_n, 1) = nd
+e_q(f_n, 2) = nd + n_3
+e_q(f_n, 3) = T_n(1, 3)
+e_q(f_n, 4) = T_n(1, 2)
+f_n = f_n + 1
+e_q(f_n, 1) = nd + 2
+e_q(f_n, 2) = nd + n_3 + 2
+e_q(f_n, 3) = T_n(3, 3)
+e_q(f_n, 4) = T_n(3, 2)
+e_c = [T_n(2, 2), n_t3 + 1]
+v_c = [0, 0]
+#show
+#modelo3d(X_3, e_q, e_c, v_3, v_c, U_m, 30)
 
 ## 7 · Comprobación geotécnica
 

@@ -169,7 +169,7 @@ namespace HekatanLisp
    function proj(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;
      var rx=-X*sa+Y*ca,up=-se*ca*X-se*sa*Y+ce*Zn;
-     return [W*0.5+rx*W*0.62,H*0.58-up*H*0.60];}
+     return [W*0.5+rx*W*0.58,H*0.64-up*H*0.48];}
    function dep(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;return ce*ca*X+ce*sa*Y+se*Zn;}
    // bandas + isolíneas como el #contourf 2D (paleta CSI, 12 niveles): data-bands=0 vuelve al degradado jet de antes

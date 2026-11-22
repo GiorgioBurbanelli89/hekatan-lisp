@@ -1,4 +1,4 @@
-# Zapata aislada 1.50 × 1.50 m: presión rígida vs SAFE y OpenSees y comprobación geotécnica
+# Zapata aislada 1.50 × 1.50 m: presión rígida, placa sobre resortes y suelo por FEM (membrana 2D, sólido 3D) vs SAFE y OpenSees, comprobación geotécnica
 #numerico
 
 ## 1 · Datos
@@ -197,7 +197,291 @@ d_ops = max(abs(t_hek - t_ops)) 'máx |Hekatan − OpenSees| [kPa]
 d_safe = max(abs(t_hek - t_safe)) 'máx |Hekatan − SAFE| [kPa]
 #: Hekatan LISP y OpenSees resuelven el mismo elemento (MITC4) y los mismos resortes: coinciden en todas las cifras impresas. La placa gruesa de SAFE es un elemento algo distinto: 0.005 %. El 1–2.5 % frente a la fórmula rígida es la flexión de la zapata real de 0.60 m.
 
-## 5 · Comprobación geotécnica
+## 5 · El suelo por elementos finitos (1): membrana 2D, deformación plana
+
+#: Ahora se malla el SUELO mismo (no resortes): un corte vertical por la zapata en y = 0, suelo de 6 m de ancho y 4.5 m de profundidad con cuadriláteros de 0.25 m, y la zapata de concreto de 0.60 m encima (6 × 2 cuadriláteros). Deformación plana: una rebanada de 1 m, carga P/B y M_y/B por metro. Base fija, lados con rodillos. La misma malla en OpenSees (quad PlaneStrain).
+#: **Símbolos: matriz D de deformación plana** (σ = D·ε, ε_z = 0) y la deformación de un cuadrilátero de 4 nudos, ε = B·u con ε_x = ∂u/∂x, ε_y = ∂v/∂y, γ_xy = ∂u/∂y + ∂v/∂x:
+d_11 = Simplify{E*(1-nu)/((1+nu)*(1-2*nu))}
+d_12 = Simplify{E*nu/((1+nu)*(1-2*nu))}
+d_33 = Simplify{E/(2*(1+nu))}
+#: Matriz del elemento K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 puntos de Gauss (integración completa, como el quad de OpenSees).
+h_s = 0.25 'lado del elemento de suelo [m]
+W_s = 6 'ancho del suelo [m]
+H_s = 4.5 'profundidad del suelo [m]
+#hide
+n_sx = W_s/h_s
+n_sy = H_s/h_s
+D_s2 = E_s/((1 + nu_s)·(1 - 2·nu_s))·[1 - nu_s, nu_s, 0; nu_s, 1 - nu_s, 0; 0, 0, (1 - 2·nu_s)/2]
+D_c2 = E_c/((1 + nu_c)·(1 - 2·nu_c))·[1 - nu_c, nu_c, 0; nu_c, 1 - nu_c, 0; 0, 0, (1 - 2·nu_c)/2]
+S_u = zeros(4, 8)
+S_v = zeros(4, 8)
+for k = 1:4
+  S_u(k, 2·k - 1) = 1
+  S_v(k, 2·k) = 1
+end
+#show
+d_r(r, s) = [-(1 - s)/4, (1 - s)/4, (1 + s)/4, -(1 + s)/4]
+d_s(r, s) = [-(1 - r)/4, -(1 + r)/4, (1 + r)/4, (1 - r)/4]
+B_q(r, s, a, b) = [transpose(d_r(r, s))·S_u/a; transpose(d_s(r, s))·S_v/b; transpose(d_s(r, s))·S_u/b + transpose(d_r(r, s))·S_v/a]
+#hide
+K_s2 = zeros(8, 8)
+K_c2 = zeros(8, 8)
+for p = 1:4
+  B_1 = B_q(r_g(p), s_g(p), h_s/2, h_s/2)
+  K_s2 = K_s2 + h_s^2/4·transpose(B_1)·D_s2·B_1
+  B_2 = B_q(r_g(p), s_g(p), h_s/2, t/4)
+  K_c2 = K_c2 + h_s·t/8·transpose(B_2)·D_c2·B_2
+end
+n_2 = n_sx + 1
+n_ss = n_2·(n_sy + 1)
+n_t2 = n_ss + 14
+F_n = zeros(3, 7)
+for m = 1:7
+  F_n(1, m) = n_sy·n_2 + (n_sx/2 - 3) + m
+  F_n(2, m) = n_ss + m
+  F_n(3, m) = n_ss + 7 + m
+end
+K_2 = zeros(2·n_t2, 2·n_t2)
+for j = 1:n_sy
+  for i = 1:n_sx
+    nd = (j - 1)·n_2 + i
+    c_4 = [nd, nd + 1, nd + 1 + n_2, nd + n_2]
+    g = [2·c_4(1) - 1, 2·c_4(1), 2·c_4(2) - 1, 2·c_4(2), 2·c_4(3) - 1, 2·c_4(3), 2·c_4(4) - 1, 2·c_4(4)]
+    K_2(g, g) = K_2(g, g) + K_s2
+  end
+end
+for k = 1:2
+  for m = 1:6
+    c_4 = [F_n(k, m), F_n(k, m + 1), F_n(k + 1, m + 1), F_n(k + 1, m)]
+    g = [2·c_4(1) - 1, 2·c_4(1), 2·c_4(2) - 1, 2·c_4(2), 2·c_4(3) - 1, 2·c_4(3), 2·c_4(4) - 1, 2·c_4(4)]
+    K_2(g, g) = K_2(g, g) + K_c2
+  end
+end
+for i = 1:n_2
+  K_2(2·i - 1, 2·i - 1) = K_2(2·i - 1, 2·i - 1) + 1e20
+  K_2(2·i, 2·i) = K_2(2·i, 2·i) + 1e20
+end
+for j = 2:n_sy + 1
+  K_2(2·((j - 1)·n_2 + 1) - 1, 2·((j - 1)·n_2 + 1) - 1) = K_2(2·((j - 1)·n_2 + 1) - 1, 2·((j - 1)·n_2 + 1) - 1) + 1e20
+  K_2(2·(j·n_2) - 1, 2·(j·n_2) - 1) = K_2(2·(j·n_2) - 1, 2·(j·n_2) - 1) + 1e20
+end
+F_2 = zeros(2·n_t2, 1)
+F_2(2·F_n(3, 3)) = -P/B/4 + M_y/B/0.5
+F_2(2·F_n(3, 4)) = -P/B/2
+F_2(2·F_n(3, 5)) = -P/B/4 - M_y/B/0.5
+U_2 = clsolve(K_2, F_2)
+f_2 = zeros(n_t2, 1)
+for i = 1:n_sx
+  nd = (n_sy - 1)·n_2 + i
+  c_4 = [nd, nd + 1, nd + 1 + n_2, nd + n_2]
+  u_e = [U_2(2·c_4(1) - 1), U_2(2·c_4(1)), U_2(2·c_4(2) - 1), U_2(2·c_4(2)), U_2(2·c_4(3) - 1), U_2(2·c_4(3)), U_2(2·c_4(4) - 1), U_2(2·c_4(4))]
+  f_e = K_s2·u_e
+  f_2(c_4(3)) = f_2(c_4(3)) + f_e(6)
+  f_2(c_4(4)) = f_2(c_4(4)) + f_e(8)
+end
+q_2 = zeros(7, 1)
+x_2 = zeros(7, 1)
+l_t = [h_s/2, h_s, h_s, h_s, h_s, h_s, h_s/2]
+for m = 1:7
+  x_2(m) = -B/2 + (m - 1)·h_s
+  q_2(m) = -f_2(F_n(1, m))/l_t(m)
+end
+#show
+w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·(12·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'asientos [mm]: centro arriba de la zapata, bordes −x y +x de la zapata, suelo a 1.5 m de profundidad, superficie en x = 1.5 m
+w2_ops = [14.020634, 13.134775, 14.847468, 7.662677, 5.861839] 'OpenSees quad PlaneStrain, mismos nudos [mm]
+q2_ops = [388.259557, 129.551971, 111.596147, 111.441855, 120.562607, 152.292770, 494.183075] 'presión de contacto de OpenSees [kPa]
+q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), q(0.75, 0)] 'fórmula rígida en y = 0 [kPa]
+#tabla("x [m]:2","Fórmula rígida [kPa]:2","Hekatan LISP, suelo 2D [kPa]:6","OpenSees [kPa]:6")(x_2; q2_rig; q_2; q2_ops)
+#dibujo("Modelo 2D: suelo 6 × 4.5 m, zapata y presión de contacto (rojo: suelo FEM, azul: fórmula rígida)", ud = m, escala = auto, cotas = m, alto = 120)
+#  rect(-3, -4.5, 6, 4.5, "fina gris tenue")
+#  achurado(-B/2, 0, B, t, "concreto")
+#  rect(-B/2, 0, B, t, "gruesa")
+#  linea(-3.1, -4.5, 3.1, -4.5, "muygruesa")
+#  texto(0, -4.75, "base fija", 2.4, "c")
+#  texto(-3.05, -2.2, "rodillo", 2.4, "d")
+#  texto(3.05, -2.2, "rodillo", 2.4, "i")
+#  flecha(0, 1.6, 0, 0.62, "gruesa rojo")
+#  texto(0.08, 1.4, "P/B = {P/B:1} kN/m, M_y/B = {M_y/B:1} kN·m/m", 2.4, "i")
+#  polilinea(x_2, -0.004*q_2, "gruesa rojo")
+#  polilinea(x_2, -0.004*q2_rig, "media azul")
+#  linea(-B/2, 0, -B/2, -0.004*q_2(1), "fina rojo")
+#  linea(B/2, 0, B/2, -0.004*q_2(7), "fina rojo")
+#  texto(B/2 + 0.08, -0.004*q_2(7), "{q_2(7):0} kPa", 2.4, "i")
+#  texto(-B/2 - 0.08, -0.004*q_2(1), "{q_2(1):0} kPa", 2.4, "d")
+#  hover(x_2, -0.004*q_2, "x = {#1:2} m · q = {#2:1} kPa (suelo FEM)", x_2, q_2)
+#  hover(x_2, -0.004*q2_rig, "x = {#1:2} m · q = {#2:1} kPa (rígida)", x_2, q2_rig)
+#fin
+dw_2 = max(abs(w_2 - w2_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
+dq_2 = max(abs(q_2 - q2_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
+#: La presión de contacto es la fuerza que cada nudo de la zapata pasa al suelo (fuerza interna de los elementos de suelo de arriba) entre su largo tributario; la suma da exactamente P/B. En un suelo continuo una zapata rígida **concentra la presión en sus bordes** (388 y 494 kPa frente a 111 kPa en el medio): los resortes (Winkler) no pueden mostrar eso, el suelo mallado sí.
+
+## 6 · El suelo por elementos finitos (2): sólido 3D
+
+#: La zapata completa sobre un bloque de suelo 3D de 6 × 6 × 4.5 m con hexaedros de 8 nudos de 0.75 m (8 × 8 × 6); la zapata como 2 × 2 hexaedros de concreto de 0.75 × 0.75 × 0.60. Base fija, lados con rodillos; P, M_x, M_y arriba de la zapata. La misma malla en OpenSees (stdBrick).
+#: **Símbolos: función de forma de un hexaedro** (coordenadas naturales ξ, η, ζ) y la matriz D del sólido (λ, G):
+N_b1 = Simplify{(1-xi)*(1-eta)*(1-zeta)/8}
+l_am = Simplify{E*nu/((1+nu)*(1-2*nu))}
+G_s = Simplify{E/(2*(1+nu))}
+h_3 = 0.75 'lado del hexaedro [m]
+#hide
+D_s3 = zeros(6, 6)
+D_c3 = zeros(6, 6)
+for i = 1:3
+  for j = 1:3
+    D_s3(i, j) = E_s·nu_s/((1 + nu_s)·(1 - 2·nu_s))
+    D_c3(i, j) = E_c·nu_c/((1 + nu_c)·(1 - 2·nu_c))
+  end
+  D_s3(i, i) = D_s3(i, i) + E_s/(1 + nu_s)
+  D_c3(i, i) = D_c3(i, i) + E_c/(1 + nu_c)
+  D_s3(i + 3, i + 3) = E_s/(2·(1 + nu_s))
+  D_c3(i + 3, i + 3) = E_c/(2·(1 + nu_c))
+end
+s_x = [-1, 1, 1, -1, -1, 1, 1, -1]
+s_y = [-1, -1, 1, 1, -1, -1, 1, 1]
+s_z = [-1, -1, -1, -1, 1, 1, 1, 1]
+T_u = zeros(8, 24)
+T_v = zeros(8, 24)
+T_w = zeros(8, 24)
+for k = 1:8
+  T_u(k, 3·k - 2) = 1
+  T_v(k, 3·k - 1) = 1
+  T_w(k, 3·k) = 1
+end
+K_s3 = zeros(24, 24)
+K_c3 = zeros(24, 24)
+for p = 1:8
+  r = s_x(p)/sqrt(3)
+  s = s_y(p)/sqrt(3)
+  z = s_z(p)/sqrt(3)
+  a_x = zeros(8, 1)
+  a_y = zeros(8, 1)
+  a_z = zeros(8, 1)
+  for k = 1:8
+    a_x(k) = s_x(k)·(1 + s_y(k)·s)·(1 + s_z(k)·z)/8
+    a_y(k) = s_y(k)·(1 + s_x(k)·r)·(1 + s_z(k)·z)/8
+    a_z(k) = s_z(k)·(1 + s_x(k)·r)·(1 + s_y(k)·s)/8
+  end
+  B_s = [transpose(a_x)·T_u/(h_3/2); transpose(a_y)·T_v/(h_3/2); transpose(a_z)·T_w/(h_3/2); transpose(a_y)·T_u/(h_3/2) + transpose(a_x)·T_v/(h_3/2); transpose(a_z)·T_v/(h_3/2) + transpose(a_y)·T_w/(h_3/2); transpose(a_z)·T_u/(h_3/2) + transpose(a_x)·T_w/(h_3/2)]
+  B_c = [transpose(a_x)·T_u/(h_3/2); transpose(a_y)·T_v/(h_3/2); transpose(a_z)·T_w/(t/2); transpose(a_y)·T_u/(h_3/2) + transpose(a_x)·T_v/(h_3/2); transpose(a_z)·T_v/(t/2) + transpose(a_y)·T_w/(h_3/2); transpose(a_z)·T_u/(t/2) + transpose(a_x)·T_w/(h_3/2)]
+  K_s3 = K_s3 + (h_3/2)^3·transpose(B_s)·D_s3·B_s
+  K_c3 = K_c3 + (h_3/2)^2·(t/2)·transpose(B_c)·D_c3·B_c
+end
+n_3 = 9
+n_s3 = n_3^2·7
+n_t3 = n_s3 + 9
+K_3 = zeros(3·n_t3, 3·n_t3)
+for k = 1:6
+  for j = 1:8
+    for i = 1:8
+      nd = (k - 1)·81 + (j - 1)·9 + i
+      c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+      g = zeros(24, 1)
+      for m = 1:8
+        g(3·m - 2) = 3·c_8(m) - 2
+        g(3·m - 1) = 3·c_8(m) - 1
+        g(3·m) = 3·c_8(m)
+      end
+      K_3(g, g) = K_3(g, g) + K_s3
+    end
+  end
+end
+T_n = zeros(3, 3)
+for j = 1:3
+  for i = 1:3
+    T_n(i, j) = n_s3 + (j - 1)·3 + i
+  end
+end
+for j = 1:2
+  for i = 1:2
+    nd = 6·81 + (j + 2)·9 + i + 3
+    c_8 = [nd, nd + 1, nd + 10, nd + 9, T_n(i, j), T_n(i + 1, j), T_n(i + 1, j + 1), T_n(i, j + 1)]
+    g = zeros(24, 1)
+    for m = 1:8
+      g(3·m - 2) = 3·c_8(m) - 2
+      g(3·m - 1) = 3·c_8(m) - 1
+      g(3·m) = 3·c_8(m)
+    end
+    K_3(g, g) = K_3(g, g) + K_c3
+  end
+end
+for k = 1:7
+  for j = 1:9
+    for i = 1:9
+      nd = (k - 1)·81 + (j - 1)·9 + i
+      if k == 1
+        K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
+        K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
+        K_3(3·nd, 3·nd) = K_3(3·nd, 3·nd) + 1e20
+      else
+        if i == 1
+          K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
+        end
+        if i == 9
+          K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
+        end
+        if j == 1
+          K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
+        end
+        if j == 9
+          K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
+        end
+      end
+    end
+  end
+end
+F_3 = zeros(3·n_t3, 1)
+F_3(3·T_n(2, 2)) = -P
+F_3(3·T_n(3, 2)) = -M_y/1.5
+F_3(3·T_n(1, 2)) = M_y/1.5
+F_3(3·T_n(2, 1)) = -M_x/1.5
+F_3(3·T_n(2, 3)) = M_x/1.5
+U_3 = clsolve(K_3, F_3)
+f_3 = zeros(n_t3, 1)
+for j = 1:8
+  for i = 1:8
+    nd = 5·81 + (j - 1)·9 + i
+    c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+    u_e = zeros(24, 1)
+    for m = 1:8
+      u_e(3·m - 2) = U_3(3·c_8(m) - 2)
+      u_e(3·m - 1) = U_3(3·c_8(m) - 1)
+      u_e(3·m) = U_3(3·c_8(m))
+    end
+    f_e = K_s3·u_e
+    for m = 5:8
+      f_3(c_8(m)) = f_3(c_8(m)) + f_e(3·m)
+    end
+  end
+end
+q_3 = zeros(9, 1)
+l_3 = [h_3/2, h_3, h_3/2]
+for j = 1:3
+  for i = 1:3
+    nd = 6·81 + (j + 2)·9 + i + 3
+    q_3((j - 1)·3 + i) = -f_3(nd)/(l_3(i)·l_3(j))
+  end
+end
+#show
+w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(6·81 + 3·9 + 6)), -1000·U_3(3·(6·81 + 5·9 + 4)), -1000·U_3(3·(4·81 + 4·9 + 5)), -1000·U_3(3·(6·81 + 4·9 + 7))] 'asientos [mm]: centro arriba de la zapata, esquinas (0.75; −0.75) y (−0.75; 0.75), suelo a 1.5 m de profundidad, superficie en x = 1.5 m
+w3_ops = [6.544825, 7.772255, 5.200530, 3.073474, 2.334232] 'OpenSees stdBrick, mismos nudos [mm]
+q3_ops = [368.128089, 187.464244, 430.716261, 139.124279, 63.801906, 171.350922, 242.951745, 123.010958, 305.539917] 'presión de contacto de OpenSees [kPa]
+#tabla("Nudo (x; y) [m]","Hekatan LISP, suelo 3D [kPa]:6","OpenSees [kPa]:6")({"(−0.75; −0.75)","(0; −0.75)","(0.75; −0.75)","(−0.75; 0)","(0; 0)","(0.75; 0)","(−0.75; 0.75)","(0; 0.75)","(0.75; 0.75)"}; q_3; q3_ops)
+#hide
+Q_3 = zeros(3, 3)
+for j = 1:3
+  for i = 1:3
+    Q_3(i, j) = q_3((j - 1)·3 + i)
+  end
+end
+#show
+p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
+#contourf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
+#surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
+dw_3 = max(abs(w_3 - w3_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
+dq_3 = max(abs(q_3 - q3_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
+#: Lo mismo en 3D: las esquinas cargan más (431 kPa en la esquina +x, −y, donde empujan M_x y M_y) y el centro menos (64 kPa). Los hexaedros de 0.75 m son gruesos (2 × 2 bajo la zapata): es una validación del método contra OpenSees, no una malla de diseño.
+
+## 7 · Comprobación geotécnica
 
 #sust
 phi_r = phi·pi/180

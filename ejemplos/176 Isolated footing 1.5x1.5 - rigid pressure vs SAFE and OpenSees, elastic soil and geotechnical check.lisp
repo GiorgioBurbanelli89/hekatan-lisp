@@ -199,15 +199,15 @@ d_safe = max(abs(t_hek - t_safe)) 'max |Hekatan − SAFE| [kPa]
 
 ## 5 · The soil by finite elements (1): 2D membrane, plane strain
 
-#: Now the SOIL itself is meshed (not springs): a vertical cut through the footing at y = 0, soil 6 m wide and 4.5 m deep with 0.25 m quads, the 0.60 m concrete footing on top (6 × 2 quads). Plane strain: a slice 1 m thick, load P/B and M_y/B per metre. Bottom fixed, sides on rollers. Same mesh in OpenSees (quad PlaneStrain).
+#: Now the SOIL itself is meshed (not springs): a vertical cut through the footing at y = 0, soil 4.5 m wide and 3 m deep with 0.25 m quads, the 0.60 m concrete footing on top (6 × 2 quads). Plane strain: a slice 1 m thick, load P/B and M_y/B per metre. Bottom fixed, sides on rollers. Same mesh in OpenSees (quad PlaneStrain).
 #: **Symbolic: plane-strain matrix D** (σ = D·ε, ε_z = 0) and the strain of a 4-node quad, ε = B·u with ε_x = ∂u/∂x, ε_y = ∂v/∂y, γ_xy = ∂u/∂y + ∂v/∂x:
 d_11 = Simplify{E*(1-nu)/((1+nu)*(1-2*nu))}
 d_12 = Simplify{E*nu/((1+nu)*(1-2*nu))}
 d_33 = Simplify{E/(2*(1+nu))}
 #: Element matrix K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 Gauss points (full integration, as OpenSees quad).
 h_s = 0.25 'soil element size [m]
-W_s = 6 'soil width [m]
-H_s = 4.5 'soil depth [m]
+W_s = 4.5 'soil width [m]
+H_s = 3 'soil depth [m]
 #hide
 n_sx = W_s/h_s
 n_sy = H_s/h_s
@@ -287,19 +287,19 @@ for m = 1:7
   q_2(m) = -f_2(F_n(1, m))/l_t(m)
 end
 #show
-w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·(12·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'settlements [mm]: footing top centre, footing edges −x and +x, soil at 1.5 m depth, soil surface at x = 1.5 m
-w2_ops = [14.020634, 13.134775, 14.847468, 7.662677, 5.861839] 'OpenSees quad PlaneStrain, same nodes [mm]
-q2_ops = [388.259557, 129.551971, 111.596147, 111.441855, 120.562607, 152.292770, 494.183075] 'OpenSees contact pressure [kPa]
+w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·((H_s - 1.5)/h_s·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'settlements [mm]: footing top centre, footing edges −x and +x, soil at 1.5 m depth, soil surface at x = 1.5 m
+w2_ops = [11.209830, 10.342998, 12.017109, 4.703981, 3.607047] 'OpenSees quad PlaneStrain, same nodes [mm]
+q2_ops = [381.707985, 129.868413, 113.408390, 113.706140, 122.403693, 152.641280, 487.569516] 'OpenSees contact pressure [kPa]
 q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), q(0.75, 0)] 'rigid formula at y = 0 [kPa]
 #tabla("x [m]:2","Rigid formula [kPa]:2","Hekatan LISP, 2D soil [kPa]:6","OpenSees [kPa]:6")(x_2; q2_rig; q_2; q2_ops)
-#dibujo("2D model: soil 6 × 4.5 m, footing and contact pressure (red: soil FEM, blue: rigid formula)", ud = m, escala = auto, cotas = m, alto = 120)
-#  rect(-3, -4.5, 6, 4.5, "fina gris tenue")
+#dibujo("2D model: soil 4.5 × 3 m, footing and contact pressure (red: soil FEM, blue: rigid formula)", ud = m, escala = auto, cotas = m, alto = 120)
+#  rect(-W_s/2, -H_s, W_s, H_s, "fina gris tenue")
 #  achurado(-B/2, 0, B, t, "concreto")
 #  rect(-B/2, 0, B, t, "gruesa")
-#  linea(-3.1, -4.5, 3.1, -4.5, "muygruesa")
-#  texto(0, -4.75, "fixed base", 2.4, "c")
-#  texto(-3.05, -2.2, "roller", 2.4, "d")
-#  texto(3.05, -2.2, "roller", 2.4, "i")
+#  linea(-W_s/2 - 0.1, -H_s, W_s/2 + 0.1, -H_s, "muygruesa")
+#  texto(0, -H_s - 0.25, "fixed base", 2.4, "c")
+#  texto(-W_s/2 - 0.05, -H_s/2, "roller", 2.4, "d")
+#  texto(W_s/2 + 0.05, -H_s/2, "roller", 2.4, "i")
 #  flecha(0, 1.6, 0, 0.62, "gruesa rojo")
 #  texto(0.08, 1.4, "P/B = {P/B:1} kN/m, M_y/B = {M_y/B:1} kN·m/m", 2.4, "i")
 #  polilinea(x_2, -0.004*q_2, "gruesa rojo")
@@ -313,7 +313,7 @@ q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), 
 #fin
 dw_2 = max(abs(w_2 - w2_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_2 = max(abs(q_2 - q2_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
-#: The contact pressure is the force each footing node passes to the soil (internal force of the top soil elements) over its tributary length; the sum gives exactly P/B. On a continuous soil a stiff footing **concentrates the pressure at its edges** (388 and 494 kPa against 111 kPa in the middle): springs (Winkler) cannot show that, the meshed soil does.
+#: The contact pressure is the force each footing node passes to the soil (internal force of the top soil elements) over its tributary length; the sum gives exactly P/B. On a continuous soil a stiff footing **concentrates the pressure at its edges** (382 and 488 kPa against 114 kPa in the middle): springs (Winkler) cannot show that, the meshed soil does.
 #: **The pressure bulb** (what Boussinesq describes, here by FEM): vertical stress σ_y in the soil, σ = D·B·u at the centre of each quad, averaged at the nodes. Compression positive [kPa]; hover for the value:
 #hide
 S_2 = zeros(n_ss, 1)
@@ -339,16 +339,18 @@ for j = 1:n_sy + 1
 end
 #show
 s_y2(x, y) = spline(1 + (x + W_s/2)/h_s, 1 + (y + H_s)/h_s, G_2)
-#contourf(s_y2(x, y), [-3 3], [-4.5 0])
+#contourf(s_y2(x, y), [-W_s/2 W_s/2], [-H_s 0])
 
 ## 6 · The soil by finite elements (2): 3D solid
 
-#: The whole footing on a 3D soil block 6 × 6 × 4.5 m with 8-node bricks of 0.75 m (8 × 8 × 6), the footing as 2 × 2 concrete bricks 0.75 × 0.75 × 0.60. Bottom fixed, sides on rollers; P, M_x, M_y on the top of the footing. Same mesh in OpenSees (stdBrick).
+#: The whole footing on a 3D soil block 6 × 4.5 × 3 m with 8-node bricks of 0.75 m (6 × 6 × 4), the footing as 2 × 2 concrete bricks 0.75 × 0.75 × 0.60. Bottom fixed, sides on rollers; P, M_x, M_y on the top of the footing. Same mesh in OpenSees (stdBrick).
 #: **Symbolic: shape function of a brick** (natural coordinates ξ, η, ζ) and the solid matrix D (λ, G):
 N_b1 = Simplify{(1-xi)*(1-eta)*(1-zeta)/8}
 l_am = Simplify{E*nu/((1+nu)*(1-2*nu))}
 G_s = Simplify{E/(2*(1+nu))}
 h_3 = 0.75 'brick size [m]
+W_3 = 4.5 'soil block width [m]
+H_3 = 3 'soil block depth [m]
 #hide
 D_s3 = zeros(6, 6)
 D_c3 = zeros(6, 6)
@@ -392,15 +394,20 @@ for p = 1:8
   K_s3 = K_s3 + (h_3/2)^3·transpose(B_s)·D_s3·B_s
   K_c3 = K_c3 + (h_3/2)^2·(t/2)·transpose(B_c)·D_c3·B_c
 end
-n_3 = 9
-n_s3 = n_3^2·7
+n_3 = W_3/h_3 + 1
+n_z = H_3/h_3 + 1
+p_2 = n_3^2
+i_0 = (W_3/2 - B/2)/h_3
+e_3 = n_3 - 1
+e_z = n_z - 1
+n_s3 = p_2·n_z
 n_t3 = n_s3 + 9
 K_3 = zeros(3·n_t3, 3·n_t3)
-for k = 1:6
-  for j = 1:8
-    for i = 1:8
-      nd = (k - 1)·81 + (j - 1)·9 + i
-      c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+for k = 1:e_z
+  for j = 1:e_3
+    for i = 1:e_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
+      c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, nd + p_2, nd + p_2 + 1, nd + p_2 + n_3 + 1, nd + p_2 + n_3]
       g = zeros(24, 1)
       for m = 1:8
         g(3·m - 2) = 3·c_8(m) - 2
@@ -419,8 +426,8 @@ for j = 1:3
 end
 for j = 1:2
   for i = 1:2
-    nd = 6·81 + (j + 2)·9 + i + 3
-    c_8 = [nd, nd + 1, nd + 10, nd + 9, T_n(i, j), T_n(i + 1, j), T_n(i + 1, j + 1), T_n(i, j + 1)]
+    nd = e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0
+    c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, T_n(i, j), T_n(i + 1, j), T_n(i + 1, j + 1), T_n(i, j + 1)]
     g = zeros(24, 1)
     for m = 1:8
       g(3·m - 2) = 3·c_8(m) - 2
@@ -430,10 +437,10 @@ for j = 1:2
     K_3(g, g) = K_3(g, g) + K_c3
   end
 end
-for k = 1:7
-  for j = 1:9
-    for i = 1:9
-      nd = (k - 1)·81 + (j - 1)·9 + i
+for k = 1:n_z
+  for j = 1:n_3
+    for i = 1:n_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
       if k == 1
         K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
         K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
@@ -442,13 +449,13 @@ for k = 1:7
         if i == 1
           K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
         end
-        if i == 9
+        if i == n_3
           K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
         end
         if j == 1
           K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
         end
-        if j == 9
+        if j == n_3
           K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
         end
       end
@@ -463,10 +470,10 @@ F_3(3·T_n(2, 1)) = -M_x/1.5
 F_3(3·T_n(2, 3)) = M_x/1.5
 U_3 = clsolve(K_3, F_3)
 f_3 = zeros(n_t3, 1)
-for j = 1:8
-  for i = 1:8
-    nd = 5·81 + (j - 1)·9 + i
-    c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+for j = 1:e_3
+  for i = 1:e_3
+    nd = (e_z - 1)·p_2 + (j - 1)·n_3 + i
+    c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, nd + p_2, nd + p_2 + 1, nd + p_2 + n_3 + 1, nd + p_2 + n_3]
     u_e = zeros(24, 1)
     for m = 1:8
       u_e(3·m - 2) = U_3(3·c_8(m) - 2)
@@ -483,14 +490,14 @@ q_3 = zeros(9, 1)
 l_3 = [h_3/2, h_3, h_3/2]
 for j = 1:3
   for i = 1:3
-    nd = 6·81 + (j + 2)·9 + i + 3
+    nd = e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0
     q_3((j - 1)·3 + i) = -f_3(nd)/(l_3(i)·l_3(j))
   end
 end
 #show
-w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(6·81 + 3·9 + 6)), -1000·U_3(3·(6·81 + 5·9 + 4)), -1000·U_3(3·(4·81 + 4·9 + 5)), -1000·U_3(3·(6·81 + 4·9 + 7))] 'settlements [mm]: footing top centre, corners (0.75; −0.75) and (−0.75; 0.75), soil at 1.5 m depth, surface at x = 1.5 m
-w3_ops = [6.544825, 7.772255, 5.200530, 3.073474, 2.334232] 'OpenSees stdBrick, same nodes [mm]
-q3_ops = [368.128089, 187.464244, 430.716261, 139.124279, 63.801906, 171.350922, 242.951745, 123.010958, 305.539917] 'OpenSees contact pressure [kPa]
+w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(e_z·p_2 + i_0·n_3 + i_0 + 3)), -1000·U_3(3·(e_z·p_2 + (i_0 + 2)·n_3 + i_0 + 1)), -1000·U_3(3·((H_3 - 1.5)/h_3·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2)), -1000·U_3(3·(e_z·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2 + 2))] 'settlements [mm]: footing top centre, corners (0.75; −0.75) and (−0.75; 0.75), soil at 1.5 m depth, surface at x = 1.5 m
+w3_ops = [5.769229, 6.985553, 4.435608, 2.191077, 1.704312] 'OpenSees stdBrick, same nodes [mm]
+q3_ops = [365.618869, 188.051611, 428.177492, 139.667323, 65.180715, 171.923515, 240.501624, 123.539227, 303.060246] 'OpenSees contact pressure [kPa]
 #tabla("Node (x; y) [m]","Hekatan LISP, 3D soil [kPa]:6","OpenSees [kPa]:6")({"(−0.75; −0.75)","(0; −0.75)","(0.75; −0.75)","(−0.75; 0)","(0; 0)","(0.75; 0)","(−0.75; 0.75)","(0; 0.75)","(0.75; 0.75)"}; q_3; q3_ops)
 #hide
 Q_3 = zeros(3, 3)
@@ -505,7 +512,7 @@ p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
 #surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
 dw_3 = max(abs(w_3 - w3_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
-#: Same picture in 3D: the corners carry the most (431 kPa at the +x, −y corner where M_x and M_y push) and the centre the least (64 kPa). The 0.75 m bricks are coarse (2 × 2 under the footing): this is a validation of the method against OpenSees, not a design mesh.
+#: Same picture in 3D: the corners carry the most (428 kPa at the +x, −y corner where M_x and M_y push) and the centre the least (65 kPa). The 0.75 m bricks are coarse (2 × 2 under the footing): this is a validation of the method against OpenSees, not a design mesh.
 #: **Pressure bulb in 3D**, vertical cut y = 0: σ_z at the brick centres averaged at the nodes [kPa] (compression positive):
 #hide
 S_3 = zeros(n_s3, 1)
@@ -519,11 +526,11 @@ for k = 1:8
   a_z(k) = s_z(k)/8
 end
 B_0 = [transpose(a_x)·T_u/(h_3/2); transpose(a_y)·T_v/(h_3/2); transpose(a_z)·T_w/(h_3/2); transpose(a_y)·T_u/(h_3/2) + transpose(a_x)·T_v/(h_3/2); transpose(a_z)·T_v/(h_3/2) + transpose(a_y)·T_w/(h_3/2); transpose(a_z)·T_u/(h_3/2) + transpose(a_x)·T_w/(h_3/2)]
-for k = 1:6
-  for j = 1:8
-    for i = 1:8
-      nd = (k - 1)·81 + (j - 1)·9 + i
-      c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+for k = 1:e_z
+  for j = 1:e_3
+    for i = 1:e_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
+      c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, nd + p_2, nd + p_2 + 1, nd + p_2 + n_3 + 1, nd + p_2 + n_3]
       u_e = zeros(24, 1)
       for m = 1:8
         u_e(3·m - 2) = U_3(3·c_8(m) - 2)
@@ -538,15 +545,15 @@ for k = 1:6
     end
   end
 end
-G_3 = zeros(9, 7)
-for k = 1:7
-  for i = 1:9
-    G_3(i, k) = S_3((k - 1)·81 + 4·9 + i)/c_3((k - 1)·81 + 4·9 + i)
+G_3 = zeros(n_3, n_z)
+for k = 1:n_z
+  for i = 1:n_3
+    G_3(i, k) = S_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)/c_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)
   end
 end
 #show
-s_z3(x, y) = spline(1 + (x + 3)/h_3, 1 + (y + 4.5)/h_3, G_3)
-#contourf(s_z3(x, y), [-3 3], [-4.5 0])
+s_z3(x, y) = spline(1 + (x + W_3/2)/h_3, 1 + (y + H_3)/h_3, G_3)
+#contourf(s_z3(x, y), [-W_3/2 W_3/2], [-H_3 0])
 
 ## 7 · Geotechnical check
 

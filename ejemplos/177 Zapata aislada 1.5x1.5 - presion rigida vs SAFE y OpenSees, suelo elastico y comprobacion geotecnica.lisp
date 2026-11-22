@@ -199,15 +199,15 @@ d_safe = max(abs(t_hek - t_safe)) 'máx |Hekatan − SAFE| [kPa]
 
 ## 5 · El suelo por elementos finitos (1): membrana 2D, deformación plana
 
-#: Ahora se malla el SUELO mismo (no resortes): un corte vertical por la zapata en y = 0, suelo de 6 m de ancho y 4.5 m de profundidad con cuadriláteros de 0.25 m, y la zapata de concreto de 0.60 m encima (6 × 2 cuadriláteros). Deformación plana: una rebanada de 1 m, carga P/B y M_y/B por metro. Base fija, lados con rodillos. La misma malla en OpenSees (quad PlaneStrain).
+#: Ahora se malla el SUELO mismo (no resortes): un corte vertical por la zapata en y = 0, suelo de 4.5 m de ancho y 3 m de profundidad con cuadriláteros de 0.25 m, y la zapata de concreto de 0.60 m encima (6 × 2 cuadriláteros). Deformación plana: una rebanada de 1 m, carga P/B y M_y/B por metro. Base fija, lados con rodillos. La misma malla en OpenSees (quad PlaneStrain).
 #: **Símbolos: matriz D de deformación plana** (σ = D·ε, ε_z = 0) y la deformación de un cuadrilátero de 4 nudos, ε = B·u con ε_x = ∂u/∂x, ε_y = ∂v/∂y, γ_xy = ∂u/∂y + ∂v/∂x:
 d_11 = Simplify{E*(1-nu)/((1+nu)*(1-2*nu))}
 d_12 = Simplify{E*nu/((1+nu)*(1-2*nu))}
 d_33 = Simplify{E/(2*(1+nu))}
 #: Matriz del elemento K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 puntos de Gauss (integración completa, como el quad de OpenSees).
 h_s = 0.25 'lado del elemento de suelo [m]
-W_s = 6 'ancho del suelo [m]
-H_s = 4.5 'profundidad del suelo [m]
+W_s = 4.5 'ancho del suelo [m]
+H_s = 3 'profundidad del suelo [m]
 #hide
 n_sx = W_s/h_s
 n_sy = H_s/h_s
@@ -287,19 +287,19 @@ for m = 1:7
   q_2(m) = -f_2(F_n(1, m))/l_t(m)
 end
 #show
-w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·(12·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'asientos [mm]: centro arriba de la zapata, bordes −x y +x de la zapata, suelo a 1.5 m de profundidad, superficie en x = 1.5 m
-w2_ops = [14.020634, 13.134775, 14.847468, 7.662677, 5.861839] 'OpenSees quad PlaneStrain, mismos nudos [mm]
-q2_ops = [388.259557, 129.551971, 111.596147, 111.441855, 120.562607, 152.292770, 494.183075] 'presión de contacto de OpenSees [kPa]
+w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·((H_s - 1.5)/h_s·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'asientos [mm]: centro arriba de la zapata, bordes −x y +x de la zapata, suelo a 1.5 m de profundidad, superficie en x = 1.5 m
+w2_ops = [11.209830, 10.342998, 12.017109, 4.703981, 3.607047] 'OpenSees quad PlaneStrain, mismos nudos [mm]
+q2_ops = [381.707985, 129.868413, 113.408390, 113.706140, 122.403693, 152.641280, 487.569516] 'presión de contacto de OpenSees [kPa]
 q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), q(0.75, 0)] 'fórmula rígida en y = 0 [kPa]
 #tabla("x [m]:2","Fórmula rígida [kPa]:2","Hekatan LISP, suelo 2D [kPa]:6","OpenSees [kPa]:6")(x_2; q2_rig; q_2; q2_ops)
-#dibujo("Modelo 2D: suelo 6 × 4.5 m, zapata y presión de contacto (rojo: suelo FEM, azul: fórmula rígida)", ud = m, escala = auto, cotas = m, alto = 120)
-#  rect(-3, -4.5, 6, 4.5, "fina gris tenue")
+#dibujo("Modelo 2D: suelo 4.5 × 3 m, zapata y presión de contacto (rojo: suelo FEM, azul: fórmula rígida)", ud = m, escala = auto, cotas = m, alto = 120)
+#  rect(-W_s/2, -H_s, W_s, H_s, "fina gris tenue")
 #  achurado(-B/2, 0, B, t, "concreto")
 #  rect(-B/2, 0, B, t, "gruesa")
-#  linea(-3.1, -4.5, 3.1, -4.5, "muygruesa")
-#  texto(0, -4.75, "base fija", 2.4, "c")
-#  texto(-3.05, -2.2, "rodillo", 2.4, "d")
-#  texto(3.05, -2.2, "rodillo", 2.4, "i")
+#  linea(-W_s/2 - 0.1, -H_s, W_s/2 + 0.1, -H_s, "muygruesa")
+#  texto(0, -H_s - 0.25, "base fija", 2.4, "c")
+#  texto(-W_s/2 - 0.05, -H_s/2, "rodillo", 2.4, "d")
+#  texto(W_s/2 + 0.05, -H_s/2, "rodillo", 2.4, "i")
 #  flecha(0, 1.6, 0, 0.62, "gruesa rojo")
 #  texto(0.08, 1.4, "P/B = {P/B:1} kN/m, M_y/B = {M_y/B:1} kN·m/m", 2.4, "i")
 #  polilinea(x_2, -0.004*q_2, "gruesa rojo")
@@ -313,7 +313,7 @@ q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), 
 #fin
 dw_2 = max(abs(w_2 - w2_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_2 = max(abs(q_2 - q2_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
-#: La presión de contacto es la fuerza que cada nudo de la zapata pasa al suelo (fuerza interna de los elementos de suelo de arriba) entre su largo tributario; la suma da exactamente P/B. En un suelo continuo una zapata rígida **concentra la presión en sus bordes** (388 y 494 kPa frente a 111 kPa en el medio): los resortes (Winkler) no pueden mostrar eso, el suelo mallado sí.
+#: La presión de contacto es la fuerza que cada nudo de la zapata pasa al suelo (fuerza interna de los elementos de suelo de arriba) entre su largo tributario; la suma da exactamente P/B. En un suelo continuo una zapata rígida **concentra la presión en sus bordes** (382 y 488 kPa frente a 114 kPa en el medio): los resortes (Winkler) no pueden mostrar eso, el suelo mallado sí.
 #: **El bulbo de presiones** (lo que describe Boussinesq, aquí por FEM): esfuerzo vertical σ_y en el suelo, σ = D·B·u en el centro de cada cuadrilátero, promediado en los nudos. Compresión positiva [kPa]; con el cursor se ve el valor:
 #hide
 S_2 = zeros(n_ss, 1)
@@ -339,16 +339,18 @@ for j = 1:n_sy + 1
 end
 #show
 s_y2(x, y) = spline(1 + (x + W_s/2)/h_s, 1 + (y + H_s)/h_s, G_2)
-#contourf(s_y2(x, y), [-3 3], [-4.5 0])
+#contourf(s_y2(x, y), [-W_s/2 W_s/2], [-H_s 0])
 
 ## 6 · El suelo por elementos finitos (2): sólido 3D
 
-#: La zapata completa sobre un bloque de suelo 3D de 6 × 6 × 4.5 m con hexaedros de 8 nudos de 0.75 m (8 × 8 × 6); la zapata como 2 × 2 hexaedros de concreto de 0.75 × 0.75 × 0.60. Base fija, lados con rodillos; P, M_x, M_y arriba de la zapata. La misma malla en OpenSees (stdBrick).
+#: La zapata completa sobre un bloque de suelo 3D de 6 × 4.5 × 3 m con hexaedros de 8 nudos de 0.75 m (6 × 6 × 4); la zapata como 2 × 2 hexaedros de concreto de 0.75 × 0.75 × 0.60. Base fija, lados con rodillos; P, M_x, M_y arriba de la zapata. La misma malla en OpenSees (stdBrick).
 #: **Símbolos: función de forma de un hexaedro** (coordenadas naturales ξ, η, ζ) y la matriz D del sólido (λ, G):
 N_b1 = Simplify{(1-xi)*(1-eta)*(1-zeta)/8}
 l_am = Simplify{E*nu/((1+nu)*(1-2*nu))}
 G_s = Simplify{E/(2*(1+nu))}
 h_3 = 0.75 'lado del hexaedro [m]
+W_3 = 4.5 'ancho del bloque de suelo [m]
+H_3 = 3 'profundidad del bloque de suelo [m]
 #hide
 D_s3 = zeros(6, 6)
 D_c3 = zeros(6, 6)
@@ -392,15 +394,20 @@ for p = 1:8
   K_s3 = K_s3 + (h_3/2)^3·transpose(B_s)·D_s3·B_s
   K_c3 = K_c3 + (h_3/2)^2·(t/2)·transpose(B_c)·D_c3·B_c
 end
-n_3 = 9
-n_s3 = n_3^2·7
+n_3 = W_3/h_3 + 1
+n_z = H_3/h_3 + 1
+p_2 = n_3^2
+i_0 = (W_3/2 - B/2)/h_3
+e_3 = n_3 - 1
+e_z = n_z - 1
+n_s3 = p_2·n_z
 n_t3 = n_s3 + 9
 K_3 = zeros(3·n_t3, 3·n_t3)
-for k = 1:6
-  for j = 1:8
-    for i = 1:8
-      nd = (k - 1)·81 + (j - 1)·9 + i
-      c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+for k = 1:e_z
+  for j = 1:e_3
+    for i = 1:e_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
+      c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, nd + p_2, nd + p_2 + 1, nd + p_2 + n_3 + 1, nd + p_2 + n_3]
       g = zeros(24, 1)
       for m = 1:8
         g(3·m - 2) = 3·c_8(m) - 2
@@ -419,8 +426,8 @@ for j = 1:3
 end
 for j = 1:2
   for i = 1:2
-    nd = 6·81 + (j + 2)·9 + i + 3
-    c_8 = [nd, nd + 1, nd + 10, nd + 9, T_n(i, j), T_n(i + 1, j), T_n(i + 1, j + 1), T_n(i, j + 1)]
+    nd = e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0
+    c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, T_n(i, j), T_n(i + 1, j), T_n(i + 1, j + 1), T_n(i, j + 1)]
     g = zeros(24, 1)
     for m = 1:8
       g(3·m - 2) = 3·c_8(m) - 2
@@ -430,10 +437,10 @@ for j = 1:2
     K_3(g, g) = K_3(g, g) + K_c3
   end
 end
-for k = 1:7
-  for j = 1:9
-    for i = 1:9
-      nd = (k - 1)·81 + (j - 1)·9 + i
+for k = 1:n_z
+  for j = 1:n_3
+    for i = 1:n_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
       if k == 1
         K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
         K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
@@ -442,13 +449,13 @@ for k = 1:7
         if i == 1
           K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
         end
-        if i == 9
+        if i == n_3
           K_3(3·nd - 2, 3·nd - 2) = K_3(3·nd - 2, 3·nd - 2) + 1e20
         end
         if j == 1
           K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
         end
-        if j == 9
+        if j == n_3
           K_3(3·nd - 1, 3·nd - 1) = K_3(3·nd - 1, 3·nd - 1) + 1e20
         end
       end
@@ -463,10 +470,10 @@ F_3(3·T_n(2, 1)) = -M_x/1.5
 F_3(3·T_n(2, 3)) = M_x/1.5
 U_3 = clsolve(K_3, F_3)
 f_3 = zeros(n_t3, 1)
-for j = 1:8
-  for i = 1:8
-    nd = 5·81 + (j - 1)·9 + i
-    c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+for j = 1:e_3
+  for i = 1:e_3
+    nd = (e_z - 1)·p_2 + (j - 1)·n_3 + i
+    c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, nd + p_2, nd + p_2 + 1, nd + p_2 + n_3 + 1, nd + p_2 + n_3]
     u_e = zeros(24, 1)
     for m = 1:8
       u_e(3·m - 2) = U_3(3·c_8(m) - 2)
@@ -483,14 +490,14 @@ q_3 = zeros(9, 1)
 l_3 = [h_3/2, h_3, h_3/2]
 for j = 1:3
   for i = 1:3
-    nd = 6·81 + (j + 2)·9 + i + 3
+    nd = e_z·p_2 + (j + i_0 - 1)·n_3 + i + i_0
     q_3((j - 1)·3 + i) = -f_3(nd)/(l_3(i)·l_3(j))
   end
 end
 #show
-w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(6·81 + 3·9 + 6)), -1000·U_3(3·(6·81 + 5·9 + 4)), -1000·U_3(3·(4·81 + 4·9 + 5)), -1000·U_3(3·(6·81 + 4·9 + 7))] 'asientos [mm]: centro arriba de la zapata, esquinas (0.75; −0.75) y (−0.75; 0.75), suelo a 1.5 m de profundidad, superficie en x = 1.5 m
-w3_ops = [6.544825, 7.772255, 5.200530, 3.073474, 2.334232] 'OpenSees stdBrick, mismos nudos [mm]
-q3_ops = [368.128089, 187.464244, 430.716261, 139.124279, 63.801906, 171.350922, 242.951745, 123.010958, 305.539917] 'presión de contacto de OpenSees [kPa]
+w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(e_z·p_2 + i_0·n_3 + i_0 + 3)), -1000·U_3(3·(e_z·p_2 + (i_0 + 2)·n_3 + i_0 + 1)), -1000·U_3(3·((H_3 - 1.5)/h_3·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2)), -1000·U_3(3·(e_z·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2 + 2))] 'asientos [mm]: centro arriba de la zapata, esquinas (0.75; −0.75) y (−0.75; 0.75), suelo a 1.5 m de profundidad, superficie en x = 1.5 m
+w3_ops = [5.769229, 6.985553, 4.435608, 2.191077, 1.704312] 'OpenSees stdBrick, mismos nudos [mm]
+q3_ops = [365.618869, 188.051611, 428.177492, 139.667323, 65.180715, 171.923515, 240.501624, 123.539227, 303.060246] 'presión de contacto de OpenSees [kPa]
 #tabla("Nudo (x; y) [m]","Hekatan LISP, suelo 3D [kPa]:6","OpenSees [kPa]:6")({"(−0.75; −0.75)","(0; −0.75)","(0.75; −0.75)","(−0.75; 0)","(0; 0)","(0.75; 0)","(−0.75; 0.75)","(0; 0.75)","(0.75; 0.75)"}; q_3; q3_ops)
 #hide
 Q_3 = zeros(3, 3)
@@ -505,7 +512,7 @@ p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
 #surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
 dw_3 = max(abs(w_3 - w3_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
-#: Lo mismo en 3D: las esquinas cargan más (431 kPa en la esquina +x, −y, donde empujan M_x y M_y) y el centro menos (64 kPa). Los hexaedros de 0.75 m son gruesos (2 × 2 bajo la zapata): es una validación del método contra OpenSees, no una malla de diseño.
+#: Lo mismo en 3D: las esquinas cargan más (428 kPa en la esquina +x, −y, donde empujan M_x y M_y) y el centro menos (65 kPa). Los hexaedros de 0.75 m son gruesos (2 × 2 bajo la zapata): es una validación del método contra OpenSees, no una malla de diseño.
 #: **Bulbo de presiones en 3D**, corte vertical y = 0: σ_z en el centro de los hexaedros promediado en los nudos [kPa] (compresión positiva):
 #hide
 S_3 = zeros(n_s3, 1)
@@ -519,11 +526,11 @@ for k = 1:8
   a_z(k) = s_z(k)/8
 end
 B_0 = [transpose(a_x)·T_u/(h_3/2); transpose(a_y)·T_v/(h_3/2); transpose(a_z)·T_w/(h_3/2); transpose(a_y)·T_u/(h_3/2) + transpose(a_x)·T_v/(h_3/2); transpose(a_z)·T_v/(h_3/2) + transpose(a_y)·T_w/(h_3/2); transpose(a_z)·T_u/(h_3/2) + transpose(a_x)·T_w/(h_3/2)]
-for k = 1:6
-  for j = 1:8
-    for i = 1:8
-      nd = (k - 1)·81 + (j - 1)·9 + i
-      c_8 = [nd, nd + 1, nd + 10, nd + 9, nd + 81, nd + 82, nd + 91, nd + 90]
+for k = 1:e_z
+  for j = 1:e_3
+    for i = 1:e_3
+      nd = (k - 1)·p_2 + (j - 1)·n_3 + i
+      c_8 = [nd, nd + 1, nd + n_3 + 1, nd + n_3, nd + p_2, nd + p_2 + 1, nd + p_2 + n_3 + 1, nd + p_2 + n_3]
       u_e = zeros(24, 1)
       for m = 1:8
         u_e(3·m - 2) = U_3(3·c_8(m) - 2)
@@ -538,15 +545,15 @@ for k = 1:6
     end
   end
 end
-G_3 = zeros(9, 7)
-for k = 1:7
-  for i = 1:9
-    G_3(i, k) = S_3((k - 1)·81 + 4·9 + i)/c_3((k - 1)·81 + 4·9 + i)
+G_3 = zeros(n_3, n_z)
+for k = 1:n_z
+  for i = 1:n_3
+    G_3(i, k) = S_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)/c_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)
   end
 end
 #show
-s_z3(x, y) = spline(1 + (x + 3)/h_3, 1 + (y + 4.5)/h_3, G_3)
-#contourf(s_z3(x, y), [-3 3], [-4.5 0])
+s_z3(x, y) = spline(1 + (x + W_3/2)/h_3, 1 + (y + H_3)/h_3, G_3)
+#contourf(s_z3(x, y), [-W_3/2 W_3/2], [-H_3 0])
 
 ## 7 · Comprobación geotécnica
 

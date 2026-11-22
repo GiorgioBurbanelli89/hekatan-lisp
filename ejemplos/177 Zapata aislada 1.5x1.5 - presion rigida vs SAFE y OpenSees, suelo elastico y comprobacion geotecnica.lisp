@@ -520,22 +520,10 @@ w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(e_z·p_2 + i_0·n_3 + i_0 + 3)),
 w3_ops = [5.769229, 6.985553, 4.435608, 2.191077, 1.704312] 'OpenSees stdBrick, mismos nudos [mm]
 q3_ops = [365.618869, 188.051611, 428.177492, 139.667323, 65.180715, 171.923515, 240.501624, 123.539227, 303.060246] 'presión de contacto de OpenSees [kPa]
 #tabla("Nudo (x; y) [m]","Hekatan LISP, suelo 3D [kPa]:6","OpenSees [kPa]:6")({"(−0.75; −0.75)","(0; −0.75)","(0.75; −0.75)","(−0.75; 0)","(0; 0)","(0.75; 0)","(−0.75; 0.75)","(0; 0.75)","(0.75; 0.75)"}; q_3; q3_ops)
-#hide
-Q_3 = zeros(3, 3)
-for j = 1:3
-  for i = 1:3
-    Q_3(i, j) = q_3((j - 1)·3 + i)
-  end
-end
-#show
-p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
-#contourf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
-#surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
 dw_3 = max(abs(w_3 - w3_ops)) 'máx |Hekatan − OpenSees| en asiento [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'máx |Hekatan − OpenSees| en presión de contacto [kPa]
 dK_b = round(K_s3(1, 1) - (D_s3(1, 1) + 2·D_s3(4, 4))·2·(h_3/2)/9, 6) 'K(u1,u1): numérica − forma cerrada simbólica (cubo a = b = c_z), debe dar 0
 #: Lo mismo en 3D: las esquinas cargan más (428 kPa en la esquina +x, −y, donde empujan M_x y M_y) y el centro menos (65 kPa). Los hexaedros de 0.75 m son gruesos (2 × 2 bajo la zapata): es una validación del método contra OpenSees, no una malla de diseño.
-#: **Bulbo de presiones en 3D**, corte vertical y = 0: σ_z en el centro de los hexaedros promediado en los nudos [kPa] (compresión positiva):
 #hide
 S_3 = zeros(n_s3, 1)
 c_3 = zeros(n_s3, 1)
@@ -567,16 +555,8 @@ for k = 1:e_z
     end
   end
 end
-G_3 = zeros(n_3, n_z)
-for k = 1:n_z
-  for i = 1:n_3
-    G_3(i, k) = S_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)/c_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)
-  end
-end
 #show
-s_z3(x, y) = spline(1 + (x + W_3/2)/h_3, 1 + (y + H_3)/h_3, G_3)
-#contourf(s_z3(x, y), [-W_3/2 W_3/2], [-H_3 0])
-#: **3D: el suelo como sólido**, cortado en y = 0 para ver por dentro: color = esfuerzo vertical σ_z [kPa] (el bulbo en la cara del corte), deformada ×30, la columna como barra. Arrastra para girar, rueda para acercar, cursor para leer:
+#: **3D: el suelo como sólido**, cortado en y = 0 para ver por dentro: color = esfuerzo vertical σ_z [kPa] (el bulbo en la cara del corte), deformada ×30, la columna como barra. Bandas de color e isolíneas como en los mapas. Arrastra para girar, rueda para acercar, cursor para leer:
 #hide
 n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
 X_3 = zeros(n_t3 + 1, 3)

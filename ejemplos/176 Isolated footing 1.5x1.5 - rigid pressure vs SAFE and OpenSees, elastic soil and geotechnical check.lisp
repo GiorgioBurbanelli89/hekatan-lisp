@@ -520,22 +520,10 @@ w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(e_z·p_2 + i_0·n_3 + i_0 + 3)),
 w3_ops = [5.769229, 6.985553, 4.435608, 2.191077, 1.704312] 'OpenSees stdBrick, same nodes [mm]
 q3_ops = [365.618869, 188.051611, 428.177492, 139.667323, 65.180715, 171.923515, 240.501624, 123.539227, 303.060246] 'OpenSees contact pressure [kPa]
 #tabla("Node (x; y) [m]","Hekatan LISP, 3D soil [kPa]:6","OpenSees [kPa]:6")({"(−0.75; −0.75)","(0; −0.75)","(0.75; −0.75)","(−0.75; 0)","(0; 0)","(0.75; 0)","(−0.75; 0.75)","(0; 0.75)","(0.75; 0.75)"}; q_3; q3_ops)
-#hide
-Q_3 = zeros(3, 3)
-for j = 1:3
-  for i = 1:3
-    Q_3(i, j) = q_3((j - 1)·3 + i)
-  end
-end
-#show
-p_3(x, y) = spline(1 + (x + B/2)/h_3, 1 + (y + B/2)/h_3, Q_3)
-#contourf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
-#surf(p_3(x, y), [-B/2 B/2], [-B/2 B/2])
 dw_3 = max(abs(w_3 - w3_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
 dK_b = round(K_s3(1, 1) - (D_s3(1, 1) + 2·D_s3(4, 4))·2·(h_3/2)/9, 6) 'K(u1,u1): numeric − symbolic closed form (cube a = b = c_z), must be 0
 #: Same picture in 3D: the corners carry the most (428 kPa at the +x, −y corner where M_x and M_y push) and the centre the least (65 kPa). The 0.75 m bricks are coarse (2 × 2 under the footing): this is a validation of the method against OpenSees, not a design mesh.
-#: **Pressure bulb in 3D**, vertical cut y = 0: σ_z at the brick centres averaged at the nodes [kPa] (compression positive):
 #hide
 S_3 = zeros(n_s3, 1)
 c_3 = zeros(n_s3, 1)
@@ -567,16 +555,8 @@ for k = 1:e_z
     end
   end
 end
-G_3 = zeros(n_3, n_z)
-for k = 1:n_z
-  for i = 1:n_3
-    G_3(i, k) = S_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)/c_3((k - 1)·p_2 + (n_3 - 1)/2·n_3 + i)
-  end
-end
 #show
-s_z3(x, y) = spline(1 + (x + W_3/2)/h_3, 1 + (y + H_3)/h_3, G_3)
-#contourf(s_z3(x, y), [-W_3/2 W_3/2], [-H_3 0])
-#: **3D: the soil as a solid**, cut at y = 0 to see inside: colour = vertical stress σ_z [kPa] (the pressure bulb on the cut face), deformed shape ×30, the column as a bar. Drag to rotate, wheel to zoom, hover to read:
+#: **3D: the soil as a solid**, cut at y = 0 to see inside: colour = vertical stress σ_z [kPa] (the pressure bulb on the cut face), deformed shape ×30, the column as a bar. Colour bands and isolines as in the maps. Drag to rotate, wheel to zoom, hover to read:
 #hide
 n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
 X_3 = zeros(n_t3 + 1, 3)

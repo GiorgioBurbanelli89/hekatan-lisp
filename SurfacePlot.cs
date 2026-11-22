@@ -162,9 +162,10 @@ namespace HekatanLisp
  function jetr(t){t=Math.max(0,Math.min(1,t));
    var r=Math.max(0,Math.min(1,1.5-Math.abs(4*t-3))),g=Math.max(0,Math.min(1,1.5-Math.abs(4*t-2))),b=Math.max(0,Math.min(1,1.5-Math.abs(4*t-1)));
    return 'rgb('+(r*255|0)+','+(g*255|0)+','+(b*255|0)+')';}
+ function hd(cv,c,W,H){var k=Math.min(4,Math.max(2,(window.devicePixelRatio||1)*1.5));if(cv._k!==k){cv._k=k;if(!cv.style.width){cv.style.width=W+'px';cv.style.maxWidth='100%';cv.style.height='auto';}cv.width=Math.round(W*k);cv.height=Math.round(H*k);}c.setTransform(k,0,0,k,0,0);}          // nitido al acercar (Ctrl +) y en pantallas HiDPI: el lienzo se dibuja a k x su tamano
  function setup(cv){
    var nn=+cv.dataset.nn, zmin=+cv.dataset.zmin, zmax=+cv.dataset.zmax, z=JSON.parse(cv.dataset.z);
-   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=cv.dataset.az?+cv.dataset.az:-0.9,el=0.5,rng=(zmax-zmin)||1;
+   var W=cv._W||(cv._W=cv.width),H=cv._H||(cv._H=cv.height),ctx=cv.getContext('2d'),az=cv.dataset.az?+cv.dataset.az:-0.9,el=0.5,rng=(zmax-zmin)||1;
    function Z(i,j){return z[j*(nn+1)+i];}
    function proj(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;
@@ -201,7 +202,7 @@ namespace HekatanLisp
        for(var k=1;k<NB;k++){var L=zmin+rng*k/NB;if(L<=lo||L>=hi)continue;var e=[];
          for(var a=0;a<3;a++){var A=T[a],Bq=T[(a+1)%3];if((A[2]-L)*(Bq[2]-L)<0){var t=(L-A[2])/(Bq[2]-A[2]);e.push(proj(A[0]+t*(Bq[0]-A[0]),A[1]+t*(Bq[1]-A[1]),L));}}
          if(e.length==2){ctx.beginPath();ctx.moveTo(e[0][0],e[0][1]);ctx.lineTo(e[1][0],e[1][1]);ctx.strokeStyle=rgb(csi((k+0.5)/NB),0.62);ctx.lineWidth=1.2;ctx.lineCap='round';ctx.stroke();}}});}
-   function draw(){ctx.clearRect(0,0,W,H);var c=[];
+   function draw(){hd(cv,ctx,W,H);ctx.clearRect(0,0,W,H);var c=[];
      for(var i=0;i<nn;i++)for(var j=0;j<nn;j++){var zc=(Z(i,j)+Z(i+1,j)+Z(i+1,j+1)+Z(i,j+1))/4;c.push([dep(i,j,zc),i,j,zc]);}
      c.sort(function(a,b){return a[0]-b[0];});
      for(var k=0;k<c.length;k++){var i=c[k][1],j=c[k][2],zc=c[k][3];
@@ -214,7 +215,7 @@ namespace HekatanLisp
    if(cv.dataset.frames){var FR=JSON.parse(cv.dataset.frames),ZR=JSON.parse(cv.dataset.zr||'[]');
      cv.hkFrame=function(k){if(!FR[k])return;z=FR[k];if(ZR[k]){zmin=ZR[k][0];zmax=ZR[k][1];}rng=(zmax-zmin)||1;cv.dataset.frame=k;draw();};
      if(cv.dataset.frame&&+cv.dataset.frame>0)cv.hkFrame(+cv.dataset.frame);}
-   draw();cv.style.cursor='grab';
+   draw();cv.style.cursor='grab';window.addEventListener('resize',function(){if(cv.isConnected&&cv._k!==Math.min(4,Math.max(2,(window.devicePixelRatio||1)*1.5)))draw();});
    // ---- HOVER: el nudo mas cercano al cursor, con su x, y, z (17-sep-2026, Jorge) ----
    var xa=+cv.dataset.xa,xb=+cv.dataset.xb,ya=+cv.dataset.ya,yb=+cv.dataset.yb;
    var vx=cv.dataset.vx||'x',vy=cv.dataset.vy||'y';
@@ -608,7 +609,7 @@ namespace HekatanLisp
                  + " data-xa=\"" + xa.ToString("0.######", inv) + "\" data-xb=\"" + xb.ToString("0.######", inv) + "\""
                  + " data-ya=\"" + ya.ToString("0.######", inv) + "\" data-yb=\"" + yb.ToString("0.######", inv) + "\""
                  + " data-vx=\"" + System.Net.WebUtility.HtmlEncode(vx) + "\" data-vy=\"" + System.Net.WebUtility.HtmlEncode(vy) + "\""
-                 + " data-z='" + sb + "'>" + img + "</span>";
+                 + " data-z='" + sb + "'>" + (img.Contains(" width=") ? img : img.Replace("<img ", "<img width=\"560\" ")) + "</span>";
         }
 
         // Script del hover de los MAPAS (se emite una vez, como el del orbit).
@@ -696,28 +697,29 @@ namespace HekatanLisp
             float pw = W - pL - pR, ph = H - pT - pB;
             SKColor bg = dark ? new SKColor(0x14, 0x16, 0x1a) : new SKColor(0xFB, 0xF7, 0xEC);
             SKColor fg = dark ? new SKColor(0xC8, 0xCC, 0xD0) : new SKColor(0x33, 0x33, 0x33);
-            var info = new SKImageInfo(W, H);
+            const int S = 2;          // 2x: nitido al acercar (Ctrl +) y en pantallas HiDPI; se muestra a 560 px (width en la img)
+            var info = new SKImageInfo(W * S, H * S);
             using var surf = SKSurface.Create(info);
             var cv = surf.Canvas;
-            cv.Clear(bg);
+            cv.Clear(bg); cv.Scale(S);
             // celdas de color (j hacia ARRIBA en pantalla)
             float cw = pw / nn, chh = ph / nn;
             // relleno POR PÍXEL con interpolación bilineal de la rejilla (no un color por celda): los bordes de banda salen
             // curvas suaves, sin los escalones de la rejilla (estilo Hekatan Engineers, como Hekatan Geotechnic)
             {
-                int bw = (int)Math.Ceiling(pw), bh = (int)Math.Ceiling(ph);
+                int bw = (int)Math.Ceiling(pw * S), bh = (int)Math.Ceiling(ph * S);
                 using var bmp = new SKBitmap(bw, bh, SKColorType.Rgba8888, SKAlphaType.Premul);
                 for (int py = 0; py < bh; py++)
                 {
-                    double gj = (ph - (py + 0.5)) / chh; int j = Math.Clamp((int)gj, 0, nn - 1); double fj = Math.Clamp(gj - j, 0, 1);
+                    double gj = (ph - (py + 0.5) / S) / chh; int j = Math.Clamp((int)gj, 0, nn - 1); double fj = Math.Clamp(gj - j, 0, 1);
                     for (int px = 0; px < bw; px++)
                     {
-                        double gi = (px + 0.5) / cw; int i = Math.Clamp((int)gi, 0, nn - 1); double fi = Math.Clamp(gi - i, 0, 1);
+                        double gi = (px + 0.5) / S / cw; int i = Math.Clamp((int)gi, 0, nn - 1); double fi = Math.Clamp(gi - i, 0, 1);
                         double z = (1 - fi) * (1 - fj) * Z[i, j] + fi * (1 - fj) * Z[i + 1, j] + fi * fj * Z[i + 1, j + 1] + (1 - fi) * fj * Z[i, j + 1];
                         bmp.SetPixel(px, py, double.IsNaN(z) ? bg : Banda((z - zmin) / (zmax - zmin), nlev, csi));
                     }
                 }
-                cv.DrawBitmap(bmp, pL, pT);
+                cv.DrawBitmap(bmp, SKRect.Create(pL, pT, bw / (float)S, bh / (float)S));
             }
             // ISOLÍNEAS finas en cada borde de banda (estilo Hekatan Engineers): del COLOR de su nivel (un poco más oscuro,
             // para que se vea sobre la banda), no negras; trazadas por interpolación lineal en cada celda (marching squares),
@@ -850,9 +852,10 @@ namespace HekatanLisp
  function csi(t){t=1-Math.max(0,Math.min(1,t));var u=t*(CSI.length-1),k=Math.min(CSI.length-2,Math.floor(u)),f=u-k;
    var A=CSI[k],B=CSI[k+1];
    return 'rgb('+((A[0]+(B[0]-A[0])*f)|0)+','+((A[1]+(B[1]-A[1])*f)|0)+','+((A[2]+(B[2]-A[2])*f)|0)+')';}
+ function hd(cv,c,W,H){var k=Math.min(4,Math.max(2,(window.devicePixelRatio||1)*1.5));if(cv._k!==k){cv._k=k;if(!cv.style.width){cv.style.width=W+'px';cv.style.maxWidth='100%';cv.style.height='auto';}cv.width=Math.round(W*k);cv.height=Math.round(H*k);}c.setTransform(k,0,0,k,0,0);}          // nitido al acercar (Ctrl +) y en pantallas HiDPI: el lienzo se dibuja a k x su tamano
  function setup(cv){
    var F=JSON.parse(cv.dataset.f),a=+cv.dataset.a,b=+cv.dataset.b,h=+cv.dataset.h;
-   var W=cv.width,H=cv.height,ctx=cv.getContext('2d'),az=-0.75,el=0.42;
+   var W=cv._W||(cv._W=cv.width),H=cv._H||(cv._H=cv.height),ctx=cv.getContext('2d'),az=-0.75,el=0.42;
    var m=Math.max(a,Math.max(b,h))||1;
    function proj(X,Y,Z){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var x=X/m-a/m/2,y=Y/m-b/m/2,z=Z/m-h/m/2;
@@ -860,7 +863,7 @@ namespace HekatanLisp
      return [W*0.5+rx*W*0.60,H*0.52-up*H*0.58];}
    function dep(X,Y,Z){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var x=X/m-a/m/2,y=Y/m-b/m/2,z=Z/m-h/m/2;return ce*ca*x+ce*sa*y+se*z;}
-   function draw(){ctx.clearRect(0,0,W,H);var n=F.length/13,ord=[];
+   function draw(){hd(cv,ctx,W,H);ctx.clearRect(0,0,W,H);var n=F.length/13,ord=[];
      for(var q=0;q<n;q++){var o=q*13,d=0;
        for(var v=0;v<4;v++)d+=dep(F[o+v*3],F[o+v*3+1],F[o+v*3+2]);
        ord.push([d/4,q]);}
@@ -876,7 +879,7 @@ namespace HekatanLisp
    cv.addEventListener('pointermove',function(e){if(!drag)return;az-=(e.clientX-px)*0.01;el+=(e.clientY-py)*0.01;
      el=Math.max(-1.4,Math.min(1.4,el));px=e.clientX;py=e.clientY;draw();});
    cv.addEventListener('pointerup',function(e){drag=false;cv.style.cursor='grab';});
-   draw();}
+   draw();window.addEventListener('resize',function(){if(cv.isConnected&&cv._k!==Math.min(4,Math.max(2,(window.devicePixelRatio||1)*1.5)))draw();});}
  function todos(){var l=document.querySelectorAll('canvas.hk-sol');for(var i=0;i<l.length;i++)if(!l[i].__hk){l[i].__hk=1;setup(l[i]);}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',todos);else todos();
 })();
@@ -945,12 +948,12 @@ function csi(t){t=1-Math.max(0,Math.min(1,t));for(var i=0;i<PAL.length-1;i++){va
 function cut(P,L,arriba){var o=[];for(var a=0;a<P.length;a++){var A=P[a],B=P[(a+1)%P.length],ia=arriba?A[2]>=L:A[2]<=L,ib=arriba?B[2]>=L:B[2]<=L;if(ia)o.push(A);if(ia!==ib){var t=(L-A[2])/(B[2]-A[2]);o.push([A[0]+t*(B[0]-A[0]),A[1]+t*(B[1]-A[1]),L]);}}return o;}
 function fmt(v){var a=Math.abs(v);return (a!==0&&(a<1e-3||a>=1e5))?v.toExponential(3):v.toFixed(4);}
 function init(cv){
- if(cv._m3d)return;cv._m3d=1;
+ if(cv._m3d)return;cv._m3d=1; function hd(cv,c,W,H){var k=Math.min(4,Math.max(2,(window.devicePixelRatio||1)*1.5));if(cv._k!==k){cv._k=k;if(!cv.style.width){cv.style.width=W+'px';cv.style.maxWidth='100%';cv.style.height='auto';}cv.width=Math.round(W*k);cv.height=Math.round(H*k);}c.setTransform(k,0,0,k,0,0);}          // nitido al acercar (Ctrl +) y en pantallas HiDPI: el lienzo se dibuja a k x su tamano
  var D=JSON.parse(cv.getAttribute('data-m3d'));
  var EN=(document.documentElement.lang||'').toLowerCase().indexOf('en')===0;          // página en inglés (i18n): los textos del lienzo también
  var GR={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',eta:'η',theta:'θ',kappa:'κ',lambda:'λ',mu:'μ',nu:'ν',xi:'ξ',rho:'ρ',sigma:'σ',tau:'τ',phi:'φ',psi:'ψ',omega:'ω'};
  D.nS=String(D.nS||'').replace(/^([a-z]+)(?=_|$)/,function(m){return GR[m]||m;});          // sigma_z → σ_z (el nombre de la escala)
- var g=cv.getContext('2d'),W=cv.width,H=cv.height,tip=cv.parentNode.querySelector('.hk-m3d-tip');
+ var g=cv.getContext('2d'),W=cv._W||(cv._W=cv.width),H=cv._H||(cv._H=cv.height),tip=cv.parentNode.querySelector('.hk-m3d-tip');
  var n=D.X.length,P=[],i,k;
  function setP(f){P=[];for(i=0;i<n;i++){var u=(D.U&&D.U[i])?D.U[i]:[0,0,0],e=(D.esc||0)*f;P.push([D.X[i][0]+e*u[0],D.X[i][1]+e*u[1],D.X[i][2]+e*u[2]]);}}
  setP(1);
@@ -1010,7 +1013,7 @@ function init(cv){
     for(var a=0;a<3;a++){var A=T[a],B=T[(a+1)%3];if((A[2]-L)*(B[2]-L)<0){var t=(L-A[2])/(B[2]-A[2]);e.push([A[0]+t*(B[0]-A[0]),A[1]+t*(B[1]-A[1])]);}}
     if(e.length==2){var c0=csi((k+0.5)/NB);g.beginPath();g.moveTo(e[0][0],e[0][1]);g.lineTo(e[1][0],e[1][1]);g.strokeStyle=css([c0[0]*0.62|0,c0[1]*0.62|0,c0[2]*0.62|0],1);g.stroke();}}});
   var so=F.p.map(pr);g.beginPath();g.moveTo(so[0][0],so[0][1]);for(var m1=1;m1<4;m1++)g.lineTo(so[m1][0],so[m1][1]);g.closePath();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=0.7;g.lineCap='butt';g.stroke();}
- function draw(){g.clearRect(0,0,W,H);var fg=getComputedStyle(cv.parentNode).color||'#222';
+ function draw(){hd(cv,g,W,H);g.clearRect(0,0,W,H);var fg=getComputedStyle(cv.parentNode).color||'#222';
   var L=prims.map(function(p){var sc=p.p.map(pr),d=0;sc.forEach(function(q){d+=q[2];});return {p:p,sc:sc,d:d/sc.length};});
   L.sort(function(a,b){return b.d-a.d;});
   L.forEach(function(o){var p=o.p,sc=o.sc,m;g.beginPath();g.moveTo(sc[0][0],sc[0][1]);for(m=1;m<sc.length;m++)g.lineTo(sc[m][0],sc[m][1]);
@@ -1034,7 +1037,7 @@ function init(cv){
   if(best){var r=m[2];tip.textContent=best.txt;tip.style.display='block';tip.style.left=(m[0]*r.width/W+14)+'px';tip.style.top=(m[1]*r.height/H+14)+'px';}else tip.style.display='none';});
  cv.addEventListener('pointerleave',function(){hov=null;tip.style.display='none';draw();});
  cv.addEventListener('wheel',function(ev){ev.preventDefault();zoom*=ev.deltaY<0?1.1:1/1.1;draw();},{passive:false});
- build();draw();
+ build();draw();window.addEventListener('resize',function(){if(cv.isConnected&&cv._k!==Math.min(4,Math.max(2,(window.devicePixelRatio||1)*1.5)))draw();});
  if(D.anim>0){var t0=performance.now(),play=true,moved=false;
   var hint=document.createElement('div');hint.textContent=EN?'animation: click = pause / resume · drag to rotate':'animación: clic = pausa / reanudar · arrastra para girar';hint.style.cssText='position:absolute;left:8px;top:6px;font:12px sans-serif;color:#555;pointer-events:none';cv.parentNode.appendChild(hint);
   cv.addEventListener('pointerdown',function(){moved=false;});cv.addEventListener('pointermove',function(){if(drag)moved=true;});

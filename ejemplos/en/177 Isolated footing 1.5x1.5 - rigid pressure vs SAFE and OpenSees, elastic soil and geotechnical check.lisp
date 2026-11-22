@@ -5,34 +5,17 @@
 
 B = 1.5 'side [m]
 t = 0.6 'thickness [m]
-D_f = 1.5 'foundation depth [m]
+D_f = 1.5 'depth [m]
 P = 400 'axial load [kN]
 M_x = 40 'moment about x [kN·m]
 M_y = 20 'moment about y [kN·m]
 k_s = 20000 'subgrade modulus [kN/m3]
-gamma = 18 'unit weight of the soil [kN/m3]
-phi = 30 'friction angle [degrees]
+gamma = 18 'soil unit weight [kN/m3]
+phi = 30 'friction angle [deg]
 E_s = 20000 'soil modulus [kPa]
-nu_s = 0.3 'soil Poisson's ratio
+nu_s = 0.3 'soil Poisson ratio
 FS = 3 'safety factor
-
-## 2 · Rigid footing: linear pressure
-
-#sust
-A = B^2
-I = B^4/12
-e_x = M_y/P
-e_y = M_x/P
-#equ
-q(x, y) = P/A + M_y·x/I - M_x·y/I
-#sust
-q_max = q(B/2, -B/2)
-q_min = q(-B/2, B/2)
-#equ
-c_col = 0.4 'column side [m]
-q_xp = q(B/2, 0) 'pressure at x = +B/2, y = 0 [kPa]
-q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
-#dibujo("Footing and column: elevation (y = 0) and plan", ud = m, escala = auto, cotas = m, alto = 120)
+#dibujo("Footing and column: elevation (y = 0) and plan", ud = m, escala = auto, cotas = m, alto = 120, lado = derecha)
 #  linea(-1.3, 0, 1.3, 0, "media gris")
 #  achurado(-B/2, -D_f, B, t, "concreto")
 #  rect(-B/2, -D_f, B, t, "gruesa")
@@ -59,15 +42,32 @@ q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
 #  texto(2.9, -0.55 - B/2 - 0.3, "plan · M_x = {M_x:0} kN·m, M_y = {M_y:0} kN·m", 2.4, "c")
 #  hover([2.9 + B/2, 2.9 - B/2, 2.9 + B/2, 2.9 - B/2, 2.9], [-0.55 - B/2, -0.55 + B/2, -0.55 + B/2, -0.55 - B/2, -0.55], "q = {#1:2} kPa (rigid)", [q_max, q_min, P/A + (M_y - M_x)*B/2/I, P/A - (M_y - M_x)*B/2/I, P/A])
 #fin
+
+## 2 · Rigid footing: linear pressure
+
+#sust
+A = B^2
+I = B^4/12
+e_x = M_y/P
+e_y = M_x/P
+#equ
+q(x, y) = P/A + M_y·x/I - M_x·y/I
+#sust
+q_max = q(B/2, -B/2)
+q_min = q(-B/2, B/2)
+#equ
+c_col = 0.4 'column side [m]
+q_xp = q(B/2, 0) 'pressure at x = +B/2, y = 0 [kPa]
+q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
 #sust
 #contourf(q(x, y), [-B/2 B/2], [-B/2 B/2])
 #: Right-hand rule: M_x > 0 compresses the −y side, M_y > 0 the +x side. e_x, e_y ≤ B/6 = 0.25 m: the whole base is in compression.
 
 ## 3 · Hekatan LISP by finite elements: MITC4 plate on Winkler soil
 
-#: The same model as SAFE and OpenSees, assembled here step by step: 4-node Mindlin plate with MITC4 shear (the OpenSees ShellMITC4 element), 3 dof per node [w, θ_x, θ_y], 10 × 10 mesh, soil springs k_s·A_trib at each node.
+#: The same model as SAFE and OpenSees, built here step by step: a Mindlin plate of 4 nodes with MITC4 shear (the element of OpenSees ShellMITC4), 3 dof per node [w, θ_x, θ_y], 10 × 10 mesh, soil springs k_s·A_trib at each node.
 
-#: **Symbols: shape functions and Jacobian.** Element of sides 2a × 2b, natural coordinates ξ, η ∈ [−1, 1]. Shape function of node 1 and the mapping x(ξ), y(η):
+#: **Symbolic: shape functions and Jacobian.** Element of sides 2a × 2b, natural coordinates ξ, η ∈ [−1, 1]. Shape function of node 1 and the map x(ξ), y(η):
 N_1 = Simplify{(1-xi)*(1-eta)/4}
 x_s = Simplify{a*(-(1-xi)*(1-eta)/4 + (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 - (1-xi)*(1+eta)/4)}
 y_s = Simplify{b*(-(1-xi)*(1-eta)/4 - (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 + (1-xi)*(1+eta)/4)}
@@ -78,19 +78,19 @@ J_det = Simplify{a*b - 0*0}
 #: det J = a·b converts dξ·dη into dx·dy. Derivatives in x and y: ∂N/∂x = (1/a)·∂N/∂ξ, ∂N/∂y = (1/b)·∂N/∂η:
 N_1_x = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
 N_1_y = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
-#: **Symbols: plate stiffnesses and MITC4 shear.** Bending D = E·t³/(12(1 − ν²)); shear C_s = (5/6)·G·t. The strain γ_xz is not taken at the Gauss points (that locks the thin plate) but at the midpoints of the sides A = (0, −1), B = (0, 1), and interpolated in η:
+#: **Symbolic: plate stiffnesses and MITC4 shear.** Bending D = E·t³/(12(1 − ν²)); shear C_s = (5/6)·G·t. The shear strain γ_xz is not taken at the Gauss points (that locks a thin plate) but at the mid-sides A = (0, −1), B = (0, 1) and interpolated in η:
 D_flex = Simplify{E*h^3/(12*(1-nu^2))}
 C_shear = Simplify{5/6*E/(2*(1+nu))*h}
 g_xz = Simplify{(1-eta)/2*g_A + (1+eta)/2*g_B}
-#: Two-term closed form of the element matrix (integrated by hand over 2a × 2b):
+#: Closed form of two terms of the element matrix (integrated by hand over 2a × 2b):
 K_ww = Simplify{C*(b/(3*a) + a/(3*b))}
 K_tt = Simplify{D*b/(3*a) + D*(1-nu)*a/(6*b) + C*a*b/3}
 
-#: **Numbers: 12 × 12 element matrix** with 2 × 2 Gauss points:
-E_c = 24.87e6 'elastic modulus of the concrete [kPa]
-nu_c = 0.2 'Poisson's ratio of the concrete
+#: **Numeric: element matrix 12 × 12** with 2 × 2 Gauss points:
+E_c = 24.87e6 'concrete modulus [kPa]
+nu_c = 0.2 'concrete Poisson ratio
 n_x = 10 'elements per side
-h_e = B/n_x 'element side [m]
+h_e = B/n_x 'element size [m]
 a_e = h_e/2 'half side [m]
 D_0 = E_c·t^3/(12·(1 - nu_c^2)) 'bending stiffness [kN·m]
 C_s = 5/6·E_c/(2·(1 + nu_c))·t 'shear stiffness [kN/m]
@@ -126,11 +126,11 @@ for p = 1:4
   K_e = K_e + j_d·(transpose(B_1)·D_b·B_1 + C_s·(transpose(g_1)·g_1 + transpose(g_2)·g_2))
 end
 #show
-#: Check against the closed forms (they must give 0):
+#: Check against the closed forms (must be 0):
 dK_ww = round(K_e(1, 1) - C_s·2/3, 6)
 dK_tt = round(K_e(3, 3) - (D_0/3 + D_0·(1 - nu_c)/6 + C_s·a_e^2/3), 6)
 
-#: **Mesh, springs, load, assembly and solution.** Nodes row by row from (−B/2, −B/2); spring k_s·A_trib (corner h²/4, edge h²/2, interior h²); P, M_x, M_y at the central node:
+#: **Mesh, springs, load, assembly and solution.** Nodes row by row from (−B/2, −B/2); spring k_s·A_trib (corner h²/4, edge h²/2, inside h²); P, M_x, M_y at the center node:
 n_n = n_x + 1
 n_j = n_n^2
 n_g = 3·n_j
@@ -181,12 +181,12 @@ end
 R_f 'sum of soil reactions = P [kN]
 p_fem(x, y) = spline(1 + (x + B/2)/h_e, 1 + (y + B/2)/h_e, P_m)
 #contourf(p_fem(x, y), [-B/2 B/2], [-B/2 B/2])
-#: **3D:** the same soil pressure as a surface (on Winkler springs the settlement w = p/k_s has the same shape). Drag to rotate, hover to see the value:
+#: **3D:** the same soil pressure as a surface (on Winkler springs the settlement w = p/k_s has the same shape). Drag to rotate, hover for the value:
 #surf(p_fem(x, y), [-B/2 B/2], [-B/2 B/2])
 
 ## 4 · Validation: Hekatan LISP vs SAFE 20 vs OpenSees
 
-#: Same mesh node by node, offsets = 0. Corners: nodes 121 (+,+), 111 (−,+), 11 (+,−), 1 (−,−); central node 61.
+#: Same mesh node by node, offsets = 0. Corners are nodes 121 (+,+), 111 (−,+), 11 (+,−), 1 (−,−); center node 61.
 #equ
 t_rig = [q(B/2, -B/2), q(-B/2, -B/2), q(B/2, B/2), q(-B/2, B/2), q(0, 0)] 'rigid formula [kPa]
 t_hek = [p_f(11), p_f(1), p_f(n_j), p_f(n_j - n_x), p_f(n_c)] 'Hekatan LISP MITC4 [kPa]
@@ -195,24 +195,24 @@ t_ops = [281.960118, 212.260957, 142.561796, 72.862635, 178.811271] 'OpenSees Sh
 #tabla("Point (x; y) [m]","Rigid formula [kPa]:2","Hekatan LISP [kPa]:6","OpenSees [kPa]:6","SAFE 20 [kPa]:6")({"(0.75; −0.75)","(−0.75; −0.75)","(0.75; 0.75)","(−0.75; 0.75)","(0; 0)"}; t_rig; t_hek; t_ops; t_safe)
 d_ops = max(abs(t_hek - t_ops)) 'max |Hekatan − OpenSees| [kPa]
 d_safe = max(abs(t_hek - t_safe)) 'max |Hekatan − SAFE| [kPa]
-#: Hekatan LISP and OpenSees solve the same element (MITC4) and the same springs: they agree in all printed digits. The SAFE thick plate is a somewhat different element: 0.005 %. The 1–2.5 % against the rigid formula is the flexure of the real 0.60 m footing.
+#: Hekatan LISP and OpenSees solve the same element (MITC4) and the same springs: they agree to the printed digits. SAFE's thick shell is a slightly different element: 0.005 %. The 1–2.5 % to the rigid formula is the bending of the real 0.60 m footing.
 
 ## 5 · The soil by finite elements (1): 2D membrane, plane strain
 
-#: Now the SOIL itself is meshed (not springs): a vertical cut through the footing at y = 0, soil 4.5 m wide and 3 m deep with 0.25 m quadrilaterals, and the 0.60 m concrete footing on top (6 × 2 quadrilaterals). Plane strain: a 1 m slice, load P/B and M_y/B per meter. Fixed base, sides with rollers. The same mesh in OpenSees (quad PlaneStrain).
-#: **Symbols: plane-strain D matrix** (σ = D·ε, ε_z = 0) and the strain of a 4-node quadrilateral, ε = B·u with ε_x = ∂u/∂x, ε_y = ∂v/∂y, γ_xy = ∂u/∂y + ∂v/∂x:
+#: Now the SOIL itself is meshed (not springs): a vertical cut through the footing at y = 0, soil 4.5 m wide and 3 m deep with 0.25 m quads, the 0.60 m concrete footing on top (6 × 2 quads). Plane strain: a slice 1 m thick, load P/B and M_y/B per metre. Bottom fixed, sides on rollers. Same mesh in OpenSees (quad PlaneStrain).
+#: **Symbolic: plane-strain matrix D** (σ = D·ε, ε_z = 0) and the strain of a 4-node quad, ε = B·u with ε_x = ∂u/∂x, ε_y = ∂v/∂y, γ_xy = ∂u/∂y + ∂v/∂x:
 d_11 = Simplify{E*(1-nu)/((1+nu)*(1-2*nu))}
 d_12 = Simplify{E*nu/((1+nu)*(1-2*nu))}
 d_33 = Simplify{E/(2*(1+nu))}
-#: **Symbols: the quadrilateral step by step.** The same bilinear shape functions and the same Jacobian J = diag(a, b) as the plate (section 3). Derivatives of N_1 in x and y (the columns of B of node 1):
+#: **Symbolic: the quad, step by step.** Same bilinear shape functions and the same Jacobian J = diag(a, b) as the plate (section 3). Derivatives of N_1 in x and y (the columns of B for node 1):
 N_q1x = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
 N_q1y = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
-#: K(u_1, u_1) = ∫∫ (d_11·N_1,x² + d_33·N_1,y²)·det J dξ dη, integrated in symbols:
+#: K(u_1, u_1) = ∫∫ (d_11·N_1,x² + d_33·N_1,y²)·det J dξ dη, integrated symbolically:
 K_uu = Simplify{Area{Area{(D_11*((eta-1)/(4*a))^2 + D_33*((xi-1)/(4*b))^2)*a*b @ xi = -1 : 1} @ eta = -1 : 1}}
-#: Element matrix K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 Gauss points (full integration, like the OpenSees quad).
-h_s = 0.25 'side of the soil element [m]
-W_s = 4.5 'width of the soil [m]
-H_s = 3 'depth of the soil [m]
+#: Element matrix K_e = ∫ Bᵀ·D·B·det J dξ dη, 2 × 2 Gauss points (full integration, as OpenSees quad).
+h_s = 0.25 'soil element size [m]
+W_s = 4.5 'soil width [m]
+H_s = 3 'soil depth [m]
 #hide
 n_sx = W_s/h_s
 n_sy = H_s/h_s
@@ -292,12 +292,12 @@ for m = 1:7
   q_2(m) = -f_2(F_n(1, m))/l_t(m)
 end
 #show
-w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·((H_s - 1.5)/h_s·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'settlements [mm]: center on top of the footing, −x and +x edges of the footing, soil at 1.5 m depth, surface at x = 1.5 m
+w_2 = [-1000·U_2(2·F_n(3, 4)), -1000·U_2(2·F_n(1, 1)), -1000·U_2(2·F_n(1, 7)), -1000·U_2(2·((H_s - 1.5)/h_s·n_2 + n_sx/2 + 1)), -1000·U_2(2·(n_sy·n_2 + n_sx/2 + 7))] 'settlements [mm]: footing top centre, footing edges −x and +x, soil at 1.5 m depth, soil surface at x = 1.5 m
 w2_ops = [11.209830, 10.342998, 12.017109, 4.703981, 3.607047] 'OpenSees quad PlaneStrain, same nodes [mm]
 q2_ops = [381.707985, 129.868413, 113.408390, 113.706140, 122.403693, 152.641280, 487.569516] 'OpenSees contact pressure [kPa]
 q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), q(0.75, 0)] 'rigid formula at y = 0 [kPa]
 #tabla("x [m]:2","Rigid formula [kPa]:2","Hekatan LISP, 2D soil [kPa]:6","OpenSees [kPa]:6")(x_2; q2_rig; q_2; q2_ops)
-#dibujo("2D model: soil 4.5 × 3 m, footing and contact pressure (red: FEM soil, blue: rigid formula)", ud = m, escala = auto, cotas = m, alto = 120)
+#dibujo("2D model: soil 4.5 × 3 m, footing and contact pressure (red: soil FEM, blue: rigid formula)", ud = m, escala = auto, cotas = m, alto = 120)
 #  rect(-W_s/2, -H_s, W_s, H_s, "fina gris tenue")
 #  achurado(-B/2, 0, B, t, "concreto")
 #  rect(-B/2, 0, B, t, "gruesa")
@@ -313,14 +313,14 @@ q2_rig = [q(-0.75, 0), q(-0.5, 0), q(-0.25, 0), q(0, 0), q(0.25, 0), q(0.5, 0), 
 #  linea(B/2, 0, B/2, -0.004*q_2(7), "fina rojo")
 #  texto(B/2 + 0.08, -0.004*q_2(7), "{q_2(7):0} kPa", 2.4, "i")
 #  texto(-B/2 - 0.08, -0.004*q_2(1), "{q_2(1):0} kPa", 2.4, "d")
-#  hover(x_2, -0.004*q_2, "x = {#1:2} m · q = {#2:1} kPa (FEM soil)", x_2, q_2)
+#  hover(x_2, -0.004*q_2, "x = {#1:2} m · q = {#2:1} kPa (soil FEM)", x_2, q_2)
 #  hover(x_2, -0.004*q2_rig, "x = {#1:2} m · q = {#2:1} kPa (rigid)", x_2, q2_rig)
 #fin
 dw_2 = max(abs(w_2 - w2_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_2 = max(abs(q_2 - q2_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
-dK_q = round(K_s2(1, 1) - (D_s2(1, 1) + D_s2(3, 3))/3, 6) 'K(u1,u1): numerical − symbolic closed form (a = b), must give 0
-#: The contact pressure is the force that each footing node passes to the soil (internal force of the soil elements above) divided by its tributary length; the sum gives exactly P/B. In a continuous soil a rigid footing **concentrates the pressure at its edges** (382 and 488 kPa against 114 kPa in the middle): springs (Winkler) cannot show that, the meshed soil can.
-#: **The pressure bulb** (what Boussinesq describes, here by FEM): vertical stress σ_y in the soil, σ = D·B·u at the center of each quadrilateral, averaged at the nodes. Compression positive [kPa]; the value is seen with the cursor:
+dK_q = round(K_s2(1, 1) - (D_s2(1, 1) + D_s2(3, 3))/3, 6) 'K(u1,u1): numeric − symbolic closed form (a = b), must be 0
+#: The contact pressure is the force each footing node passes to the soil (internal force of the top soil elements) over its tributary length; the sum gives exactly P/B. On a continuous soil a stiff footing **concentrates the pressure at its edges** (382 and 488 kPa against 114 kPa in the middle): springs (Winkler) cannot show that, the meshed soil does.
+#: **The pressure bulb** (what Boussinesq describes, here by FEM): vertical stress σ_y in the soil, σ = D·B·u at the centre of each quad, averaged at the nodes. Compression positive [kPa]; hover for the value:
 #hide
 S_2 = zeros(n_ss, 1)
 c_2 = zeros(n_ss, 1)
@@ -349,12 +349,12 @@ s_y2(x, y) = spline(1 + (x + W_s/2)/h_s, 1 + (y + H_s)/h_s, G_2)
 
 ## 6 · The soil by finite elements (2): 3D solid
 
-#: The complete footing on a 3D soil block of 6 × 4.5 × 3 m with 8-node hexahedra of 0.75 m (6 × 6 × 4); the footing as 2 × 2 concrete hexahedra of 0.75 × 0.75 × 0.60. Fixed base, sides with rollers; P, M_x, M_y on top of the footing. The same mesh in OpenSees (stdBrick).
-#: **Symbols: shape function of a hexahedron** (natural coordinates ξ, η, ζ) and the solid D matrix (λ, G):
+#: The whole footing on a 3D soil block 6 × 4.5 × 3 m with 8-node bricks of 0.75 m (6 × 6 × 4), the footing as 2 × 2 concrete bricks 0.75 × 0.75 × 0.60. Bottom fixed, sides on rollers; P, M_x, M_y on the top of the footing. Same mesh in OpenSees (stdBrick).
+#: **Symbolic: shape function of a brick** (natural coordinates ξ, η, ζ) and the solid matrix D (λ, G):
 N_b1 = Simplify{(1-xi)*(1-eta)*(1-zeta)/8}
 l_am = Simplify{E*nu/((1+nu)*(1-2*nu))}
 G_s = Simplify{E/(2*(1+nu))}
-#: **The mapping and the Jacobian.** A hexahedron of sides 2a × 2b × 2c_z: x = Σ N_i·x_i with the 8 corners (±a, ±b, ±c_z):
+#: **The map and the Jacobian.** A brick of sides 2a × 2b × 2c_z: x = Σ N_i·x_i with the 8 corners (±a, ±b, ±c_z):
 x_b = Simplify{a*(-(1-xi)*(1-eta)*(1-zeta) + (1+xi)*(1-eta)*(1-zeta) + (1+xi)*(1+eta)*(1-zeta) - (1-xi)*(1+eta)*(1-zeta) - (1-xi)*(1-eta)*(1+zeta) + (1+xi)*(1-eta)*(1+zeta) + (1+xi)*(1+eta)*(1+zeta) - (1-xi)*(1+eta)*(1+zeta))/8}
 J_b11 = Partial{a*xi @ xi}
 J_b22 = Partial{b*eta @ eta}
@@ -365,13 +365,13 @@ detJ_b = Simplify{a*b*c_z}
 N_b1x = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ xi}/a}
 N_b1y = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ eta}/b}
 N_b1z = Simplify{Partial{(1-xi)*(1-eta)*(1-zeta)/8 @ zeta}/c_z}
-#: Solid D: d_11 = λ + 2G on the diagonal of the normal strains, λ off it, G for the shears:
+#: D of the solid: d_11 = λ + 2G on the diagonal of the normal strains, λ off it, G for the shears:
 d_b11 = Simplify{E*nu/((1+nu)*(1-2*nu)) + E/(1+nu)}
-#: K(u_1, u_1) = ∫∫∫ ((λ + 2G)·N_1,x² + G·N_1,y² + G·N_1,z²)·det J dξ dη dζ, integrated in symbols:
+#: K(u_1, u_1) = ∫∫∫ ((λ + 2G)·N_1,x² + G·N_1,y² + G·N_1,z²)·det J dξ dη dζ, integrated symbolically:
 K_bu = Simplify{Area{Area{Area{(D_11*((1-eta)*(1-zeta)/(8*a))^2 + G*((1-xi)*(1-zeta)/(8*b))^2 + G*((1-xi)*(1-eta)/(8*c_z))^2)*a*b*c_z @ xi = -1 : 1} @ eta = -1 : 1} @ zeta = -1 : 1}}
-h_3 = 0.75 'side of the hexahedron [m]
-W_3 = 4.5 'width of the soil block [m]
-H_3 = 3 'depth of the soil block [m]
+h_3 = 0.75 'brick size [m]
+W_3 = 4.5 'soil block width [m]
+H_3 = 3 'soil block depth [m]
 #hide
 D_s3 = zeros(6, 6)
 D_c3 = zeros(6, 6)
@@ -516,14 +516,14 @@ for j = 1:3
   end
 end
 #show
-w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(e_z·p_2 + i_0·n_3 + i_0 + 3)), -1000·U_3(3·(e_z·p_2 + (i_0 + 2)·n_3 + i_0 + 1)), -1000·U_3(3·((H_3 - 1.5)/h_3·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2)), -1000·U_3(3·(e_z·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2 + 2))] 'settlements [mm]: center on top of the footing, corners (0.75; −0.75) and (−0.75; 0.75), soil at 1.5 m depth, surface at x = 1.5 m
+w_3 = [-1000·U_3(3·T_n(2, 2)), -1000·U_3(3·(e_z·p_2 + i_0·n_3 + i_0 + 3)), -1000·U_3(3·(e_z·p_2 + (i_0 + 2)·n_3 + i_0 + 1)), -1000·U_3(3·((H_3 - 1.5)/h_3·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2)), -1000·U_3(3·(e_z·p_2 + (n_3 - 1)/2·n_3 + (n_3 + 1)/2 + 2))] 'settlements [mm]: footing top centre, corners (0.75; −0.75) and (−0.75; 0.75), soil at 1.5 m depth, surface at x = 1.5 m
 w3_ops = [5.769229, 6.985553, 4.435608, 2.191077, 1.704312] 'OpenSees stdBrick, same nodes [mm]
 q3_ops = [365.618869, 188.051611, 428.177492, 139.667323, 65.180715, 171.923515, 240.501624, 123.539227, 303.060246] 'OpenSees contact pressure [kPa]
 #tabla("Node (x; y) [m]","Hekatan LISP, 3D soil [kPa]:6","OpenSees [kPa]:6")({"(−0.75; −0.75)","(0; −0.75)","(0.75; −0.75)","(−0.75; 0)","(0; 0)","(0.75; 0)","(−0.75; 0.75)","(0; 0.75)","(0.75; 0.75)"}; q_3; q3_ops)
 dw_3 = max(abs(w_3 - w3_ops)) 'max |Hekatan − OpenSees| in settlement [mm]
 dq_3 = max(abs(q_3 - q3_ops)) 'max |Hekatan − OpenSees| in contact pressure [kPa]
-dK_b = round(K_s3(1, 1) - (D_s3(1, 1) + 2·D_s3(4, 4))·2·(h_3/2)/9, 6) 'K(u1,u1): numerical − symbolic closed form (cube a = b = c_z), must give 0
-#: The same in 3D: the corners carry more (428 kPa at the +x, −y corner, where M_x and M_y push) and the center less (65 kPa). The 0.75 m hexahedra are coarse (2 × 2 under the footing): it is a validation of the method against OpenSees, not a design mesh.
+dK_b = round(K_s3(1, 1) - (D_s3(1, 1) + 2·D_s3(4, 4))·2·(h_3/2)/9, 6) 'K(u1,u1): numeric − symbolic closed form (cube a = b = c_z), must be 0
+#: Same picture in 3D: the corners carry the most (428 kPa at the +x, −y corner where M_x and M_y push) and the centre the least (65 kPa). The 0.75 m bricks are coarse (2 × 2 under the footing): this is a validation of the method against OpenSees, not a design mesh.
 #hide
 S_3 = zeros(n_s3, 1)
 c_3 = zeros(n_s3, 1)
@@ -556,11 +556,11 @@ for k = 1:e_z
   end
 end
 #show
-#: **3D: the soil as a solid**, cut at y = 0 to see inside: color = vertical stress σ_z [kPa] (the bulb on the cut face), deformed shape ×30, the column as a bar, the concrete footing in gray (it is another element: it does not carry the soil stress). Color bands and isolines as in the maps. Drag to rotate, wheel to zoom, cursor to read:
+#: **3D: the soil as a solid**, cut at y = 0 to see inside: colour = settlement u_z [mm] (vertical displacement, down positive: how the soil sinks under the footing; the contact STRESS is in the contact-pressure maps and tables), deformed shape ×30, the column as a bar, the concrete footing in grey (it is another element: it has no soil stress). Colour bands and isolines as in the maps. Drag to rotate, wheel to zoom, hover to read:
 #hide
 n_f3 = e_3·e_3 + 2·(e_3/2)·e_z + 2·e_3·e_z + 8
 X_3 = zeros(n_t3 + 1, 3)
-sigma_z = zeros(n_t3 + 1, 1)
+u_z = zeros(n_t3 + 1, 1)
 U_m = zeros(n_t3 + 1, 3)
 for k = 1:n_z
   for j = 1:n_3
@@ -569,7 +569,7 @@ for k = 1:n_z
       X_3(nd, 1) = -W_3/2 + (i - 1)·h_3
       X_3(nd, 2) = -W_3/2 + (j - 1)·h_3
       X_3(nd, 3) = -H_3 + (k - 1)·h_3
-      sigma_z(nd) = S_3(nd)/c_3(nd)
+      u_z(nd) = -1000·U_3(3·nd)
     end
   end
 end
@@ -578,7 +578,7 @@ for j = 1:3
     X_3(T_n(i, j), 1) = -B/2 + (i - 1)·h_3
     X_3(T_n(i, j), 2) = -B/2 + (j - 1)·h_3
     X_3(T_n(i, j), 3) = t
-    sigma_z(T_n(i, j)) = -1e30
+    u_z(T_n(i, j)) = -1e30
   end
 end
 X_3(n_t3 + 1, 3) = t + 1
@@ -670,7 +670,7 @@ e_q(f_n, 4) = T_n(3, 2)
 e_c = [T_n(2, 2), n_t3 + 1]
 v_c = [0, 0]
 #show
-#modelo3d(X_3, e_q, e_c, sigma_z, v_c, U_m, 30)
+#modelo3d(X_3, e_q, e_c, u_z, v_c, U_m, 30)
 
 ## 7 · Geotechnical check
 
@@ -686,4 +686,4 @@ q_u = gamma·D_f·N_q·s_q + 0.5·gamma·B_p·N_g·s_g
 q_adm = q_u/FS
 U = q_max/q_adm
 s = 1000·(P/A)·B·(1 - nu_s^2)/E_s·0.82
-#: Meyerhof effective area B'·L' (B' the smaller side), Vesić N_γ, De Beer shape factors, sand c = 0. U < 1: the soil resists q_max. Settlement s [mm]: elastic, rigid square footing, influence factor 0.82 (Bowles).
+#: Meyerhof effective area B'·L' (B' the smaller side), Vesić N_γ, De Beer shape factors, sand c = 0. U < 1: the soil carries q_max. Settlement s [mm]: elastic, rigid square footing, influence factor 0.82 (Bowles).

@@ -15,24 +15,7 @@ phi = 30 'friction angle [deg]
 E_s = 20000 'soil modulus [kPa]
 nu_s = 0.3 'soil Poisson ratio
 FS = 3 'safety factor
-
-## 2 · Rigid footing: linear pressure
-
-#sust
-A = B^2
-I = B^4/12
-e_x = M_y/P
-e_y = M_x/P
-#equ
-q(x, y) = P/A + M_y·x/I - M_x·y/I
-#sust
-q_max = q(B/2, -B/2)
-q_min = q(-B/2, B/2)
-#equ
-c_col = 0.4 'column side [m]
-q_xp = q(B/2, 0) 'pressure at x = +B/2, y = 0 [kPa]
-q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
-#dibujo("Footing and column: elevation (y = 0) and plan", ud = m, escala = auto, cotas = m, alto = 120)
+#dibujo("Footing and column: elevation (y = 0) and plan", ud = m, escala = auto, cotas = m, alto = 120, lado = derecha)
 #  linea(-1.3, 0, 1.3, 0, "media gris")
 #  achurado(-B/2, -D_f, B, t, "concreto")
 #  rect(-B/2, -D_f, B, t, "gruesa")
@@ -59,6 +42,23 @@ q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
 #  texto(2.9, -0.55 - B/2 - 0.3, "plan · M_x = {M_x:0} kN·m, M_y = {M_y:0} kN·m", 2.4, "c")
 #  hover([2.9 + B/2, 2.9 - B/2, 2.9 + B/2, 2.9 - B/2, 2.9], [-0.55 - B/2, -0.55 + B/2, -0.55 + B/2, -0.55 - B/2, -0.55], "q = {#1:2} kPa (rigid)", [q_max, q_min, P/A + (M_y - M_x)*B/2/I, P/A - (M_y - M_x)*B/2/I, P/A])
 #fin
+
+## 2 · Rigid footing: linear pressure
+
+#sust
+A = B^2
+I = B^4/12
+e_x = M_y/P
+e_y = M_x/P
+#equ
+q(x, y) = P/A + M_y·x/I - M_x·y/I
+#sust
+q_max = q(B/2, -B/2)
+q_min = q(-B/2, B/2)
+#equ
+c_col = 0.4 'column side [m]
+q_xp = q(B/2, 0) 'pressure at x = +B/2, y = 0 [kPa]
+q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
 #sust
 #contourf(q(x, y), [-B/2 B/2], [-B/2 B/2])
 #: Right-hand rule: M_x > 0 compresses the −y side, M_y > 0 the +x side. e_x, e_y ≤ B/6 = 0.25 m: the whole base is in compression.

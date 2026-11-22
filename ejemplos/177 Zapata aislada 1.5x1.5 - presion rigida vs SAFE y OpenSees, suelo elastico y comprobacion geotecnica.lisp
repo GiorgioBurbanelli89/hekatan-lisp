@@ -15,24 +15,7 @@ phi = 30 'ángulo de rozamiento [grados]
 E_s = 20000 'módulo del suelo [kPa]
 nu_s = 0.3 'Poisson del suelo
 FS = 3 'factor de seguridad
-
-## 2 · Zapata rígida: presión lineal
-
-#sust
-A = B^2
-I = B^4/12
-e_x = M_y/P
-e_y = M_x/P
-#equ
-q(x, y) = P/A + M_y·x/I - M_x·y/I
-#sust
-q_max = q(B/2, -B/2)
-q_min = q(-B/2, B/2)
-#equ
-c_col = 0.4 'lado de la columna [m]
-q_xp = q(B/2, 0) 'presión en x = +B/2, y = 0 [kPa]
-q_xm = q(-B/2, 0) 'presión en x = −B/2, y = 0 [kPa]
-#dibujo("Zapata y columna: alzado (y = 0) y planta", ud = m, escala = auto, cotas = m, alto = 120)
+#dibujo("Zapata y columna: alzado (y = 0) y planta", ud = m, escala = auto, cotas = m, alto = 120, lado = derecha)
 #  linea(-1.3, 0, 1.3, 0, "media gris")
 #  achurado(-B/2, -D_f, B, t, "concreto")
 #  rect(-B/2, -D_f, B, t, "gruesa")
@@ -59,6 +42,23 @@ q_xm = q(-B/2, 0) 'presión en x = −B/2, y = 0 [kPa]
 #  texto(2.9, -0.55 - B/2 - 0.3, "planta · M_x = {M_x:0} kN·m, M_y = {M_y:0} kN·m", 2.4, "c")
 #  hover([2.9 + B/2, 2.9 - B/2, 2.9 + B/2, 2.9 - B/2, 2.9], [-0.55 - B/2, -0.55 + B/2, -0.55 + B/2, -0.55 - B/2, -0.55], "q = {#1:2} kPa (rígida)", [q_max, q_min, P/A + (M_y - M_x)*B/2/I, P/A - (M_y - M_x)*B/2/I, P/A])
 #fin
+
+## 2 · Zapata rígida: presión lineal
+
+#sust
+A = B^2
+I = B^4/12
+e_x = M_y/P
+e_y = M_x/P
+#equ
+q(x, y) = P/A + M_y·x/I - M_x·y/I
+#sust
+q_max = q(B/2, -B/2)
+q_min = q(-B/2, B/2)
+#equ
+c_col = 0.4 'lado de la columna [m]
+q_xp = q(B/2, 0) 'presión en x = +B/2, y = 0 [kPa]
+q_xm = q(-B/2, 0) 'presión en x = −B/2, y = 0 [kPa]
 #sust
 #contourf(q(x, y), [-B/2 B/2], [-B/2 B/2])
 #: Regla de la mano derecha: M_x > 0 comprime el lado −y, M_y > 0 el lado +x. e_x, e_y ≤ B/6 = 0.25 m: toda la base está comprimida.

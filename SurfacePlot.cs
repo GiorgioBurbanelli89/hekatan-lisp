@@ -97,7 +97,7 @@ namespace HekatanLisp
         /// resultados FEM, funciones propias…), Z de (n+1)×(n+1). Se remuestrea a ≤ 40 divisiones para que girar sea fluido.</summary>
         public static string SurfaceCanvasGrid(double[,] Z0, int n0, double xa, double xb, double ya, double yb, int id, string vx = "x", string vy = "y")
         {
-            int nn = Math.Min(n0, 40);
+            int nn = Math.Min(n0, 48);
             var Z = new double[nn + 1, nn + 1]; double zmin = double.MaxValue, zmax = double.MinValue;
             for (int i = 0; i <= nn; i++)
                 for (int j = 0; j <= nn; j++)
@@ -133,7 +133,7 @@ namespace HekatanLisp
         public static string SurfaceCanvas(LispConverter.N f, string vx, string vy,
                                            double xa, double xb, double ya, double yb, int id)
         {
-            const int nn = 32;
+            const int nn = 48;          // 48 divisiones: las bandas y las isolíneas del 3D salen lisas (antes 32)
             var (Z, zmin, zmax) = Sample(f, vx, vy, xa, xb, ya, yb, nn);
             var inv = CultureInfo.InvariantCulture;
             var sb = new System.Text.StringBuilder();
@@ -172,12 +172,30 @@ namespace HekatanLisp
      return [W*0.5+rx*W*0.62,H*0.58-up*H*0.60];}
    function dep(i,j,zz){var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
      var X=i/nn-0.5,Y=j/nn-0.5,Zn=(zz-zmin)/rng;return ce*ca*X+ce*sa*Y+se*Zn;}
+   // bandas + isolíneas como el #contourf 2D (paleta CSI, 12 niveles): data-bands=0 vuelve al degradado jet de antes
+   var NB=cv.dataset.bands===undefined?12:+cv.dataset.bands;
+   var PAL=[[0,255,0,255],[.077,255,0,180],[.154,255,0,0],[.231,255,80,0],[.308,255,140,0],[.385,255,190,0],[.462,255,255,0],[.538,180,255,0],[.615,0,255,0],[.692,0,255,180],[.769,0,255,255],[.846,0,180,255],[.923,0,0,255],[1,0,0,180]];
+   function csi(t){t=1-Math.max(0,Math.min(1,t));for(var i=0;i<PAL.length-1;i++){var a=PAL[i],b=PAL[i+1];if(t<=b[0]){var u=b[0]>a[0]?(t-a[0])/(b[0]-a[0]):0;return [a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*u,a[3]+(b[3]-a[3])*u];}}var l=PAL[PAL.length-1];return [l[1],l[2],l[3]];}
+   function banda(t){if(NB<=0)return null;t=Math.max(0,Math.min(0.999999,t));return csi((Math.floor(t*NB)+0.5)/NB);}
+   function rgb(c,f){f=f||1;return 'rgb('+(c[0]*f|0)+','+(c[1]*f|0)+','+(c[2]*f|0)+')';}
+   // cada celda = 2 triángulos (lineales): cada banda se RECORTA exacta en sus niveles (sin escalera) y las isolíneas caen justo en el borde
+   function cut(P,L,arriba){var o=[];for(var a=0;a<P.length;a++){var A=P[a],Bq=P[(a+1)%P.length],ia=arriba?A[2]>=L:A[2]<=L,ib=arriba?Bq[2]>=L:Bq[2]<=L;
+     if(ia)o.push(A);if(ia!==ib){var t=(L-A[2])/(Bq[2]-A[2]);o.push([A[0]+t*(Bq[0]-A[0]),A[1]+t*(Bq[1]-A[1]),L]);}}return o;}
+   function poly(P,st){ctx.beginPath();for(var a=0;a<P.length;a++){var q=proj(P[a][0],P[a][1],P[a][2]);if(a)ctx.lineTo(q[0],q[1]);else ctx.moveTo(q[0],q[1]);}ctx.closePath();ctx.fillStyle=st;ctx.fill();ctx.strokeStyle=st;ctx.lineWidth=0.7;ctx.stroke();}
+   function celda(i,j){var p00=[i,j,Z(i,j)],p10=[i+1,j,Z(i+1,j)],p11=[i+1,j+1,Z(i+1,j+1)],p01=[i,j+1,Z(i,j+1)];
+     [[p00,p10,p11],[p00,p11,p01]].forEach(function(T){var lo=Math.min(T[0][2],T[1][2],T[2][2]),hi=Math.max(T[0][2],T[1][2],T[2][2]);
+       var k0=Math.max(0,Math.min(NB-1,Math.floor((lo-zmin)/rng*NB))),k1=Math.max(0,Math.min(NB-1,Math.floor((hi-zmin)/rng*NB)));
+       for(var k=k0;k<=k1;k++){var P=T;if(k>0)P=cut(P,zmin+rng*k/NB,true);if(k<NB-1)P=cut(P,zmin+rng*(k+1)/NB,false);if(P.length>=3)poly(P,rgb(csi((k+0.5)/NB)));}
+       for(var k=1;k<NB;k++){var L=zmin+rng*k/NB;if(L<=lo||L>=hi)continue;var e=[];
+         for(var a=0;a<3;a++){var A=T[a],Bq=T[(a+1)%3];if((A[2]-L)*(Bq[2]-L)<0){var t=(L-A[2])/(Bq[2]-A[2]);e.push(proj(A[0]+t*(Bq[0]-A[0]),A[1]+t*(Bq[1]-A[1]),L));}}
+         if(e.length==2){ctx.beginPath();ctx.moveTo(e[0][0],e[0][1]);ctx.lineTo(e[1][0],e[1][1]);ctx.strokeStyle=rgb(csi((k+0.5)/NB),0.62);ctx.lineWidth=1.1;ctx.stroke();}}});}
    function draw(){ctx.clearRect(0,0,W,H);var c=[];
      for(var i=0;i<nn;i++)for(var j=0;j<nn;j++){var zc=(Z(i,j)+Z(i+1,j)+Z(i+1,j+1)+Z(i,j+1))/4;c.push([dep(i,j,zc),i,j,zc]);}
      c.sort(function(a,b){return a[0]-b[0];});
      for(var k=0;k<c.length;k++){var i=c[k][1],j=c[k][2],zc=c[k][3];
        var p0=proj(i,j,Z(i,j)),p1=proj(i+1,j,Z(i+1,j)),p2=proj(i+1,j+1,Z(i+1,j+1)),p3=proj(i,j+1,Z(i,j+1));
        ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.lineTo(p3[0],p3[1]);ctx.closePath();
+       if(NB>0){celda(i,j);continue;}
        ctx.fillStyle=jetr((zc-zmin)/rng);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.stroke();}}
    // #anim surf: varios cuadros en el MISMO lienzo; el reproductor llama cv.hkFrame(k)
    if(cv.dataset.frames){var FR=JSON.parse(cv.dataset.frames),ZR=JSON.parse(cv.dataset.zr||'[]');

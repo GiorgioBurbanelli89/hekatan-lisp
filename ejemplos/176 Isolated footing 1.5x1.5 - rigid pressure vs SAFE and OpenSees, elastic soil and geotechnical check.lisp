@@ -68,23 +68,23 @@ q_xm = q(-B/2, 0) 'pressure at x = −B/2, y = 0 [kPa]
 #: The same model as SAFE and OpenSees, built here step by step: a Mindlin plate of 4 nodes with MITC4 shear (the element of OpenSees ShellMITC4), 3 dof per node [w, θ_x, θ_y], 10 × 10 mesh, soil springs k_s·A_trib at each node.
 
 #: **Symbolic: shape functions and Jacobian.** Element of sides 2a × 2b, natural coordinates ξ, η ∈ [−1, 1]. Shape function of node 1 and the map x(ξ), y(η):
-N_1s = Simplify{(1-xi)*(1-eta)/4}
+N_1 = Simplify{(1-xi)*(1-eta)/4}
 x_s = Simplify{a*(-(1-xi)*(1-eta)/4 + (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 - (1-xi)*(1+eta)/4)}
 y_s = Simplify{b*(-(1-xi)*(1-eta)/4 - (1+xi)*(1-eta)/4 + (1+xi)*(1+eta)/4 + (1-xi)*(1+eta)/4)}
 J_11 = Partial{a*xi @ xi}
 J_22 = Partial{b*eta @ eta}
 J_12 = Partial{a*xi @ eta}
-detJ_s = Simplify{a*b - 0*0}
+J_det = Simplify{a*b - 0*0}
 #: det J = a·b converts dξ·dη into dx·dy. Derivatives in x and y: ∂N/∂x = (1/a)·∂N/∂ξ, ∂N/∂y = (1/b)·∂N/∂η:
-dN1dx_s = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
-dN1dy_s = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
+N_1_x = Simplify{Partial{(1-xi)*(1-eta)/4 @ xi}/a}
+N_1_y = Simplify{Partial{(1-xi)*(1-eta)/4 @ eta}/b}
 #: **Symbolic: plate stiffnesses and MITC4 shear.** Bending D = E·t³/(12(1 − ν²)); shear C_s = (5/6)·G·t. The shear strain γ_xz is not taken at the Gauss points (that locks a thin plate) but at the mid-sides A = (0, −1), B = (0, 1) and interpolated in η:
-D_s = Simplify{Ee*hh^3/(12*(1-nn^2))}
-C_ss = Simplify{5/6*Ee/(2*(1+nn))*hh}
-g_xz = Simplify{(1-eta)/2*gA + (1+eta)/2*gB}
+D_flex = Simplify{E*h^3/(12*(1-nu^2))}
+C_shear = Simplify{5/6*E/(2*(1+nu))*h}
+g_xz = Simplify{(1-eta)/2*g_A + (1+eta)/2*g_B}
 #: Closed form of two terms of the element matrix (integrated by hand over 2a × 2b):
-K_ww_s = Simplify{Cs*(b/(3*a) + a/(3*b))}
-K_tt_s = Simplify{Dp*b/(3*a) + Dp*(1-nn)*a/(6*b) + Cs*a*b/3}
+K_ww = Simplify{C*(b/(3*a) + a/(3*b))}
+K_tt = Simplify{D*b/(3*a) + D*(1-nu)*a/(6*b) + C*a*b/3}
 
 #: **Numeric: element matrix 12 × 12** with 2 × 2 Gauss points:
 E_c = 24.87e6 'concrete modulus [kPa]

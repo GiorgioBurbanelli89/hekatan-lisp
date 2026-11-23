@@ -13,6 +13,7 @@ N=$(find "$PUB/ejemplos" -name '*.lisp' 2>/dev/null | wc -l)
 [ "$N" -ge 10 ] || { echo "ERROR: solo $N ejemplos en el publish; NO se publica"; exit 1; }
 if grep -q '{fingerprint}' "$PUB/index.html"; then echo "ERROR: index.html con marcadores sin reemplazar; NO se publica"; exit 1; fi
 T=$(mktemp -d)
+trap 'cd / && rm -rf "$T"' EXIT          # la copia de gh-pages (~100 MB) se borra al salir; antes quedaba en TEMP en cada publicación
 git clone -q --branch gh-pages --single-branch https://github.com/GiorgioBurbanelli89/hekatan-lisp.git "$T"
 cd "$T"
 git config user.name "$(git -C "$RAIZ" log -1 --format=%an)"; git config user.email "$(git -C "$RAIZ" log -1 --format=%ae)"

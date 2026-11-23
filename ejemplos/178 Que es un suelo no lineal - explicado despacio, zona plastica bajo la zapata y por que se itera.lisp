@@ -6,12 +6,10 @@
 ## 1 · Lineal contra no lineal: un resorte con tope
 
 #: LINEAL: el doble de carga da el doble de deformación. Es una recta, como y = m·x + b con b = 0: q = k·δ. Nunca falla: si pones mil toneladas, te da un asiento mil veces más grande, pero ninguna alarma.
-#: NO LINEAL: el suelo es un resorte con TOPE. Mientras está lejos de la falla, se porta como la recta. Cuando llega a su capacidad q_f, la curva se vuelve PLANA: puede seguir hundiéndose, pero ya no da más fuerza. Con k = 1 y q_f = 0.6 (gráfica de la izquierda). Se escribe q = mín(k·δ, q_f).
-#: La animación (derecha) carga poco a poco: las dos curvas van juntas hasta δ = 0.6; después la del suelo se queda en 0.6 y la lineal sigue subiendo.
-#fila
+#: NO LINEAL: el suelo es un resorte con TOPE. Mientras está lejos de la falla, se porta como la recta. Cuando llega a su capacidad q_f, la curva se vuelve PLANA: puede seguir hundiéndose, pero ya no da más fuerza. Con k = 1 y q_f = 0.6 (primera gráfica). Se escribe q = mín(k·δ, q_f).
+#: La animación (debajo) carga poco a poco: las dos curvas van juntas hasta δ = 0.6; después la del suelo se queda en 0.6 y la lineal sigue subiendo.
 #fplot(lineal = x, suelo = 0.6 - (0.6 - x + abs(0.6 - x))/2, [0 1])
 #anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 0:10
-#finfila
 
 ## 2 · ¿Cuándo llega al tope un punto del suelo? El círculo de Mohr
 
@@ -57,11 +55,9 @@ Ut(u) = 1 - (1 - u + abs(1 - u))/2
 U_1(x, y) = Ut(U(x, y, p_1))
 U_2(x, y) = Ut(U(x, y, p_2))
 U_3(x, y) = Ut(U(x, y, p_3))
-#fila
 #contourf(U_1(x, y), [-4 4], [-4 0])
 #contourf(U_2(x, y), [-4 4], [-4 0])
 #contourf(U_3(x, y), [-4 4], [-4 0])
-#finfila
 
 #: Lo que se ve: ya con p = q_f/4 plastifican dos puntitos en los BORDES de la zapata (ahí el corte elástico se dispara). Con la mitad, las dos manchas ya se juntaron en un bulbo magenta bajo la zapata; con tres cuartos, el bulbo plástico crece hacia abajo y hacia los lados. El modelo lineal no se entera: sus esfuerzos solo se multiplican por la carga, y todo lo magenta es esfuerzo IMPOSIBLE. Ojo: este mapa sale de esfuerzos ELÁSTICOS, por eso exagera la zona plástica; el tamaño real lo da el cálculo no lineal (sección 4), que reparte el exceso a los puntos vecinos.
 

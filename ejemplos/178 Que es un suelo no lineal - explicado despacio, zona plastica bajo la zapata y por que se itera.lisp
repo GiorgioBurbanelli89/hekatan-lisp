@@ -5,14 +5,51 @@
 
 ## 1 · Lineal contra no lineal: un resorte con tope
 
+#dibujo("El suelo bajo la zapata visto como resortes (Winkler): cada resorte tiene un TOPE", ud = m, escala = auto, cotas = m, alto = 110)
+#  achurado(-1, -0.6, 2, 0.6, "concreto")
+#  rect(-1, -0.6, 2, 0.6, "gruesa")
+#  achurado(-0.2, 0, 0.4, 0.8, "concreto")
+#  rect(-0.2, 0, 0.4, 0.8, "gruesa")
+#  flecha(0, 1.5, 0, 0.85, "gruesa rojo")
+#  texto(0.1, 1.35, "P", 3, "i")
+#  polilinea(-0.800, -0.600, -0.800, -0.720, -0.730, -0.783, -0.870, -0.910, -0.730, -1.037, -0.870, -1.163, -0.730, -1.290, -0.870, -1.417, -0.800, -1.480, -0.800, -1.600, "media azul")
+#  polilinea(-0.400, -0.600, -0.400, -0.720, -0.330, -0.783, -0.470, -0.910, -0.330, -1.037, -0.470, -1.163, -0.330, -1.290, -0.470, -1.417, -0.400, -1.480, -0.400, -1.600, "media azul")
+#  polilinea(0.000, -0.600, 0.000, -0.720, 0.070, -0.783, -0.070, -0.910, 0.070, -1.037, -0.070, -1.163, 0.070, -1.290, -0.070, -1.417, 0.000, -1.480, 0.000, -1.600, "media azul")
+#  polilinea(0.400, -0.600, 0.400, -0.720, 0.470, -0.783, 0.330, -0.910, 0.470, -1.037, 0.330, -1.163, 0.470, -1.290, 0.330, -1.417, 0.400, -1.480, 0.400, -1.600, "media azul")
+#  polilinea(0.800, -0.600, 0.800, -0.720, 0.870, -0.783, 0.730, -0.910, 0.870, -1.037, 0.730, -1.163, 0.870, -1.290, 0.730, -1.417, 0.800, -1.480, 0.800, -1.600, "media azul")
+#  achurado(-1.6, -1.9, 3.2, 0.3, "terreno")
+#  linea(-1.6, -1.6, 1.6, -1.6, "gruesa")
+#  texto(1.1, -1.05, "resorte: q = mín(k·δ, q_f)", 2.6, "i")
+#  texto(0, -2.15, "suelo firme", 2.4, "c")
+#fin
 #: LINEAL: el doble de carga da el doble de deformación. Es una recta, como y = m·x + b con b = 0: q = k·δ. Nunca falla: si pones mil toneladas, te da un asiento mil veces más grande, pero ninguna alarma.
 #: NO LINEAL: el suelo es un resorte con TOPE. Mientras está lejos de la falla, se porta como la recta. Cuando llega a su capacidad q_f, la curva se vuelve PLANA: puede seguir hundiéndose, pero ya no da más fuerza. Con k = 1 y q_f = 0.6 (primera gráfica). Se escribe q = mín(k·δ, q_f).
 #: La animación (debajo) carga poco a poco: las dos curvas van juntas hasta δ = 0.6; después la del suelo se queda en 0.6 y la lineal sigue subiendo.
 #fplot(lineal = x, suelo = 0.6 - (0.6 - x + abs(0.6 - x))/2, [0 1])
-#anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 0:10
+#anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 1:10
 
 ## 2 · ¿Cuándo llega al tope un punto del suelo? El círculo de Mohr
 
+#dibujo("Un punto A del suelo, bajo el borde de la zapata: lo aprietan σ_1 (de arriba) y σ_3 (de los lados)", ud = m, escala = auto, cotas = m, alto = 120)
+#  achurado(-3, -3, 6, 3, "terreno")
+#  linea(-3, 0, 3, 0, "gruesa")
+#  achurado(-1, 0, 2, 0.5, "concreto")
+#  rect(-1, 0, 2, 0.5, "gruesa")
+#  achurado(-0.2, 0.5, 0.4, 0.7, "concreto")
+#  rect(-0.2, 0.5, 0.4, 0.7, "gruesa")
+#  flecha(0, 1.8, 0, 1.25, "gruesa rojo")
+#  texto(0.1, 1.65, "P", 3, "i")
+#  rect(0.75, -1.45, 0.5, 0.5, "gruesa denso gris")
+#  flecha(1, -0.35, 1, -0.9, "gruesa rojo")
+#  flecha(1, -2.05, 1, -1.5, "gruesa rojo")
+#  texto(1.08, -0.45, "σ_1", 3, "i")
+#  flecha(2.0, -1.2, 1.3, -1.2, "media azul")
+#  flecha(0, -1.2, 0.7, -1.2, "media azul")
+#  texto(2.05, -1.2, "σ_3", 3, "i")
+#  texto(1, -2.35, "punto A", 2.6, "c")
+#  texto(-2.9, -2.75, "suelo (c, φ)", 2.4, "i")
+#  texto(-2.9, 0.15, "superficie", 2.4, "i")
+#fin
 #: Un punto del suelo bajo la zapata está apretado por dos esfuerzos principales: σ_1 (el mayor, casi vertical) y σ_3 (el menor, de los lados). Con ellos se dibuja un círculo: centro (σ_1 + σ_3)/2, radio (σ_1 − σ_3)/2. El radio es el corte máximo que sufre el punto.
 #: El suelo resiste un corte τ = c + σ·tan φ (recta de Mohr-Coulomb, c = cohesión, φ = ángulo de rozamiento). Mientras el círculo quede DEBAJO de la recta, el punto está elástico y el modelo lineal vale. Cuando el círculo TOCA la recta, el punto plastifica.
 
@@ -36,6 +73,22 @@ F_3 = F(200, s_3)
 
 B = 2 'ancho de la zapata [m]
 g_s = 18 'peso específico [kN/m3]
+#dibujo("Zapata corrida de ancho B sobre el suelo: el punto (x, y) «ve» la zapata con el ángulo α", ud = m, escala = auto, cotas = m, alto = 120)
+#  achurado(-4, -4, 8, 4, "terreno")
+#  linea(-4, 0, 4, 0, "gruesa")
+#  carga(-B/2, 0, B/2, 0, 0.6, 0.6, "p", "rojo")
+#  circulo(1.8, -1.6, 0.06, "denso negro")
+#  texto(1.9, -1.75, "(x, y)", 2.6, "i")
+#  linea(1.8, -1.6, -B/2, 0, "fina azul")
+#  linea(1.8, -1.6, B/2, 0, "fina azul")
+#  texto(1.45, -1.05, "α", 3.2, "c")
+#  cota(-B/2, 0.95, B/2, 0.95, 0, "B = {B:1} m")
+#  flecha(-4, 0, -3.3, 0, "fina")
+#  texto(-3.25, 0.08, "x", 2.6, "i")
+#  flecha(-4, 0, -4, -0.7, "fina")
+#  texto(-3.92, -0.75, "y", 2.6, "i")
+#  texto(0, -4.35, "el mapa de abajo es este mismo corte: x de −4 a 4 m, y de 0 a −4 m", 2.4, "c")
+#fin
 al(x, y) = atan((x + B/2)/(0.001 - y)) - atan((x - B/2)/(0.001 - y))
 U(x, y, p) = ((p/π)·sin(al(x, y)))/((p/π·al(x, y) - g_s·y)·sin(phi) + c·cos(phi))
 

@@ -5,14 +5,51 @@
 
 ## 1 · Linear versus nonlinear: a spring with a cap
 
+#dibujo("The soil under the footing seen as springs (Winkler): each spring has a CAP", ud = m, escala = auto, cotas = m, alto = 110)
+#  achurado(-1, -0.6, 2, 0.6, "concreto")
+#  rect(-1, -0.6, 2, 0.6, "gruesa")
+#  achurado(-0.2, 0, 0.4, 0.8, "concreto")
+#  rect(-0.2, 0, 0.4, 0.8, "gruesa")
+#  flecha(0, 1.5, 0, 0.85, "gruesa rojo")
+#  texto(0.1, 1.35, "P", 3, "i")
+#  polilinea(-0.800, -0.600, -0.800, -0.720, -0.730, -0.783, -0.870, -0.910, -0.730, -1.037, -0.870, -1.163, -0.730, -1.290, -0.870, -1.417, -0.800, -1.480, -0.800, -1.600, "media azul")
+#  polilinea(-0.400, -0.600, -0.400, -0.720, -0.330, -0.783, -0.470, -0.910, -0.330, -1.037, -0.470, -1.163, -0.330, -1.290, -0.470, -1.417, -0.400, -1.480, -0.400, -1.600, "media azul")
+#  polilinea(0.000, -0.600, 0.000, -0.720, 0.070, -0.783, -0.070, -0.910, 0.070, -1.037, -0.070, -1.163, 0.070, -1.290, -0.070, -1.417, 0.000, -1.480, 0.000, -1.600, "media azul")
+#  polilinea(0.400, -0.600, 0.400, -0.720, 0.470, -0.783, 0.330, -0.910, 0.470, -1.037, 0.330, -1.163, 0.470, -1.290, 0.330, -1.417, 0.400, -1.480, 0.400, -1.600, "media azul")
+#  polilinea(0.800, -0.600, 0.800, -0.720, 0.870, -0.783, 0.730, -0.910, 0.870, -1.037, 0.730, -1.163, 0.870, -1.290, 0.730, -1.417, 0.800, -1.480, 0.800, -1.600, "media azul")
+#  achurado(-1.6, -1.9, 3.2, 0.3, "terreno")
+#  linea(-1.6, -1.6, 1.6, -1.6, "gruesa")
+#  texto(1.1, -1.05, "spring: q = min(k·δ, q_f)", 2.6, "i")
+#  texto(0, -2.15, "firm soil", 2.4, "c")
+#fin
 #: LINEAR: twice the load gives twice the deformation. It is a straight line, like y = m·x + b with b = 0: q = k·δ. It never fails: put a thousand tonnes on it and it gives you a settlement a thousand times larger, but no alarm.
 #: NONLINEAR: the soil is a spring with a CAP. While it is far from failure, it behaves like the straight line. When it reaches its capacity q_f, the curve goes FLAT: it can keep sinking, but it gives no more force. With k = 1 and q_f = 0.6 (first chart). It is written q = min(k·δ, q_f).
 #: The animation (below) loads little by little: both curves go together up to δ = 0.6; then the soil one stays at 0.6 and the linear one keeps rising.
 #fplot(lineal = x, suelo = 0.6 - (0.6 - x + abs(0.6 - x))/2, [0 1])
-#anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 0:10
+#anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 1:10
 
 ## 2 · When does a soil point reach the cap? Mohr's circle
 
+#dibujo("A soil point A, under the footing edge: squeezed by σ_1 (from above) and σ_3 (from the sides)", ud = m, escala = auto, cotas = m, alto = 120)
+#  achurado(-3, -3, 6, 3, "terreno")
+#  linea(-3, 0, 3, 0, "gruesa")
+#  achurado(-1, 0, 2, 0.5, "concreto")
+#  rect(-1, 0, 2, 0.5, "gruesa")
+#  achurado(-0.2, 0.5, 0.4, 0.7, "concreto")
+#  rect(-0.2, 0.5, 0.4, 0.7, "gruesa")
+#  flecha(0, 1.8, 0, 1.25, "gruesa rojo")
+#  texto(0.1, 1.65, "P", 3, "i")
+#  rect(0.75, -1.45, 0.5, 0.5, "gruesa denso gris")
+#  flecha(1, -0.35, 1, -0.9, "gruesa rojo")
+#  flecha(1, -2.05, 1, -1.5, "gruesa rojo")
+#  texto(1.08, -0.45, "σ_1", 3, "i")
+#  flecha(2.0, -1.2, 1.3, -1.2, "media azul")
+#  flecha(0, -1.2, 0.7, -1.2, "media azul")
+#  texto(2.05, -1.2, "σ_3", 3, "i")
+#  texto(1, -2.35, "point A", 2.6, "c")
+#  texto(-2.9, -2.75, "soil (c, φ)", 2.4, "i")
+#  texto(-2.9, 0.15, "surface", 2.4, "i")
+#fin
 #: A soil point under the footing is squeezed by two principal stresses: σ_1 (the larger, almost vertical) and σ_3 (the smaller, from the sides). With them a circle is drawn: centre (σ_1 + σ_3)/2, radius (σ_1 − σ_3)/2. The radius is the maximum shear the point carries.
 #: The soil resists a shear τ = c + σ·tan φ (Mohr-Coulomb line, c = cohesion, φ = friction angle). While the circle stays BELOW the line, the point is elastic and the linear model works. When the circle TOUCHES the line, the point yields.
 
@@ -36,6 +73,22 @@ F_3 = F(200, s_3)
 
 B = 2 'footing width [m]
 g_s = 18 'unit weight [kN/m3]
+#dibujo("Strip footing of width B on the soil: the point (x, y) «sees» the footing under the angle α", ud = m, escala = auto, cotas = m, alto = 120)
+#  achurado(-4, -4, 8, 4, "terreno")
+#  linea(-4, 0, 4, 0, "gruesa")
+#  carga(-B/2, 0, B/2, 0, 0.6, 0.6, "p", "rojo")
+#  circulo(1.8, -1.6, 0.06, "denso negro")
+#  texto(1.9, -1.75, "(x, y)", 2.6, "i")
+#  linea(1.8, -1.6, -B/2, 0, "fina azul")
+#  linea(1.8, -1.6, B/2, 0, "fina azul")
+#  texto(1.45, -1.05, "α", 3.2, "c")
+#  cota(-B/2, 0.95, B/2, 0.95, 0, "B = {B:1} m")
+#  flecha(-4, 0, -3.3, 0, "fina")
+#  texto(-3.25, 0.08, "x", 2.6, "i")
+#  flecha(-4, 0, -4, -0.7, "fina")
+#  texto(-3.92, -0.75, "y", 2.6, "i")
+#  texto(0, -4.35, "the map below is this same cut: x from −4 to 4 m, y from 0 to −4 m", 2.4, "c")
+#fin
 al(x, y) = atan((x + B/2)/(0.001 - y)) - atan((x - B/2)/(0.001 - y))
 U(x, y, p) = ((p/π)·sin(al(x, y)))/((p/π·al(x, y) - g_s·y)·sin(phi) + c·cos(phi))
 

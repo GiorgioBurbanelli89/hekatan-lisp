@@ -28,6 +28,26 @@
 #fplot(lineal = x, suelo = 0.6 - (0.6 - x + abs(0.6 - x))/2, [0 1])
 #anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 1:10
 
+#dibujo("La ley COMPLETA del resorte: la zapata se inclina; un borde se levanta, el otro llega al tope", ud = m, escala = auto, cotas = m, alto = 120)
+#  poligono(-1, -0.350, 1, -0.850, 1, -0.350, -1, 0.150, "gruesa")
+#  flecha(0.45, 1.0, 0.45, -0.162, "gruesa rojo")
+#  texto(0.55, 0.9, "P (corrida)", 2.6, "i")
+#  polilinea(-0.800, -0.600, -0.800, -0.720, -0.730, -0.783, -0.870, -0.910, -0.730, -1.037, -0.870, -1.163, -0.730, -1.290, -0.870, -1.417, -0.800, -1.480, -0.800, -1.600, "media gris")
+#  linea(-0.95, -0.55, -0.65, -0.55, "fina gris")
+#  polilinea(-0.400, -0.500, -0.400, -0.632, -0.330, -0.702, -0.470, -0.841, -0.330, -0.980, -0.470, -1.120, -0.330, -1.259, -0.470, -1.398, -0.400, -1.468, -0.400, -1.600, "media azul")
+#  polilinea(0.000, -0.600, 0.000, -0.720, 0.070, -0.783, -0.070, -0.910, 0.070, -1.037, -0.070, -1.163, 0.070, -1.290, -0.070, -1.417, 0.000, -1.480, 0.000, -1.600, "media azul")
+#  polilinea(0.400, -0.700, 0.400, -0.808, 0.470, -0.865, 0.330, -0.979, 0.470, -1.093, 0.330, -1.207, 0.470, -1.321, 0.330, -1.435, 0.400, -1.492, 0.400, -1.600, "media azul")
+#  polilinea(0.800, -0.800, 0.800, -0.896, 0.870, -0.947, 0.730, -1.048, 0.870, -1.149, 0.730, -1.251, 0.870, -1.352, 0.730, -1.453, 0.800, -1.504, 0.800, -1.600, "gruesa rojo")
+#  achurado(-1.6, -1.9, 3.2, 0.3, "terreno")
+#  linea(-1.6, -1.6, 1.6, -1.6, "gruesa")
+#  texto(-1.05, -0.2, "se levanta: q = 0 (CONTACTO, hoja 49)", 2.4, "d")
+#  texto(1.05, -1.05, "tope q_f: FALLA del suelo (hoja 178)", 2.4, "i")
+#  texto(0, -2.15, "en medio: lineal, q = k·δ", 2.4, "c")
+#fin
+#: **La ley completa del resorte (hojas 49 y 178 juntas).** Son DOS no linealidades distintas en el mismo resorte, pero pasan en lugares diferentes: 1) si la zapata se LEVANTA (δ < 0), el resorte se apaga: q = 0. Pasa en el CONTACTO zapata–suelo: el suelo no está pegado al concreto, puede empujar pero no tirar (hoja 49). 2) En medio, lineal: q = k·δ (k sale del módulo E del suelo o del ensayo de placa). 3) Si llega al TOPE q_f, el SUELO de abajo falla por corte (su círculo de Mohr toca la recta de c y φ, sección 2): q no sube más (esta hoja). En una línea: q = mín(máx(k·δ, 0), q_f).
+#fplot(resorte = 0.6 - (0.6 - (x + abs(x))/2 + abs(0.6 - (x + abs(x))/2))/2, lineal = x, [-0.5 1])
+#: En Plaxis o GEO5 cada una tiene su lugar: el levantamiento con elementos de INTERFAZ entre zapata y suelo; el tope con Mohr-Coulomb en los elementos del SUELO. SAFE o ETABS solo tienen lo primero (resortes «solo compresión»).
+
 ## 2 · ¿Cuándo llega al tope un punto del suelo? El círculo de Mohr
 
 #dibujo("Un punto A del suelo, bajo el borde de la zapata: lo aprietan σ_1 (de arriba) y σ_3 (de los lados)", ud = m, escala = auto, cotas = m, alto = 120)

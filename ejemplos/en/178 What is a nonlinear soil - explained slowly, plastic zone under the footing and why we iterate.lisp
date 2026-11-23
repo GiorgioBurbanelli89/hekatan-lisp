@@ -28,6 +28,26 @@
 #fplot(lineal = x, suelo = 0.6 - (0.6 - x + abs(0.6 - x))/2, [0 1])
 #anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 1:10
 
+#dibujo("The COMPLETE spring law: the footing tilts; one edge lifts, the other reaches the cap", ud = m, escala = auto, cotas = m, alto = 120)
+#  poligono(-1, -0.350, 1, -0.850, 1, -0.350, -1, 0.150, "gruesa")
+#  flecha(0.45, 1.0, 0.45, -0.162, "gruesa rojo")
+#  texto(0.55, 0.9, "P (off centre)", 2.6, "i")
+#  polilinea(-0.800, -0.600, -0.800, -0.720, -0.730, -0.783, -0.870, -0.910, -0.730, -1.037, -0.870, -1.163, -0.730, -1.290, -0.870, -1.417, -0.800, -1.480, -0.800, -1.600, "media gris")
+#  linea(-0.95, -0.55, -0.65, -0.55, "fina gris")
+#  polilinea(-0.400, -0.500, -0.400, -0.632, -0.330, -0.702, -0.470, -0.841, -0.330, -0.980, -0.470, -1.120, -0.330, -1.259, -0.470, -1.398, -0.400, -1.468, -0.400, -1.600, "media azul")
+#  polilinea(0.000, -0.600, 0.000, -0.720, 0.070, -0.783, -0.070, -0.910, 0.070, -1.037, -0.070, -1.163, 0.070, -1.290, -0.070, -1.417, 0.000, -1.480, 0.000, -1.600, "media azul")
+#  polilinea(0.400, -0.700, 0.400, -0.808, 0.470, -0.865, 0.330, -0.979, 0.470, -1.093, 0.330, -1.207, 0.470, -1.321, 0.330, -1.435, 0.400, -1.492, 0.400, -1.600, "media azul")
+#  polilinea(0.800, -0.800, 0.800, -0.896, 0.870, -0.947, 0.730, -1.048, 0.870, -1.149, 0.730, -1.251, 0.870, -1.352, 0.730, -1.453, 0.800, -1.504, 0.800, -1.600, "gruesa rojo")
+#  achurado(-1.6, -1.9, 3.2, 0.3, "terreno")
+#  linea(-1.6, -1.6, 1.6, -1.6, "gruesa")
+#  texto(-1.05, -0.2, "lifts: q = 0 (CONTACT, sheet 49)", 2.4, "d")
+#  texto(1.05, -1.05, "cap q_f: soil FAILURE (sheet 178)", 2.4, "i")
+#  texto(0, -2.15, "in between: linear, q = k·δ", 2.4, "c")
+#fin
+#: **The complete spring law (sheets 49 and 178 together).** They are TWO different nonlinearities in the same spring, but they happen in different places: 1) if the footing LIFTS (δ < 0), the spring switches off: q = 0. It happens at the footing–soil CONTACT: the soil is not glued to the concrete, it can push but not pull (sheet 49). 2) In between, linear: q = k·δ (k comes from the soil modulus E or from the plate load test). 3) If it reaches the CAP q_f, the SOIL below fails in shear (its Mohr circle touches the c–φ line, section 2): q rises no more (this sheet). In one line: q = min(max(k·δ, 0), q_f).
+#fplot(resorte = 0.6 - (0.6 - (x + abs(x))/2 + abs(0.6 - (x + abs(x))/2))/2, lineal = x, [-0.5 1])
+#: In Plaxis or GEO5 each one has its place: the lift-off with INTERFACE elements between footing and soil; the cap with Mohr-Coulomb in the SOIL elements. SAFE or ETABS only have the first one («compression only» springs).
+
 ## 2 · When does a soil point reach the cap? Mohr's circle
 
 #dibujo("A soil point A, under the footing edge: squeezed by σ_1 (from above) and σ_3 (from the sides)", ud = m, escala = auto, cotas = m, alto = 120)

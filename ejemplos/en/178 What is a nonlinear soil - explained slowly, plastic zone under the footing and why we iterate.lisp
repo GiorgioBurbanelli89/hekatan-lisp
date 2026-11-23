@@ -6,12 +6,10 @@
 ## 1 · Linear versus nonlinear: a spring with a cap
 
 #: LINEAR: twice the load gives twice the deformation. It is a straight line, like y = m·x + b with b = 0: q = k·δ. It never fails: put a thousand tonnes on it and it gives you a settlement a thousand times larger, but no alarm.
-#: NONLINEAR: the soil is a spring with a CAP. While it is far from failure, it behaves like the straight line. When it reaches its capacity q_f, the curve goes FLAT: it can keep sinking, but it gives no more force. With k = 1 and q_f = 0.6 (left chart). It is written q = min(k·δ, q_f).
-#: The animation (right) loads little by little: both curves go together up to δ = 0.6; then the soil one stays at 0.6 and the linear one keeps rising.
-#fila
+#: NONLINEAR: the soil is a spring with a CAP. While it is far from failure, it behaves like the straight line. When it reaches its capacity q_f, the curve goes FLAT: it can keep sinking, but it gives no more force. With k = 1 and q_f = 0.6 (first chart). It is written q = min(k·δ, q_f).
+#: The animation (below) loads little by little: both curves go together up to δ = 0.6; then the soil one stays at 0.6 and the linear one keeps rising.
 #fplot(lineal = x, suelo = 0.6 - (0.6 - x + abs(0.6 - x))/2, [0 1])
 #anim fplot(lineal = x*(1 + sign(n/10 - x))/2, suelo = (0.6 - (0.6 - x + abs(0.6 - x))/2)*(1 + sign(n/10 - x))/2, [0 1]), n = 0:10
-#finfila
 
 ## 2 · When does a soil point reach the cap? Mohr's circle
 
@@ -57,11 +55,9 @@ Ut(u) = 1 - (1 - u + abs(1 - u))/2
 U_1(x, y) = Ut(U(x, y, p_1))
 U_2(x, y) = Ut(U(x, y, p_2))
 U_3(x, y) = Ut(U(x, y, p_3))
-#fila
 #contourf(U_1(x, y), [-4 4], [-4 0])
 #contourf(U_2(x, y), [-4 4], [-4 0])
 #contourf(U_3(x, y), [-4 4], [-4 0])
-#finfila
 
 #: What you see: already at p = q_f/4 two small spots yield at the EDGES of the footing (there the elastic shear shoots up). At half, the two spots have merged into a magenta bulb under the footing; at three quarters, the plastic bulb grows down and sideways. The linear model does not notice: its stresses are just multiplied by the load, and all the magenta is IMPOSSIBLE stress. Note: this map comes from ELASTIC stresses, so it exaggerates the plastic zone; its real size comes from the nonlinear calculation (section 4), which passes the excess on to the neighbouring points.
 

@@ -28,5 +28,6 @@
  "91 Solidos y superficies nativos - caja cilindro cono esfera toro extruir revolucion superficie perfil-i tubo-rect.lisp": "91 Native solids and surfaces - box cylinder cone sphere torus extrude revolve surface I-profile rect-tube.lisp",
  "95 Funciones de forma de Hermite de la losa - dibujadas en CAD, derivadas y animadas.lisp": "95 Hermite shape functions of the slab - drawn in CAD, derivatives and animated.lisp",
  "59 La zapata de Das resuelta por elementos finitos aqui.lisp": "59 Das footing solved by finite elements here.lisp",
- "97 Columna de suelo con sismo - masa, frecuencias y Newmark paso a paso contra Abaqus.lisp": "97 Soil column with earthquake - mass, frequencies and Newmark step by step against Abaqus.lisp"
+ "97 Columna de suelo con sismo - masa, frecuencias y Newmark paso a paso contra Abaqus.lisp": "97 Soil column with earthquake - mass, frequencies and Newmark step by step against Abaqus.lisp",
+ "178 Que es un suelo no lineal - explicado despacio, zona plastica bajo la zapata y por que se itera.lisp": "178 What is a nonlinear soil - explained slowly, plastic zone under the footing and why we iterate.lisp"
 }

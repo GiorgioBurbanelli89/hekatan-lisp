@@ -159,6 +159,10 @@ end
 a_j = [5, 6, 7, 8]
 #show
 #malla(x_j, y_j, C, a_j)
+#: **Gráfica 2D · mapa de color en planta.** El desplazamiento horizontal u (en milésimas de pulgada) sobre toda la placa: u = 10³·10⁻³·(x + y/2) = x + y/2. Las bandas de color son **rectas paralelas inclinadas** (u es lineal): como cada elemento reproduce exactamente un campo lineal, el FEM da este mismo mapa en los 5 cuadriláteros, sin saltos entre ellos.
+#map(x + y/2, [0 0.24], [0 0.12])
+#: Y el desplazamiento vertical v = x/2 + y (milésimas): también lineal. Las bandas de u (u = cte → y = 2·(c − x)) caen con pendiente −2, casi verticales; las de v (v = cte → y = c − x/2) caen con pendiente −1/2, más tendidas.
+#map(x/2 + y, [0 0.24], [0 0.12])
 #: **Gráfica 2D (corte).** El mismo u cortado a lo largo del borde de abajo (y = 0) y del de arriba (y = 0.12 in), en milésimas: dos rectas paralelas, porque u = 10⁻³·(x + y/2) es lineal; los nudos de las esquinas caen justo sobre ellas.
 #fplot(borde_inferior = x, borde_superior = x + 0.06, puntos = [0 0; 0.24 0.24; 0 0.06; 0.24 0.3], [0 0.24])
 

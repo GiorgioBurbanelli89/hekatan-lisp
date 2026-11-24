@@ -129,8 +129,6 @@ end
 #: Los **cinco elementos dan la misma tensión**, aunque ninguno es rectangular: el Q4 pasa el patch test.
 
 ## 7b · El mismo resultado en color
-#: **Gráfica 2D.** La solución exacta u = 10⁻³·(x + y/2) en planta, en milésimas de pulgada: los colores van de 0 (esquina inferior izquierda) a 0.3 (esquina superior derecha), en franjas rectas porque u es lineal:
-#map(x + y/2, [0 0.24], [0 0.12])
 #: **Gráfica 3D.** Lo que calculan los elementos finitos:
 #: Color = desplazamiento horizontal u en milésimas de pulgada, **interpolado** dentro de cada elemento con sus funciones de forma; líneas = bordes de los 5 elementos; forma deformada × 100. Como u es lineal en x e y, los colores pasan de un elemento a otro sin saltos: eso es lo que permite que la tensión sea la misma en todos.
 #hide
@@ -150,6 +148,8 @@ e_b = [1, 1]
 v_b = [0, 0]
 #show
 #modelo3d(X_m, e_m, e_b, u_mil, v_b, U_m, 100)
+#: **Gráfica 2D (corte).** El mismo u cortado a lo largo del borde de abajo (y = 0) y del de arriba (y = 0.12 in), en milésimas: dos rectas paralelas, porque u = 10⁻³·(x + y/2) es lineal; los nudos de las esquinas caen justo sobre ellas.
+#fplot(borde_inferior = x, borde_superior = x + 0.06, puntos = [0 0; 0.24 0.24; 0 0.06; 0.24 0.3], [0 0.24])
 
 ## 8 · Comparación con el manual de SAP2000
 #hide

@@ -30,16 +30,13 @@ v_cort = 1*L/(5/6*G*A) 'caso 2: flecha por cortante [in]
 v_2 = v_flex + v_cort 'caso 2: flecha total [in]
 u_3 = 1*L/(E*I)*h/2 'caso 3: desplazamiento de la fibra extrema [in]
 
-## 3 · La malla: 14 nudos y 6 rectángulos (modelo A)
-#: Nudos 1 a 7 abajo (z = 0) y 8 a 14 arriba (z = 0.2), de x = 0 a x = 6. Cada elemento tiene sus nudos en sentido antihorario.
+## 3 · Las mallas: 14 nudos y 6 cuadriláteros (modelos A, B y C)
+#: Nudos 1 a 7 abajo (z = 0) y 8 a 14 arriba (z = 0.2 in); cada elemento con sus nudos en sentido antihorario. Los tres modelos tienen los mismos nudos en los extremos y cambian la posición x de los nudos intermedios (del manual):
+#: **A · rectángulos:** abajo y arriba 0, 1, 2, 3, 4, 5, 6. **B · trapecios:** abajo 0, 1.1, 1.9, 3.1, 3.9, 5.1, 6 y arriba 0, 0.9, 2.1, 2.9, 4.1, 4.9, 6. **C · paralelogramos:** abajo 0, 0.9, 1.9, 2.9, 3.9, 4.9, 6 y arriba 0, 1.1, 2.1, 3.1, 4.1, 5.1, 6.
+X_ab = [0, 1, 2, 3, 4, 5, 6; 0, 1.1, 1.9, 3.1, 3.9, 5.1, 6; 0, 0.9, 1.9, 2.9, 3.9, 4.9, 6]
+X_ar = [0, 1, 2, 3, 4, 5, 6; 0, 0.9, 2.1, 2.9, 4.1, 4.9, 6; 0, 1.1, 2.1, 3.1, 4.1, 5.1, 6]
 #hide
-XY = zeros(14, 2)
 C = zeros(6, 4)
-for n = 1:7
-  XY(n, 1) = n - 1
-  XY(n + 7, 1) = n - 1
-  XY(n + 7, 2) = h
-end
 for e = 1:6
   C(e, 1) = e
   C(e, 2) = e + 1
@@ -76,44 +73,16 @@ k_ci(xi, eta, X) = t*dJ_q(xi, eta, X)*(Db(1, 1)*transpose(Bx_q(xi, eta, X))*Bx_i
 k_ii(xi, eta, X) = t*dJ_q(xi, eta, X)*(Db(1, 1)*transpose(Bx_i(xi, eta, X))*Bx_i(xi, eta, X) + Db(1, 2)*(transpose(Bx_i(xi, eta, X))*By_i(xi, eta, X) + transpose(By_i(xi, eta, X))*Bx_i(xi, eta, X)) + Db(2, 2)*transpose(By_i(xi, eta, X))*By_i(xi, eta, X) + Db(3, 3)*transpose(Bg_i(xi, eta, X))*Bg_i(xi, eta, X))
 g = 1/sqrt(3) 'punto de Gauss
 
-## 5 · Ensamblaje (28 × 28) para los dos elementos
+## 5 · Ensamblaje, apoyos, cargas y solución para cada modelo
+#: Para cada modelo: se arma la rigidez global 28 × 28 con Q4 (K_a) y con modos incompatibles (K_b); apoyos como en SAP2000 (nudo 1 fijo en x y z, nudo 8 fijo solo en x, con un resorte muy rígido) y las tres cargas: caso 1 F_x = 0.5 lb en 7 y 14 · caso 2 F_z = 0.5 lb en 7 y 14 y −0.5 lb en 8 (la reacción, sin Poisson) · caso 3 F_x = −5 lb en 7 y +5 lb en 14.
+#: Resultado de cada caso (promedio de los nudos 7 y 14, como el manual): R_q(modelo, caso) con Q4 y R_m(modelo, caso) con modos incompatibles; V_q y V_m guardan la flecha del caso 2 en los 14 nudos (para las gráficas).
 #hide
-K_a = zeros(28, 28)
-K_b = zeros(28, 28)
+R_q = zeros(3, 3)
+R_m = zeros(3, 3)
+V_q = zeros(3, 14)
+V_m = zeros(3, 14)
+XY = zeros(14, 2)
 Xn = zeros(4, 2)
-for e = 1:6
-  for a = 1:4
-    Xn(a, 1) = XY(C(e, a), 1)
-    Xn(a, 2) = XY(C(e, a), 2)
-  end
-  K_cc = k_q(-g, -g, Xn) + k_q(g, -g, Xn) + k_q(g, g, Xn) + k_q(-g, g, Xn)
-  K_ci = k_ci(-g, -g, Xn) + k_ci(g, -g, Xn) + k_ci(g, g, Xn) + k_ci(-g, g, Xn)
-  K_ii = k_ii(-g, -g, Xn) + k_ii(g, -g, Xn) + k_ii(g, g, Xn) + k_ii(-g, g, Xn)
-  K_m = K_cc - K_ci*inv(K_ii)*transpose(K_ci)
-  for a = 1:4
-    for b = 1:4
-      for i = 1:2
-        for j = 1:2
-          K_a(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) = K_a(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) + K_cc(2*a - 2 + i, 2*b - 2 + j)
-          K_b(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) = K_b(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) + K_m(2*a - 2 + i, 2*b - 2 + j)
-        end
-      end
-    end
-  end
-end
-#show
-
-## 6 · Apoyos y cargas (como en el modelo de SAP2000)
-#: Nudo 1: fijo en x y z. Nudo 8: fijo solo en x (así no aparece el efecto de Poisson en el empotramiento). Se imponen con un resorte muy rígido en esos grados de libertad.
-#hide
-for i = 1:1
-  K_a(1, 1) = K_a(1, 1) + 1e15
-  K_a(2, 2) = K_a(2, 2) + 1e15
-  K_a(15, 15) = K_a(15, 15) + 1e15
-  K_b(1, 1) = K_b(1, 1) + 1e15
-  K_b(2, 2) = K_b(2, 2) + 1e15
-  K_b(15, 15) = K_b(15, 15) + 1e15
-end
 F_1 = zeros(28, 1)
 F_2 = zeros(28, 1)
 F_3 = zeros(28, 1)
@@ -126,79 +95,133 @@ for i = 1:1
   F_3(13) = -5
   F_3(27) = 5
 end
+for m = 1:3
+  for n = 1:7
+    XY(n, 1) = X_ab(m, n)
+    XY(n + 7, 1) = X_ar(m, n)
+    XY(n + 7, 2) = h
+  end
+  K_a = zeros(28, 28)
+  K_b = zeros(28, 28)
+  for e = 1:6
+    for a = 1:4
+      Xn(a, 1) = XY(C(e, a), 1)
+      Xn(a, 2) = XY(C(e, a), 2)
+    end
+    K_cc = k_q(-g, -g, Xn) + k_q(g, -g, Xn) + k_q(g, g, Xn) + k_q(-g, g, Xn)
+    K_ci = k_ci(-g, -g, Xn) + k_ci(g, -g, Xn) + k_ci(g, g, Xn) + k_ci(-g, g, Xn)
+    K_ii = k_ii(-g, -g, Xn) + k_ii(g, -g, Xn) + k_ii(g, g, Xn) + k_ii(-g, g, Xn)
+    K_m = K_cc - K_ci*inv(K_ii)*transpose(K_ci)
+    for a = 1:4
+      for b = 1:4
+        for i = 1:2
+          for j = 1:2
+            K_a(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) = K_a(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) + K_cc(2*a - 2 + i, 2*b - 2 + j)
+            K_b(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) = K_b(2*C(e, a) - 2 + i, 2*C(e, b) - 2 + j) + K_m(2*a - 2 + i, 2*b - 2 + j)
+          end
+        end
+      end
+    end
+  end
+  K_a(1, 1) = K_a(1, 1) + 1e15
+  K_a(2, 2) = K_a(2, 2) + 1e15
+  K_a(15, 15) = K_a(15, 15) + 1e15
+  K_b(1, 1) = K_b(1, 1) + 1e15
+  K_b(2, 2) = K_b(2, 2) + 1e15
+  K_b(15, 15) = K_b(15, 15) + 1e15
+  U_a1 = clsolve(K_a, F_1)
+  U_a2 = clsolve(K_a, F_2)
+  U_a3 = clsolve(K_a, F_3)
+  U_b1 = clsolve(K_b, F_1)
+  U_b2 = clsolve(K_b, F_2)
+  U_b3 = clsolve(K_b, F_3)
+  R_q(m, 1) = (U_a1(13) + U_a1(27))/2
+  R_q(m, 2) = (U_a2(14) + U_a2(28))/2
+  R_q(m, 3) = (abs(U_a3(13)) + abs(U_a3(27)))/2
+  R_m(m, 1) = (U_b1(13) + U_b1(27))/2
+  R_m(m, 2) = (U_b2(14) + U_b2(28))/2
+  R_m(m, 3) = (abs(U_b3(13)) + abs(U_b3(27)))/2
+  for n = 1:14
+    V_q(m, n) = U_a2(2*n)
+    V_m(m, n) = U_b2(2*n)
+  end
+end
 #show
-#: Caso 1: F_x = 0.5 lb en los nudos 7 y 14 · Caso 2: F_z = 0.5 lb en 7 y 14 y −0.5 lb en 8 (la reacción, sin Poisson) · Caso 3: F_x = −5 lb en 7 y +5 lb en 14.
+#: Flecha de la punta en el caso 2 (fuerza vertical), modelos A, B y C:
+v_Q4 = transpose([R_q(1, 2); R_q(2, 2); R_q(3, 2)]) 'Q4 [in]
+v_MI = transpose([R_m(1, 2); R_m(2, 2); R_m(3, 2)]) 'modos incompatibles [in]
 
-## 7 · Solución
-U_a1 = clsolve(K_a, F_1)
-U_a2 = clsolve(K_a, F_2)
-U_a3 = clsolve(K_a, F_3)
-U_b1 = clsolve(K_b, F_1)
-U_b2 = clsolve(K_b, F_2)
-U_b3 = clsolve(K_b, F_3)
-#: Resultados en la punta (promedio de los nudos 7 y 14, como el manual):
-ua_1 = (U_a1(13) + U_a1(27))/2 'Q4, caso 1 [in]
-ua_2 = (U_a2(14) + U_a2(28))/2 'Q4, caso 2 [in]
-ua_3 = (abs(U_a3(13)) + abs(U_a3(27)))/2 'Q4, caso 3 [in]
-ub_1 = (U_b1(13) + U_b1(27))/2 'modos incompatibles, caso 1 [in]
-ub_2 = (U_b2(14) + U_b2(28))/2 'modos incompatibles, caso 2 [in]
-ub_3 = (abs(U_b3(13)) + abs(U_b3(27)))/2 'modos incompatibles, caso 3 [in]
-
-## 8 · Gráficas
-#: **Gráfica 3D.** La viga deformada con los modos incompatibles (caso 2, flecha × 10); color = desplazamiento vertical:
+## 6 · Gráficas
+#: **Gráfica 3D.** La viga del modelo A deformada con los modos incompatibles (caso 2, flecha × 10); color = desplazamiento vertical:
 #hide
 X_m = zeros(15, 3)
 U_m = zeros(15, 3)
 v_n = zeros(15, 1)
+for n = 1:7
+  X_m(n, 1) = X_ab(1, n)
+  X_m(n + 7, 1) = X_ar(1, n)
+  X_m(n + 7, 2) = h
+end
 for n = 1:14
-  X_m(n, 1) = XY(n, 1)
-  X_m(n, 2) = XY(n, 2)
-  U_m(n, 1) = U_b2(2*n - 1)
-  U_m(n, 2) = U_b2(2*n)
-  v_n(n) = U_b2(2*n)
+  U_m(n, 2) = V_m(1, n)
+  v_n(n) = V_m(1, n)
 end
 X_m(15, 3) = 0.01
 e_b = [1, 1]
 v_b = [0, 0]
 #show
 #modelo3d(X_m, C, e_b, v_n, v_b, U_m, 10)
-#: **Gráfica 2D (corte por el eje de la viga) con la discretización.** La curva es la teoría de vigas, v(x) = P·x²·(3L − x)/(6EI) + P·x/(κGA). Los puntos son los **7 nudos** de la malla de 6 elementos (promedio de los nudos de abajo y de arriba en cada x): con **Q4** quedan muy por debajo (se traba); con **modos incompatibles** caen sobre la curva.
+#: **Gráfica 2D (corte por el eje de la viga) con la discretización.** La curva es la teoría de vigas, v(x) = P·x²·(3L − x)/(6EI) + P·x/(κGA). Los puntos son los **7 nudos** del modelo A (promedio de abajo y arriba en cada x): con **Q4** quedan muy por debajo (se traba); con **modos incompatibles** caen sobre la curva.
 #hide
 P_q4 = zeros(7, 2)
 P_mi = zeros(7, 2)
 for n = 1:7
   P_q4(n, 1) = n - 1
-  P_q4(n, 2) = (U_a2(2*n) + U_a2(2*n + 14))/2
+  P_q4(n, 2) = (V_q(1, n) + V_q(1, n + 7))/2
   P_mi(n, 1) = n - 1
-  P_mi(n, 2) = (U_b2(2*n) + U_b2(2*n + 14))/2
+  P_mi(n, 2) = (V_m(1, n) + V_m(1, n + 7))/2
 end
 #show
 #fplot(teoria = x^2*(18 - x)/4000 + x/(5/6*3846153.85*0.02), Q4 = P_q4, modos_inc = P_mi, [0 6])
 
-## 9 · Comparación con el manual de SAP2000
+## 7 · Comparación con el manual de SAP2000
 #hide
 for i = 1:1
-  r_sapq = zeros(3, 1)
-  r_sapq(1) = 3.000E-05
-  r_sapq(2) = 0.0101
-  r_sapq(3) = 0.840E-04
-  r_sapm = zeros(3, 1)
-  r_sapm(1) = 3.000E-05
-  r_sapm(2) = 0.1073
-  r_sapm(3) = 9.000E-04
-  r_ind = zeros(3, 1)
-  r_ind(1) = u_1
-  r_ind(2) = v_2
-  r_ind(3) = u_3
-  r_hq = zeros(3, 1)
-  r_hq(1) = ua_1
-  r_hq(2) = ua_2
-  r_hq(3) = ua_3
-  r_hm = zeros(3, 1)
-  r_hm(1) = ub_1
-  r_hm(2) = ub_2
-  r_hm(3) = ub_3
+  S_q = zeros(9, 1)
+  S_m = zeros(9, 1)
+  T_i = zeros(9, 1)
+  H_q = zeros(9, 1)
+  H_m = zeros(9, 1)
+  S_q(1) = 3.000E-05
+  S_q(2) = 3.000E-05
+  S_q(3) = 3.000E-05
+  S_q(4) = 0.0101
+  S_q(5) = 0.0030
+  S_q(6) = 0.0038
+  S_q(7) = 0.840E-04
+  S_q(8) = 0.206E-04
+  S_q(9) = 0.282E-04
+  S_m(1) = 3.000E-05
+  S_m(2) = 3.000E-05
+  S_m(3) = 3.000E-05
+  S_m(4) = 0.1073
+  S_m(5) = 0.0238
+  S_m(6) = 0.0861
+  S_m(7) = 9.000E-04
+  S_m(8) = 1.466E-04
+  S_m(9) = 7.614E-04
+  for k = 1:3
+    T_i(k) = u_1
+    T_i(k + 3) = v_2
+    T_i(k + 6) = u_3
+    H_q(k) = R_q(k, 1)
+    H_q(k + 3) = R_q(k, 2)
+    H_q(k + 6) = R_q(k, 3)
+    H_m(k) = R_m(k, 1)
+    H_m(k + 3) = R_m(k, 2)
+    H_m(k + 6) = R_m(k, 3)
+  end
 end
 #show
-#tabla("Caso de carga","Teoría de vigas:6","SAP2000 sin modos inc.:6","Hekatan Q4:6","SAP2000 con modos inc.:6","Hekatan modos inc.:6")({"1 · tracción, Ux","2 · fuerza, Uz","3 · momento, |Ux|"}; r_ind; r_sapq; r_hq; r_sapm; r_hm)
-#: **Conclusión.** En tracción los dos elementos dan exacto (3·10⁻⁵ in). En flexión el Q4 simple se **traba**: da 0.0101 in contra 0.1081 de la teoría (−91 %), igual que SAP2000 sin modos incompatibles. Con los **modos incompatibles** la flecha sube a ≈ 0.107 in (−1 %) y el momento da exacto, igual que SAP2000. La diferencia que queda en el caso 2 es la flecha por cortante, que la malla de un solo elemento de alto no recoge del todo.
+#tabla("Caso · modelo","Teoría:6","SAP2000 sin modos inc.:6","Hekatan Q4:6","SAP2000 con modos inc.:6","Hekatan modos inc.:6")({"1 tracción · A","1 tracción · B","1 tracción · C","2 fuerza · A","2 fuerza · B","2 fuerza · C","3 momento · A","3 momento · B","3 momento · C"}; T_i; S_q; H_q; S_m; H_m)
+#: **Conclusión.** En **tracción** todos dan exacto (3·10⁻⁵ in), por deformados que estén los elementos. En **flexión** el **Q4** se traba siempre y Hekatan da lo mismo que SAP2000 en los tres modelos (0.0101, 0.0030 y 0.0038 in). Con **modos incompatibles** el modelo de **rectángulos** queda exacto (0.1073 in); en los elementos **deformados** la flecha cae mucho —trapecios ≈ 0.023 in (−79 %), paralelogramos ≈ 0.085 in (−21 %)— y Hekatan queda a 1–3 % de SAP2000, que usa la versión de Taylor de los modos incompatibles para elementos deformados. Es lo que advierten MacNeal y Harder: la forma de la malla importa tanto como el elemento.

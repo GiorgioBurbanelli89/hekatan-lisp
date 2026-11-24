@@ -783,6 +783,70 @@ namespace HekatanLisp
                         catch { outList.Add(""); }
                         continue;
                     }
+                    // VARIAS superficies en UNA gráfica 3D (Jorge, 24-nov-2026: «siempre gráfica 3D»): #surf(f1, f2, f3, [xa xb], [ya yb], punto = [x y z])
+                    // → cada función es una malla de caras con SU color en el visor 3D (Modelo3DHtml): se ve dónde se cortan (p. ej. los 3 planos de un sistema 3×3)
+                    if (isSurf)
+                    {
+                        var argsM = SplitTop(pm.Groups[1].Value).Select(a => a.Trim()).ToList();
+                        var rangos = argsM.Where(a => System.Text.RegularExpressions.Regex.IsMatch(a, @"^\[[^\[\];]*\]$")).ToList();
+                        string ptA = argsM.FirstOrDefault(a => System.Text.RegularExpressions.Regex.IsMatch(a, @"^punto\s*="));
+                        var funcs = argsM.Where(a => !rangos.Contains(a) && a != ptA).ToList();
+                        if (funcs.Count >= 2 && rangos.Count == 2)
+                        {
+                            try
+                            {
+                                var ci = System.Globalization.CultureInfo.InvariantCulture; string F(double v) => v.ToString("0.######", ci);
+                                var nodos = new List<string>(); var caras = new List<string>(); var vals = new List<string>(); int n = 12; var P = new List<double[]>();
+                                double rxa = 0, rxb = 1, rya = 0, ryb = 1;
+                                for (int k = 0; k < funcs.Count; k++)
+                                {
+                                    string fx0 = System.Text.RegularExpressions.Regex.Replace(funcs[k], @"^[\p{L}_][\p{L}\p{N}_]*\s*=\s*(?!=)", "");          // «plano_1 = …»: el nombre es solo rótulo
+                                    var (fk, _, a1, b1, a2, b2) = ParseSurfArgs(fx0 + ", " + rangos[0] + ", " + rangos[1], byName, inv);
+                                    if (fk == null) throw new Exception();
+                                    var faltan = new List<string>(); fk = ResolverNombres(fk, byName, new HashSet<string> { "x", "y" }, faltan); if (faltan.Count > 0) throw new Exception();
+                                    rxa = a1; rxb = b1; rya = a2; ryb = b2; int b0 = nodos.Count;
+                                    for (int j = 0; j <= n; j++) for (int i = 0; i <= n; i++)
+                                    {
+                                        double x = a1 + (b1 - a1) * i / n, y = a2 + (b2 - a2) * j / n;
+                                        double z = SurfacePlot.Eval(fk, new Dictionary<string, double> { ["x"] = x, ["y"] = y });
+                                        P.Add(new[] { x, y, z }); nodos.Add(""); vals.Add(F(k + 1));
+                                    }
+                                    for (int j = 0; j < n; j++) for (int i = 0; i < n; i++)
+                                    {
+                                        int p = b0 + j * (n + 1) + i + 1;
+                                        caras.Add(p + ", " + (p + 1) + ", " + (p + n + 2) + ", " + (p + n + 1));
+                                    }
+                                }
+                                // z A ESCALA de x-y (si no, det = a·d − 14 de −14 a 50 sobre x, y de 0 a 8 era una aguja): el alto de z = el lado mayor de la planta
+                                double zmin = P.Min(q => q[2]), zmax = P.Max(q => q[2]), lado = Math.Max(rxb - rxa, ryb - rya), sz = zmax - zmin > 1e-12 ? lado / (zmax - zmin) : 1;
+                                for (int q = 0; q < P.Count; q++) nodos[q] = F(P[q][0]) + ", " + F(P[q][1]) + ", " + F(P[q][2] * sz);
+                                var barras = new List<string>(); var vB = new List<string>();
+                                if (ptA != null)
+                                {
+                                    var pv = System.Text.RegularExpressions.Regex.Matches(ptA, @"-?\d+(\.\d+)?([eE][+-]?\d+)?").Cast<System.Text.RegularExpressions.Match>().Select(m => double.Parse(m.Value, ci)).ToArray();
+                                    if (pv.Length >= 3)
+                                    {
+                                        double d = 0.08 * Math.Max(rxb - rxa, ryb - rya);
+                                        foreach (var (dx, dy, dz) in new[] { (d, 0.0, 0.0), (0.0, d, 0.0), (0.0, 0.0, d) })
+                                        {
+                                            nodos.Add(F(pv[0] - dx) + ", " + F(pv[1] - dy) + ", " + F(pv[2] * sz - dz)); vals.Add("0");
+                                            nodos.Add(F(pv[0] + dx) + ", " + F(pv[1] + dy) + ", " + F(pv[2] * sz + dz)); vals.Add("0");
+                                            barras.Add((nodos.Count - 1) + ", " + nodos.Count); vB.Add("0, 0");
+                                        }
+                                    }
+                                }
+                                if (barras.Count == 0) { barras.Add("1, 1"); vB.Add("0, 0"); }
+                                string Lv(List<string> filas) => "(vector " + string.Join(" ", filas.Select(r => "(vector " + r.Replace(",", " ") + ")")) + ")";          // literal de LISP, el formato que lee Modelo3DHtml (Rows3)
+                                var litsM = new List<string> { Lv(nodos), Lv(caras), Lv(barras), "(vector " + string.Join(" ", vals) + ")", Lv(vB) };
+                                string rot = string.Join("  ·  ", funcs.Select((q, k) => (k + 1) + ": z = " + System.Net.WebUtility.HtmlEncode(System.Text.RegularExpressions.Regex.Replace(q, @"^[\p{L}_][\p{L}\p{N}_]*\s*=\s*(?!=)", ""))));
+                                anySurf = true;
+                                outList.Add(PlotWrap(SurfacePlot.Modelo3DHtml(litsM, new List<string> { "", "", "", "superficie", "" }, surfId++),
+                                                     rot + (Math.Abs(sz - 1) > 1e-9 ? "  ·  z a escala ×" + F(Math.Round(sz, 4)) : "") + (ptA != null ? "  ·  + = " + System.Net.WebUtility.HtmlEncode(ptA.Substring(ptA.IndexOf('=') + 1).Trim()) : "") + "  ·  <span style=\"opacity:.7\">arrastra para girar</span>"));
+                            }
+                            catch { outList.Add(AvisoTexto("#surf: no pude dibujar las superficies (revisa las funciones y los rangos [a b])")); }
+                            continue;
+                        }
+                    }
                     var (f, spec, xa, xb, ya, yb) = ParseSurfArgs(pm.Groups[1].Value, byName, inv);
                     if (f == null) { outList.Add(""); continue; }
                     var vs0 = LispConverter.VarsOf(f);
@@ -982,11 +1046,12 @@ namespace HekatanLisp
             string plot = R.Groups[1].Value.Trim(), par = R.Groups[2].Value;
             double a = double.Parse(R.Groups[3].Value, inv), b = double.Parse(R.Groups[4].Value, inv), st = 1;
             if (R.Groups[5].Success) { st = b; b = double.Parse(R.Groups[5].Value, inv); }
+            else if (b > a && !(a == Math.Floor(a) && b == Math.Floor(b) && b - a >= 5 && b - a <= 50)) st = (b - a) / 50;          // «n = lo:hi» sin paso: 50 pasos, como Math Studio (los rangos enteros de 5 a 50, como «n = 1:8», siguen de uno en uno)
             if (st <= 0 || b < a) return "";
             plot = System.Text.RegularExpressions.Regex.Replace(plot, @"^(?:fplot|plot|ezplot)\s*(?=\()", "",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             var vals = new List<double>();
-            for (double v = a; v <= b + st * 1e-9 && vals.Count < 240; v += st) vals.Add(v);
+            for (int k = 0; vals.Count < 240; k++) { double v = a + k * st; if (v > b + st * 1e-9) break; vals.Add(v); }
             if (vals.Count == 0) return "";
             int id = System.Threading.Interlocked.Increment(ref _sliderId);
             string P(double v) => v.ToString("0.####", inv);
@@ -1428,7 +1493,7 @@ dib();})();";
         private static readonly System.Text.RegularExpressions.Regex RxMarcaBloque = new System.Text.RegularExpressions.Regex(
             @"^\s*#hkbloque:(\d+)\s*$");
         private static readonly System.Text.RegularExpressions.Regex RxVis = new System.Text.RegularExpressions.Regex(
-            @"^\s*#\s*(hide|show|noc|equ|val|ocultar|mostrar|formula|valor)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            @"^\s*#\s*(hide|show|noc|equ|val|sust|sustituir|triple|nosust|ocultar|mostrar|formula|valor)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         private bool _numMode;
         private HojaNumerica.Resultado _numRes;
         private List<List<string>> _numBlocks;
@@ -1513,6 +1578,26 @@ dib();})();";
             try { f = tree != null ? LispConverter.ToLisp(tree) : null; } catch { }
             bool trivial = f == null || f == v || f == lbl || modo == 'v' ||
                            System.Text.RegularExpressions.Regex.IsMatch(f, @"^-?[\d.]+(e-?\d+)?$");
+            // TRIPLE IGUALDAD (#sust): ecuación = ecuación con los números puestos = resultado  (como Calcpad: c = √(a²+b²) = √(3²+4²) = 5)
+            if (modo == 's' && lbl != null && !trivial && tree != null)
+            {
+                var nombres = new HashSet<string>();
+                void Recoge(LispConverter.N q) { if (q == null) return; if (q.IsAtom) { if (!string.IsNullOrEmpty(q.Atom) && char.IsLetter(q.Atom[0])) nombres.Add(q.Atom); return; } Recoge(q.A); Recoge(q.B); if (q.Items != null) foreach (var it in q.Items) Recoge(it); }
+                Recoge(tree);
+                var mapa = new Dictionary<string, LispConverter.N>();
+                foreach (var nm in nombres)
+                {
+                    var lit = NumLiteral(nm, i);
+                    if (lit != null && System.Text.RegularExpressions.Regex.IsMatch(lit.Trim(), @"^-?[\d.]+(e[+-]?\d+)?$"))
+                    { var t0 = HojaNumerica.FormatoLiteral(lit.Trim()); mapa[nm] = LispConverter.N.Leaf(t0.StartsWith("-") ? "(" + t0 + ")" : t0); }
+                }
+                if (mapa.Count > 0)
+                {
+                    string fs = null;
+                    try { fs = LispConverter.ToLisp(LispConverter.SubstLabels(tree, mapa, lbl, new HashSet<string>())); } catch { }
+                    if (fs != null && fs != f && fs != v) return lbl + " = " + f + " = " + fs + " = " + v;
+                }
+            }
             if (lbl != null) return trivial ? lbl + " = " + v : lbl + " = " + f + " = " + v;
             return f != null && f != v ? f + " = " + v : v;
         }
@@ -1791,6 +1876,7 @@ dib();})();";
         private readonly object _computeLock = new object();
         private List<string> ComputeResult(string text, string dvar)
         {
+            text = text?.Replace("\r\n", "\n").Replace('\r', '\n');          // saltos de Windows (CRLF: Bloc de notas, portapapeles de Math Studio) → LF: con «\r» los bucles daban «t names a defined constant»
             lock (_computeLock) return ComputeResultUno(text, dvar);
         }
         private List<string> ComputeResultUno(string text, string dvar)
@@ -1816,6 +1902,7 @@ dib();})();";
             // #anim(n = a:b) … #finanim: el bloque se repite por cuadro ANTES que nada (LispAnim.cs)
             // mapa línea procesada → línea del editor (0-based); se actualiza en cada paso que pliega o parte
             int[] mapaT = Enumerable.Range(0, text.Replace("\r", "").Split('\n').Length).ToArray();
+            { var a0 = text; text = LispObjetos.Expande(text); Paso(ref mapaT, a0, text); }          // fresorte(…), fbarra(…), fmembrana(…) y #slider fresorte/fresortesim: los objetos de Math Studio pasan a #dibujo / #anim (LispObjetos.cs)
             { var a0 = text; text = LispAnim.ExpandirBloques(text); Paso(ref mapaT, a0, text); }
             // un PROGRAMA LISP corre con SU texto: PrepareNames es para la matemática de la hoja y
             // renombraba también dentro de las cadenas "…" del programa («La» → «lahkq6»).
@@ -1907,6 +1994,7 @@ dib();})();";
             // Expresiones (matemática o LISP) → aplicar la operación elegida.
             // Antes: unir las líneas de una MATRIZ multi-línea (el '[' sigue abierto). El salto de
             // línea dentro de [ ] es separador de FILA (MATLAB), así que se une con ';'.
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^([ \t]*)&&[ \t]?", "$1");          // «&& …» (marca de Math Studio: misma fila que la anterior): aquí se quita y la línea baja a una fila normal
             var lines = ExpandMathSemicolons(JoinBracketLines(text).Split('\n'), out var contLine);
             int[] mapaL = null;
             if (mapaT != null)
@@ -2009,6 +2097,8 @@ dib();})();";
                             case "show": case "mostrar": oculta = false; break;
                             case "noc": case "formula": modo = 'n'; break;
                             case "equ": modo = 'e'; break;
+                            case "sust": case "sustituir": case "triple": modo = 's'; break;   // formula = formula con números = valor
+                            case "nosust": modo = 'e'; break;
                             case "val": case "valor": modo = 'v'; break;
                         }
                         lines[i] = ""; numOculta[i] = true; continue;
@@ -2594,7 +2684,7 @@ dib();})();";
         private static string NotationLine(string raw)
         {
             var line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith("(")) return null;   // LISP crudo no
+            if (line.Length == 0) return null;
             var eqs = TopLevelEquals(line);   // solo '=' de NIVEL 0 (el '=' interno de Slope{f@x=a} NO cuenta)
             if (eqs.Count == 0) return null;
             // antes del PRIMER '=' ¿hay una llamada de función  id(  ?  (definición f(x)= …)

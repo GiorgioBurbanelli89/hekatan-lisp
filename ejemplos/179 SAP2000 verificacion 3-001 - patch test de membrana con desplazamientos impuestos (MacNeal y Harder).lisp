@@ -148,6 +148,17 @@ e_b = [1, 1]
 v_b = [0, 0]
 #show
 #modelo3d(X_m, e_m, e_b, u_mil, v_b, U_m, 100)
+#: **Gráfica 2D · la placa en planta.** Los 5 cuadriláteros irregulares (numerados), los 8 nudos y, en rojo, las 4 esquinas donde se impone el desplazamiento:
+#hide
+x_j = zeros(8, 1)
+y_j = zeros(8, 1)
+for n = 1:8
+  x_j(n) = XY(n, 1)
+  y_j(n) = XY(n, 2)
+end
+a_j = [5, 6, 7, 8]
+#show
+#malla(x_j, y_j, C, a_j)
 #: **Gráfica 2D (corte).** El mismo u cortado a lo largo del borde de abajo (y = 0) y del de arriba (y = 0.12 in), en milésimas: dos rectas paralelas, porque u = 10⁻³·(x + y/2) es lineal; los nudos de las esquinas caen justo sobre ellas.
 #fplot(borde_inferior = x, borde_superior = x + 0.06, puntos = [0 0; 0.24 0.24; 0 0.06; 0.24 0.3], [0 0.24])
 

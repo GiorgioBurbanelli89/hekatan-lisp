@@ -39,7 +39,7 @@ namespace HekatanLisp
         }
 
         public sealed class Rejilla { public double Xa, Xb, Ya, Yb; public int N; public double[,] Z; }
-        public sealed class MallaDatos { public double[] X, Y; public int[][] Elem; public int[] Apoyos; public int[][] Restr; }
+        public sealed class MallaDatos { public double[] X, Y; public int[][] Elem; public int[] Apoyos; public int[][] Restr; public double[] Valores; }   // Valores: #campo (el 4.º dato sin redondear)
 
         public sealed class Resultado
         {
@@ -846,6 +846,7 @@ namespace HekatanLisp
                     var el = ps.Length > 2 ? Regex.Matches(ps[2], @"\(vector ([^()]*)\)").Select(m => Nums(m.Groups[1].Value).Select(v => (int)Math.Round(v)).ToArray()).ToArray() : new int[0][];
                     md.Elem = el;
                     md.Apoyos = ps.Length > 3 ? Nums(ps[3]).Select(v => (int)Math.Round(v)).ToArray() : new int[0];
+                    md.Valores = ps.Length > 3 ? Nums(ps[3]) : new double[0];   // #campo(x, y, elementos, valores)
                     // 5.º dato opcional: qué grados de libertad fija cada apoyo (una fila por apoyo: 1 = fijo),
                     // p. ej. [w θx θy ψ] en la placa. El dibujo distingue apoyo puntual, borde apoyado y empotramiento.
                     if (ps.Length > 4)

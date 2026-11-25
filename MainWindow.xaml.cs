@@ -318,7 +318,8 @@ namespace HekatanLisp
                             ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
                     html = LispAnim.PostProcesar(html);   // #anim(n = a:b) … #finanim: los cuadros en su reproductor
                     if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + SurfacePlot.Modelo3DScript + "</body>");   // orbit + hover de mapas, una vez
-                    if (LispDibujo.UsaHover(html)) html = html.Replace("</body>", LispDibujo.HoverScript + "</body>");   // #dibujo con hover(): globo con el cursor, una vez
+                    if (LispDibujo.UsaHover(html)) html = html.Replace("</body>", LispDibujo.HoverScript + "</body>");
+                    if (html.Contains("hk-fplot")) html = html.Replace("</body>", LispConverter.PlotScript + "</body>");   // hover de #fplot (25-nov-2026)   // #dibujo con hover(): globo con el cursor, una vez
                 }
                 _lastHtml = html;   // --html: guardar el HTML REAL del motor (para Hekatan School)
                 // Recalcular NO debe mandar arriba: se guarda dónde estaba el lector y se repone en la

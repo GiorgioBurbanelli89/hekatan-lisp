@@ -32,7 +32,8 @@ namespace HekatanLisp
                         ph != null && ph.Contains("<svg") ? "<div class=\"hk-plotslot\">" + ph + "</div>" : ph ?? "");
                 html = LispAnim.PostProcesar(html);
                 if (anySurf) html = html.Replace("</body>", SurfacePlot.OrbitScript + SurfacePlot.SolidScript + SurfacePlot.MapScript + SurfacePlot.Modelo3DScript + "</body>");
-                if (LispDibujo.UsaHover(html)) html = html.Replace("</body>", LispDibujo.HoverScript + "</body>");   // #dibujo con hover()
+                if (LispDibujo.UsaHover(html)) html = html.Replace("</body>", LispDibujo.HoverScript + "</body>");
+                if (html.Contains("hk-fplot")) html = html.Replace("</body>", LispConverter.PlotScript + "</body>");   // hover de #fplot (25-nov-2026)   // #dibujo con hover()
                 return html;
             }
             var sb = new StringBuilder();

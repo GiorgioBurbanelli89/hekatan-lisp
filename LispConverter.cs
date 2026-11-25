@@ -2456,7 +2456,23 @@ document.addEventListener('mouseup',function(){
             double SY(double y) => H - pB - (H - pT - pB) * (y - ymin) / (ymax - ymin);
             string Num(double v) => (Math.Abs(v) < 1e-9 ? 0 : v).ToString("0.###", C);
             var sb = new StringBuilder();
-            sb.Append("<div class=\"ws-plot\"><svg viewBox=\"0 0 ").Append(W).Append(' ').Append(H)
+            // 25-nov-2026, Jorge: «2D debe tener cursor hover, iguala con lo que ya tenga». Los datos de
+            // cada curva van en data-s para que PlotScript (mismo globo que MapScript) lea x y cada valor.
+            var js = new StringBuilder("[");
+            void Serie(string nm, string col, double[] xs, double[] ys)
+            {
+                if (js.Length > 1) js.Append(',');
+                js.Append("{\"n\":\"").Append(PrettyLabel(nm).Replace("\\", "\\\\").Replace("\"", "\\\"")).Append("\",\"c\":\"").Append(col).Append("\",\"x\":[");
+                for (int k = 0; k < xs.Length; k++) { if (k > 0) js.Append(','); js.Append(double.IsNaN(xs[k]) || double.IsInfinity(xs[k]) ? "null" : xs[k].ToString("R", C)); }
+                js.Append("],\"y\":[");
+                for (int k = 0; k < ys.Length; k++) { if (k > 0) js.Append(','); js.Append(double.IsNaN(ys[k]) || double.IsInfinity(ys[k]) ? "null" : ys[k].ToString("R", C)); }
+                js.Append("]}");
+            }
+            for (int s0 = 0; s0 < series.Count; s0++) Serie(series[s0].name, PlotColors[s0 % PlotColors.Length], series[s0].xs, series[s0].ys);
+            for (int d0 = 0; d0 < dots.Count; d0++) Serie(dots[d0].name, PlotColors[(series.Count + d0) % PlotColors.Length], dots[d0].xs, dots[d0].ys);
+            js.Append(']');
+            sb.Append("<div class=\"ws-plot hk-fplot\" data-g=\"").Append(string.Join(",", new[] { lo, hi, ymin, ymax, W, H, pL, pR, pT, pB }.Select(v => v.ToString("R", C))))
+              .Append("\" data-s=\"").Append(System.Net.WebUtility.HtmlEncode(js.ToString())).Append("\"><svg viewBox=\"0 0 ").Append(W).Append(' ').Append(H)
               .Append("\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"'Segoe UI',Arial,sans-serif\" style=\"width:100%;max-width:540px;height:auto;display:block;margin:0 auto\">");
             // GRID (líneas tenues en cada tick) — estilo MATLAB
             for (double gx = Math.Ceiling(lo / xstep) * xstep; gx <= hi + xstep * 1e-6; gx += xstep)
@@ -2504,7 +2520,7 @@ document.addEventListener('mouseup',function(){
                 {
                     if (double.IsNaN(dys[k]) || dxs[k] < lo || dxs[k] > hi) continue;
                     sb.Append("<circle cx=\"").Append(Num(SX(dxs[k]))).Append("\" cy=\"").Append(Num(SY(dys[k])))
-                      .Append("\" r=\"4.5\" fill=\"").Append(col).Append("\" stroke=\"var(--bg)\" stroke-width=\"1.2\"><title>(")
+                      .Append("\" r=\"").Append(curva && dxs.Length > 30 ? "2.5" : "4.5").Append("\" fill=\"").Append(col).Append("\" stroke=\"var(--bg)\" stroke-width=\"1.2\"><title>(")
                       .Append(Num(dxs[k])).Append("; ").Append(Num(dys[k])).Append(")</title></circle>");
                 }
             }
@@ -2553,6 +2569,19 @@ document.addEventListener('mouseup',function(){
                     body.Append("<div class=\"lp-hdr\">").Append(System.Net.WebUtility.HtmlEncode(line)).Append("</div>");
                     continue;
                 }
+                bool curva = dxs.Length >= 2;
+                for (int k = 1; k < dxs.Length && curva; k++) if (!(dxs[k] >= dxs[k - 1])) curva = false;
+                if (curva)
+                {
+                    var pl = new StringBuilder();
+                    for (int k = 0; k < dxs.Length; k++)
+                    {
+                        if (double.IsNaN(dys[k]) || double.IsInfinity(dys[k])) continue;
+                        if (pl.Length > 0) pl.Append(' ');
+                        pl.Append(Num(SX(Math.Max(lo, Math.Min(hi, dxs[k]))))).Append(',').Append(Num(SY(dys[k])));
+                    }
+                    sb.Append("<polyline points=\"").Append(pl).Append("\" fill=\"none\" stroke=\"").Append(col).Append("\" stroke-width=\"2\"/>");
+                }
                 N tree; try { tree = fromLisp ? ParseLisp(exprStr) : ParseMath(exprStr); }
                 catch { body.Append("<div class=\"lp-hdr\">").Append(System.Net.WebUtility.HtmlEncode(line)).Append("</div>"); continue; }
                 string mat = System.Net.WebUtility.HtmlEncode(ToLab(tree, 0));
@@ -2583,3 +2612,49 @@ document.addEventListener('mouseup',function(){
         public static string LispToLab(string line) => ToLab(ParseLisp(line), 0);
     }
 }
+        /// <summary>Hover de las gráficas 2D (#fplot): línea vertical en el cursor, un punto en cada curva y el
+        /// MISMO globo de los mapas (MapScript): x y el valor de cada curva. Se emite una vez por página.</summary>
+        public const string PlotScript = @"<script>
+(function(){
+ if(window.__hkFplot)return;window.__hkFplot=1;
+ var NS='http://www.w3.org/2000/svg';
+ function num(v){var a=Math.abs(v);if(a<1e-9)return (0).toFixed(4);return (a>=1e5||(a>0&&a<1e-3))?v.toExponential(3):v.toFixed(4);}
+ function val(s,x){var X=s.x,Y=s.y,n=X.length,b=null;
+   for(var k=0;k<n-1;k++){if(X[k]==null||X[k+1]==null||Y[k]==null||Y[k+1]==null)continue;
+     if(x>=X[k]&&x<=X[k+1]){if(X[k+1]===X[k])continue;var t=(x-X[k])/(X[k+1]-X[k]);return Y[k]+(Y[k+1]-Y[k])*t;}}
+   var dm=1e300;for(var k=0;k<n;k++){if(X[k]==null||Y[k]==null)continue;var d=Math.abs(X[k]-x);if(d<dm){dm=d;b=Y[k];}}
+   return b;}
+ function setup(dv){
+   var g=dv.dataset.g.split(',').map(Number),S=JSON.parse(dv.dataset.s),sv=dv.querySelector('svg');if(!sv)return;
+   var lo=g[0],hi=g[1],y0=g[2],y1=g[3],W=g[4],H=g[5],pL=g[6],pR=g[7],pT=g[8],pB=g[9];
+   var tip=document.createElement('div');
+   tip.style.cssText='position:fixed;z-index:9999;display:none;pointer-events:none;background:#fffffff2;'+
+     'border:1px solid #888;border-radius:4px;padding:3px 6px;font:12px/1.35 Consolas,monospace;color:#111;'+
+     'box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:pre';
+   document.body.appendChild(tip);
+   var ln=document.createElementNS(NS,'line');ln.setAttribute('y1',pT);ln.setAttribute('y2',H-pB);
+   ln.setAttribute('stroke','#888');ln.setAttribute('stroke-dasharray','4 3');ln.style.display='none';sv.appendChild(ln);
+   var pts=S.map(function(s){var c=document.createElementNS(NS,'circle');c.setAttribute('r','4');c.setAttribute('fill','#fff');
+     c.setAttribute('stroke',s.c);c.setAttribute('stroke-width','2');c.style.display='none';sv.appendChild(c);return c;});
+   function SY(y){return H-pB-(H-pT-pB)*(y-y0)/(y1-y0);}
+   function oculta(){tip.style.display='none';ln.style.display='none';pts.forEach(function(c){c.style.display='none';});}
+   sv.addEventListener('pointermove',function(e){
+     var r=sv.getBoundingClientRect(),px=(e.clientX-r.left)*W/r.width,u=(px-pL)/(W-pL-pR);
+     if(u<0||u>1){oculta();return;}
+     var x=lo+(hi-lo)*u,txt='x = '+num(x);
+     ln.setAttribute('x1',px);ln.setAttribute('x2',px);ln.style.display='';
+     for(var k=0;k<S.length;k++){var v=val(S[k],x);
+       if(v==null||!isFinite(v)){pts[k].style.display='none';continue;}
+       txt+='\n'+S[k].n+' = '+num(v);
+       pts[k].setAttribute('cx',px);pts[k].setAttribute('cy',SY(v));pts[k].style.display='';}
+     tip.textContent=txt;tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+   });
+   sv.addEventListener('pointerleave',oculta);
+   sv.style.cursor='crosshair';
+ }
+ function init(){var m=document.querySelectorAll('div.hk-fplot');for(var i=0;i<m.length;i++)if(!m[i].__hk){m[i].__hk=1;setup(m[i]);}}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+ new MutationObserver(init).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>";
+

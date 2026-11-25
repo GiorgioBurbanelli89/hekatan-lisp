@@ -308,13 +308,14 @@ H_1(1:n_h, 1:4)
 #: Hekatan Geotechnic con la MISMA malla (y el programa de referencia en Python, línea por línea) da |u| máx = 45.3220 mm con F = 1, 59.5693 mm con F = 1.4 y 96.844 mm con F = 1.52: la hoja da lo mismo a cuatro decimales. Con F = 1.55 la iteración se dispara: el factor de seguridad está entre 1.52 y 1.55 (Geotechnic con su escalera de GEO5: 1.524).
 
 ## 6 · Mapas de Δu = |u(F) − u(1)| (pasa el cursor: valor en cada punto)
-#: El campo de cada triángulo se interpola con sus MISMAS funciones de forma N₁…N₆ en una rejilla de 0.5 m (fuera del suelo, sobre el talud, la rejilla vale 0).
+#: El campo de cada triángulo se interpola con sus MISMAS funciones de forma N₁…N₆ en una rejilla de 0.5 m; entre los puntos de la rejilla, interpolación bilineal.
 #hide
 h_g = 0.5
 n_x = 184
 n_y = 47
 M_14 = zeros(n_x, n_y)
 M_15 = zeros(n_x, n_y)
+Z_m = zeros(n_x, n_y)
 for i = 1:n_x
   for j = 1:n_y
     M_14(i, j) = 0
@@ -353,13 +354,28 @@ for e = 1:n_e
         end
         M_14(i, j) = 1000·sqrt(x_u(1)^2 + y_u(1)^2)
         M_15(i, j) = 1000·sqrt(x_u(2)^2 + y_u(2)^2)
+        Z_m(i, j) = 1
       end
     end
   end
 end
+for i = 1:n_x
+  for j = 2:n_y
+    if Z_m(i, j) == 0
+      M_14(i, j) = M_14(i, j - 1)
+      M_15(i, j) = M_15(i, j - 1)
+    end
+  end
+end
 #show
-u_14(x, y) = M_14(round(x/h_g) + 1, round(y/h_g) + 1)
-u_15(x, y) = M_15(round(x/h_g) + 1, round(y/h_g) + 1)
+#: El terreno: y_s(x) es la superficie del talud; m_s(x, y) vale 1 dentro del suelo y 0 fuera (fuera el mapa queda vacío: 0/0).
+y_s(x) = 7.62 + min(max(x - 30.48, 0), 30.48)/2
+m_s(x, y) = min(1, max(0, (y_s(x) - y)·1000 + 1))
+#: Entre los puntos de la rejilla, interpolación bilineal con sus 4 vecinos: u(x, y) = Σ (1 − fx o fx)·(1 − fy o fy)·M(i, j), con fx, fy la parte fraccionaria de x/h, y/h.
+#hide
+u_14(x, y) = (1 - (x/h_g - floor(x/h_g)))·(1 - (y/h_g - floor(y/h_g)))·M_14(floor(x/h_g) + 1, floor(y/h_g) + 1) + (x/h_g - floor(x/h_g))·(1 - (y/h_g - floor(y/h_g)))·M_14(min(floor(x/h_g) + 2, n_x), floor(y/h_g) + 1) + (1 - (x/h_g - floor(x/h_g)))·(y/h_g - floor(y/h_g))·M_14(floor(x/h_g) + 1, min(floor(y/h_g) + 2, n_y)) + (x/h_g - floor(x/h_g))·(y/h_g - floor(y/h_g))·M_14(min(floor(x/h_g) + 2, n_x), min(floor(y/h_g) + 2, n_y)) + 0/m_s(x, y)
+u_15(x, y) = (1 - (x/h_g - floor(x/h_g)))·(1 - (y/h_g - floor(y/h_g)))·M_15(floor(x/h_g) + 1, floor(y/h_g) + 1) + (x/h_g - floor(x/h_g))·(1 - (y/h_g - floor(y/h_g)))·M_15(min(floor(x/h_g) + 2, n_x), floor(y/h_g) + 1) + (1 - (x/h_g - floor(x/h_g)))·(y/h_g - floor(y/h_g))·M_15(floor(x/h_g) + 1, min(floor(y/h_g) + 2, n_y)) + (x/h_g - floor(x/h_g))·(y/h_g - floor(y/h_g))·M_15(min(floor(x/h_g) + 2, n_x), min(floor(y/h_g) + 2, n_y)) + 0/m_s(x, y)
+#show
 #: **F = 1.4** (Δu en mm):
 #contourf(u_14(x, y), [0 91.44], [0 22.86])
 #: **F = 1.52** (el último que converge): la cuña que desliza une el pie con la corona.

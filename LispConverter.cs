@@ -749,7 +749,7 @@ namespace HekatanLisp
                 // variables). Efecto secundario aceptado: una referencia de columna en #tabla(...) que
                 // choque de mayuscula/minuscula con otra igual en el resto de la hoja no se renombra
                 // (ResolveTablaColumn no la encuentra y la muestra literal, no revienta).
-                bool plotDir = Regex.IsMatch(t, @"^#\s*(fplot|plot|ezplot|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?)\b", RegexOptions.IgnoreCase);
+                bool plotDir = Regex.IsMatch(t, @"^#\s*(fplot|plot|ezplot|surf|superficie|plot3d|mesh|map|mapa|heatmap|contourf?|malla|mallado|campo|modelo3d)\b", RegexOptions.IgnoreCase);
                 if (t.Length == 0 || ((t[0] == '#' || t[0] == ';' || t[0] == '%') && !plotDir)) continue;
                 int at = ln.IndexOf("@@", StringComparison.Ordinal);
                 string body = at >= 0 ? ln.Substring(0, at) : ln, tail = at >= 0 ? ln.Substring(at) : "";

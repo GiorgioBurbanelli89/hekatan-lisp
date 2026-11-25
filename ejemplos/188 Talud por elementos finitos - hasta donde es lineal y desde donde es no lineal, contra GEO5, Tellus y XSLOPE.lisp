@@ -51,6 +51,24 @@ k_DP = Simplify{6*c*cos(phi)/(sqrt(3)*(3 + sin(phi)))}
 J_n = Simplify{J - G*(J + alpha*I_1 - k)/G}
 #: **Y el equilibrio, con Newton-Raphson:** K_T·Δu = F_ext − F_int(u); se repite hasta que Δu es despreciable. En lineal K_T = K y basta UNA vez.
 du_N = Simplify{(F_ext - F_int)/K_T}
+#: **Lo mismo en Hekatan OpenSees (misma malla, nudo a nudo).** OpenSees tiene el elemento T6 (`tri6n`, SixNodeTri: los mismos 6 nudos y las mismas N₁…N₆) y su propio Drucker-Prager, escrito con la norma del desviador ‖s‖ = √(2·J₂) = √2·J:
+f_OS = Simplify{sqrt(2)*J + rho*I_1 - sqrt(2/3)*sigma_Y}
+#: Para que sea EL MISMO cono que el de GEO5 (f = J + α·I₁ − k) se toma ρ = √2·α y σ_Y = √3·k. Reemplazando:
+f_OS2 = Simplify{sqrt(2)*J + sqrt(2)*alpha*I_1 - sqrt(2/3)*sqrt(3)*k}
+#: El factor que acompaña a k es √(2/3)·√3 = √2 (comprobado con números):
+s_23 = sqrt(2/3)·sqrt(3) 'factor de k
+s_2 = sqrt(2) 'raíz de 2
+#: Con eso, el Drucker-Prager de OpenSees es √2 veces el de GEO5: la resta da CERO, símbolo a símbolo:
+f_OS3 = Simplify{sqrt(2)*J + sqrt(2)*alpha*I_1 - sqrt(2)*k}
+d_OS = Simplify{sqrt(2)*J + sqrt(2)*alpha*I_1 - sqrt(2)*k - sqrt(2)*(J + alpha*I_1 - k)}
+#: f_OS = √2·f_GEO5: las dos funciones se anulan en los mismos esfuerzos, la superficie de fluencia es idéntica. El flujo plástico sin dilatancia (ψ = 0) es ρ̄ = 0 en OpenSees. Las constantes elásticas que pide OpenSees:
+K_OS = Simplify{E/(3*(1 - 2*nu))}
+G_OS = Simplify{E/(2*(1 + nu))}
+#: **El guion de Hekatan OpenSees** (Tcl, una corrida por cada F; las cargas de peso propio son las mismas W/3 de los nudos del medio):
+#: `nDMaterial DruckerPrager 1 $K $G [expr sqrt(3)*$k] [expr sqrt(2)*$alfa] 0.0 0 0 0 0 0 0 0`
+#: `element tri6n $e $n1 $n2 $n3 $n4 $n5 $n6 1.0 PlaneStrain 1`
+#: `pattern Plain 1 1 { load $nudoMedio 0.0 [expr -$gamma*$A/3] ... }`
+#: `algorithm NewtonLineSearch -type Bisection` · `test NormDispIncr 1e-7 60` · `integrator LoadControl 0.025` (40 pasos: con 10 pasos Newton diverge en F = 1.2 y no es el suelo, es el paso)
 #: **Los números, en el triángulo del pie del talud** (elemento 266 de la malla de Geotechnic, 2361 T6 y 4902 nudos):
 x_1 = 32.3136 'esquina 1 [m]
 y_1 = 6.9934
@@ -66,6 +84,10 @@ W_e = 19.6363·A_e 'peso del triángulo [kN/m]
 W_m = W_e/3 'carga en cada nudo del MEDIO [kN/m] (las esquinas llevan 0 en el T6)
 a_1 = 2·sin(20·pi/180)/(sqrt(3)·(3 + sin(20·pi/180))) 'α de Drucker-Prager con φ = 20°
 k_1 = 6·14.9625·cos(20·pi/180)/(sqrt(3)·(3 + sin(20·pi/180))) 'k con c = 15 kPa [kPa]
+rho_1 = sqrt(2)·a_1 'ρ de OpenSees con φ = 20°
+sY_1 = sqrt(3)·k_1 'σ_Y de OpenSees con c = 15 kPa [kPa]
+K_1 = 100000/(3·(1 - 2·0.3)) 'módulo volumétrico [kPa]
+G_1 = 100000/(2·(1 + 0.3)) 'módulo de corte [kPa]
 #: **La iteración de Newton del solver** (registro real de Geotechnic, talud entero): DNorm = |Δu|/|u| en cada iteración. Con SRF = 1.4069 converge en 8 iteraciones; con SRF = 1.4439 no baja y diverge: ahí está la falla.
 i_N = [1, 2, 3, 4, 5, 6, 7, 8] 'iteración
 d_ok = [1, 0.2924, 0.09952, 0.02609, 0.01418, 0.003741, 0.0004525, 0.0005802] 'DNorm con SRF = 1.4069 (converge)

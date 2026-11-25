@@ -169,6 +169,7 @@ for i_F = 1:n_F
   P_d = [2/3, -1/3, -1/3, 0; -1/3, 2/3, -1/3, 0; -1/3, -1/3, 2/3, 0; 0, 0, 0, 1]
   n_g = 7·n_e
   S_g = zeros(4·n_g, 1)
+  P_l = zeros(n_g, 1)
   D_g = zeros(4·n_g, 4)
   for i = 1:n_g
     D_g(4·(i - 1) + 1:4·i, 1:4) = D_e
@@ -247,6 +248,10 @@ for i_F = 1:n_F
             end
           end
           if p_s == 2
+            P_l(i_g) = 0
+            if f_y > 1e-12
+              P_l(i_g) = 1
+            end
             S_g(4·(i_g - 1) + 1:4·i_g) = s_t
             D_g(4·(i_g - 1) + 1:4·i_g, 1:4) = D_p
           end
@@ -292,6 +297,9 @@ for i_F = 1:n_F
     u_max = max(u_max, sqrt(u(2·i - 1)^2 + u(2·i)^2))
   end
   U_F(1:2·n_n, i_F) = u
+  if i_F == 3
+    P_15 = P_l
+  end
   C_F(i_F) = c_v
   I_F(i_F) = i_t
   M_F(i_F) = 1000·u_max
@@ -302,7 +310,7 @@ for i_F = 1:n_F
 end
 #show
 #: **Newton con F = 1** (cada fila es una iteración: η de la búsqueda lineal y las tres normas de GEO5):
-H_1(1:n_h, 1:4)
+Hist = H_1(1:n_h, 1:4) 'columnas: η, DNorm, OBFNorm, ENorm
 #: **Resultado para cada F** (1 = converge, 2 = NO converge en 12 iteraciones: las normas crecen) y |u| máximo en mm:
 #tabla("F:2","¿converge?:0","iteraciones:0","|u| máx [mm]:4")(F_l; C_F; I_F; M_F)
 #: Hekatan Geotechnic con la MISMA malla (y el programa de referencia en Python, línea por línea) da |u| máx = 45.3220 mm con F = 1, 59.5693 mm con F = 1.4 y 96.844 mm con F = 1.52: la hoja da lo mismo a cuatro decimales. Con F = 1.55 la iteración se dispara: el factor de seguridad está entre 1.52 y 1.55 (Geotechnic con su escalera de GEO5: 1.524).
@@ -315,7 +323,24 @@ for i = 1:n_n
   d_14(i) = 1000·sqrt((U_F(2·i - 1, 2) - U_F(2·i - 1, 1))^2 + (U_F(2·i, 2) - U_F(2·i, 1))^2)
   d_15(i) = 1000·sqrt((U_F(2·i - 1, 3) - U_F(2·i - 1, 1))^2 + (U_F(2·i, 3) - U_F(2·i, 1))^2)
 end
+p_n = zeros(n_n, 1)
+c_n = zeros(n_n, 1)
+for e = 1:n_e
+  p_e = 0
+  for q = 1:7
+    p_e = p_e + P_15(7·(e - 1) + q)/7
+  end
+  for a = 1:6
+    p_n(E_t(e, a)) = p_n(E_t(e, a)) + p_e
+    c_n(E_t(e, a)) = c_n(E_t(e, a)) + 1
+  end
+end
+for i = 1:n_n
+  p_n(i) = p_n(i)/c_n(i)
+end
 #show
+#: **La superficie de falla: la zona PLÁSTICA con F = 1.52** (fracción de los 7 puntos de Gauss de cada triángulo donde el suelo fluye, f ≥ 0; promedio en los nudos). 0 = elástico, 1 = todo plástico. Pasa el cursor: la banda roja que va del PIE a la CORONA es el mecanismo de falla.
+#campo(X_n, Y_n, E_t, p_n)
 #: **Sobre los triángulos de la malla** (como los programas de elementos finitos): el valor de cada nudo, interpolado dentro de cada triángulo. **F = 1.4** (Δu en mm):
 #campo(X_n, Y_n, E_t, d_14)
 #: **F = 1.52** (el último que converge): la cuña que desliza une el pie con la corona.

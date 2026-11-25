@@ -475,5 +475,15 @@ t_2 = [FS_xs2; FS_gl; FS_hk2; FS_te2] 'FS ejemplo 2
 #: • **El modelo:** el Drucker-Prager de GEO5 (cono redondo) resiste algo más que Mohr-Coulomb (cono hexagonal). Con la malla fina: Drucker-Prager 1.425 (Hekatan) y 1.44 (GEO5) contra Mohr-Coulomb 1.35–1.37.
 #: • **La malla:** con triángulos de ~5 m la cuña de falla se dibuja con pocos elementos y la malla es más rígida: el mismo Drucker-Prager pasa de 1.425 (malla de 1.2 m) a 1.524 (malla de 5 m). Por eso esta hoja se compara NUDO A NUDO con Geotechnic en la MISMA malla gruesa (sección 5: idéntica a cuatro decimales), y el valor de diseño sale de la malla fina.
 r_DP = 1.425/1.35 'Drucker-Prager / Mohr-Coulomb (malla fina)
+#: **XSLOPE como juez, con la MISMA malla de esta hoja** (144 T6, mismo orden de nudos; XSLOPE 1.1.0 instalado de PyPI, revisado: sin virus, su cálculo no usa internet). XSLOPE solo tiene Mohr-Coulomb, así que Geotechnic se corre también con Mohr-Coulomb (ψ = 0) en esa malla:
+u_xs = 40.8498 'XSLOPE, |u| máx con F = 1 [mm]
+u_hk = 40.8217 'Hekatan Geotechnic, |u| máx con F = 1 [mm]
+d_u = 0.079 'máxima diferencia nudo a nudo, de 666 desplazamientos [mm]
+p_u = 100·d_u/u_hk 'diferencia nudo a nudo [%]
+FS_xsg = 1.436 'XSLOPE, reducción de resistencia, malla de la hoja
+FS_hkg = 1.407 'Hekatan Geotechnic, Mohr-Coulomb, malla de la hoja (escalera de GEO5)
+p_F = 100·(FS_hkg - FS_xsg)/FS_xsg 'Hekatan contra XSLOPE [%]
+r_DPg = 1.524/1.407 'esta hoja (Drucker-Prager) / Mohr-Coulomb, malla de la hoja
+#: Con el MISMO modelo y la MISMA malla los desplazamientos coinciden nudo a nudo (0.19 %) y el FS a 2 % (1.407 contra 1.436): Hekatan sube F en escalones como GEO5 y se queda con el último que converge; XSLOPE biseca hasta 0.004. El 1.52 de esta hoja es Drucker-Prager: ×1.083 sobre Mohr-Coulomb en esta malla.
 r_M = 1.524/1.425 'malla gruesa / malla fina (mismo Drucker-Prager)
 #: **Lineal** te dice cuánto se deforma el talud. **No lineal** (la iteración de esta hoja) te dice si se cae.

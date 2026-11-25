@@ -308,6 +308,19 @@ H_1(1:n_h, 1:4)
 #: Hekatan Geotechnic con la MISMA malla (y el programa de referencia en Python, línea por línea) da |u| máx = 45.3220 mm con F = 1, 59.5693 mm con F = 1.4 y 96.844 mm con F = 1.52: la hoja da lo mismo a cuatro decimales. Con F = 1.55 la iteración se dispara: el factor de seguridad está entre 1.52 y 1.55 (Geotechnic con su escalera de GEO5: 1.524).
 
 ## 6 · Mapas de Δu = |u(F) − u(1)| (pasa el cursor: valor en cada punto)
+#hide
+d_14 = zeros(n_n, 1)
+d_15 = zeros(n_n, 1)
+for i = 1:n_n
+  d_14(i) = 1000·sqrt((U_F(2·i - 1, 2) - U_F(2·i - 1, 1))^2 + (U_F(2·i, 2) - U_F(2·i, 1))^2)
+  d_15(i) = 1000·sqrt((U_F(2·i - 1, 3) - U_F(2·i - 1, 1))^2 + (U_F(2·i, 3) - U_F(2·i, 1))^2)
+end
+#show
+#: **Sobre los triángulos de la malla** (como los programas de elementos finitos): el valor de cada nudo, interpolado dentro de cada triángulo. **F = 1.4** (Δu en mm):
+#campo(X_n, Y_n, E_t, d_14)
+#: **F = 1.52** (el último que converge): la cuña que desliza une el pie con la corona.
+#campo(X_n, Y_n, E_t, d_15)
+#: **Lo mismo pasado a una rejilla** (para el mapa 2D clásico y el 3D):
 #: El campo de cada triángulo se interpola con sus MISMAS funciones de forma N₁…N₆ en una rejilla de 0.381 m (91.44/240: cae justo en los bordes del talud); entre los puntos de la rejilla, interpolación bilineal.
 #hide
 h_g = 91.44/240

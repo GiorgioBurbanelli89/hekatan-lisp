@@ -297,6 +297,9 @@ for i_F = 1:n_F
     u_max = max(u_max, sqrt(u(2·i - 1)^2 + u(2·i)^2))
   end
   U_F(1:2·n_n, i_F) = u
+  if i_F == 1
+    P_10 = P_l
+  end
   if i_F == 3
     P_15 = P_l
   end
@@ -328,7 +331,7 @@ c_n = zeros(n_n, 1)
 for e = 1:n_e
   p_e = 0
   for q = 1:7
-    p_e = p_e + P_15(7·(e - 1) + q)/7
+    p_e = p_e + max(P_15(7·(e - 1) + q) - P_10(7·(e - 1) + q), 0)/7
   end
   for a = 1:6
     p_n(E_t(e, a)) = p_n(E_t(e, a)) + p_e
@@ -339,7 +342,7 @@ for i = 1:n_n
   p_n(i) = p_n(i)/c_n(i)
 end
 #show
-#: **La superficie de falla: la zona PLÁSTICA con F = 1.52** (fracción de los 7 puntos de Gauss de cada triángulo donde el suelo fluye, f ≥ 0; promedio en los nudos). 0 = elástico, 1 = todo plástico. Pasa el cursor: la banda roja que va del PIE a la CORONA es el mecanismo de falla.
+#: **La superficie de falla:** los puntos de Gauss que PASAN a plásticos al debilitar el suelo de F = 1 a F = 1.52 (fracción de los 7 de cada triángulo; promedio en los nudos). Con F = 1 el peso propio ya hace fluir algunos puntos en la base (confinados, no fallan): se restan. Lo que queda es la banda que une el PIE con la CORONA: el mecanismo de falla. Pasa el cursor para ver el valor.
 #campo(X_n, Y_n, E_t, p_n)
 #: **Sobre los triángulos de la malla** (como los programas de elementos finitos): el valor de cada nudo, interpolado dentro de cada triángulo. **F = 1.4** (Δu en mm):
 #campo(X_n, Y_n, E_t, d_14)

@@ -151,7 +151,7 @@ u_lineal = 1000·m_el 'mm (Hekatan Geotechnic con el suelo elástico: 38.82 mm)
 ## 5 · Parte NO LINEAL: Drucker-Prager y Newton para cada F
 #: Para cada F se divide la resistencia (c/F, tan φ/F) y se arranca de cero con el peso propio completo, como hace Geotechnic en cada peldaño. Si en 12 iteraciones las normas no bajan de 0.01 (crecen), NO hay equilibrio: el talud se cayó.
 #hide
-F_l = [1, 1.4, 1.52, 1.55]
+F_l = [1; 1.4; 1.52; 1.55]
 n_F = 4
 U_F = zeros(2·n_n, n_F)
 C_F = zeros(n_F, 1)
@@ -168,7 +168,7 @@ for i_F = 1:n_F
   O_n = [1; 1; 1; 0]
   P_d = [2/3, -1/3, -1/3, 0; -1/3, 2/3, -1/3, 0; -1/3, -1/3, 2/3, 0; 0, 0, 0, 1]
   n_g = 7·n_e
-  S_g = zeros(n_g, 4)
+  S_g = zeros(4·n_g, 1)
   D_g = zeros(4·n_g, 4)
   for i = 1:n_g
     D_g(4·(i - 1) + 1:4·i, 1:4) = D_e
@@ -184,7 +184,11 @@ for i_F = 1:n_F
     i_t = i_t + 1
     K_t = zeros(2·n_n, 2·n_n)
     for e = 1:n_e
-      g = transpose(G_e(e, 1:12))
+      g = zeros(12, 1)
+      for a = 1:6
+        g(2·a - 1) = 2·E_t(e, a) - 1
+        g(2·a) = 2·E_t(e, a)
+      end
       Kel = zeros(12, 12)
       for q = 1:7
         i_g = 7·(e - 1) + q
@@ -200,11 +204,15 @@ for i_F = 1:n_F
     for p_s = 1:2
       F_n = zeros(2·n_n, 1)
       for e = 1:n_e
-        g = transpose(G_e(e, 1:12))
+        g = zeros(12, 1)
+        for a = 1:6
+          g(2·a - 1) = 2·E_t(e, a) - 1
+          g(2·a) = 2·E_t(e, a)
+        end
         for q = 1:7
           i_g = 7·(e - 1) + q
           B = B_s(4·(i_g - 1) + 1:4·i_g, 1:12)
-          s_t = transpose(S_g(i_g, 1:4)) + D_e·B·d_u(g)·e_t
+          s_t = S_g(4·(i_g - 1) + 1:4·i_g) + D_e·B·d_u(g)·e_t
           I_1 = s_t(1) + s_t(2) + s_t(3)
           s_m = I_1/3
           s_d = s_t - s_m·O_n
@@ -239,7 +247,7 @@ for i_F = 1:n_F
             end
           end
           if p_s == 2
-            S_g(i_g, 1:4) = transpose(s_t)
+            S_g(4·(i_g - 1) + 1:4·i_g) = s_t
             D_g(4·(i_g - 1) + 1:4·i_g, 1:4) = D_p
           end
           F_n(g) = F_n(g) + transpose(B)·s_t·w_s(i_g)
@@ -268,7 +276,10 @@ for i_F = 1:n_F
     e_u = sqrt(sum((d_f).*(d_f)))
     e_f = sqrt(sum((R_f).*(R_f)))/sqrt(sum((F_f).*(F_f)))
     e_e = sqrt(abs(sum(d_f.*R_f)))/sqrt(abs(sum(A_d.*F_f)))
-    H_n(i_t, 1:4) = [e_t, e_u, e_f, e_e]
+    H_n(i_t, 1) = e_t
+    H_n(i_t, 2) = e_u
+    H_n(i_t, 3) = e_f
+    H_n(i_t, 4) = e_e
     if max(max(e_u, e_f), e_e) < 0.01
       c_v = 1
     end
@@ -297,6 +308,7 @@ H_1(1:n_h, 1:4)
 #: Hekatan Geotechnic con la MISMA malla (y el programa de referencia en Python, línea por línea) da |u| máx = 45.3220 mm con F = 1, 59.5693 mm con F = 1.4 y 96.844 mm con F = 1.52: la hoja da lo mismo a cuatro decimales. Con F = 1.55 la iteración se dispara: el factor de seguridad está entre 1.52 y 1.55 (Geotechnic con su escalera de GEO5: 1.524).
 
 ## 6 · Mapas de Δu = |u(F) − u(1)| (pasa el cursor: valor en cada punto)
+#: El campo de cada triángulo se interpola con sus MISMAS funciones de forma N₁…N₆ en una rejilla de 0.5 m (fuera del suelo, sobre el talud, la rejilla vale 0).
 #hide
 h_g = 0.5
 n_x = 184
@@ -305,8 +317,8 @@ M_14 = zeros(n_x, n_y)
 M_15 = zeros(n_x, n_y)
 for i = 1:n_x
   for j = 1:n_y
-    M_14(i, j) = 0/0
-    M_15(i, j) = 0/0
+    M_14(i, j) = 0
+    M_15(i, j) = 0
   end
 end
 for e = 1:n_e
@@ -365,9 +377,27 @@ end
 #show
 C_s
 #: Δu máximo (mm) contra F, calculado AQUÍ (la recta lineal sería Δu = 0 siempre):
-d_F(x) = (x <= 1.4)·C_s(2, 2)·(x - 1)/0.4 + (x > 1.4)·(C_s(2, 2) + (C_s(3, 2) - C_s(2, 2))·(x - 1.4)/0.12)
-#fplot(no_lineal = d_F(x), lineal = 0, [1 1.52])
-#: (tramos rectos entre los F calculados: 1, 1.4 y 1.52; con 1.55 ya no hay equilibrio)
+c_14 = C_s(2, 2) 'Δu con F = 1.4 [mm]
+c_15 = C_s(3, 2) 'Δu con F = 1.52 [mm]
+h_x = [100; 140; 152] 'F × 100 (eje del dibujo)
+h_y = [0; c_14; c_15] 'Δu [mm]
+h_F = [1; 1.4; 1.52] 'F
+#dibujo("Δu máximo contra F, calculado en esta hoja (pasa el cursor por los puntos)", ud = m, escala = auto, alto = 90)
+#  linea(100, 0, 160, 0, "gruesa azul")
+#  texto(156, 2.5, "lineal: Δu = 0", 2.2, "c")
+#  polilinea([100, 140, 152], [0, c_14, c_15], "gruesa rojo")
+#  circulo(140, c_14, 0.8, "rojo")
+#  circulo(152, c_15, 0.8, "rojo")
+#  linea(155, 0, 155, 58, "trazos rojo")
+#  texto(155, 60, "F = 1.55: no converge", 2.2, "c")
+#  linea(100, 0, 100, 58, "fina")
+#  texto(100, -4, "F = 1", 2.2, "c")
+#  texto(140, -4, "1.4", 2.2, "c")
+#  texto(152, -4, "1.52", 2.2, "c")
+#  texto(95, 50, "Δu [mm]", 2.2, "c")
+#  hover(h_x, h_y, "F = {#1:2}: Δu = {#2:2} mm", h_F, h_y)
+#fin
+#: (eje horizontal: F; la recta azul es lo LINEAL, que no cambia con F; la roja es lo NO LINEAL que calcula la hoja; con F = 1.55 ya no hay equilibrio)
 
 ## 8 · ¿Está bien? Comparación con XSLOPE
 #: XSLOPE (Jones y Williams 2026, SoftwareX 36, código abierto) publica su verificación con los MISMOS taludes de Griffiths y Lane (1999), usando Mohr-Coulomb sin dilatancia y reducción de resistencia por elementos finitos. Para comparar con justicia hay que usar el MISMO modelo de suelo y una malla fina:
@@ -380,7 +410,9 @@ FS_te2 = 1.349 'Tellus, ej. 2, Mohr-Coulomb ψ = 0 (otro programa)
 p_1 = 100·(FS_hk1 - FS_xs1)/FS_xs1 'Hekatan contra XSLOPE, ej. 1 [%]
 p_2 = 100·(FS_hk2 - FS_xs2)/FS_xs2 'Hekatan contra XSLOPE, ej. 2 [%]
 p_3 = 100·(FS_te2 - FS_xs2)/FS_xs2 'Tellus contra XSLOPE, ej. 2 [%]
-#tabla("Programa","Modelo","Ej. 1:3","Ej. 2:3")({"XSLOPE","Griffiths y Lane","Hekatan Geotechnic","Tellus"}; {"Mohr-Coulomb ψ=0","Mohr-Coulomb","Mohr-Coulomb ψ=φ","Mohr-Coulomb ψ=0"}; [FS_xs1, FS_gl, FS_hk1, 0]; [FS_xs2, FS_gl, FS_hk2, FS_te2])
+t_1 = [FS_xs1; FS_gl; FS_hk1; 0] 'FS ejemplo 1
+t_2 = [FS_xs2; FS_gl; FS_hk2; FS_te2] 'FS ejemplo 2
+#tabla("Programa","Modelo","Ej. 1:3","Ej. 2:3")({"XSLOPE","Griffiths y Lane","Hekatan Geotechnic","Tellus"}; {"Mohr-Coulomb ψ=0","Mohr-Coulomb","Mohr-Coulomb ψ=φ","Mohr-Coulomb ψ=0"}; t_1; t_2)
 #: Con el mismo modelo (Mohr-Coulomb) Hekatan queda a +0.1 % y +1.6 % de XSLOPE, dentro de la banda XSLOPE–Griffiths y Lane (1.35–1.40). (Tellus no publica el ej. 1: 0 en la tabla.)
 #: **¿Y por qué esta hoja da 1.52–1.55?** Por dos razones que se pueden medir por separado, no por un error:
 #: • **El modelo:** el Drucker-Prager de GEO5 (cono redondo) resiste algo más que Mohr-Coulomb (cono hexagonal). Con la malla fina: Drucker-Prager 1.425 (Hekatan) y 1.44 (GEO5) contra Mohr-Coulomb 1.35–1.37.

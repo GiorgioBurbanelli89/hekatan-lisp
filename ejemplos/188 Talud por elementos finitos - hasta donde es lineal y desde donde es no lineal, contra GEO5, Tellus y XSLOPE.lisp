@@ -159,7 +159,8 @@ FS_xslope = 1.35 'XSLOPE, elementos finitos (bisección), Mohr-Coulomb ψ = 0
 FS_gl = 1.40 'Griffiths y Lane 1999, elementos finitos
 FS_ops = 1.394 'Hekatan OpenSees, misma malla T6 (tri6n), Drucker-Prager ψ = 0, 100 pasos
 d_geo5 = 100·(FS_hk - FS_geo5)/FS_geo5 'Hekatan contra GEO5 [%]
-#tabla("Programa","Modelo","FS:3")({"Hekatan Geotechnic","Hekatan OpenSees","GEO5 2024 FEM","Tellus 0.1.4","XSLOPE","Griffiths y Lane","Bishop (equilibrio límite)"}; {"Drucker-Prager ψ=0","Drucker-Prager ψ=0 (misma malla)","Drucker-Prager ψ=0","Mohr-Coulomb ψ=0","Mohr-Coulomb ψ=0","Mohr-Coulomb","círculo, dovelas"}; [FS_hk, FS_ops, FS_geo5, FS_tellus, FS_xslope, FS_gl, FS_bishop])
+t_FS = [FS_hk; FS_ops; FS_geo5; FS_tellus; FS_xslope; FS_gl; FS_bishop] 'FS de cada programa
+#tabla("Programa","Modelo","FS:3")({"Hekatan Geotechnic","Hekatan OpenSees","GEO5 2024 FEM","Tellus 0.1.4","XSLOPE","Griffiths y Lane","Bishop (equilibrio límite)"}; {"Drucker-Prager ψ=0","Drucker-Prager ψ=0 (misma malla)","Drucker-Prager ψ=0","Mohr-Coulomb ψ=0","Mohr-Coulomb ψ=0","Mohr-Coulomb","círculo, dovelas"}; t_FS)
 #: **Hekatan OpenSees con la MISMA malla** (Δu = |u(F) − u(1)| máximo): F = 1.1 → 2.98 mm, 1.2 → 6.70, 1.3 → 11.72, 1.35 → 15.12, 1.38 → 17.92 (Hekatan Geotechnic: 2.75, 6.25, 10.88, 14.15, 16.79). Cerca de la falla el resultado depende del paso de carga: con 40 pasos OpenSees se detiene en 1.30–1.35; con 100 pasos llega a FS = 1.394. Por eso PLAXIS exige longitud de arco para capturar la falla.
 #fplot(Geotechnic = [1 0; 1.1 2.75; 1.2 6.25; 1.3 10.88; 1.35 14.15; 1.38 16.79; 1.4 19.15; 1.41 20.57; 1.42 22.38], OpenSees = [1 0; 1.1 2.98; 1.2 6.7; 1.3 11.72; 1.35 15.12; 1.38 17.92], [1 1.45])
 d_ops = 100·(FS_ops - FS_hk)/FS_hk 'OpenSees contra Geotechnic [%]

@@ -308,11 +308,11 @@ H_1(1:n_h, 1:4)
 #: Hekatan Geotechnic con la MISMA malla (y el programa de referencia en Python, línea por línea) da |u| máx = 45.3220 mm con F = 1, 59.5693 mm con F = 1.4 y 96.844 mm con F = 1.52: la hoja da lo mismo a cuatro decimales. Con F = 1.55 la iteración se dispara: el factor de seguridad está entre 1.52 y 1.55 (Geotechnic con su escalera de GEO5: 1.524).
 
 ## 6 · Mapas de Δu = |u(F) − u(1)| (pasa el cursor: valor en cada punto)
-#: El campo de cada triángulo se interpola con sus MISMAS funciones de forma N₁…N₆ en una rejilla de 0.5 m; entre los puntos de la rejilla, interpolación bilineal.
+#: El campo de cada triángulo se interpola con sus MISMAS funciones de forma N₁…N₆ en una rejilla de 0.381 m (91.44/240: cae justo en los bordes del talud); entre los puntos de la rejilla, interpolación bilineal.
 #hide
-h_g = 0.5
-n_x = 184
-n_y = 47
+h_g = 91.44/240
+n_x = 241
+n_y = 61
 M_14 = zeros(n_x, n_y)
 M_15 = zeros(n_x, n_y)
 Z_m = zeros(n_x, n_y)

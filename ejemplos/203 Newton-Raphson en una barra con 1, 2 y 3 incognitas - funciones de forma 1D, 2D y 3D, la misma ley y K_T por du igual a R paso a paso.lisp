@@ -76,6 +76,68 @@ N_bien = 20*(-20)/(1 + 20*abs(-20)/300) 'con |d|: −171.4 kN, compresión bajo 
 N_b = Simplify{k*delta/(1 + k*delta/N_u)}
 k_b = Simplify{Diff{k*delta/(1 + k*delta/N_u) @ delta}}
 #: Es kₜ = k/(1 + k·|d|/N_u)²: vale k al inicio y baja al estirarse. **El paso de Newton con 1 incógnita: Δ d = R/kₜ.** En el sólido y el área la misma ley se aplica a ε_x en cada punto de Gauss (σ = E·ε/(1 + E·|ε|/σᵤ), σᵤ = N_u/A), con ν = 0.
+### 1.5 · De dónde sale la fórmula de Newton
+#: Hasta aquí se **usó** Δ d = R/kₜ sin decir de dónde sale. La idea es una sola: **cerca de un punto, una curva se parece a su recta tangente**. Newton cambia la curva R(d) = P − N(d) por su tangente en el punto actual dₖ, busca dónde esa recta corta el cero y repite. (La ley N(d) es el dato, sección 1.4; esto es el método.)
+#dibujo("El problema: la barra con P en la punta; adentro responde N(d), que se ablanda", ud = m, escala = auto, cotas = m, alto = 45)
+#  achurado([-0.4, 0, 0, -0.4], [-0.6, -0.6, 0.6, 0.6], "suelo")
+#  linea(0, 0, 3, 0, "gruesa")
+#  circulo(0, 0, 0.08, "negro")
+#  circulo(3, 0, 0.08, "negro")
+#  flecha(3, 0, 3.9, 0, "gruesa rojo")
+#  texto(4.4, 0.3, "P = 240 kN", 2.4, "c")
+#  flecha(2.6, -0.35, 1.8, -0.35, "fina azul")
+#  texto(2.2, -0.75, "N(d)", 2.2, "c")
+#  cota(0, -1.2, 3, -1.2, 0, "d = ? (alargamiento)")
+#fin
+#: **Paso 1 · Taylor.** Toda curva suave, cerca de dₖ, se escribe como una suma: su valor, más la pendiente por el paso, más la curvatura por el paso al cuadrado, …  **R(dₖ + Δ d) = R(dₖ) + R′(dₖ)·Δ d + ½·R″(dₖ)·Δ d² + …**  El motor lo hace con la ley de la barra alrededor de d = 0 (orden 2; k = 20 kN/mm, Nᵤ = 300 kN, P = 240 kN):
+T_0 = Taylor{240 - 20*x/(1 + 20*x/300) @ x = 0 : 2}
+#: Los dos primeros términos, **240 − 20·d**, son la recta tangente en d = 0; el tercero, (4/3)·d², es la curvatura que Newton desprecia.
+#: **Paso 2 · cortar en el término lineal.** Si el paso Δ d es chico, Δ d² es mucho más chico: se desprecia. Queda una recta en Δ d, como y = m·x + b: **b = Rₖ** (lo que falta ahora), **m = R′(dₖ)** (la pendiente) y **x = Δ d**. La pendiente de R = P − N es menos la de N (el motor deriva):
+R_d1 = Simplify{Diff{P - k*x/(1 + k*x/N_u) @ x}}
+#: Es −Nᵤ²·k/(k·d + Nᵤ)² = **−k/(1 + k·d/Nᵤ)² = −dN/dd = −kₜ**. **Paso 3 · igualar la recta a cero**: Rₖ − kₜ·Δ d = 0 ⇒ **Δ d = Rₖ/kₜ**. El motor comprueba que ese Δ d anula la recta:
+c_0 = Simplify{R_k - k_T*(R_k/k_T)}
+#: Entonces **dₖ₊₁ = dₖ + Δ d**. Esa es toda la fórmula de Newton: la recta tangente igualada a cero, una y otra vez.
+#: Con números (para d > 0, |d| = d):
+G_r(x) = 240 - 20*x/(1 + 20*abs(x)/300) 'R(d) = P − N(d) [kN]
+G_t(x) = 20/(1 + 20*abs(x)/300)^2 'kₜ = dN/dd [kN/mm]
+#: **Vuelta 1** (d₀ = 0 mm):
+r_a = G_r(0) 'R₀ [kN]
+t_a = G_t(0) 'kₜ en d₀ [kN/mm]
+z_a = r_a/t_a 'Δd = R/kₜ [mm]
+h_1 = 0 + z_a 'd₁ [mm]
+#: **Vuelta 2** (d₁ = 12 mm):
+r_b = G_r(h_1) 'R₁ [kN]
+t_b = G_t(h_1) 'kₜ en d₁ [kN/mm]
+z_b = r_b/t_b 'Δd [mm]
+h_2 = h_1 + z_b 'd₂ [mm]
+#: Las siguientes, en una línea cada una:
+h_3 = h_2 + G_r(h_2)/G_t(h_2) 'd₃ [mm]
+h_4 = h_3 + G_r(h_3)/G_t(h_3) 'd₄ [mm]
+h_5 = h_4 + G_r(h_4)/G_t(h_4) 'd₅ [mm]
+h_6 = h_5 + G_r(h_5)/G_t(h_5) 'd₆ [mm]
+h_7 = h_6 + G_r(h_6)/G_t(h_6) 'd₇ [mm]
+#: **La recta tangente en cada vuelta** (eje horizontal: d en mm; vertical: R en kN; cada tangente dibujada solo de dₖ a dₖ₊₁; pasa el cursor por los puntos). Cada tangente corta el cero en el d siguiente: 0 → 12 → 29.28 → 47.42 → 57.89 mm:
+#fplot(R = 240 - 20*x/(1 + 20*x/300), tangente_0 = 240 - 20*x + 0*sqrt(x*(14 - x)), tangente_1 = 106.667 - 6.17284*(x - 12) + 0*sqrt((x - 10)*(32 - x)), tangente_2 = 41.626 - 2.29508*(x - 29.28) + 0*sqrt((x - 27)*(50 - x)), cero = 0*x, puntos = [0 240; 12 0; 12 106.667; 29.28 0; 29.28 41.626; 47.4171 0; 47.4171 12.0956; 57.8889 0; 60 0], [0 64])
+#: **Por qué converge tan rápido.** El término que se tiró es ½·R″·Δ d². Por eso el error de la vuelta siguiente es proporcional al error **al cuadrado**: eₖ₊₁ ≈ C·eₖ², con C = |R″/(2R′)|. El motor saca R″ y el cociente:
+R_d2 = Simplify{Diff{Diff{P - k*x/(1 + k*x/N_u) @ x} @ x}}
+C_q = Simplify{Diff{Diff{P - k*x/(1 + k*x/N_u) @ x} @ x}/(2*Diff{P - k*x/(1 + k*x/N_u) @ x})}
+#: C = k/(Nᵤ + k·d); en la solución d = 60 mm, C = 20/(300 + 1200) = 1/75 1/mm. Error eₖ = 60 − dₖ y la razón eₖ₊₁/eₖ²:
+C_75 = 20/(300 + 20*60) 'C en d = 60 mm [1/mm]
+e_v = 1*[60 - 0; 60 - h_1; 60 - h_2; 60 - h_3; 60 - h_4; 60 - h_5; 60 - h_6] 'error eₖ [mm]
+c_v = 1*[(60 - h_1)/60^2; (60 - h_2)/(60 - h_1)^2; (60 - h_3)/(60 - h_2)^2; (60 - h_4)/(60 - h_3)^2; (60 - h_5)/(60 - h_4)^2; (60 - h_6)/(60 - h_5)^2] 'eₖ₊₁/eₖ² [1/mm]
+#: En esta ley la razón es **exactamente 1/75 en todas las vueltas**: eₖ₊₁ = eₖ²/75 (60 → 48 → 30.72 → 12.58 → 2.111 → 0.0594 → 0.0000471 mm). Al principio, con eₖ cerca de 75 mm, el error apenas baja; cuando eₖ es chico, **los decimales correctos se duplican** en cada vuelta. En escala logarítmica (eje horizontal: la vuelta; vertical: log₁₀ del error en mm):
+H_e = [0, log10(60); 1, log10(60 - h_1); 2, log10(60 - h_2); 3, log10(60 - h_3); 4, log10(60 - h_4); 5, log10(60 - h_5); 6, log10(60 - h_6)] 'log₁₀ eₖ
+#fplot(error = H_e, [0 6])
+#: **Varias incógnitas: la misma deducción con vectores.** R(uₖ + Δ u) ≈ Rₖ + (∂R/∂u)·Δ u = Rₖ − Kₜ·Δ u = 0 ⇒ **Kₜ·Δ u = R**, con Kₜ = ∂fᵢₙₜ/∂u (el jacobiano; en elementos finitos Kₜ = ∫ Bᵀ·Eₜ·B dV). Con los dos elementos de la sección 4, cada residuo es una superficie sobre (u₁, u₂) y su tangente es un **plano**. En u = (0, 0): R₁ ≈ 90 − 40·u₁ + 20·u₂ y R₂ ≈ 150 + 20·u₁ − 20·u₂. Donde los dos planos cortan el cero a la vez está el paso:
+K_u0 = 1*[40, -20; -20, 20] 'Kₜ en u = 0 [kN/mm]
+U_1 = lsolve(K_u0, [90; 150]) 'Δu de la vuelta 1 [mm]
+#: La superficie R₁(u₁, u₂), su plano tangente en (0, 0) y el plano tangente de R₂ (arrastra para girar; x = u₁, y = u₂ en mm, vertical en kN). El punto (12, 19.5, 0) es donde los dos planos cortan el cero:
+#surf(R_1 = 90 - 20*x/(1 + 20*abs(x)/300) + 20*(y - x)/(1 + 20*abs(y - x)/200), plano_1 = 90 - 40*x + 20*y, plano_2 = 150 + 20*x - 20*y, cero = 0, [0 20], [0 30], punto = [12 19.5 0])
+#: **Cuándo falla.** (a) Si se empieza lejos, donde la tangente es casi horizontal, el corte con el cero cae muy lejos: desde d₀ = 200 mm, kₜ = 0.097 kN/mm y Δ d = −401 mm; la vuelta siguiente salta a 5198 mm y diverge (con eₖ₊₁ = eₖ²/75, si el error pasa de 75 mm el primer paso no acerca):
+j_0 = 200 'd₀ [mm]
+j_1 = j_0 + G_r(j_0)/G_t(j_0) 'd₁ [mm]
+j_2 = j_1 + G_r(j_1)/G_t(j_1) 'd₂: diverge [mm]
+#: (b) Si la carga llega al techo, P = Nᵤ = 300 kN, no hay solución: cada vuelta d se duplica (15, 45, 105, 225, 465 mm…), R se divide entre 2 y kₜ → 0. Por eso los programas **cargan por escalones** (cada escalón empieza donde convergió el anterior) y, para pasar un pico, usan **longitud de arco** (se controla el largo del paso, no la carga).
 
 ## 2 · 1 GDL con números: siete vueltas
 E_y = 60000 'módulo E [kPa]

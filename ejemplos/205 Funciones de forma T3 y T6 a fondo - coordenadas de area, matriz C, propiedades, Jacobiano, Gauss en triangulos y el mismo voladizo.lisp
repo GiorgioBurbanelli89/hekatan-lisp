@@ -40,6 +40,7 @@
 #  texto(4, -0.8, "T6 cuadrático (LST)", 2.6, "c")
 #  texto(7, -0.8, "T10 cúbico", 2.6, "c")
 #fin
+#: **De dónde se parte.** **¿Qué sé?** el desplazamiento de los nudos. **¿Qué quiero?** saberlo dentro del triángulo. **¿Qué propongo?** un polinomio con tantas constantes como nudos: 3 (grado 1 completo) o 6 (grado 2 completo); en el triángulo las filas del triángulo de Pascal entran **enteras**. **¿Qué exijo?** que en cada nudo valga lo del nudo (C·a = u). **¿Qué sale?** Nᵢ = base·(columna i de C⁻¹). **¿Para qué?** B = ∂N/∂x y K = ∫Bᵀ·D·B dA. El triángulo de referencia (ξ, η de 0 a 1) es el mismo para todos; el Jacobiano lo lleva al triángulo real.
 #: Nudos del triángulo de referencia: 1 (0, 0), 2 (1, 0), 3 (0, 1); mitades 4 (½, 0), 5 (½, ½), 6 (0, ½). CST = *constant strain triangle* (deformación constante), LST = *linear strain triangle* (deformación lineal).
 
 ## 1 · T3: tres planos y las coordenadas de área

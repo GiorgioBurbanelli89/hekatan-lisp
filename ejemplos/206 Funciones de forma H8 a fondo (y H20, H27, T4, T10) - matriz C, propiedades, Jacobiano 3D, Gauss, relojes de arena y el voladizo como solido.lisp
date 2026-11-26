@@ -40,6 +40,7 @@
 #  texto(5.1, -0.4, "T4 (4 nudos) / T10 (+ 6 en las aristas)", 2.2, "c")
 #  texto(1.4, -0.6, "H8 (H20: + 12 en las aristas; H27: + 6 caras + centro)", 2.2, "c")
 #fin
+#: **De dónde se parte.** **¿Qué sé?** los 3 desplazamientos de cada nudo. **¿Qué quiero?** el desplazamiento en cualquier punto del sólido. **¿Qué propongo?** un polinomio con 8 constantes (8 nudos): lineal en cada dirección, [1, ξ, η, ζ, ξη, ηζ, ζξ, ξηζ], igual para las tres. **¿Qué exijo?** que en cada nudo valga lo del nudo (C·a = u). **¿Qué sale?** las Nᵢ. **¿Para qué?** B = ∂N/∂x (6 deformaciones) y K = ∫Bᵀ·D·B dV. El cubo de referencia (ξ, η, ζ de −1 a +1) se estira al ladrillo real con el Jacobiano 3 × 3 (sección 4).
 #: Nudos de referencia (ξ, η, ζ de −1 a +1): 1 (−1, −1, −1), 2 (+1, −1, −1), 3 (+1, +1, −1), 4 (−1, +1, −1), y 5 a 8 iguales con ζ = +1.
 
 ## 1 · H8: del polinomio a N con la matriz C (8 × 8)

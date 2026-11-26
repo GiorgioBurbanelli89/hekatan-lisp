@@ -92,6 +92,123 @@ dN1_dy = Simplify{Partial{(1 - xi)*(1 - eta)/4 @ eta}*2/a}
 #: **En una viga** B era la segunda derivada (la curvatura); **en el suelo** son primeras derivadas (estiramiento y distorsión). La idea es la misma: B = cómo se deforma el material cuando los nudos se mueven.
 #: **En una línea:** 4 cuadrados, 9 nudos, carpas N que interpolan, el Jacobiano que escala y B que da las deformaciones.
 
+## 2 bis · ¿Qué elemento uso? T3, T6, Q4, Q8 y Q9
+#: **¿Qué problema hay?** Esta hoja usa **Q4** (4 cuadrados, para hacerlo a mano), pero el talud de Griffiths y Lane de las hojas 190 y 195 usa **T6** (triángulos de 6 nudos). ¿Cuál se usa y cuándo? La **letra** dice la forma (T = triángulo, Q = cuadrilátero) y el **número** dice cuántos nudos tiene.
+#dibujo("La familia: esquinas (negro), nudos en la mitad de los lados (azul) y nudo central (rojo)", ud = m, escala = auto, alto = 60)
+#  poligono(0, 0, 2, 0, 0, 2, "gruesa")
+#  poligono(3, 0, 5, 0, 3, 2, "gruesa")
+#  poligono(6, 0, 8, 0, 8, 2, 6, 2, "gruesa")
+#  poligono(9, 0, 11, 0, 11, 2, 9, 2, "gruesa")
+#  poligono(12, 0, 14, 0, 14, 2, 12, 2, "gruesa")
+#  circulo(0, 0, 0.1, "negro")
+#  circulo(2, 0, 0.1, "negro")
+#  circulo(0, 2, 0.1, "negro")
+#  circulo(3, 0, 0.1, "negro")
+#  circulo(5, 0, 0.1, "negro")
+#  circulo(3, 2, 0.1, "negro")
+#  circulo(4, 0, 0.1, "azul")
+#  circulo(4, 1, 0.1, "azul")
+#  circulo(3, 1, 0.1, "azul")
+#  circulo(10, 0, 0.1, "azul")
+#  circulo(11, 1, 0.1, "azul")
+#  circulo(10, 2, 0.1, "azul")
+#  circulo(9, 1, 0.1, "azul")
+#  circulo(13, 0, 0.1, "azul")
+#  circulo(14, 1, 0.1, "azul")
+#  circulo(13, 2, 0.1, "azul")
+#  circulo(12, 1, 0.1, "azul")
+#  circulo(13, 1, 0.1, "rojo")
+#  circulo(6, 0, 0.1, "negro")
+#  circulo(8, 0, 0.1, "negro")
+#  circulo(8, 2, 0.1, "negro")
+#  circulo(6, 2, 0.1, "negro")
+#  circulo(9, 0, 0.1, "negro")
+#  circulo(11, 0, 0.1, "negro")
+#  circulo(11, 2, 0.1, "negro")
+#  circulo(9, 2, 0.1, "negro")
+#  circulo(12, 0, 0.1, "negro")
+#  circulo(14, 0, 0.1, "negro")
+#  circulo(14, 2, 0.1, "negro")
+#  circulo(12, 2, 0.1, "negro")
+#  texto(0.7, -0.6, "T3", 2.6, "c")
+#  texto(3.7, -0.6, "T6", 2.6, "c")
+#  texto(7, -0.6, "Q4", 2.6, "c")
+#  texto(10, -0.6, "Q8", 2.6, "c")
+#  texto(13, -0.6, "Q9", 2.6, "c")
+#fin
+#: Un «T9» no es de uso común: lo usual es el **Q9** (cuadrilátero de Lagrange con nudo central). Los triángulos de orden más alto son el **T10** (cúbico) y el **T15** que usa PLAXIS.
+#: **¿Qué se hace? Deducir las funciones de forma con símbolos** (igual que Hermite en la viga): polinomio genérico → condiciones en los nudos → matriz C → inversa → N. **T3**: u = a₀ + a₁ξ + a₂η, nudos en (0, 0), (1, 0) y (0, 1). Cada fila de C es [1, ξ, η] evaluado en un nudo:
+C_3 = Simplify{[1, 0, 0; 1, 1, 0; 1, 0, 1]}
+C_3i = Simplify{inv(C_3)}
+N_T3 = Simplify{[1, xi, eta]*C_3i}
+#: **N = [1 − ξ − η, ξ, η]**: tres planos. Sus derivadas (lo que entra en la matriz B):
+dT3_dxi = Simplify{Diff{1 - xi - eta @ xi}}
+dT3_deta = Simplify{Diff{1 - xi - eta @ eta}}
+#: **No dependen de ξ ni de η**: dentro del T3 la deformación es **constante**. Un triángulo entero con una sola deformación: por eso es tan rígido.
+#: **T6**: polinomio completo de 2.º grado, 6 términos para 6 nudos: esquinas (0, 0), (1, 0), (0, 1) y medios (½, 0), (½, ½), (0, ½). Filas [1, ξ, η, ξ², ξη, η²]:
+C_6 = Simplify{[1, 0, 0, 0, 0, 0; 1, 1, 0, 1, 0, 0; 1, 0, 1, 0, 0, 1; 1, 1/2, 0, 1/4, 0, 0; 1, 1/2, 1/2, 1/4, 1/4, 1/4; 1, 0, 1/2, 0, 0, 1/4]}
+C_6i = Simplify{inv(C_6)}
+N_T6 = Simplify{[1, xi, eta, xi^2, xi*eta, eta^2]*C_6i}
+dT6_4 = Simplify{Diff{4*xi*(1 - xi - eta) @ xi}}
+#: (N₄ = 4ξ(1 − ξ − η) es la del nudo de la mitad del lado 1-2.) Su derivada **sí depende de ξ y η**: la deformación del T6 varía linealmente dentro del elemento. **Q4, Q8 y Q9**: N = ¼(1 + ξξᵢ)(1 + ηηᵢ) (Q4, bilineal, el de esta hoja); Q8 agrega los nudos de los lados (serendípito, sin nudo central); Q9 es el producto de dos parábolas ℓᵢ(ξ)·ℓⱼ(η) (Lagrange, con nudo central). La del nudo central del Q9:
+N_Q9c = Simplify{(1 - xi^2)*(1 - eta^2)}
+#: **Las carpas en 3D** (arrastra para girar). T3, N₁ = 1 − x − y (un plano):
+#surf(max(0, 1 - x - y), [0 1], [0 1])
+#: T6, N₄ = 4x(1 − x − y) (una curva):
+#surf(max(0, 4*x*(1 - x - y)), [0 1], [0 1])
+#: Q9, la del nudo central (1 − x²)(1 − y²):
+#surf((1 - x^2)*(1 - y^2), [-1 1], [-1 1])
+#: **¿Qué número sale?** El MISMO bloque y la misma zapata con cada elemento, 2 × 2 celdas (los triángulos parten cada celda en dos) y 8 × 8, contra una malla muy fina (Q9 de 64 × 64). Asiento bajo el centro en mm, calculado en Python (intro_fem_manim/juez/elementos.py); T3 y Q4 dan lo mismo en Hekatan OpenSees a 4 decimales (esa DLL no trae T6 ni Q8). El Q4 de 2 × 2 es exactamente esta hoja: 18.4694 mm.
+#hide
+w_a = [14.4022, 18.4694, 19.5226, 19.9492, 20.6972]
+w_b = [18.7143, 20.0077, 20.2288, 20.2026, 20.1991]
+w_c = [2.6078, 4.1723, 10.7041, 11.6368, 11.8203]
+w_d = [7.8028, 9.9305, 11.8860, 11.8616, 11.8664]
+s_a = zeros(5, 1)
+s_b = zeros(5, 1)
+s_c = zeros(5, 1)
+s_d = zeros(5, 1)
+p_a = zeros(5, 1)
+p_c = zeros(5, 1)
+for i = 1:5
+  s_a(i) = w_a(i)
+  s_b(i) = w_b(i)
+  s_c(i) = w_c(i)
+  s_d(i) = w_d(i)
+  p_a(i) = 100·w_a(i)/20.2062
+  p_c(i) = 100·w_c(i)/11.8902
+end
+#show
+#tabla("Elemento","arena ν = 1/3, 2×2 [mm]:4","8×8 [mm]:4","% del correcto (2×2):0","arcilla ν = 0.49, 2×2 [mm]:4","8×8 [mm]:4","% del correcto (2×2):0")({"T3","Q4","T6","Q8","Q9"}; s_a; s_b; p_a; s_c; s_d; p_c)
+#: (malla muy fina: 20.2062 mm con ν = 1/3 y 11.8902 mm con ν = 0.49.) **Arcilla saturada (ν = 0.49, casi sin cambio de volumen)**, % del asiento correcto con 2 × 2 celdas (pasa el cursor):
+#hide
+h_xe = zeros(5, 1)
+h_ye = zeros(5, 1)
+for i = 1:5
+  h_xe(i) = 10·i - 4
+  h_ye(i) = p_c(i)/4
+end
+#show
+#dibujo("Arcilla saturada: % del asiento correcto con 2 × 2 celdas (rojo: lineales que se bloquean; verde: cuadráticos)", ud = m, escala = auto, alto = 70)
+#  linea(0, 0, 52, 0, "fina")
+#  linea(0, 25, 52, 25, "trazos")
+#  texto(50, 27, "100 %", 2.6, "c")
+#  rect(3, 0, 6, 5.48, "rojo")
+#  texto(6, -2, "T3", 2.6, "c")
+#  rect(13, 0, 6, 8.77, "rojo")
+#  texto(16, -2, "Q4", 2.6, "c")
+#  rect(23, 0, 6, 22.50, "verde")
+#  texto(26, -2, "T6", 2.6, "c")
+#  rect(33, 0, 6, 24.47, "verde")
+#  texto(36, -2, "Q8", 2.6, "c")
+#  rect(43, 0, 6, 24.85, "verde")
+#  texto(46, -2, "Q9", 2.6, "c")
+#  hover(h_xe, h_ye, "{#2:1} % del asiento correcto", h_xe, p_c)
+#fin
+#: **¿Qué significa?** Con la arena los lineales se quedan cortos (T3 71 %, Q4 91 %) y los cuadráticos casi aciertan (97–102 %). Con la arcilla saturada el T3 da 22 % y el Q4 35 %: **se bloquean** (no pueden deformarse sin cambiar de volumen, y el agua no deja cambiar el volumen). Lo mismo pasa cuando el suelo fluye en plasticidad: por eso el FS del paso 8 necesita otra malla.
+#: **Cuándo usar cada uno:** **T3** demasiado rígido → evitarlo para la falla del suelo. **T6** el estándar en geotecnia (GEO5 y PLAXIS usan triángulos cuadráticos; se mallan solos en taludes y excavaciones). **Q4** simple, para enseñar y mallas regulares; rígido con pocos elementos. **Q8 / Q9** cuadráticos para mallas ordenadas; Q9 algo más robusto. **Regla práctica: para la falla del suelo, elementos cuadráticos (T6, Q8) y malla fina.**
+#: **En una línea:** T3 constante y rígido, T6 lineal y el estándar; cuadráticos + malla fina para la falla.
+
 ## 3 · Material: elástico, y el techo de Mohr-Coulomb
 #: **¿Qué problema hay?** Hay que decir cuánto esfuerzo produce cada deformación, como en una viga se dice E.
 #: **¿Qué se hace?** Primero lo más simple: **elástico** (un resorte: el doble de deformación da el doble de esfuerzo). En deformación plana se usan λ y G (dos números que salen de E y ν):
@@ -669,7 +786,7 @@ end
 #: Diferencia máxima nudo a nudo: lineal 2·10⁻¹⁵ mm; no lineal 3·10⁻⁹ mm y 2·10⁻⁸ kPa en los 16 puntos de Gauss. Los 6 puntos plásticos son los mismos.
 
 ## 10 · Resumen: los 8 pasos en una pantalla
-#tabla("Paso","¿Qué problema hay?","¿Qué se hace?")({"1 · Qué cambia","2 · Malla","3 · Material","4 · Bordes","5 · Estado inicial","6 · Cargar y resolver","7 · Resultados","8 · Factor de seguridad"}; {"el suelo es continuo, largo, sin fin, pesado y con agua","infinitos puntos","¿cuánto esfuerzo da cada deformación?","el suelo cortado sigue empujando","el suelo ya está apretado por su peso","la carga está repartida; el suelo se ablanda","8 números no dicen nada solos","la resistencia depende del esfuerzo"}; {"elementos, deformación plana, frontera lejos, σ′ = σ − u","4 Q4, carpas N, Jacobiano, B","D elástica (λ, G) + techo Mohr-Coulomb / Drucker-Prager","base fija, rodillos, superficie libre","σ_v = γz, σ_h = K₀σ_v, luego u = 0","K·u = F lineal; Newton con K_T y residuo","interpolar con N; esfuerzos en Gauss","c/F, tan φ/F hasta que no converge"})
+#tabla("Paso","¿Qué problema hay?","¿Qué se hace?")({"1 · Qué cambia","2 · Malla y elemento","3 · Material","4 · Bordes","5 · Estado inicial","6 · Cargar y resolver","7 · Resultados","8 · Factor de seguridad"}; {"el suelo es continuo, largo, sin fin, pesado y con agua","infinitos puntos","¿cuánto esfuerzo da cada deformación?","el suelo cortado sigue empujando","el suelo ya está apretado por su peso","la carga está repartida; el suelo se ablanda","8 números no dicen nada solos","la resistencia depende del esfuerzo"}; {"elementos, deformación plana, frontera lejos, σ′ = σ − u","4 Q4, carpas N, Jacobiano, B","D elástica (λ, G) + techo Mohr-Coulomb / Drucker-Prager","base fija, rodillos, superficie libre","σ_v = γz, σ_h = K₀σ_v, luego u = 0","K·u = F lineal; Newton con K_T y residuo","interpolar con N; esfuerzos en Gauss","c/F, tan φ/F hasta que no converge"})
 #: **Y qué número sale en el ejemplo:**
-#tabla("Paso","¿Qué sale en el ejemplo?")({"1 · Qué cambia","2 · Malla","3 · Material","4 · Bordes","5 · Estado inicial","6 · Cargar y resolver","7 · Resultados","8 · Factor de seguridad"}; {"8 incógnitas en vez de infinitas","K de 8 × 8; el lado a se cancela","M = 30 000 kPa, α = 0.165, k = 8.57 kPa","8 de 18 movimientos libres","4.8 mm (= γH²/2M), 18 y 54 kPa","18.47 mm lineal → 20.32 mm no lineal","6 de 16 puntos plásticos; la superficie vecina sube","4 elementos no fallan → malla fina: FS 1.407…1.615"})
+#tabla("Paso","¿Qué sale en el ejemplo?")({"1 · Qué cambia","2 · Malla y elemento","3 · Material","4 · Bordes","5 · Estado inicial","6 · Cargar y resolver","7 · Resultados","8 · Factor de seguridad"}; {"8 incógnitas en vez de infinitas","K de 8 × 8; el lado a se cancela","M = 30 000 kPa, α = 0.165, k = 8.57 kPa","8 de 18 movimientos libres","4.8 mm (= γH²/2M), 18 y 54 kPa","18.47 mm lineal → 20.32 mm no lineal","6 de 16 puntos plásticos; la superficie vecina sube","4 elementos no fallan → malla fina: FS 1.407…1.615"})
 #: **Qué quedó:** los 8 pasos con números verificados. **Qué falta:** el agua (presión de poros y consolidación) y una malla fina para el factor de seguridad. **Qué hereda la siguiente hoja:** esta misma receta con agua (σ′ = σ − u) y más elementos.

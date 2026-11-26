@@ -62,11 +62,20 @@ S_H8 = Simplify{(1 + xi)*(1 - eta)*(1 - zeta)/8 + (1 + xi)*(1 + eta)*(1 - zeta)/
 K_H8 = Simplify{E*Integral{Integral{Integral{(1/L)^2*(L/2)*(b/2)*(h/2) @ zeta = -1 : 1} @ eta = -1 : 1} @ xi = -1 : 1}}
 #: **E·b·h/L = EA/L** otra vez. Los tres elementos, con la cara atada y ν = 0, son **la misma rigidez**. Un corte de N₁ del H8 en ζ = 0 (en 2D, la mitad del Q4):
 #fplot(corte_N1 = (1 - x)/4, corte_N2 = (1 + x)/4, [-1 1])
-### 1.4 · La ley que se ablanda y su rigidez tangente
-#: (La de la hoja 198, aplicada a ε_x en cada punto de Gauss; los demás esfuerzos, elásticos con ν = 0.) En fuerza: N = k·δ/(1 + k·δ/N_u) para δ > 0. Su derivada, la rigidez tangente:
+### 1.4 · La ley del material NO sale de Newton: se elige
+#: Dos cosas distintas que se confunden: **la ley N(d) es el material** (un dato: una hipótesis o un ensayo); **Newton es el método** para hallar el d que cumple N(d) = P. Como en y = m·x + b: la recta es el dato, despejar x es el método. Si cambias el material, Newton no cambia; solo cambia la N(d) que le das.
+#: **De dónde sale esta ley.** Se pide que cumpla tres hipótesis: **H1** al inicio es elástica, N ≈ k·d (k = EA/L); **H2** tiene un techo, nunca pasa de N_u; **H3** entre ambas, una curva suave, sin saltos. Una forma de cumplir las tres: **dos resortes en serie**, uno elástico (k·d) y un tope (N_u). En serie se suman las inversas:
+N_s = Simplify{1/(1/(k*d) + 1/N_u)}
+#: Es **N = k·d/(1 + k·d/N_u)**. Comprobaciones: con d pequeño, k·d/N_u ≈ 0 y N ≈ k·d (H1); con d grande, N → N_u (H2); y es suave (H3). Es la **hipérbola de Kondner (1963)**, la base del modelo Duncan-Chang para suelos.
+#: **¿Por qué |d|?** Para que valga igual en tracción y en compresión (simétrica). Sin el valor absoluto, con d < 0 el denominador 1 + k·d/N_u se achica y la fuerza crece sin techo. Con números (k = 20 kN/mm, N_u = 300 kN, d = −20 mm):
+N_mal = 20*(-20)/(1 + 20*(-20)/300) 'sin |d|: ¡+1200 kN, signo y techo equivocados! [kN]
+N_bien = 20*(-20)/(1 + 20*abs(-20)/300) 'con |d|: −171.4 kN, compresión bajo el techo [kN]
+#: **Las tres hipótesis sobre la curva** (gráfica dinámica; n recorre d en mm; la recta tangente es lo que usará Newton):
+#anim fplot(recta = 20*x, techo = 300 + 0*x, ley = 20*x/(1 + 20*x/300), tangente = 20*n/(1 + 20*n/300) + 20/(1 + 20*n/300)^2*(x - n), [0 150]), n = 0:3:150
+#: **Qué toma Newton de la ley** (para d > 0): el residuo R = P − N(d) y la pendiente, la **rigidez tangente** kₜ = dN/dd, que el motor deriva:
 N_b = Simplify{k*delta/(1 + k*delta/N_u)}
 k_b = Simplify{Diff{k*delta/(1 + k*delta/N_u) @ delta}}
-#: Es k/(1 + k·δ/N_u)²: vale k al inicio y baja al estirarse. **El paso de Newton con 1 incógnita: Δ u = R/kₜ.**
+#: Es kₜ = k/(1 + k·|d|/N_u)²: vale k al inicio y baja al estirarse. **El paso de Newton con 1 incógnita: Δ d = R/kₜ.** En el sólido y el área la misma ley se aplica a ε_x en cada punto de Gauss (σ = E·ε/(1 + E·|ε|/σᵤ), σᵤ = N_u/A), con ν = 0.
 
 ## 2 · 1 GDL con números: siete vueltas
 E_y = 60000 'módulo E [kPa]

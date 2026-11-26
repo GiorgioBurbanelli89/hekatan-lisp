@@ -10,6 +10,8 @@ c = 15 'cohesión [kPa]
 f_g = 20 'ángulo de fricción φ [°]
 g_s = 19.64 'peso unitario γ [kN/m³]
 n_d = 30 'número de dovelas [-]
+E_s = 100000 'módulo de elasticidad del suelo (elementos finitos) [kPa]
+nu = 0.3 'coeficiente de Poisson [-]
 #: La geometría que sale de esos datos (el pie a 2·H del borde izquierdo y la corona plana 2·H más):
 x_t = 2·H 'x del pie [m]
 x_c = x_t + n_s·H 'x de la corona [m]
@@ -435,3 +437,329 @@ D_l = S_L/c 'Σ Δl [m]
 S_F(x, y) = (x·D_l + tan(y·pi/180)·S_C)/S_W
 #map(S_F(x, y), [0 40], [5 40])
 #surf(S_F(x, y), [0 40], [5 40])
+
+## 7 · El mismo talud por ELEMENTOS FINITOS NO LINEALES (mapas de color de la falla)
+#: El mismo cálculo de la hoja 190 (triángulos de 6 nudos, 7 puntos de Gauss, Drucker-Prager de GEO5, Newton-Raphson con búsqueda lineal), pero con la **malla generada aquí** desde los datos de arriba: 12 × 6 cuadros (el pie y la corona caen justo en nudos) partidos en 2 triángulos T6 cada uno. La base está fija y los lados con rodillo. Para cada F se divide la resistencia (c/F, tan φ/F) y se busca el equilibrio; donde Newton ya no converge, el talud se cayó. Ojo: este Drucker-Prager (el de GEO5) no es Mohr-Coulomb, así que su F no tiene por qué coincidir con Bishop.
+#hide
+n_x = 12
+n_y = 6
+m_x = 2·n_x + 1
+m_y = 2·n_y + 1
+n_n = m_x·m_y
+n_e = 2·n_x·n_y
+X_n = zeros(n_n, 1)
+Y_n = zeros(n_n, 1)
+for i_i = 0:m_x - 1
+  if i_i <= 8
+    x_i = x_t·i_i/8
+  end
+  if i_i > 8
+    if i_i <= 16
+      x_i = x_t + (x_c - x_t)·(i_i - 8)/8
+    end
+  end
+  if i_i > 16
+    x_i = x_c + (L_t - x_c)·(i_i - 16)/8
+  end
+  for j_j = 0:m_y - 1
+    X_n(i_i·m_y + j_j + 1) = x_i
+    Y_n(i_i·m_y + j_j + 1) = y_g(x_i)·j_j/(m_y - 1)
+  end
+end
+E_t = zeros(n_e, 6)
+k_e = 0
+for c_i = 0:n_x - 1
+  for c_j = 0:n_y - 1
+    n_a = 2·c_i·m_y + 2·c_j + 1
+    n_b = (2·c_i + 2)·m_y + 2·c_j + 1
+    n_c = (2·c_i + 2)·m_y + 2·c_j + 3
+    n_f = 2·c_i·m_y + 2·c_j + 3
+    n_m = (2·c_i + 1)·m_y + 2·c_j + 2
+    X_n(n_m) = (X_n(n_a) + X_n(n_c))/2
+    Y_n(n_m) = (Y_n(n_a) + Y_n(n_c))/2
+    k_e = k_e + 1
+    E_t(k_e, 1) = n_a
+    E_t(k_e, 2) = n_b
+    E_t(k_e, 3) = n_c
+    E_t(k_e, 4) = (2·c_i + 1)·m_y + 2·c_j + 1
+    E_t(k_e, 5) = (2·c_i + 2)·m_y + 2·c_j + 2
+    E_t(k_e, 6) = n_m
+    k_e = k_e + 1
+    E_t(k_e, 1) = n_a
+    E_t(k_e, 2) = n_c
+    E_t(k_e, 3) = n_f
+    E_t(k_e, 4) = n_m
+    E_t(k_e, 5) = (2·c_i + 1)·m_y + 2·c_j + 3
+    E_t(k_e, 6) = 2·c_i·m_y + 2·c_j + 2
+  end
+end
+L_g = zeros(2·n_n - 2·m_x - 2·(m_y - 1), 1)
+k_l = 0
+for i_i = 0:m_x - 1
+  for j_j = 1:m_y - 1
+    n_k = i_i·m_y + j_j + 1
+    if i_i > 0
+      if i_i < m_x - 1
+        k_l = k_l + 1
+        L_g(k_l) = 2·n_k - 1
+      end
+    end
+    k_l = k_l + 1
+    L_g(k_l) = 2·n_k
+  end
+end
+gam = g_s
+l_a = E_s·nu/((1 + nu)·(1 - 2·nu))
+G_s = E_s/(2·(1 + nu))
+D_e = [l_a + 2·G_s, l_a, l_a, 0; l_a, l_a + 2·G_s, l_a, 0; l_a, l_a, l_a + 2·G_s, 0; 0, 0, 0, G_s]
+c_7 = 0.1012865073235
+C_7 = 0.7974269853531
+e_7 = 0.4701420641051
+E_7 = 0.0597158717898
+P_g = [1/3, 1/3; c_7, c_7; C_7, c_7; c_7, C_7; e_7, e_7; E_7, e_7; e_7, E_7]
+W_g = [0.225/2, 0.1259391805448/2, 0.1259391805448/2, 0.1259391805448/2, 0.1323941527885/2, 0.1323941527885/2, 0.1323941527885/2]
+K = zeros(2·n_n, 2·n_n)
+B_s = zeros(4·7·n_e, 12)
+w_s = zeros(7·n_e, 1)
+F = zeros(2·n_n, 1)
+for e = 1:n_e
+  x_e = zeros(6, 1)
+  y_e = zeros(6, 1)
+  g = zeros(12, 1)
+  for a = 1:6
+    x_e(a) = X_n(E_t(e, a))
+    y_e(a) = Y_n(E_t(e, a))
+    g(2·a - 1) = 2·E_t(e, a) - 1
+    g(2·a) = 2·E_t(e, a)
+  end
+  Kel = zeros(12, 12)
+  for q = 1:7
+    L_1 = P_g(q, 1)
+    L_2 = P_g(q, 2)
+    L_3 = 1 - L_1 - L_2
+    N_v = [L_1·(2·L_1 - 1), L_2·(2·L_2 - 1), L_3·(2·L_3 - 1), 4·L_1·L_2, 4·L_2·L_3, 4·L_3·L_1]
+    d_1 = [4·L_1 - 1, 0, -(4·L_3 - 1), 4·L_2, -4·L_2, 4·L_3 - 4·L_1]
+    d_2 = [0, 4·L_2 - 1, -(4·L_3 - 1), 4·L_1, 4·L_3 - 4·L_2, -4·L_1]
+    j_11 = 0
+    j_12 = 0
+    j_21 = 0
+    j_22 = 0
+    for a = 1:6
+      j_11 = j_11 + d_1(a)·x_e(a)
+      j_12 = j_12 + d_1(a)·y_e(a)
+      j_21 = j_21 + d_2(a)·x_e(a)
+      j_22 = j_22 + d_2(a)·y_e(a)
+    end
+    d_J = j_11·j_22 - j_12·j_21
+    B = zeros(4, 12)
+    for a = 1:6
+      B(1, 2·a - 1) = (j_22·d_1(a) - j_12·d_2(a))/d_J
+      B(2, 2·a) = (-j_21·d_1(a) + j_11·d_2(a))/d_J
+      B(4, 2·a - 1) = B(2, 2·a)
+      B(4, 2·a) = B(1, 2·a - 1)
+    end
+    Kel = Kel + transpose(B)·D_e·B·d_J·W_g(q)
+    i_g = 7·(e - 1) + q
+    B_s(4·(i_g - 1) + 1:4·i_g, 1:12) = B
+    w_s(i_g) = d_J·W_g(q)
+    for a = 1:6
+      F(g(2·a)) = F(g(2·a)) - N_v(a)·gam·d_J·W_g(q)
+    end
+  end
+  K(g, g) = K(g, g) + Kel
+end
+F_l = [1; F_2; 1.1·F_2; 1.2·F_2]
+n_F = 4
+U_F = zeros(2·n_n, n_F)
+P_A = zeros(7·n_e, n_F)
+C_F = zeros(n_F, 1)
+I_F = zeros(n_F, 1)
+M_F = zeros(n_F, 1)
+for i_F = 1:n_F
+  F_r = F_l(i_F)
+  p_r = atan(tan(f_g·pi/180)/F_r)
+  c_r = c/F_r
+  a_l = 2·sin(p_r)/(sqrt(3)·(3 + sin(p_r)))
+  k_d = 6·c_r·cos(p_r)/(sqrt(3)·(3 + sin(p_r)))
+  K_b = E_s/(3·(1 - 2·nu))
+  O_n = [1; 1; 1; 0]
+  P_d = [2/3, -1/3, -1/3, 0; -1/3, 2/3, -1/3, 0; -1/3, -1/3, 2/3, 0; 0, 0, 0, 1]
+  n_g = 7·n_e
+  S_g = zeros(4·n_g, 1)
+  P_l = zeros(n_g, 1)
+  D_g = zeros(4·n_g, 4)
+  for i = 1:n_g
+    D_g(4·(i - 1) + 1:4·i, 1:4) = D_e
+  end
+  u = zeros(2·n_n, 1)
+  A_d = zeros(length(L_g), 1)
+  F_f = F(L_g)
+  Fint = zeros(2·n_n, 1)
+  c_v = 0
+  i_t = 0
+  H_n = zeros(40, 4)
+  while c_v == 0
+    i_t = i_t + 1
+    K_t = zeros(2·n_n, 2·n_n)
+    for e = 1:n_e
+      g = zeros(12, 1)
+      for a = 1:6
+        g(2·a - 1) = 2·E_t(e, a) - 1
+        g(2·a) = 2·E_t(e, a)
+      end
+      Kel = zeros(12, 12)
+      for q = 1:7
+        i_g = 7·(e - 1) + q
+        B = B_s(4·(i_g - 1) + 1:4·i_g, 1:12)
+        Kel = Kel + transpose(B)·D_g(4·(i_g - 1) + 1:4·i_g, 1:4)·B·w_s(i_g)
+      end
+      K_t(g, g) = K_t(g, g) + Kel
+    end
+    R = F - Fint
+    d_u = zeros(2·n_n, 1)
+    d_u(L_g) = lsolve(K_t(L_g, L_g), R(L_g))
+    e_t = 1
+    for p_s = 1:2
+      F_q = zeros(2·n_n, 1)
+      for e = 1:n_e
+        g = zeros(12, 1)
+        for a = 1:6
+          g(2·a - 1) = 2·E_t(e, a) - 1
+          g(2·a) = 2·E_t(e, a)
+        end
+        for q = 1:7
+          i_g = 7·(e - 1) + q
+          B = B_s(4·(i_g - 1) + 1:4·i_g, 1:12)
+          s_t = S_g(4·(i_g - 1) + 1:4·i_g) + D_e·B·d_u(g)·e_t
+          I_1 = s_t(1) + s_t(2) + s_t(3)
+          s_m = I_1/3
+          s_d = s_t - s_m·O_n
+          J_2 = sqrt(max(0.5·(s_d(1)^2 + s_d(2)^2 + s_d(3)^2) + s_d(4)^2, 0))
+          f_y = J_2 + a_l·I_1 - k_d
+          D_p = D_e
+          if f_y > 1e-12
+            a_p = k_d/(3·a_l)
+            o_k = 0
+            if s_m < a_p
+              if J_2 > 1e-12
+                if J_2 - f_y >= 1e-12
+                  o_k = 1
+                end
+              end
+            end
+            if o_k == 1
+              b_t = (J_2 - f_y)/J_2
+              s_t = s_m·O_n + b_t·s_d
+              p_m = (s_t(1) + s_t(2) + s_t(3))/3
+              d_v = s_t - p_m·O_n
+              s_j = sqrt(max(0.5·(d_v(1)^2 + d_v(2)^2 + d_v(3)^2) + d_v(4)^2, 0))
+              w_v = [d_v(1); d_v(2); d_v(3); 2·d_v(4)]/(2·s_j)
+              n_v = w_v + a_l·O_n
+              X_i = K_b·O_n·transpose(O_n) + b_t·2·G_s·P_d
+              X_i(4, 4) = b_t·G_s
+              X_m = X_i·w_v
+              d_n = sum(n_v.*X_m)
+              D_p = X_i - X_m·(transpose(n_v)·X_i)/d_n
+            else
+              s_t = [a_p; a_p; a_p; 0]
+            end
+          end
+          if p_s == 2
+            P_l(i_g) = 0
+            if f_y > -0.005·(k_d + abs(a_l·I_1))
+              P_l(i_g) = 1
+            end
+            S_g(4·(i_g - 1) + 1:4·i_g) = s_t
+            D_g(4·(i_g - 1) + 1:4·i_g, 1:4) = D_p
+          end
+          F_q(g) = F_q(g) + transpose(B)·s_t·w_s(i_g)
+        end
+      end
+      if p_s == 1
+        R_1 = F(L_g) - F_q(L_g)
+        s_0 = sum(d_u(L_g).*R(L_g))
+        s_1 = sum(d_u(L_g).*R_1)
+        n_0 = sqrt(sum((R(L_g)).*(R(L_g))))
+        n_1 = sqrt(sum((R_1).*(R_1)))
+        a_c = 1
+        if min(min(n_0, n_1), abs(s_0 - s_1)) > 1e-10
+          if n_1/n_0 >= 0.8
+            a_c = s_0/(s_0 - s_1)
+          end
+        end
+        e_t = min(max(a_c, 0.1), 1)
+      end
+    end
+    Fint = F_q
+    u = u + e_t·d_u
+    d_f = e_t·d_u(L_g)
+    A_d = A_d + d_f
+    R_f = F(L_g) - Fint(L_g)
+    e_u = sqrt(sum((d_f).*(d_f)))
+    e_f = sqrt(sum((R_f).*(R_f)))/sqrt(sum((F_f).*(F_f)))
+    e_e = sqrt(abs(sum(d_f.*R_f)))/sqrt(abs(sum(A_d.*F_f)))
+    H_n(i_t, 1) = e_t
+    H_n(i_t, 2) = e_u
+    H_n(i_t, 3) = e_f
+    H_n(i_t, 4) = e_e
+    if max(max(e_u, e_f), e_e) < 0.01
+      c_v = 1
+    end
+    if i_t >= 12
+      c_v = 2
+    end
+  end
+  u_max = 0
+  for i = 1:n_n
+    u_max = max(u_max, sqrt(u(2·i - 1)^2 + u(2·i)^2))
+  end
+  U_F(1:2·n_n, i_F) = u
+  P_A(1:7·n_e, i_F) = P_l
+  C_F(i_F) = c_v
+  I_F(i_F) = i_t
+  M_F(i_F) = 1000·u_max
+end
+k_v = 1
+for i_F = 2:n_F
+  if C_F(i_F) == 1
+    if k_v == i_F - 1
+      k_v = i_F
+    end
+  end
+end
+d_U = zeros(n_n, 1)
+p_U = zeros(n_n, 1)
+c_U = zeros(n_n, 1)
+for i = 1:n_n
+  d_U(i) = 1000·sqrt((U_F(2·i - 1, k_v) - U_F(2·i - 1, 1))^2 + (U_F(2·i, k_v) - U_F(2·i, 1))^2)
+end
+for e = 1:n_e
+  p_e = 0
+  for q = 1:7
+    p_e = p_e + max(P_A(7·(e - 1) + q, k_v) - P_A(7·(e - 1) + q, 1), 0)/7
+  end
+  for a = 1:6
+    p_U(E_t(e, a)) = p_U(E_t(e, a)) + p_e
+    c_U(E_t(e, a)) = c_U(E_t(e, a)) + 1
+  end
+end
+for i = 1:n_n
+  p_U(i) = p_U(i)/c_U(i)
+end
+u_1 = zeros(n_n, 1)
+for i = 1:n_n
+  u_1(i) = 1000·sqrt(U_F(2·i - 1, 1)^2 + U_F(2·i, 1)^2)
+end
+#show
+n_nudos = n_n
+n_triangulos = n_e
+#: **La malla generada** (cada triángulo coloreado con |u| con F = 1, en mm; pasa el cursor):
+#campo(X_n, Y_n, E_t, u_1)
+#: **Newton para cada F** (1 = converge, 2 = NO converge en 12 iteraciones) y |u| máximo en mm:
+#tabla("F:3","¿converge?:0","iteraciones:0","|u| máx [mm]:3")(F_l; C_F; I_F; M_F)
+F_FEM = F_l(k_v) 'último F que todavía converge (el FS por elementos finitos está entre este y el siguiente) [-]
+#: **La SUPERFICIE DE FALLA no lineal:** los puntos de Gauss que están SOBRE el cono (f ≥ −0.5 % de la resistencia; un punto que ya fluyó queda justo en f ≈ 0) y que pasan a plásticos al debilitar el suelo de F = 1 hasta el último F que converge (fracción de los 7 de cada triángulo, promediada en los nudos). La banda roja que une el PIE con la CORONA es el mecanismo. Pasa el cursor:
+#campo(X_n, Y_n, E_t, p_U)
+#: **La cuña que desliza:** Δu = |u(F) − u(1)| con el último F que converge [mm]:
+#campo(X_n, Y_n, E_t, d_U)
+#: Cambia H, la pendiente, c o φ arriba y la malla, los mapas y la banda de falla se rehacen solos.

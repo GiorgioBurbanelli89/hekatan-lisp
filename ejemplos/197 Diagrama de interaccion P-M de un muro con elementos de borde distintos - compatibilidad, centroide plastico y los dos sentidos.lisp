@@ -22,7 +22,7 @@ C_c = Simplify{0.85*f_c*(t_1*s_1 + t_w*s_2 + t_2*s_3)}
 P_n = Simplify{C_c + A_1*f_1 + A_2*f_2}
 M_n = Simplify{C_c*(x_p - x_c) + A_1*f_1*(x_p - x_1) + A_2*f_2*(x_p - x_2)}
 #: (con todas las barras es Σ Aᵢ·fᵢ; las barras dentro del bloque restan el concreto que desplazan: fᵢ − 0.85·f'c). **El centroide plástico** es donde actúa la carga axial máxima con todo el concreto y todo el acero en fluencia:
-Z_p = Simplify{(0.85*f_c*(A_g - A_st)*x_g + f_y*S_x)/(0.85*f_c*(A_g - A_st) + f_y*A_st)}
+#: **x_pc = [0.85·f'c·(A_g·x_g − S_x) + f_y·S_x] / [0.85·f'c·(A_g − A_st) + f_y·A_st]**
 #: (S_x = Σ Aᵢ·xᵢ del acero, con el centro del concreto corregido por las barras). **Compresión pura** y **factor φ** de ACI según la deformación ε_t del acero más traccionado:
 P_0 = Simplify{0.85*f_c*(A_g - A_st) + f_y*A_st}
 p_f = Simplify{0.65 + 0.25*(e_t - e_y)/(0.005 - e_y)}

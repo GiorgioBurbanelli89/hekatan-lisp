@@ -89,6 +89,50 @@ k_b = Simplify{Diff{k*delta/(1 + k*delta/N_u) @ delta}}
 #  texto(2.2, -0.75, "N(d)", 2.2, "c")
 #  cota(0, -1.2, 3, -1.2, 0, "d = ? (alargamiento)")
 #fin
+#: **Antes: ¿de dónde sale la serie de Taylor?** Newton la usa; aquí se deduce, partiendo de lo que ya se sabe.
+#: **¿Qué sé?** (1) Una recta, y = m·x + b, es fácil: b es su valor y m su pendiente. (2) La **derivada** f′(x) es la pendiente de la curva en x; la **segunda derivada** f″(x) dice cuánto cambia esa pendiente (la curvatura).  **¿Qué quiero?** Cambiar una curva complicada f(x) por algo fácil que se le **pegue cerca de un punto a**. Lo más fácil después de la recta es un **polinomio** (solo sumas y productos). La curva de ejemplo, f(x) = sen x cerca de a = 1, y su recta tangente (pasa el cursor):
+#fplot(f = sin(x), tangente = 0.841471 + 0.540302*(x - 1), [-1 4])
+#: **¿Qué propongo?** Un polinomio en potencias de (x − a), con coeficientes c₀, c₁, c₂, c₃ que no se conocen:  p(x) = c₀ + c₁·(x − a) + c₂·(x − a)² + c₃·(x − a)³.  **¿Qué exijo?** Que p y f sean iguales **en el punto a**: el mismo valor, la misma pendiente, la misma curvatura, … El motor pone x = a (Limit con x → a) y deriva. **Mismo valor:** en x = a cada (x − a) vale 0 y solo sobrevive c₀:
+p_0 = Limit{c_0 + c_1*(x - a) + c_2*(x - a)^2 + c_3*(x - a)^3 @ x = a}
+#: ⇒ **c₀ = f(a)**. Para derivar cómodo llamo t = x − a (dt/dx = 1, así que derivar en t es derivar en x; y x = a es t = 0): p = c₀ + c₁·t + c₂·t² + c₃·t³. **Misma pendiente:** derivo una vez:
+p_1 = Diff{c_0 + c_1*t + c_2*t^2 + c_3*t^3 @ t}
+#: En t = 0 solo sobrevive c₁ ⇒ **c₁ = f′(a)**: c₀ + c₁·(x − a) es la recta tangente (y = m·x + b con b = f(a) y m = f′(a)). **Misma curvatura:** derivo dos veces; el 2 del cuadrado «baja»:
+p_2 = Diff{Diff{c_0 + c_1*t + c_2*t^2 + c_3*t^3 @ t} @ t}
+#: En t = 0: 2·c₂ = f″(a) ⇒ **c₂ = f″(a)/2**. Tres derivadas: baja 3·2·1 = 6:
+p_3 = Diff{Diff{Diff{c_0 + c_1*t + c_2*t^2 + c_3*t^3 @ t} @ t} @ t}
+#: ⇒ 6·c₃ = f‴(a) ⇒ **c₃ = f‴(a)/6**. **El patrón (por qué aparece el factorial):** derivar (x − a)ⁿ n veces deja n·(n − 1)···2·1 = **n!** (n factorial). El motor con n = 4 y n = 5:
+F_4 = Simplify{Diff{Diff{Diff{Diff{(x - a)^4 @ x} @ x} @ x} @ x}}
+F_5 = Simplify{Diff{Diff{Diff{Diff{Diff{(x - a)^5 @ x} @ x} @ x} @ x} @ x}}
+#: **¿Qué sale?**  **cₙ = f⁽ⁿ⁾(a)/n!**  y  **f(x) ≈ f(a) + f′(a)·(x − a) + f″(a)/2!·(x − a)² + f‴(a)/3!·(x − a)³ + …**  Esa es la serie de Taylor: no se inventa, se **exige**.
+#: **Con el seno, alrededor de a = 0.** El motor deriva: sen, cos, −sen, −cos y se repite:
+s_1 = Diff{sin(x) @ x}
+s_2 = Diff{Diff{sin(x) @ x} @ x}
+s_3 = Diff{Diff{Diff{sin(x) @ x} @ x} @ x}
+s_4 = Diff{Diff{Diff{Diff{sin(x) @ x} @ x} @ x} @ x}
+#: En x = 0 valen 0, 1, 0, −1, 0, 1, … Solo sobreviven las potencias impares: **sen x ≈ x − x³/3! + x⁵/5! − x⁷/7!** (3! = 6, 5! = 120, 7! = 5040). El orden 2 es igual al 1 porque sen″(0) = 0. El motor lo confirma:
+T_s = Taylor{sin(x) @ x = 0 : 7}
+#: Cada término más, el polinomio se pega **más lejos** de 0 (pasa el cursor: valor de cada curva en x):
+#fplot(sen = sin(x), orden_1 = x, orden_3 = x - x^3/6, orden_5 = x - x^3/6 + x^5/120, orden_7 = x - x^3/6 + x^5/120 - x^7/5040, [-3.5 3.5])
+#: **Lo que se corta: el resto (Lagrange).** f(x) = pₙ(x) + Rₙ(x), con Rₙ(x) = f⁽ⁿ⁺¹⁾(ξ)/(n + 1)!·(x − a)ⁿ⁺¹ y ξ algún punto entre a y x. Para el seno |f⁽ⁿ⁺¹⁾| ≤ 1, así que |Rₙ| ≤ |x|ⁿ⁺¹/(n + 1)!. El error real en x = 1 y en x = 2:
+E_1 = 1*[abs(sin(1) - 1), 1/2; abs(sin(1) - (1 - 1/6)), 1/24; abs(sin(1) - (1 - 1/6 + 1/120)), 1/720; abs(sin(1) - (1 - 1/6 + 1/120 - 1/5040)), 1/40320] 'x = 1: [error, cota] para n = 1, 3, 5, 7
+E_2 = 1*[abs(sin(2) - 2), 2^2/2; abs(sin(2) - (2 - 8/6)), 2^4/24; abs(sin(2) - (2 - 8/6 + 32/120)), 2^6/720; abs(sin(2) - (2 - 8/6 + 32/120 - 128/5040)), 2^8/40320] 'x = 2: [error, cota]
+#: El error siempre queda bajo la cota; en x = 1, con 7 términos, es 2.7·10⁻⁶; lejos de a (x = 2) hacen falta más términos.
+#: **¿Para qué sirve?** (a) **Newton** = Taylor cortado en el término lineal (lo que sigue en esta sección). (b) Lo que Newton tira, ½·f″·Δ², es lo que hace que converja **al cuadrado**. (c) **Gauss** integra exacto los polinomios, y una función suave se parece a su polinomio de Taylor: por eso Gauss funciona (∫ eˣ de −1 a 1 = 2.3504; Gauss con 2 puntos, exacto hasta x³: 2.3427). (d) **Péndulo / deformaciones pequeñas:** sen θ ≈ θ (a 10°: 0.17453 contra 0.17365, 0.51 %). (e) **La barra** de las hojas 198 y 203: N(d) = k·d/(1 + k·d/Nᵤ); sus coeficientes con Diff (para d > 0):
+N_1d = Simplify{Diff{k*x/(1 + k*x/N_u) @ x}}
+N_2d = Simplify{Diff{Diff{k*x/(1 + k*x/N_u) @ x} @ x}}
+N_3d = Simplify{Diff{Diff{Diff{k*x/(1 + k*x/N_u) @ x} @ x} @ x}}
+#: En d = 0 los denominadores valen Nᵤ², Nᵤ³ y Nᵤ⁴: N′ = k, N″ = −2k²/Nᵤ, N‴ = 6k³/Nᵤ²; divididos entre 1!, 2! y 3!: c₁ = k, c₂ = −k²/Nᵤ, c₃ = k³/Nᵤ². Con números, el motor lo confirma:
+T_N = Taylor{20*x/(1 + 20*x/300) @ x = 0 : 3}
+#: ⇒ **N(d) ≈ k·d − k²·d²/Nᵤ + k³·d³/Nᵤ² − …** Con k = 20 kN/mm y Nᵤ = 300 kN: 20·d − (4/3)·d² + (4/45)·d³ − …; por eso R = P − N = 240 − 20·d + (4/3)·d² − …, justo lo que sale en el paso 1.
+#: **Dos variables (solo lo lineal).** Si me muevo Δ x y Δ y, la función cambia lo que sube en x más lo que sube en y: **f(x + Δ x, y + Δ y) ≈ f + f_x·Δ x + f_y·Δ y**, con f_x = ∂f/∂x y f_y = ∂f/∂y (las pendientes en cada dirección). Eso es un **plano**: el plano tangente. Ejemplo f = 1 + x² + y²/2 en (1, 1):
+f_x = Partial{1 + x^2 + y^2/2 @ x}
+f_y = Partial{1 + x^2 + y^2/2 @ y}
+#: En (1, 1): f = 2.5, f_x = 2, f_y = 1 ⇒ plano **z = 2.5 + 2·(x − 1) + (y − 1)**. Lo que se tira es exactamente Δ x² + Δ y²/2 (el motor resta):
+R_pl = Expand{(1 + (1 + u)^2 + (1 + w)^2/2) - (2.5 + 2*u + w)}
+#: La superficie y su plano tangente en (1, 1) (arrastra para girar; pasa el cursor):
+#surf(f = 1 + x^2 + y^2/2, plano = 2.5 + 2*(x - 1) + (y - 1), [-0.5 2], [-0.5 2.5], punto = [1 1 2.5])
+#: Con varios residuos R₁, R₂, …, esas pendientes ∂Rᵢ/∂uⱼ forman una matriz, el **jacobiano**: R(u + Δ u) ≈ R − Kₜ·Δ u. Es la Kₜ de Newton para sistemas (más abajo).
+#: **Ahora sí, Taylor aplicado a Newton.**
 #: **Paso 1 · Taylor.** Toda curva suave, cerca de dₖ, se escribe como una suma: su valor, más la pendiente por el paso, más la curvatura por el paso al cuadrado, …  **R(dₖ + Δ d) = R(dₖ) + R′(dₖ)·Δ d + ½·R″(dₖ)·Δ d² + …**  El motor lo hace con la ley de la barra alrededor de d = 0 (orden 2; k = 20 kN/mm, Nᵤ = 300 kN, P = 240 kN):
 T_0 = Taylor{240 - 20*x/(1 + 20*x/300) @ x = 0 : 2}
 #: Los dos primeros términos, **240 − 20·d**, son la recta tangente en d = 0; el tercero, (4/3)·d², es la curvatura que Newton desprecia.

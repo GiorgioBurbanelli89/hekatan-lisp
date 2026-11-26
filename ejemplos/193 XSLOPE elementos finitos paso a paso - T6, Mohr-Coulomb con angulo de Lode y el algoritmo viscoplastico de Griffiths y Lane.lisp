@@ -26,7 +26,7 @@ s_m = Simplify{(s_x + s_y + s_z)/3}
 d_s = Simplify{sqrt(((s_x - s_y)^2 + (s_y - s_z)^2 + (s_z - s_x)^2 + 6*t^2)/2)}
 #: **Mohr-Coulomb escrito con invariantes** (Smith y Griffiths, «MOCOUF»): el suelo aguanta mientras f ≤ 0. Con la resistencia ya dividida por F:
 f_MC = Simplify{s_m*sin(phi) + d_s*(cos(theta)/sqrt(3) - sin(theta)*sin(phi)/3) - c*cos(phi)}
-#: con c_F = c/F y tan φ_F = tan φ/F. El ángulo de Lode es lo que hace del cono un hexágono: en θ = −30° (compresión) y +30° (extensión) el suelo resiste distinto.
+#: con c_F = c/F y tan φ_F = tan φ/F. El ángulo de Lode es lo que hace del cono un hexágono: con esta convención (tracción positiva, sin 3θ = −13.5·J₃/σ̄³) la compresión triaxial es θ = +30° y la extensión θ = −30°, y el suelo resiste distinto.
 #: **Si f > 0: deformación viscoplástica.** En cada iteración el punto crece su deformación plástica Δε_vp = Δt·f·∂Q/∂σ, con Q el mismo Mohr-Coulomb pero con ψ = 0 (sin dilatancia, «MOCOUQ»). ∂Q/∂σ = C₂·a₂ + C₃·a₃, con a₂ = ∂σ̄/∂σ, a₃ = ∂J₃/∂σ y:
 C_2 = Simplify{cos(theta)/sqrt(3) + sin(theta)*sin(3*theta)/(sqrt(3)*cos(3*theta))}
 C_3 = Simplify{9*sin(theta)/(2*sqrt(3)*cos(3*theta)*d^2)}
@@ -346,7 +346,7 @@ U_f = [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0
 #campo(X_n, Y_n, E_t, U_f)
 
 ## 6 · Mohr-Coulomb con el ángulo de Lode (2D y 3D)
-#: El desviador que aguanta el suelo antes de fluir, σ̄ = (c·cos φ + p·sin φ)/(cos θ/√3 − sin θ·sin φ/3), según la presión p = −σ_m y el ángulo de Lode θ. A θ = −30° (compresión triaxial) aguanta más que a +30° (extensión): eso es el hexágono de Mohr-Coulomb. Pasa el cursor:
+#: El desviador que aguanta el suelo antes de fluir, σ̄ = (c·cos φ + p·sin φ)/(cos θ/√3 − sin θ·sin φ/3), según la presión p = −σ_m y el ángulo de Lode θ. A θ = +30° (compresión triaxial: J₃ < 0) aguanta más que a −30° (extensión): eso es el hexágono de Mohr-Coulomb. Pasa el cursor:
 s_L(x, y) = (c·cos(fi) + x·sin(fi))/(cos(y·pi/180)/sqrt(3) - sin(y·pi/180)·sin(fi)/3)
 #map(s_L(x, y), [0 200], [-30 30])
 #surf(s_L(x, y), [0 200], [-30 30])

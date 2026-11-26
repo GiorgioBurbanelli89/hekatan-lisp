@@ -48,7 +48,8 @@
 #  texto(4, -0.8, "Q8 serendípito", 2.6, "c")
 #  texto(7, -0.8, "Q9 Lagrange", 2.6, "c")
 #fin
-#: Coordenadas de los nudos en el cuadrado de referencia: esquinas 1 (−1, −1), 2 (+1, −1), 3 (+1, +1), 4 (−1, +1); mitades 5 (0, −1), 6 (+1, 0), 7 (0, +1), 8 (−1, 0); centro 9 (0, 0). La letra dice la forma (Q = cuadrilátero) y el número, cuántos nudos.
+#: #: **De dónde se parte (nada «porque sí»).** **¿Qué sé?** el desplazamiento de cada nudo (es lo que resuelve K·u = F). **¿Qué quiero?** saberlo en cualquier punto de adentro. **¿Qué propongo?** un polinomio con **tantas constantes como nudos** (4, 8 o 9), con los términos más bajos del triángulo de Pascal y tratando igual a ξ y a η. **¿Qué exijo?** que en cada nudo valga el desplazamiento de ese nudo: eso arma C·a = u. **¿Qué sale?** a = C⁻¹·u, y lo que multiplica a cada uᵢ es Nᵢ. **¿Para qué?** sus derivadas dan la deformación (B = ∂N/∂x) y con ella la rigidez K = ∫Bᵀ·D·B dA. **¿Por qué ξ y η?** para no repetir la cuenta en cada elemento, todo se hace una vez en un cuadrado de referencia (ξ, η de −1 a +1) y el Jacobiano (sección 5) lo estira al elemento real.
+Coordenadas de los nudos en el cuadrado de referencia: esquinas 1 (−1, −1), 2 (+1, −1), 3 (+1, +1), 4 (−1, +1); mitades 5 (0, −1), 6 (+1, 0), 7 (0, +1), 8 (−1, 0); centro 9 (0, 0). La letra dice la forma (Q = cuadrilátero) y el número, cuántos nudos.
 
 ## 1 · Q4: del polinomio a N con la matriz C
 #: **Idea:** dentro del elemento el movimiento es un polinomio con tantos coeficientes como nudos: u = a₀ + a₁ξ + a₂η + a₃ξη. Si se piden los 4 valores de los nudos, sale un sistema C·a = u, donde cada fila de C es la base [1, ξ, η, ξη] evaluada en un nudo:

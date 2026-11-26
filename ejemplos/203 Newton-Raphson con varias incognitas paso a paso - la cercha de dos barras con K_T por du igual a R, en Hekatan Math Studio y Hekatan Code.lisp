@@ -1,4 +1,4 @@
-# Newton-Raphson con varias incógnitas, paso a paso: cómo se calcula a mano y en Hekatan Math Studio la cercha de 2 barras con K_T·Δ u = R
+# Newton-Raphson con varias incógnitas, paso a paso: cómo se calcula a mano y en Hekatan Math Studio la cercha de 2 barras con Kₜ·Δu = R
 #numerico
 
 ## 1 · El objeto: una cercha de dos barras que se ablandan
@@ -45,7 +45,7 @@ k_b = Simplify{Diff{k*delta/(1 - k*delta/N_u) @ delta}}
 #: Cada barra empuja a C con su fuerza N en su dirección (c, s). Con δ = c·u₁ + s·u₂ dentro de N:
 f_b = Simplify{k*(c*u_1 + s*u_2)/(1 - k*(c*u_1 + s*u_2)/N_u)*[c; s]}
 #: y **f_int(u) = f_AC + f_BC** (la suma de las dos barras).
-### 2.4 · La matriz tangente K_T = ∂f_int/∂u (el motor deriva)
+### 2.4 · La matriz tangente Kₜ = ∂fᵢₙₜ/∂u (el motor deriva)
 #: Con una incógnita, Newton usaba la pendiente k_T. Con dos, la «pendiente» es una **matriz 2×2**: cuánto cambia cada fuerza interna si se mueve cada incógnita. Derivando la fuerza de una barra:
 g_11 = Simplify{Diff{k*(c*u_1 + s*u_2)/(1 - k*(c*u_1 + s*u_2)/N_u)*c @ u_1}}
 g_12 = Simplify{Diff{k*(c*u_1 + s*u_2)/(1 - k*(c*u_1 + s*u_2)/N_u)*c @ u_2}}
@@ -53,7 +53,7 @@ g_22 = Simplify{Diff{k*(c*u_1 + s*u_2)/(1 - k*(c*u_1 + s*u_2)/N_u)*s @ u_2}}
 #: Las tres tienen el mismo factor: k·N_u²/(…)² = **t**, la rigidez tangente de la barra (2.2). Queda la matriz de una barra inclinada, y la de la cercha es la suma de las dos barras:
 K_e = Simplify{t*[c^2, c*s; c*s, s^2]}
 #: **K_T = K_AC + K_BC**, cada una con su t, c y s (regla de la cadena: ∂N/∂u = t·∂δ/∂u = t·[c, s]).
-### 2.5 · El paso de Newton: resolver K_T·Δ u = R
+### 2.5 · El paso de Newton: resolver Kₜ·Δu = R
 #: Con una incógnita: Δ d = R/k_T. Con dos: **Δ u = K_T⁻¹·R**. La inversa de una matriz 2×2 simétrica [a b; b e]:
 K_i = Simplify{inv([a, b; b, e])}
 #: (se cambian a y e de lugar, se cambia el signo de b y se divide por el determinante a·e − b²). Multiplicada por el residuo R = (R₁, R₂):
@@ -87,7 +87,7 @@ N_a(x, y) = k_1*d_a(x, y)/(1 + k_1*abs(d_a(x, y))/N_u) 'fuerza en AC [kN]
 N_b(x, y) = k_2*d_b(x, y)/(1 + k_2*abs(d_b(x, y))/N_u) 'fuerza en BC [kN]
 t_a(x, y) = k_1/(1 + k_1*abs(d_a(x, y))/N_u)^2 'rigidez tangente de AC [kN/mm]
 t_b(x, y) = k_2/(1 + k_2*abs(d_b(x, y))/N_u)^2 'rigidez tangente de BC [kN/mm]
-f_i(x, y) = [N_a(x, y)*c_1 + N_b(x, y)*c_2; N_a(x, y)*s_1 + N_b(x, y)*s_2] 'fuerzas internas f_int [kN]
+f_i(x, y) = [N_a(x, y)*c_1 + N_b(x, y)*c_2; N_a(x, y)*s_1 + N_b(x, y)*s_2] 'fuerzas internas fᵢₙₜ [kN]
 K_T(x, y) = [t_a(x, y)*c_1^2 + t_b(x, y)*c_2^2, t_a(x, y)*c_1*s_1 + t_b(x, y)*c_2*s_2; t_a(x, y)*c_1*s_1 + t_b(x, y)*c_2*s_2, t_a(x, y)*s_1^2 + t_b(x, y)*s_2^2] 'matriz tangente [kN/mm]
 F_v = [H_x; -P_y] 'cargas en C [kN]
 #: **Primero lo LINEAL** (un solo paso con la K inicial, la de u = 0):
@@ -99,46 +99,46 @@ u_L = lsolve(K_0, F_v) 'u lineal [mm]
 #: Cada vuelta repite los pasos 2 a 6 del algoritmo. Se escriben una debajo de otra (desplegadas): así se ve cada número.
 v_0 = [0; 0] 'u₀: punto de partida [mm]
 #: **Vuelta 1** (desde u₀ = 0): las barras aún no trabajan, f_int = 0, así que R = F completo; K_T es la K lineal, y el primer paso da justo la respuesta lineal.
-r_0 = F_v - f_i(v_0(1), v_0(2)) 'R = F − f_int(u) [kN]
+r_0 = F_v - f_i(v_0(1), v_0(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_0 = sqrt(r_0(1)^2 + r_0(2)^2) '|R| [kN]
-T_0 = K_T(v_0(1), v_0(2)) 'K_T en ese u [kN/mm]
-w_0 = lsolve(T_0, r_0) 'Δu: se resuelve K_T·Δu = R [mm]
+T_0 = K_T(v_0(1), v_0(2)) 'Kₜ en ese u [kN/mm]
+w_0 = lsolve(T_0, r_0) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_1 = v_0 + w_0 'u nuevo = u + Δu [mm]
 #: **Vuelta 2:** con u₁ las barras ya se ablandaron: K_T es más chica (mira K_T₁₁ y K_T₂₂), y el nuevo paso baja más.
-r_1 = F_v - f_i(v_1(1), v_1(2)) 'R = F − f_int(u) [kN]
+r_1 = F_v - f_i(v_1(1), v_1(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_1 = sqrt(r_1(1)^2 + r_1(2)^2) '|R| [kN]
-T_1 = K_T(v_1(1), v_1(2)) 'K_T en ese u [kN/mm]
-w_1 = lsolve(T_1, r_1) 'Δu: se resuelve K_T·Δu = R [mm]
+T_1 = K_T(v_1(1), v_1(2)) 'Kₜ en ese u [kN/mm]
+w_1 = lsolve(T_1, r_1) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_2 = v_1 + w_1 'u nuevo = u + Δu [mm]
 #: **Vuelta 3:**
-r_2 = F_v - f_i(v_2(1), v_2(2)) 'R = F − f_int(u) [kN]
+r_2 = F_v - f_i(v_2(1), v_2(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_2 = sqrt(r_2(1)^2 + r_2(2)^2) '|R| [kN]
-T_2 = K_T(v_2(1), v_2(2)) 'K_T en ese u [kN/mm]
-w_2 = lsolve(T_2, r_2) 'Δu: se resuelve K_T·Δu = R [mm]
+T_2 = K_T(v_2(1), v_2(2)) 'Kₜ en ese u [kN/mm]
+w_2 = lsolve(T_2, r_2) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_3 = v_2 + w_2 'u nuevo = u + Δu [mm]
 #: **Vuelta 4:**
-r_3 = F_v - f_i(v_3(1), v_3(2)) 'R = F − f_int(u) [kN]
+r_3 = F_v - f_i(v_3(1), v_3(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_3 = sqrt(r_3(1)^2 + r_3(2)^2) '|R| [kN]
-T_3 = K_T(v_3(1), v_3(2)) 'K_T en ese u [kN/mm]
-w_3 = lsolve(T_3, r_3) 'Δu: se resuelve K_T·Δu = R [mm]
+T_3 = K_T(v_3(1), v_3(2)) 'Kₜ en ese u [kN/mm]
+w_3 = lsolve(T_3, r_3) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_4 = v_3 + w_3 'u nuevo = u + Δu [mm]
 #: **Vuelta 5:** el residuo ya es menos de 1 kN.
-r_4 = F_v - f_i(v_4(1), v_4(2)) 'R = F − f_int(u) [kN]
+r_4 = F_v - f_i(v_4(1), v_4(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_4 = sqrt(r_4(1)^2 + r_4(2)^2) '|R| [kN]
-T_4 = K_T(v_4(1), v_4(2)) 'K_T en ese u [kN/mm]
-w_4 = lsolve(T_4, r_4) 'Δu: se resuelve K_T·Δu = R [mm]
+T_4 = K_T(v_4(1), v_4(2)) 'Kₜ en ese u [kN/mm]
+w_4 = lsolve(T_4, r_4) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_5 = v_4 + w_4 'u nuevo = u + Δu [mm]
 #: **Vuelta 6:** R ≈ 0.0016 kN.
-r_5 = F_v - f_i(v_5(1), v_5(2)) 'R = F − f_int(u) [kN]
+r_5 = F_v - f_i(v_5(1), v_5(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_5 = sqrt(r_5(1)^2 + r_5(2)^2) '|R| [kN]
-T_5 = K_T(v_5(1), v_5(2)) 'K_T en ese u [kN/mm]
-w_5 = lsolve(T_5, r_5) 'Δu: se resuelve K_T·Δu = R [mm]
+T_5 = K_T(v_5(1), v_5(2)) 'Kₜ en ese u [kN/mm]
+w_5 = lsolve(T_5, r_5) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_6 = v_5 + w_5 'u nuevo = u + Δu [mm]
 #: **Vuelta 7:** R ≈ 3·10⁻⁸ kN: después de esta vuelta, |R| < 10⁻⁹ kN.
-r_6 = F_v - f_i(v_6(1), v_6(2)) 'R = F − f_int(u) [kN]
+r_6 = F_v - f_i(v_6(1), v_6(2)) 'R = F − fᵢₙₜ(u) [kN]
 n_6 = sqrt(r_6(1)^2 + r_6(2)^2) '|R| [kN]
-T_6 = K_T(v_6(1), v_6(2)) 'K_T en ese u [kN/mm]
-w_6 = lsolve(T_6, r_6) 'Δu: se resuelve K_T·Δu = R [mm]
+T_6 = K_T(v_6(1), v_6(2)) 'Kₜ en ese u [kN/mm]
+w_6 = lsolve(T_6, r_6) 'Δu: se resuelve Kₜ·Δu = R [mm]
 v_7 = v_6 + w_6 'u nuevo = u + Δu [mm]
 r_7 = F_v - f_i(v_7(1), v_7(2)) 'residuo final [kN]
 n_7 = sqrt(r_7(1)^2 + r_7(2)^2) '|R| final [kN]

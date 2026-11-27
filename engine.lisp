@@ -1737,30 +1737,37 @@
       (hk-dgemm-nativo a b m k n)))
 
 (defun hk-dgesv-nativo (a b n nrhs)
-  "Resuelve A·X = B por Gauss con pivoteo parcial (double). NIL si es singular."
+  "Resuelve A·X = B por Gauss con pivoteo parcial (double). NIL si es singular.
+   Indices declarados fixnum y productos (the fixnum ...): en ECL (web) sin esto cada indice pasaba
+   por aritmetica generica/GMP y cada double se encajonaba (la hoja 190 no terminaba). Mismas operaciones."
   (declare (type (simple-array double-float (*)) a b) (type fixnum n nrhs)
            (optimize (speed 3) (safety 0)))
-  (dotimes (c n b)
-    (let ((piv c) (mx (abs (aref a (+ (* c n) c)))))
-      (declare (type fixnum piv) (type double-float mx))
-      (loop for r fixnum from (1+ c) below n
-            do (let ((v (abs (aref a (+ (* r n) c))))) (when (> v mx) (setf mx v piv r))))
-      (when (< mx 1d-300) (return-from hk-dgesv-nativo nil))
-      (unless (= piv c)
-        (dotimes (j n) (rotatef (aref a (+ (* c n) j)) (aref a (+ (* piv n) j))))
-        (dotimes (j nrhs) (rotatef (aref b (+ (* c nrhs) j)) (aref b (+ (* piv nrhs) j)))))
-      (let ((d (aref a (+ (* c n) c))))
-        (loop for r fixnum from 0 below n unless (= r c)
-              do (let ((f (/ (aref a (+ (* r n) c)) d)))
-                   (declare (type double-float f))
-                   (unless (zerop f)
-                     (loop for j fixnum from c below n
-                           do (decf (aref a (+ (* r n) j)) (* f (aref a (+ (* c n) j)))))
-                     (dotimes (j nrhs)
-                       (decf (aref b (+ (* r nrhs) j)) (* f (aref b (+ (* c nrhs) j)))))))))))
-  (dotimes (r n b)
-    (let ((d (aref a (+ (* r n) r))))
-      (dotimes (j nrhs) (setf (aref b (+ (* r nrhs) j)) (/ (aref b (+ (* r nrhs) j)) d))))))
+  (macrolet ((ix (i k j) `(the fixnum (+ (the fixnum (* (the fixnum ,i) (the fixnum ,k))) (the fixnum ,j)))))
+    (dotimes (c n)
+      (declare (type fixnum c))
+      (let* ((w0 (aref a (ix c n c))) (piv c) (mx (abs w0)))
+        (declare (type double-float w0) (type fixnum piv) (type double-float mx))
+        (loop for r fixnum from (1+ c) below n
+              do (let* ((w (aref a (ix r n c))) (v (abs w))) (declare (type double-float w v)) (when (> v mx) (setf mx v piv r))))
+        (when (< mx 1d-300) (return-from hk-dgesv-nativo nil))
+        (unless (= piv c)
+          (dotimes (j n) (declare (type fixnum j)) (rotatef (aref a (ix c n j)) (aref a (ix piv n j))))
+          (dotimes (j nrhs) (declare (type fixnum j)) (rotatef (aref b (ix c nrhs j)) (aref b (ix piv nrhs j)))))
+        (let ((d (aref a (ix c n c))))
+          (declare (type double-float d))
+          (loop for r fixnum from 0 below n unless (= r c)
+                do (let ((f (/ (aref a (ix r n c)) d)))
+                     (declare (type double-float f))
+                     (unless (zerop f)
+                       (loop for j fixnum from c below n
+                             do (let ((x (aref a (ix r n j))) (y (aref a (ix c n j)))) (declare (type double-float x y)) (setf (aref a (ix r n j)) (- x (* f y)))))
+                       (loop for j fixnum from 0 below nrhs
+                             do (let ((x (aref b (ix r nrhs j))) (y (aref b (ix c nrhs j)))) (declare (type double-float x y)) (setf (aref b (ix r nrhs j)) (- x (* f y)))))))))))
+    (dotimes (r n b)
+      (declare (type fixnum r))
+      (let ((d (aref a (ix r n r))))
+        (declare (type double-float d))
+        (dotimes (j nrhs) (declare (type fixnum j)) (let ((x (aref b (ix r nrhs j)))) (declare (type double-float x)) (setf (aref b (ix r nrhs j)) (/ x d))))))))
 (defun hk-dgesv (a b n nrhs)
   "X de A·X = B (B se sobrescribe). MKL LAPACKE_dgesv si esta. NIL si A es singular."
   (if (hk-mkl-p)

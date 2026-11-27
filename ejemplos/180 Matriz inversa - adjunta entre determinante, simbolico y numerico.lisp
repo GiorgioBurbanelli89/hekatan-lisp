@@ -38,10 +38,10 @@ A_ninv = adj(A_n)/det(A_n) 'inversa = adjunta / determinante
 A_ninv2 = inv(A_n)
 #: Comprobación con números:
 I_n = A_n*inv(A_n)
-#: **Gráfica 2D: por qué det(A) no puede ser cero.** Si se cambia la entrada d de A_n = [4, 7; 2, d], el determinante es 4·d − 14 y la primera entrada de la inversa es d/(4·d − 14). En d = 3.5 el determinante vale **cero** y la inversa se **dispara** (división entre cero):
-#fplot(det_A = 4*x - 14, inv_11 = x/(4*x - 14), [0 7])
-#: **Gráfica 3D.** Con a y d libres, det = a·d − 14. Donde la superficie toca el plano 0 (la curva a·d = 14) la matriz **no tiene inversa**:
+#: **Gráfica 3D.** Si se cambian a y d en A_n = [a, 7; 2, d], el determinante es det = a·d − 14. Donde la superficie toca el plano 0 (la curva a·d = 14) la matriz **no tiene inversa**:
 #surf(det_A = x*y - 14, cero = 0, [0 8], [0 8])
+#: **Gráfica 2D (corte en a = 4): por qué det(A) no puede ser cero.** Cortando la superficie en a = 4 queda det = 4·d − 14 y la primera entrada de la inversa es d/(4·d − 14). En d = 3.5 el determinante vale **cero** y la inversa se **dispara** (división entre cero):
+#fplot(det_A = 4*x - 14, inv_11 = x/(4*x - 14), [0 7])
 
 ## 5 · Con números: matriz de 3 × 3
 B_n = [2, 0, 1; 1, 3, 2; 1, 1, 2]

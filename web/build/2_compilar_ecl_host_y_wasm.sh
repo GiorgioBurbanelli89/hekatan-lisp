@@ -12,6 +12,11 @@ source ./emsdk_env.sh >/dev/null 2>&1; emcc --version | head -1
 # 2) ECL wasm32
 cd ~/lispwasm && rm -rf ecl-wasm && cp -r ecl ecl-wasm && cd ecl-wasm
 export ECL_TO_RUN=$HOME/lispwasm/host/bin/ecl
+# 26-nov-2026: ECL trae -O0 fijo para emscripten (src/aclocal.m4) y setjmp/longjmp por trampolines JS (invoke_*):
+# 4-5x mas lento. Se compila con -O2 y setjmp/longjmp nativos de wasm (Chrome/Edge/Firefox/Safari actuales).
+EH="-fwasm-exceptions -sSUPPORT_LONGJMP=wasm"
+sed -i "s/-DECL_C_COMPATIBLE_VARIADIC_DISPATCH -O0/-DECL_C_COMPATIBLE_VARIADIC_DISPATCH -O2 $EH/" src/configure
+export LDFLAGS="$EH"
 emconfigure ./configure --host=wasm32-unknown-emscripten --build=x86_64-pc-linux-gnu \
   --with-cross-config=`pwd`/src/util/wasm32-unknown-emscripten.cross_config \
   --prefix=`pwd`/ecl-emscripten --disable-shared --with-tcp=no --with-cmp=no > ../wasm_conf.log 2>&1

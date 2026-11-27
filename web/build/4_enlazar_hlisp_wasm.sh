@@ -4,7 +4,7 @@ E=~/lispwasm/ecl-wasm/ecl-emscripten
 W="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd ~/lispwasm/hl
 file engine.o | head -1
-emcc "$W/hlisp_main.c" -I$E -O0 -DECL_C_COMPATIBLE_VARIADIC_DISPATCH -Demscripten \
+emcc "$W/hlisp_main.c" -I$E -O2 -fwasm-exceptions -sSUPPORT_LONGJMP=wasm -DECL_C_COMPATIBLE_VARIADIC_DISPATCH -Demscripten \
   libhlisp.a -L$E -lecl -leclgc -leclgmp -lm \
   -sSTACK_SIZE=1048576 -sBINARYEN_EXTRA_PASSES=--spill-pointers \
   -sINITIAL_MEMORY=402653184 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=1073741824 -sMODULARIZE=1 -sEXPORT_NAME=HLisp \
